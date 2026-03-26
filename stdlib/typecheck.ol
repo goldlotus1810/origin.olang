@@ -137,3 +137,27 @@ pub fn assert_range(_ar_v, _ar_lo, _ar_hi) {
     if _ar_v > _ar_hi { __throw("Value " + __to_string(_ar_v) + " above maximum " + __to_string(_ar_hi)); };
     return _ar_v;
 }
+
+// ── Unicode string utilities ──
+// ulen: count Unicode codepoints (not bytes)
+pub fn ulen(_ul_s) {
+    let _ul_pos = 0;
+    let _ul_count = 0;
+    while _ul_pos < len(_ul_s) {
+        let _ul_pos = _ul_pos + __utf8_len(_ul_s, _ul_pos);
+        let _ul_count = _ul_count + 1;
+    };
+    return _ul_count;
+};
+
+// uchar_at: get Unicode codepoint at character index (not byte index)
+pub fn uchar_at(_uc_s, _uc_idx) {
+    let _uc_pos = 0;
+    let _uc_i = 0;
+    while _uc_pos < len(_uc_s) {
+        if _uc_i == _uc_idx { return __utf8_cp(_uc_s, _uc_pos); };
+        let _uc_pos = _uc_pos + __utf8_len(_uc_s, _uc_pos);
+        let _uc_i = _uc_i + 1;
+    };
+    return 0;
+};
