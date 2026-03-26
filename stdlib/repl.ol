@@ -364,6 +364,11 @@ pub fn repl_eval(input) {
         if src == "chao" || src == "Chao" || src == "xin chao" || src == "Xin chao" { return smart_greet(stm_count()); };
         if src == "bye" || src == "Bye" || src == "tam biet" { return smart_goodbye(stm_count()); };
     };
+    // Try NL → code before agent_respond
+    let _re_nlcode = nl_to_code(src);
+    if len(_re_nlcode) > 0 {
+      return repl_eval(_re_nlcode);
+    };
     return agent_respond(src);
   }
 
