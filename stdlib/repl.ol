@@ -142,8 +142,11 @@ pub fn repl_eval(input) {
     return "No homeos.knowledge file found.";
   }
   if src == "help" {
-    return "Code: let fn emit if while for match lambda | HOF: map filter reduce pipe any all | AI: learn respond memory | test build exit";
+    return "Code: let fn emit if while for match lambda | HOF: map filter reduce pipe any all | AI: learn respond memory | Self: diagnose benchmark selftest | test build exit";
   }
+  if src == "diagnose" || src == "diag" { return self_diagnostic(); }
+  if src == "benchmark" || src == "bench" { return self_benchmark(); }
+  if src == "selftest" { return self_test(); }
 
   // Respond command: full agent pipeline with memory → response
   if len(src) > 8 {
