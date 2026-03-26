@@ -7883,6 +7883,18 @@ op_halt:
 
     # ── REPL loop: read line → compile → execute ─────────────────
 .repl_loop:
+    # Restore heap to previous checkpoint (free temp allocations from last turn)
+    lea     repl_heap_checkpoint(%rip), %rcx
+    mov     (%rcx), %rax
+    test    %rax, %rax
+    jz      .repl_skip_restore              # first turn: no checkpoint yet
+    mov     %rax, %r15                       # restore heap pointer
+.repl_skip_restore:
+    # Save heap checkpoint for this turn
+    mov     %r15, %rax
+    lea     repl_heap_checkpoint(%rip), %rcx
+    mov     %rax, (%rcx)
+
     # Print prompt: "⦿ "
     lea     msg_prompt(%rip), %rsi
     mov     $4, %edx                    # "⦿ " (⦿ is 3 bytes UTF-8 + space)
@@ -9027,6 +9039,9 @@ eval_bc_base:
     .space 8                            # eval bytecode base (for cross-boundary closure calls)
 eval_mode:
     .space 1                            # 0 = REPL mode, 1 = --eval mode (stdin)
+    .align 8
+repl_heap_checkpoint:
+    .space 8                            # heap pointer saved at REPL turn start
     .align 8
     .space 8                            # saved initial r14 for debug
 jz_did_pop:

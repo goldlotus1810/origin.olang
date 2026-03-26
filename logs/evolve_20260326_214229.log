@@ -1,0 +1,10 @@
+[21:42:29] === OLANG EVOLUTION STARTED ===
+[21:42:29] Binary: ./origin_new.olang (1166995 bytes)
+[21:42:29] 
+[21:42:29] === GENERATION 1 ===
+[21:42:29] Benchmarking...
+[21:42:29]   fib(30) interp: timeoutms
+[21:42:29]   loop 1M:        timeoutms
+[21:42:29]   SHA×1000:        timeoutms
+[21:42:29]   fib(30) JIT:     timeoutms
+[21:42:29] Testing...
