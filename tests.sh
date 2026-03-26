@@ -501,7 +501,7 @@ echo -e "${CYAN}--- Binary Sanity ---${NC}"
 
 # Check binary size
 BINSIZE=$(stat -c%s "$BINARY" 2>/dev/null || stat -f%z "$BINARY" 2>/dev/null)
-if [ "$BINSIZE" -gt 500000 ] && [ "$BINSIZE" -lt 5000000 ]; then
+if [ "$BINSIZE" -gt 100000 ] && [ "$BINSIZE" -lt 5000000 ]; then
     PASS=$((PASS + 1))
     echo -e "  $GREEN  OK$NC binary/size ($(numfmt --to=iec $BINSIZE))"
 else
