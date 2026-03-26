@@ -16,6 +16,8 @@ let _ce_stack = __array_with_cap(512);
 let _if_stack = __array_with_cap(512);
 let _break_patches = [];
 let _continue_patches = [];
+let _ce_locals = __array_with_cap(256);
+let _ce_lc = [0];
 let _g_output = [];
 let _g_pos = 0;
 let _g_for_depth = 0;
@@ -1471,7 +1473,21 @@ fn compile_stmt(state, stmt) {
             push(_ce_stack, _ls_name);
             compile_expr(state, value);
             let _ls_name = pop(_ce_stack);
-            emit_op(state, make_op_name("Store", _ls_name));
+            // Check if variable already defined → StoreUpdate (update in place)
+            let _ls_found = 0;
+            let _ls_li = 0;
+            let _ls_cnt = __array_get(_ce_lc, 0);
+            while _ls_li < _ls_cnt {
+                if __array_get(_ce_locals, _ls_li) == _ls_name { let _ls_found = 1; };
+                let _ls_li = _ls_li + 1;
+            };
+            if _ls_found == 1 {
+                emit_op(state, make_op_name("StoreUpdate", _ls_name));
+            } else {
+                emit_op(state, make_op_name("Store", _ls_name));
+                let _ = set_at(_ce_locals, _ls_cnt, _ls_name);
+                let _ = set_at(_ce_lc, 0, _ls_cnt + 1);
+            };
         },
         Stmt::FnDef { name, params, body } => {
             // Save name/params before body compilation (body may overwrite "name")
@@ -1861,6 +1877,8 @@ fn validate(state) {
 
 pub fn analyze(ast) {
     let state = new_state();
+    // Reset locals tracking for fresh compilation
+    let _ = set_at(_ce_lc, 0, 0);
 
     // Pass 1: Collect function definitions
     collect_fns(state, ast);

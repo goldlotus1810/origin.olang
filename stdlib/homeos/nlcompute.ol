@@ -101,7 +101,7 @@ pub fn nl_to_code(_nc_input) {
         let _nc_n = _nl_num_after(_nc_s, "fibonacci");
         if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "fib"); };
         if _nc_n > 0 {
-            return "let _nf = jit_fib(); emit __call_native(_nf, " + __to_string(_nc_n) + ");";
+            return "fn _fib(n) { if n < 2 { return n; }; return _fib(n-1) + _fib(n-2); }; emit _fib(" + __to_string(_nc_n) + ");";
         };
     };
 
@@ -120,7 +120,7 @@ pub fn nl_to_code(_nc_input) {
         if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "under"); };
         if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "duoi"); };
         if _nc_n > 0 {
-            return "emit filter(__array_range(" + __to_string(_nc_n) + "), fn(n) { if n < 2 { return 0; }; let d = 2; if d * d > n { return 1; }; if n % d == 0 { return 0; }; let d = 3; if d * d > n { return 1; }; if n % d == 0 { return 0; }; let d = 5; if d * d > n { return 1; }; if n % d == 0 { return 0; }; let d = 7; if d * d > n { return 1; }; if n % d == 0 { return 0; }; let d = 11; if d * d > n { return 1; }; if n % d == 0 { return 0; }; return 1; });";
+            return "fn _is_p(n) { if n < 2 { return 0; }; let d = 2; while d * d <= n { if n % d == 0 { return 0; }; let d = d + 1; }; return 1; }; let r = []; let i = 2; while i < " + __to_string(_nc_n) + " { if _is_p(i) == 1 { let _ = push(r, i); }; let i = i + 1; }; emit r;";
         };
     };
 
