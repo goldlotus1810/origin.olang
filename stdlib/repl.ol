@@ -347,6 +347,12 @@ pub fn repl_eval(input) {
     if _re_2 == "re" { _re_is_code = 1; };
     if _re_2 == "__" { _re_is_code = 1; };
     if _re_2 == "us" { _re_is_code = 1; };  // use "module.ol"
+    if _re_2 == "as" { _re_is_code = 1; };  // assert_type, assert_eq
+    if _re_2 == "co" { _re_is_code = 1; };  // contract, contains
+    if _re_2 == "se" { _re_is_code = 1; };  // set_at
+    if _re_2 == "so" { _re_is_code = 1; };  // sort
+    if _re_2 == "fi" { _re_is_code = 1; };  // filter
+    if _re_2 == "pi" { _re_is_code = 1; };  // pipe
   };
 
   // Not code → classify: greeting / question / chat
@@ -425,6 +431,17 @@ pub fn is_olang_code(input) {
   if first_type == "Return" { return true; }
   if first_type == "Pub" { return true; }
   if first_type == "Emit" { return true; }
+
+  // Ident followed by ( → function call → code
+  if first_type == "Ident" {
+    let _ioc_i = 0;
+    while _ioc_i < len(src) {
+      let _ioc_c = __char_code(char_at(src, _ioc_i));
+      if _ioc_c == 40 { return true; };
+      if _ioc_c == 32 { let _ioc_i = len(src); };
+      let _ioc_i = _ioc_i + 1;
+    };
+  };
 
   // Check for ○{...} command syntax
   if len(src) >= 4 {

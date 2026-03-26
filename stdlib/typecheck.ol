@@ -43,7 +43,8 @@ pub fn assert_type(_at_val, _at_expected) {
 // contract(name, predicate, value) → value if predicate(value) is true, throws otherwise
 
 pub fn contract(_ct_name, _ct_pred, _ct_val) {
-    if _ct_pred(_ct_val) != 1 {
+    let _ct_r = _ct_pred(_ct_val);
+    if _ct_r < 1 {
         __throw("Contract violation: " + _ct_name + " failed for value " + __to_string(_ct_val));
     };
     return _ct_val;
