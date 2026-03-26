@@ -98,7 +98,7 @@ echo -e "  Python 3:        ${YELLOW}${t}ms${NC}"
 PY_FIB=$t
 
 # Olang
-t=$(best_of_3 "echo 'fn fib(n) { if n < 2 { return n; }; return fib(n-1) + fib(n-2); }; emit fib(30);' | timeout 120 ./origin_new.olang 2>/dev/null")
+t=$(best_of_3 "echo 'fn fib(n) { if n < 2 { return n; }; return fib(n-1) + fib(n-2); }; emit fib(30);' | timeout 120 ./origin.olang 2>/dev/null")
 echo -e "  Olang:           ${RED}${t}ms${NC}"
 OL_FIB=$t
 
@@ -137,7 +137,7 @@ t=$(best_of_3 "node $TMP/loop.js")
 echo -e "  Node.js:         ${GREEN}${t}ms${NC}"
 
 # Olang
-t=$(best_of_3 "echo 'let s = 0; let i = 0; while i < 10000000 { let s = s + i; let i = i + 1; }; emit s;' | timeout 120 ./origin_new.olang 2>/dev/null")
+t=$(best_of_3 "echo 'let s = 0; let i = 0; while i < 10000000 { let s = s + i; let i = i + 1; }; emit s;' | timeout 120 ./origin.olang 2>/dev/null")
 echo -e "  Olang:           ${RED}${t}ms${NC}"
 OL_LOOP=$t
 
@@ -171,7 +171,7 @@ t=$(best_of_3 "node $TMP/sha.js")
 echo -e "  Node.js:         ${GREEN}${t}ms${NC}"
 
 # Olang
-t=$(best_of_3 "echo 'let h = \"hello\"; let i = 0; while i < 1000 { let h = __sha256(h); let i = i + 1; }; emit substr(h, 0, 16);' | timeout 120 ./origin_new.olang 2>/dev/null")
+t=$(best_of_3 "echo 'let h = \"hello\"; let i = 0; while i < 1000 { let h = __sha256(h); let i = i + 1; }; emit substr(h, 0, 16);' | timeout 120 ./origin.olang 2>/dev/null")
 echo -e "  Olang:           ${RED}${t}ms${NC}"
 OL_SHA=$t
 
@@ -194,7 +194,7 @@ echo -e "  Python 3:        ${GREEN}${t}ms${NC}"
 PY_READ=$t
 
 # Olang
-t=$(best_of_3 "echo 'let b = __file_read(\"data/cuon_theo_chieu_gio.txt\"); let l = __line_offsets(b); emit __array_len(l) / 2;' | timeout 30 ./origin_new.olang 2>/dev/null")
+t=$(best_of_3 "echo 'let b = __file_read(\"data/cuon_theo_chieu_gio.txt\"); let l = __line_offsets(b); emit __array_len(l) / 2;' | timeout 30 ./origin.olang 2>/dev/null")
 echo -e "  Olang:           ${GREEN}${t}ms${NC}"
 OL_READ=$t
 
@@ -218,7 +218,7 @@ t=$(best_of_3 "python3 $TMP/aes.py")
 echo -e "  Python (sha256): ${GREEN}${t}ms${NC}"
 
 # Olang
-t=$(best_of_3 "echo 'let k = \"0123456789abcdef0123456789abcdef\"; let d = \"hello world 1234\"; let i = 0; while i < 1000 { let d = __aes_encrypt(k, d); let i = i + 1; }; emit __len(d);' | timeout 120 ./origin_new.olang 2>/dev/null")
+t=$(best_of_3 "echo 'let k = \"0123456789abcdef0123456789abcdef\"; let d = \"hello world 1234\"; let i = 0; while i < 1000 { let d = __aes_encrypt(k, d); let i = i + 1; }; emit __len(d);' | timeout 120 ./origin.olang 2>/dev/null")
 echo -e "  Olang (AES-NI):  ${GREEN}${t}ms${NC}"
 echo ""
 

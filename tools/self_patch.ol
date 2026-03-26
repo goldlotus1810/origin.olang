@@ -1,7 +1,7 @@
 // Olang patches itself: reverse search optimization
 // Finds var_load_hash linear scan → patches to reverse search
 
-let vm = __file_read_bytes("origin_new.olang");
+let vm = __file_read_bytes("origin.olang");
 let vm_len = __bytes_len(vm);
 emit "VM: " + to_string(vm_len) + " bytes";
 

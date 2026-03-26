@@ -8,6 +8,13 @@
 *.pdf
 *.mobi
 origin_new1.olang
+old/
+fonts/
+backup_v1_homeos/
+logs/session_*
+*.tar.gz
+UI/
+ui/
 data/test_*.txt
 data/book_*.txt
 data/ml_coban.txt

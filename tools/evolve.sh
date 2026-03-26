@@ -11,7 +11,7 @@ mkdir -p logs
 
 log() { echo "[$(date +%H:%M:%S)] $1" | tee -a "$LOG"; }
 
-BINARY="./origin_new.olang"
+BINARY="./origin.olang"
 GEN=0
 
 log "=== OLANG EVOLUTION STARTED ==="

@@ -987,401 +987,617 @@ op_call:
     pop     %rdx
     pop     %rax
 
-    # ── Math builtins ──
-    movabs  $0x57252090B96BC074, %rdx   # __hyp_add
-    cmp     %rdx, %rax
-    je      .call_add
-    movabs  $0xF28AFA91114A9D15, %rdx   # __hyp_sub
-    cmp     %rdx, %rax
-    je      .call_sub
-    movabs  $0x7800C290CB86CA01, %rdx   # __hyp_mul
+
+    # === BUILTIN JUMP TABLE DISPATCH ===
+    # 256-slot table, O(1) avg lookup (was O(110) linear scan)
+    mov     %rax, %rsi
+    and     $0xFF, %esi
+    lea     builtin_jump_table(%rip), %rdx
+    jmp     *(%rdx, %rsi, 8)
+
+    # -- Builtin chain handlers (collision resolution) --
+.builtin_slot_1:
+    movabs  $0x7800C290CB86CA01, %rdx
     cmp     %rdx, %rax
     je      .call_mul
-    movabs  $0x3E279790AB8C5BA8, %rdx   # __hyp_div
-    cmp     %rdx, %rax
-    je      .call_div
+    jmp     .call_not_builtin
 
-    # ── f64_to_le_bytes ──
-    movabs  $0x7DC336EFBBA1F85B, %rdx   # __f64_to_le_bytes
-    cmp     %rdx, %rax
-    je      .call_f64_to_le_bytes
-
-    # ── Modulo ──
-    movabs  $0x7822B690CBA39C03, %rdx   # __hyp_mod
-    cmp     %rdx, %rax
-    je      .call_mod
-
-    # ── Comparison builtins ──
-    movabs  $0x59C2494311519859, %rdx   # __eq
-    cmp     %rdx, %rax
-    je      .call_eq
-    movabs  $0xE50D9329A4496776, %rdx   # __cmp_lt
-    cmp     %rdx, %rax
-    je      .call_lt
-    movabs  $0xE525A529A45E17ED, %rdx   # __cmp_gt
-    cmp     %rdx, %rax
-    je      .call_gt
-    movabs  $0xE50D8429A4494DF9, %rdx   # __cmp_le
-    cmp     %rdx, %rax
-    je      .call_le
-    movabs  $0xE5259429A45DFB0A, %rdx   # __cmp_ge
-    cmp     %rdx, %rax
-    je      .call_ge
-    movabs  $0xE5068029A443287F, %rdx   # __cmp_ne
-    cmp     %rdx, %rax
-    je      .call_ne
-
-    # ── String builtins ──
-    movabs  $0x231F02F69878E492, %rdx   # __len
-    cmp     %rdx, %rax
-    je      .call_len
-    movabs  $0xA51ED5C2BDE7E73B, %rdx   # __concat
-    cmp     %rdx, %rax
-    je      .call_concat
-    movabs  $0x9FC9B1482B01D5E9, %rdx   # __char_at
-    cmp     %rdx, %rax
-    je      .call_char_at
-    movabs  $0x463483AB25CAB22D, %rdx   # __str_char_at (alias)
-    cmp     %rdx, %rax
-    je      .call_char_at
-    movabs  $0xE386A6329E2424BE, %rdx   # __substr
-    cmp     %rdx, %rax
-    je      .call_substr
-    movabs  $0xEA1BDD6D065BF46A, %rdx   # __str_substr (alias)
-    cmp     %rdx, %rax
-    je      .call_substr
-    movabs  $0x304A3A896BAAE100, %rdx   # substr (short alias)
-    cmp     %rdx, %rax
-    je      .call_substr
-    movabs  $0xFBE159BD1C6EBFA7, %rdx   # __str_trim
-    cmp     %rdx, %rax
-    je      .call_str_trim
-    movabs  $0x0CA83B022A791B4F, %rdx   # __str_is_keyword
-    cmp     %rdx, %rax
-    je      .call_str_is_keyword
-    movabs  $0x74AEDE408DC6787F, %rdx   # __str_slice
-    cmp     %rdx, %rax
-    je      .call_substr                 # str_slice = substr alias
-    movabs  $0x53416FC92E4E354A, %rdx   # __str_bytes
-    cmp     %rdx, %rax
-    je      .call_str_bytes
-    movabs  $0x3EA9B2DCA6EB46A2, %rdx   # __to_number
-    cmp     %rdx, %rax
-    je      .call_to_number
-    movabs  $0xE1C2E76089AECDEF, %rdx   # to_num (short alias)
-    cmp     %rdx, %rax
-    je      .call_to_number
-    movabs  $0x3F9867C32BC1B166, %rdx   # __to_string
-    cmp     %rdx, %rax
-    je      .call_to_string
-    movabs  $0x07515EC1BC3E1099, %rdx   # __char_code
-    cmp     %rdx, %rax
-    je      .call_char_code
-    # ── File I/O builtins ──
-    movabs  $0x229C6ACCAE3B5DBE, %rdx   # __file_read
-    cmp     %rdx, %rax
-    je      .call_file_read
-    movabs  $0xC8220FDA76231661, %rdx   # __file_write
-    cmp     %rdx, %rax
-    je      .call_file_write
-    # ── Raw byte builtins (for self-build) ──
-    movabs  $0xB2E2F645F237541B, %rdx   # __bytes_new
-    cmp     %rdx, %rax
-    je      .call_bytes_new
-    movabs  $0x5871F4465043D679, %rdx   # __bytes_set
-    cmp     %rdx, %rax
-    je      .call_bytes_set
-    movabs  $0xEF8C08461494EA05, %rdx   # __bytes_get
-    cmp     %rdx, %rax
-    je      .call_bytes_get
-    movabs  $0x255314D8EC3C037E, %rdx   # __bytes_write
-    cmp     %rdx, %rax
-    je      .call_bytes_write_raw
-    movabs  $0xA5845725C8B01606, %rdx   # __file_read_bytes
-    cmp     %rdx, %rax
-    je      .call_file_read_bytes
-    movabs  $0xC4352F45FC06104A, %rdx   # __bytes_len
-    cmp     %rdx, %rax
-    je      .call_bytes_len
-    movabs  $0xA3A423F5F0BEDF3B, %rdx   # __heap_save
-    cmp     %rdx, %rax
-    je      .call_heap_save
-    movabs  $0xDACC10780A43732C, %rdx   # __heap_restore
-    cmp     %rdx, %rax
-    je      .call_heap_restore
-    cmp     %rdx, %rax
-    je      .call_file_write
-
-    movabs  $0xE811320261AE416D, %rdx   # __type_of
-    cmp     %rdx, %rax
-    je      .call_type_of
-
-    # ── Crypto builtins ──
-    movabs  $0x656D6D860AA4E534, %rdx   # __sha256
-    cmp     %rdx, %rax
-    je      .call_sha256
-
-    # ── Math builtins ──
-    movabs  $0x185FC0C022E829AF, %rdx   # __floor
-    cmp     %rdx, %rax
-    je      .call_floor
-    movabs  $0x9E3D368BE8B3606A, %rdx   # __ceil
-    cmp     %rdx, %rax
-    je      .call_ceil
-
-    # ── Error handling builtins ──
-    movabs  $0xDFF308A36F62AAF5, %rdx   # __throw
-    cmp     %rdx, %rax
-    je      .call_throw
-
-    # ── Array builtins ──
-    movabs  $0xF10E316E51D66791, %rdx   # __array_new
-    cmp     %rdx, %rax
-    je      .call_array_new
-    movabs  $0xA4B7BF6E270F2A57, %rdx   # __array_get
-    cmp     %rdx, %rax
-    je      .call_array_get
-    movabs  $0x5210E36E8946BE83, %rdx   # __array_set
-    cmp     %rdx, %rax
-    je      .call_array_set
-    movabs  $0x90134D214B786D0F, %rdx   # __set_at (alias)
-    cmp     %rdx, %rax
-    je      .call_array_set
-    movabs  $0xF8BB87C89678B27D, %rdx   # __array_push
-    cmp     %rdx, %rax
-    je      .call_array_push
-    movabs  $0x9FC459281D29BE97, %rdx   # __push (alias)
-    cmp     %rdx, %rax
-    je      .call_array_push
-    movabs  $0x476FB46E82B22CB0, %rdx   # __array_pop
-    cmp     %rdx, %rax
-    je      .call_array_pop
-    movabs  $0x46A5ACF6ACD83186, %rdx   # __pop (alias)
-    cmp     %rdx, %rax
-    je      .call_array_pop
-    movabs  $0xB56460DC788BF312, %rdx   # __array_range
-    cmp     %rdx, %rax
-    je      .call_array_range
-    movabs  $0x4A94D43F636D9492, %rdx   # __array_with_cap
-    cmp     %rdx, %rax
-    je      .call_array_with_cap
-    movabs  $0xDEE1C66E474DB2AC, %rdx   # __array_len
-    cmp     %rdx, %rax
-    je      .call_len                    # same as __len
-
-    # ── Dict builtins ──
-    movabs  $0x061BEB9B86B295B2, %rdx   # __dict_new
-    cmp     %rdx, %rax
-    je      .call_dict_new
-    movabs  $0xC8B4C99B63B3BB90, %rdx   # __dict_get
-    cmp     %rdx, %rax
-    je      .call_dict_get
-    movabs  $0x5FCEDD9B2804CF1C, %rdx   # __dict_set
-    cmp     %rdx, %rax
-    je      .call_dict_set
-    movabs  $0x234A766F8747B620, %rdx   # __dict_keys
-    cmp     %rdx, %rax
-    je      .call_dict_keys
-
-    # ── Bitwise builtins ──
-    movabs  $0x31F6E47C4AE5A082, %rdx   # __bit_or
-    cmp     %rdx, %rax
-    je      .call_bit_or
-    movabs  $0x7551B73312F1D4D4, %rdx   # __bit_and
-    cmp     %rdx, %rax
-    je      .call_bit_and
-    movabs  $0x4E03A6338DB8ADC8, %rdx   # __bit_xor
-    cmp     %rdx, %rax
-    je      .call_bit_xor
-    movabs  $0xECF7CD335641730C, %rdx   # __bit_shl
-    cmp     %rdx, %rax
-    je      .call_bit_shl
-    movabs  $0xECF7E3335641986E, %rdx   # __bit_shr
-    cmp     %rdx, %rax
-    je      .call_bit_shr
-
-    # ── Struct/enum builtins ──
-    movabs  $0x46B6739DEFF894A5, %rdx   # __struct_tag
-    cmp     %rdx, %rax
-    je      .call_struct_tag
-    movabs  $0x1D937C1FCA5461FD, %rdx   # __enum_unit
-    cmp     %rdx, %rax
-    je      .call_enum_unit
-    movabs  $0x58F6E86D37FAFB4F, %rdx   # __enum_payload
-    cmp     %rdx, %rax
-    je      .call_enum_payload
-    movabs  $0x6EFB31ABBB6698FC, %rdx   # __match_enum
-    cmp     %rdx, %rax
-    je      .call_match_enum
-    movabs  $0x385DDAACD4BF03A1, %rdx   # __enum_field
-    cmp     %rdx, %rax
-    je      .call_enum_field
-    movabs  $0x0275ACD27913EF29, %rdx   # __logic_not
-    cmp     %rdx, %rax
-    je      .call_logic_not
-
-    # ── No-op builtins (pop correct arg count) ──
-    movabs  $0xC7631FF0030A6033, %rdx   # __use_module (1 arg)
-    cmp     %rdx, %rax
-    je      .call_noop_pop1
-    movabs  $0x49DF59EEA723E9FA, %rdx   # __use_module_selective (count+N+1)
-    cmp     %rdx, %rax
-    je      .call_use_module_selective
-    movabs  $0xBA79129DA012260E, %rdx   # __struct_def (2 args)
-    cmp     %rdx, %rax
-    je      .call_noop_pop2
-    movabs  $0xC3FD4316C34B889E, %rdx   # __enum_def (2 args)
-    cmp     %rdx, %rax
-    je      .call_noop_pop2
-
-    # ── Timer/sleep builtins ──
-    movabs  $0x9EEC1A86B3B21786, %rdx   # __sleep
-    cmp     %rdx, %rax
-    je      .call_sleep
-    movabs  $0x0E6B6C4BB0C674BA, %rdx   # __time
-    cmp     %rdx, %rax
-    je      .call_time
-    movabs  $0xC3ADA5D879284B3B, %rdx   # __write_raw
-    cmp     %rdx, %rax
-    je      .call_write_raw
-
-    # ── Molecule extract builtins (T5 ND.2) ──
-    movabs  $0x9AB0ED8E471CE883, %rdx   # __mol_s
-    cmp     %rdx, %rax
-    je      .call_mol_s
-    movabs  $0x9AB0EC8E471CE6D0, %rdx   # __mol_r
-    cmp     %rdx, %rax
-    je      .call_mol_r
-    movabs  $0x9AB0F08E471CED9C, %rdx   # __mol_v
-    cmp     %rdx, %rax
-    je      .call_mol_v
-    movabs  $0x9AB0DF8E471CD0B9, %rdx   # __mol_a
-    cmp     %rdx, %rax
-    je      .call_mol_a
-    movabs  $0x9AB0F28E471CF102, %rdx   # __mol_t
+.builtin_slot_2:
+    movabs  $0x9AB0F28E471CF102, %rdx
     cmp     %rdx, %rax
     je      .call_mol_t
-    movabs  $0xABFC7C5900FA2DAB, %rdx   # __mol_pack
-    cmp     %rdx, %rax
-    je      .call_mol_pack
+    jmp     .call_not_builtin
 
-    # ── UTF-8 builtins ──
-    movabs  $0x4878D01FD4BD5E1A, %rdx   # __utf8_cp(str, pos) → codepoint
+.builtin_slot_3:
+    movabs  $0x7822B690CBA39C03, %rdx
     cmp     %rdx, %rax
-    je      .call_utf8_cp
-    movabs  $0xB7114D166502D5D0, %rdx   # __utf8_len(str, pos) → byte count (1-4)
-    cmp     %rdx, %rax
-    je      .call_utf8_len
+    je      .call_mod
+    jmp     .call_not_builtin
 
-    # ── Eval bytecode (nested execution) ──
-    # ── Text/search builtins (native) ──
-    movabs  $0x10278AEC167ABEF0, %rdx   # __text_to_pw(str, tbl)
+.builtin_slot_5:
+    movabs  $0xEF8C08461494EA05, %rdx
     cmp     %rdx, %rax
-    je      .call_text_to_pw
-    movabs  $0x58485CB4691F98BE, %rdx   # __text_to_chain(str, tbl)
+    je      .call_bytes_get
+    jmp     .call_not_builtin
+
+.builtin_slot_6:
+    movabs  $0xA5845725C8B01606, %rdx
     cmp     %rdx, %rax
-    je      .call_text_to_chain
-    movabs  $0x8072B20F985EC0A2, %rdx   # __line_offsets(str)
+    je      .call_file_read_bytes
+    jmp     .call_not_builtin
+
+.builtin_slot_10:
+    movabs  $0xE5259429A45DFB0A, %rdx
     cmp     %rdx, %rax
-    je      .call_line_offsets
-    movabs  $0x3A1642345E94EA24, %rdx   # __str_find(haystack, needle)
+    je      .call_ge
+    jmp     .call_not_builtin
+
+.builtin_slot_12:
+    movabs  $0xECF7CD335641730C, %rdx
     cmp     %rdx, %rax
-    je      .call_str_find
-    # ── Network builtins ──
-    movabs  $0xC9091F4EA5E0EFF5, %rdx   # __dns_resolve(hostname)
+    je      .call_bit_shl
+    jmp     .call_not_builtin
+
+.builtin_slot_14:
+    movabs  $0xBA79129DA012260E, %rdx
     cmp     %rdx, %rax
-    je      .call_dns_resolve
-    movabs  $0x79C07AA57E23765F, %rdx   # __tcp_connect(ip, port)
-    cmp     %rdx, %rax
-    je      .call_tcp_connect
-    movabs  $0x495BE76EAB8378AD, %rdx   # __tcp_send(fd, data)
-    cmp     %rdx, %rax
-    je      .call_tcp_send
-    movabs  $0xAD9A9975BDE0C517, %rdx   # __tcp_recv(fd, max)
-    cmp     %rdx, %rax
-    je      .call_tcp_recv
-    movabs  $0xDD3AF5492696D871, %rdx   # __tcp_close(fd)
-    cmp     %rdx, %rax
-    je      .call_tcp_close
-    movabs  $0x6F0C4CBAC89C91C4, %rdx   # __tcp_listen(port)
-    cmp     %rdx, %rax
-    je      .call_tcp_listen
-    movabs  $0x493ABC5CE7C7C7CF, %rdx   # __tcp_accept(server_fd)
-    cmp     %rdx, %rax
-    je      .call_tcp_accept
-    # ── Filesystem ──
-    movabs  $0x33AB401298E66956, %rdx   # __readdir(path)
-    cmp     %rdx, %rax
-    je      .call_readdir
-    # ── Char/string ──
-    movabs  $0xA3E9AFF6513138BE, %rdx   # __chr(code)
-    cmp     %rdx, %rax
-    je      .call_chr
-    movabs  $0x93CF8290EAF97526, %rdx   # char_from_code(code)
-    cmp     %rdx, %rax
-    je      .call_chr
-    # ── Crypto ──
-    movabs  $0x89275829827A6638, %rdx   # __aes_encrypt(key, data)
-    cmp     %rdx, %rax
-    je      .call_aes_encrypt
-    movabs  $0xE653F1B42A305014, %rdx   # __aes_decrypt(key, data)
-    cmp     %rdx, %rax
-    je      .call_aes_decrypt
-    movabs  $0x90B5A88623267519, %rdx   # __sha512(data)
-    cmp     %rdx, %rax
-    je      .call_sha512
-    # ── Storage ──
-    movabs  $0x1C44C0F08C07EC77, %rdx   # __mmap_file(path, size)
-    cmp     %rdx, %rax
-    je      .call_mmap_file
-    movabs  $0xB85069B47868C218, %rdx   # __munmap_file(ptr, size)
-    cmp     %rdx, %rax
-    je      .call_munmap_file
-    # ── Math ──
-    movabs  $0x1148126D13F2B0FC, %rdx   # __isqrt(x)
-    cmp     %rdx, %rax
-    je      .call_isqrt
-    movabs  $0x463B7CECBD9DCAEF, %rdx   # _isqrt(x)
-    cmp     %rdx, %rax
-    je      .call_isqrt
-    # ── SIMD ──
-    movabs  $0x05F32B674266E367, %rdx   # __simd_compose4(a,b,c,d)
-    cmp     %rdx, %rax
-    je      .call_simd_compose4
-    # ── JIT cache register ──
-    movabs  $0xF7ED721D453C820E, %rdx   # __jit_register(fn_name, native_ptr)
+    je      .call_noop_pop2
+    movabs  $0xF7ED721D453C820E, %rdx
     cmp     %rdx, %rax
     je      .call_jit_register
-    # ── JIT invalidate ──
-    movabs  $0x9C2E99FAD130770E, %rdx   # __jit_invalidate(fn_name) → clear cache
+    movabs  $0x9C2E99FAD130770E, %rdx
     cmp     %rdx, %rax
     je      .call_jit_invalidate
-    # ── Profile ──
-    movabs  $0x45D4F29E55E01818, %rdx   # __profile_top(n) → array of [hash, count] top-n
+    jmp     .call_not_builtin
+
+.builtin_slot_15:
+    movabs  $0x90134D214B786D0F, %rdx
+    cmp     %rdx, %rax
+    je      .call_array_set
+    jmp     .call_not_builtin
+
+.builtin_slot_18:
+    movabs  $0xB56460DC788BF312, %rdx
+    cmp     %rdx, %rax
+    je      .call_array_range
+    jmp     .call_not_builtin
+
+.builtin_slot_20:
+    movabs  $0xE653F1B42A305014, %rdx
+    cmp     %rdx, %rax
+    je      .call_aes_decrypt
+    jmp     .call_not_builtin
+
+.builtin_slot_21:
+    movabs  $0xF28AFA91114A9D15, %rdx
+    cmp     %rdx, %rax
+    je      .call_sub
+    jmp     .call_not_builtin
+
+.builtin_slot_23:
+    movabs  $0xAD9A9975BDE0C517, %rdx
+    cmp     %rdx, %rax
+    je      .call_tcp_recv
+    jmp     .call_not_builtin
+
+.builtin_slot_24:
+    movabs  $0xB85069B47868C218, %rdx
+    cmp     %rdx, %rax
+    je      .call_munmap_file
+    movabs  $0x45D4F29E55E01818, %rdx
     cmp     %rdx, %rax
     je      .call_profile_top
-    movabs  $0xFC07F3E9B18D01A4, %rdx   # __profile_reset() → clear counters
-    cmp     %rdx, %rax
-    je      .call_profile_reset
-    # ── JIT ──
-    movabs  $0x641F898B1A9D68F6, %rdx   # __memcpy_to(dest_ptr, bytes_buf, len)
-    cmp     %rdx, %rax
-    je      .call_memcpy_to
-    movabs  $0x5CA205D82D643918, %rdx   # __mmap_exec(size) → ptr to RWX memory
+    movabs  $0x5CA205D82D643918, %rdx
     cmp     %rdx, %rax
     je      .call_mmap_exec
-    movabs  $0x456FFD736FB437FF, %rdx   # __call_native(ptr, arg) → result
+    jmp     .call_not_builtin
+
+.builtin_slot_25:
+    movabs  $0x90B5A88623267519, %rdx
     cmp     %rdx, %rax
-    je      .call_native
-    # ── Module loading ──
-    movabs  $0x0D8DE844314D45A6, %rdx   # __skip_scope_restore
+    je      .call_sha512
+    jmp     .call_not_builtin
+
+.builtin_slot_26:
+    movabs  $0x4878D01FD4BD5E1A, %rdx
     cmp     %rdx, %rax
-    je      .call_skip_scope_restore
-    # ── Eval bytecode ──
-    movabs  $0xB810EF14843FBB65, %rdx   # __eval_bytecode
+    je      .call_utf8_cp
+    jmp     .call_not_builtin
+
+.builtin_slot_27:
+    movabs  $0xB2E2F645F237541B, %rdx
+    cmp     %rdx, %rax
+    je      .call_bytes_new
+    jmp     .call_not_builtin
+
+.builtin_slot_28:
+    movabs  $0x5FCEDD9B2804CF1C, %rdx
+    cmp     %rdx, %rax
+    je      .call_dict_set
+    jmp     .call_not_builtin
+
+.builtin_slot_32:
+    movabs  $0x234A766F8747B620, %rdx
+    cmp     %rdx, %rax
+    je      .call_dict_keys
+    jmp     .call_not_builtin
+
+.builtin_slot_36:
+    movabs  $0x3A1642345E94EA24, %rdx
+    cmp     %rdx, %rax
+    je      .call_str_find
+    jmp     .call_not_builtin
+
+.builtin_slot_41:
+    movabs  $0x0275ACD27913EF29, %rdx
+    cmp     %rdx, %rax
+    je      .call_logic_not
+    jmp     .call_not_builtin
+
+.builtin_slot_44:
+    movabs  $0xDACC10780A43732C, %rdx
+    cmp     %rdx, %rax
+    je      .call_heap_restore
+    jmp     .call_not_builtin
+
+.builtin_slot_45:
+    movabs  $0x463483AB25CAB22D, %rdx
+    cmp     %rdx, %rax
+    je      .call_char_at
+    jmp     .call_not_builtin
+
+.builtin_slot_51:
+    movabs  $0xC7631FF0030A6033, %rdx
+    cmp     %rdx, %rax
+    je      .call_noop_pop1
+    jmp     .call_not_builtin
+
+.builtin_slot_52:
+    movabs  $0x656D6D860AA4E534, %rdx
+    cmp     %rdx, %rax
+    je      .call_sha256
+    jmp     .call_not_builtin
+
+.builtin_slot_56:
+    movabs  $0x89275829827A6638, %rdx
+    cmp     %rdx, %rax
+    je      .call_aes_encrypt
+    jmp     .call_not_builtin
+
+.builtin_slot_59:
+    movabs  $0xA51ED5C2BDE7E73B, %rdx
+    cmp     %rdx, %rax
+    je      .call_concat
+    movabs  $0xA3A423F5F0BEDF3B, %rdx
+    cmp     %rdx, %rax
+    je      .call_heap_save
+    movabs  $0xC3ADA5D879284B3B, %rdx
+    cmp     %rdx, %rax
+    je      .call_write_raw
+    jmp     .call_not_builtin
+
+.builtin_slot_74:
+    movabs  $0x53416FC92E4E354A, %rdx
+    cmp     %rdx, %rax
+    je      .call_str_bytes
+    movabs  $0xC4352F45FC06104A, %rdx
+    cmp     %rdx, %rax
+    je      .call_bytes_len
+    jmp     .call_not_builtin
+
+.builtin_slot_79:
+    movabs  $0x0CA83B022A791B4F, %rdx
+    cmp     %rdx, %rax
+    je      .call_str_is_keyword
+    movabs  $0x58F6E86D37FAFB4F, %rdx
+    cmp     %rdx, %rax
+    je      .call_enum_payload
+    jmp     .call_not_builtin
+
+.builtin_slot_86:
+    movabs  $0x33AB401298E66956, %rdx
+    cmp     %rdx, %rax
+    je      .call_readdir
+    jmp     .call_not_builtin
+
+.builtin_slot_87:
+    movabs  $0xA4B7BF6E270F2A57, %rdx
+    cmp     %rdx, %rax
+    je      .call_array_get
+    jmp     .call_not_builtin
+
+.builtin_slot_89:
+    movabs  $0x59C2494311519859, %rdx
+    cmp     %rdx, %rax
+    je      .call_eq
+    jmp     .call_not_builtin
+
+.builtin_slot_91:
+    movabs  $0x7DC336EFBBA1F85B, %rdx
+    cmp     %rdx, %rax
+    je      .call_f64_to_le_bytes
+    jmp     .call_not_builtin
+
+.builtin_slot_95:
+    movabs  $0x79C07AA57E23765F, %rdx
+    cmp     %rdx, %rax
+    je      .call_tcp_connect
+    jmp     .call_not_builtin
+
+.builtin_slot_97:
+    movabs  $0xC8220FDA76231661, %rdx
+    cmp     %rdx, %rax
+    je      .call_file_write
+    jmp     .call_not_builtin
+
+.builtin_slot_101:
+    movabs  $0xB810EF14843FBB65, %rdx
     cmp     %rdx, %rax
     je      .call_eval_bytecode
+    jmp     .call_not_builtin
 
+.builtin_slot_102:
+    movabs  $0x3F9867C32BC1B166, %rdx
+    cmp     %rdx, %rax
+    je      .call_to_string
+    jmp     .call_not_builtin
+
+.builtin_slot_103:
+    movabs  $0x05F32B674266E367, %rdx
+    cmp     %rdx, %rax
+    je      .call_simd_compose4
+    jmp     .call_not_builtin
+
+.builtin_slot_106:
+    movabs  $0xEA1BDD6D065BF46A, %rdx
+    cmp     %rdx, %rax
+    je      .call_substr
+    movabs  $0x9E3D368BE8B3606A, %rdx
+    cmp     %rdx, %rax
+    je      .call_ceil
+    jmp     .call_not_builtin
+
+.builtin_slot_109:
+    movabs  $0xE811320261AE416D, %rdx
+    cmp     %rdx, %rax
+    je      .call_type_of
+    jmp     .call_not_builtin
+
+.builtin_slot_110:
+    movabs  $0xECF7E3335641986E, %rdx
+    cmp     %rdx, %rax
+    je      .call_bit_shr
+    jmp     .call_not_builtin
+
+.builtin_slot_113:
+    movabs  $0xDD3AF5492696D871, %rdx
+    cmp     %rdx, %rax
+    je      .call_tcp_close
+    jmp     .call_not_builtin
+
+.builtin_slot_116:
+    movabs  $0x57252090B96BC074, %rdx
+    cmp     %rdx, %rax
+    je      .call_add
+    jmp     .call_not_builtin
+
+.builtin_slot_118:
+    movabs  $0xE50D9329A4496776, %rdx
+    cmp     %rdx, %rax
+    je      .call_lt
+    jmp     .call_not_builtin
+
+.builtin_slot_119:
+    movabs  $0x1C44C0F08C07EC77, %rdx
+    cmp     %rdx, %rax
+    je      .call_mmap_file
+    jmp     .call_not_builtin
+
+.builtin_slot_121:
+    movabs  $0x5871F4465043D679, %rdx
+    cmp     %rdx, %rax
+    je      .call_bytes_set
+    jmp     .call_not_builtin
+
+.builtin_slot_125:
+    movabs  $0xF8BB87C89678B27D, %rdx
+    cmp     %rdx, %rax
+    je      .call_array_push
+    jmp     .call_not_builtin
+
+.builtin_slot_126:
+    movabs  $0x255314D8EC3C037E, %rdx
+    cmp     %rdx, %rax
+    je      .call_bytes_write_raw
+    jmp     .call_not_builtin
+
+.builtin_slot_127:
+    movabs  $0xE5068029A443287F, %rdx
+    cmp     %rdx, %rax
+    je      .call_ne
+    movabs  $0x74AEDE408DC6787F, %rdx
+    cmp     %rdx, %rax
+    je      .call_substr
+    jmp     .call_not_builtin
+
+.builtin_slot_130:
+    movabs  $0x31F6E47C4AE5A082, %rdx
+    cmp     %rdx, %rax
+    je      .call_bit_or
+    jmp     .call_not_builtin
+
+.builtin_slot_131:
+    movabs  $0x5210E36E8946BE83, %rdx
+    cmp     %rdx, %rax
+    je      .call_array_set
+    movabs  $0x9AB0ED8E471CE883, %rdx
+    cmp     %rdx, %rax
+    je      .call_mol_s
+    jmp     .call_not_builtin
+
+.builtin_slot_134:
+    movabs  $0x46A5ACF6ACD83186, %rdx
+    cmp     %rdx, %rax
+    je      .call_array_pop
+    movabs  $0x9EEC1A86B3B21786, %rdx
+    cmp     %rdx, %rax
+    je      .call_sleep
+    jmp     .call_not_builtin
+
+.builtin_slot_144:
+    movabs  $0xC8B4C99B63B3BB90, %rdx
+    cmp     %rdx, %rax
+    je      .call_dict_get
+    jmp     .call_not_builtin
+
+.builtin_slot_145:
+    movabs  $0xF10E316E51D66791, %rdx
+    cmp     %rdx, %rax
+    je      .call_array_new
+    jmp     .call_not_builtin
+
+.builtin_slot_146:
+    movabs  $0x231F02F69878E492, %rdx
+    cmp     %rdx, %rax
+    je      .call_len
+    movabs  $0x4A94D43F636D9492, %rdx
+    cmp     %rdx, %rax
+    je      .call_array_with_cap
+    jmp     .call_not_builtin
+
+.builtin_slot_151:
+    movabs  $0x9FC459281D29BE97, %rdx
+    cmp     %rdx, %rax
+    je      .call_array_push
+    jmp     .call_not_builtin
+
+.builtin_slot_153:
+    movabs  $0x07515EC1BC3E1099, %rdx
+    cmp     %rdx, %rax
+    je      .call_char_code
+    jmp     .call_not_builtin
+
+.builtin_slot_156:
+    movabs  $0x9AB0F08E471CED9C, %rdx
+    cmp     %rdx, %rax
+    je      .call_mol_v
+    jmp     .call_not_builtin
+
+.builtin_slot_158:
+    movabs  $0xC3FD4316C34B889E, %rdx
+    cmp     %rdx, %rax
+    je      .call_noop_pop2
+    jmp     .call_not_builtin
+
+.builtin_slot_161:
+    movabs  $0x385DDAACD4BF03A1, %rdx
+    cmp     %rdx, %rax
+    je      .call_enum_field
+    jmp     .call_not_builtin
+
+.builtin_slot_162:
+    movabs  $0x3EA9B2DCA6EB46A2, %rdx
+    cmp     %rdx, %rax
+    je      .call_to_number
+    movabs  $0x8072B20F985EC0A2, %rdx
+    cmp     %rdx, %rax
+    je      .call_line_offsets
+    jmp     .call_not_builtin
+
+.builtin_slot_164:
+    movabs  $0xFC07F3E9B18D01A4, %rdx
+    cmp     %rdx, %rax
+    je      .call_profile_reset
+    jmp     .call_not_builtin
+
+.builtin_slot_165:
+    movabs  $0x46B6739DEFF894A5, %rdx
+    cmp     %rdx, %rax
+    je      .call_struct_tag
+    jmp     .call_not_builtin
+
+.builtin_slot_166:
+    movabs  $0x0D8DE844314D45A6, %rdx
+    cmp     %rdx, %rax
+    je      .call_skip_scope_restore
+    jmp     .call_not_builtin
+
+.builtin_slot_167:
+    movabs  $0xFBE159BD1C6EBFA7, %rdx
+    cmp     %rdx, %rax
+    je      .call_str_trim
+    jmp     .call_not_builtin
+
+.builtin_slot_168:
+    movabs  $0x3E279790AB8C5BA8, %rdx
+    cmp     %rdx, %rax
+    je      .call_div
+    jmp     .call_not_builtin
+
+.builtin_slot_171:
+    movabs  $0xABFC7C5900FA2DAB, %rdx
+    cmp     %rdx, %rax
+    je      .call_mol_pack
+    jmp     .call_not_builtin
+
+.builtin_slot_172:
+    movabs  $0xDEE1C66E474DB2AC, %rdx
+    cmp     %rdx, %rax
+    je      .call_len
+    jmp     .call_not_builtin
+
+.builtin_slot_173:
+    movabs  $0x495BE76EAB8378AD, %rdx
+    cmp     %rdx, %rax
+    je      .call_tcp_send
+    jmp     .call_not_builtin
+
+.builtin_slot_175:
+    movabs  $0x185FC0C022E829AF, %rdx
+    cmp     %rdx, %rax
+    je      .call_floor
+    jmp     .call_not_builtin
+
+.builtin_slot_176:
+    movabs  $0x476FB46E82B22CB0, %rdx
+    cmp     %rdx, %rax
+    je      .call_array_pop
+    jmp     .call_not_builtin
+
+.builtin_slot_178:
+    movabs  $0x061BEB9B86B295B2, %rdx
+    cmp     %rdx, %rax
+    je      .call_dict_new
+    jmp     .call_not_builtin
+
+.builtin_slot_185:
+    movabs  $0x9AB0DF8E471CD0B9, %rdx
+    cmp     %rdx, %rax
+    je      .call_mol_a
+    jmp     .call_not_builtin
+
+.builtin_slot_186:
+    movabs  $0x0E6B6C4BB0C674BA, %rdx
+    cmp     %rdx, %rax
+    je      .call_time
+    jmp     .call_not_builtin
+
+.builtin_slot_190:
+    movabs  $0xE386A6329E2424BE, %rdx
+    cmp     %rdx, %rax
+    je      .call_substr
+    movabs  $0x229C6ACCAE3B5DBE, %rdx
+    cmp     %rdx, %rax
+    je      .call_file_read
+    movabs  $0x58485CB4691F98BE, %rdx
+    cmp     %rdx, %rax
+    je      .call_text_to_chain
+    movabs  $0xA3E9AFF6513138BE, %rdx
+    cmp     %rdx, %rax
+    je      .call_chr
+    jmp     .call_not_builtin
+
+.builtin_slot_196:
+    movabs  $0x6F0C4CBAC89C91C4, %rdx
+    cmp     %rdx, %rax
+    je      .call_tcp_listen
+    jmp     .call_not_builtin
+
+.builtin_slot_200:
+    movabs  $0x4E03A6338DB8ADC8, %rdx
+    cmp     %rdx, %rax
+    je      .call_bit_xor
+    jmp     .call_not_builtin
+
+.builtin_slot_207:
+    movabs  $0x493ABC5CE7C7C7CF, %rdx
+    cmp     %rdx, %rax
+    je      .call_tcp_accept
+    jmp     .call_not_builtin
+
+.builtin_slot_208:
+    movabs  $0x9AB0EC8E471CE6D0, %rdx
+    cmp     %rdx, %rax
+    je      .call_mol_r
+    movabs  $0xB7114D166502D5D0, %rdx
+    cmp     %rdx, %rax
+    je      .call_utf8_len
+    jmp     .call_not_builtin
+
+.builtin_slot_212:
+    movabs  $0x7551B73312F1D4D4, %rdx
+    cmp     %rdx, %rax
+    je      .call_bit_and
+    jmp     .call_not_builtin
+
+.builtin_slot_233:
+    movabs  $0x9FC9B1482B01D5E9, %rdx
+    cmp     %rdx, %rax
+    je      .call_char_at
+    jmp     .call_not_builtin
+
+.builtin_slot_237:
+    movabs  $0xE525A529A45E17ED, %rdx
+    cmp     %rdx, %rax
+    je      .call_gt
+    jmp     .call_not_builtin
+
+.builtin_slot_240:
+    movabs  $0x10278AEC167ABEF0, %rdx
+    cmp     %rdx, %rax
+    je      .call_text_to_pw
+    jmp     .call_not_builtin
+
+.builtin_slot_245:
+    movabs  $0xDFF308A36F62AAF5, %rdx
+    cmp     %rdx, %rax
+    je      .call_throw
+    movabs  $0xC9091F4EA5E0EFF5, %rdx
+    cmp     %rdx, %rax
+    je      .call_dns_resolve
+    jmp     .call_not_builtin
+
+.builtin_slot_246:
+    movabs  $0x641F898B1A9D68F6, %rdx
+    cmp     %rdx, %rax
+    je      .call_memcpy_to
+    jmp     .call_not_builtin
+
+.builtin_slot_249:
+    movabs  $0xE50D8429A4494DF9, %rdx
+    cmp     %rdx, %rax
+    je      .call_le
+    jmp     .call_not_builtin
+
+.builtin_slot_250:
+    movabs  $0x49DF59EEA723E9FA, %rdx
+    cmp     %rdx, %rax
+    je      .call_use_module_selective
+    jmp     .call_not_builtin
+
+.builtin_slot_252:
+    movabs  $0x6EFB31ABBB6698FC, %rdx
+    cmp     %rdx, %rax
+    je      .call_match_enum
+    movabs  $0x1148126D13F2B0FC, %rdx
+    cmp     %rdx, %rax
+    je      .call_isqrt
+    jmp     .call_not_builtin
+
+.builtin_slot_253:
+    movabs  $0x1D937C1FCA5461FD, %rdx
+    cmp     %rdx, %rax
+    je      .call_enum_unit
+    jmp     .call_not_builtin
+
+.builtin_slot_255:
+    movabs  $0x456FFD736FB437FF, %rdx
+    cmp     %rdx, %rax
+    je      .call_native
+    jmp     .call_not_builtin
+
+
+.call_not_builtin:
     # ── Not a builtin: try var_table lookup ──
     # rax still has the hash from hash_name
     # Check JIT cache first: if native code exists for this hash → call directly
@@ -5369,7 +5585,17 @@ op_ret:
     lea     var_table_base(%rip), %rdi
     mov     (%rdi), %rdi
     mov     %rdx, (%rdi)               # truncate: var_table.count = saved_count
-    # No cache invalidation needed — count-based validation handles scope changes
+    # Invalidate var_cache after scope restore (entry pointers may be stale)
+    push    %rdi
+    push    %rcx
+    push    %rax
+    lea     var_cache(%rip), %rdi
+    xor     %eax, %eax
+    mov     $768, %ecx              # 6144/8 = 768 qwords
+    rep     stosq
+    pop     %rax
+    pop     %rcx
+    pop     %rdi
     jmp     vm_loop
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -7461,10 +7687,10 @@ var_store_hash:
 # var_load_hash: rax=hash → rax=val_ptr, rdx=val_len
 # REVERSE search with 4-entry direct-mapped cache (count-validated)
 var_load_hash:
-    # Check cache: 4 entries × [hash:8, entry_ptr:8, vt_count:8] = 24 bytes each
+    # Check cache: 256 entries × [hash:8, entry_ptr:8, vt_count:8] = 24 bytes each
     lea     var_cache(%rip), %rcx
     mov     %rax, %rdx
-    and     $3, %edx
+    and     $0xFF, %edx
     imul    $24, %edx                   # × 24 bytes per entry
     cmp     %rax, (%rcx, %rdx)          # hash match?
     jne     .vlh_cache_miss
@@ -7495,11 +7721,11 @@ var_load_hash:
 .vlh_search:
     cmp     (%rdi), %rax
     jne     .vlh_next
-    # Found — update cache
+    # Found — update cache (256 slots)
     push    %rax
     lea     var_cache(%rip), %rcx
     mov     %rax, %rdx
-    and     $3, %edx
+    and     $0xFF, %edx
     imul    $24, %edx
     mov     %rax, (%rcx, %rdx)          # store hash
     mov     %rdi, 8(%rcx, %rdx)         # store entry pointer
@@ -8525,6 +8751,267 @@ str_comma_sp:    .ascii ", "
 # ── REPL function name ──────────────────────────────────────────────────
 bname_repl_eval: .ascii "repl_eval"
 
+
+# ── BUILTIN JUMP TABLE (256 entries × 8 bytes = 2KB) ──────────────────
+    .align 8
+builtin_jump_table:
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_1
+    .quad   .builtin_slot_2
+    .quad   .builtin_slot_3
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_5
+    .quad   .builtin_slot_6
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_10
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_12
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_14
+    .quad   .builtin_slot_15
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_18
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_20
+    .quad   .builtin_slot_21
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_23
+    .quad   .builtin_slot_24
+    .quad   .builtin_slot_25
+    .quad   .builtin_slot_26
+    .quad   .builtin_slot_27
+    .quad   .builtin_slot_28
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_32
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_36
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_41
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_44
+    .quad   .builtin_slot_45
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_51
+    .quad   .builtin_slot_52
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_56
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_59
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_74
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_79
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_86
+    .quad   .builtin_slot_87
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_89
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_91
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_95
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_97
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_101
+    .quad   .builtin_slot_102
+    .quad   .builtin_slot_103
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_106
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_109
+    .quad   .builtin_slot_110
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_113
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_116
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_118
+    .quad   .builtin_slot_119
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_121
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_125
+    .quad   .builtin_slot_126
+    .quad   .builtin_slot_127
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_130
+    .quad   .builtin_slot_131
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_134
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_144
+    .quad   .builtin_slot_145
+    .quad   .builtin_slot_146
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_151
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_153
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_156
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_158
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_161
+    .quad   .builtin_slot_162
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_164
+    .quad   .builtin_slot_165
+    .quad   .builtin_slot_166
+    .quad   .builtin_slot_167
+    .quad   .builtin_slot_168
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_171
+    .quad   .builtin_slot_172
+    .quad   .builtin_slot_173
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_175
+    .quad   .builtin_slot_176
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_178
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_185
+    .quad   .builtin_slot_186
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_190
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_196
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_200
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_207
+    .quad   .builtin_slot_208
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_212
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_233
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_237
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_240
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_245
+    .quad   .builtin_slot_246
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_249
+    .quad   .builtin_slot_250
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_252
+    .quad   .builtin_slot_253
+    .quad   .call_not_builtin
+    .quad   .builtin_slot_255
+
 # ── BSS (writable, zero-initialized) ────────────────────────────────────
 .section .bss
 var_table_base:
@@ -8556,7 +9043,7 @@ closure_depth:
 skip_scope_restore:
     .space 8                            # >0 → skip N scope restores (for module loading)
 var_cache:
-    .space 96                           # 4 × [hash:8, entry_ptr:8, vt_count:8] = 24 bytes each
+    .space 6144                         # 256 × [hash:8, entry_ptr:8, vt_count:8] = 24 bytes each
 loop_counters:
     .space 1024                         # 256 × 4-byte backward jump counters
 loop_jit_cache:

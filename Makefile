@@ -14,7 +14,7 @@ VM_OBJ   = vm/x86_64/vm_x86_64.o
 VM_BIN   = vm/x86_64/vm_x86_64
 STDLIB   = stdlib
 KNOWLEDGE = origin.olang
-OUTPUT   = origin_new.olang
+OUTPUT   = origin.olang
 
 .PHONY: all vm build test intg clean clippy eval smoke smoke-binary verify demo check-all
 
@@ -63,11 +63,11 @@ smoke:
 
 # Smoke test: native binary boots and shows prompt
 smoke-binary: build
-	@echo "Testing origin_new.olang boots..." && \
+	@echo "Testing origin.olang boots..." && \
 	OUTPUT=$$(echo 'exit' | ./$(OUTPUT) 2>&1) && \
 	echo "$$OUTPUT" | grep -q "HomeOS" && \
-	echo "PASS: origin_new.olang boots OK" || \
-	(echo "FAIL: origin_new.olang did not boot"; exit 1)
+	echo "PASS: origin.olang boots OK" || \
+	(echo "FAIL: origin.olang did not boot"; exit 1)
 
 # E2E demo — 10 scenarios (requires tools/demo/scenarios.sh)
 demo:

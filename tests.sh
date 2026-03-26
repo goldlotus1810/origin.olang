@@ -8,7 +8,7 @@
 set -euo pipefail
 
 ORIGIN_DIR="$(cd "$(dirname "$0")" && pwd)"
-BINARY="$ORIGIN_DIR/origin_new.olang"
+BINARY="$ORIGIN_DIR/origin.olang"
 TEST_DIR="$ORIGIN_DIR/test"
 TMP_DIR="/tmp/olang_tests"
 
