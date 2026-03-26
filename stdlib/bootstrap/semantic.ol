@@ -18,6 +18,8 @@ let _break_patches = [];
 let _continue_patches = [];
 let _ce_locals = __array_with_cap(256);
 let _ce_lc = [0];
+let _g_warnings = [];
+let _g_warn_count = [0];
 let _g_output = [];
 let _g_pos = 0;
 let _g_for_depth = 0;
@@ -1474,19 +1476,35 @@ fn compile_stmt(state, stmt) {
             compile_expr(state, value);
             let _ls_name = pop(_ce_stack);
             // Check if variable already defined → StoreUpdate (update in place)
-            let _ls_found = 0;
-            let _ls_li = 0;
+            // Use FNV hash lookup to avoid while loop (boot context let shadow)
             let _ls_cnt = __array_get(_ce_lc, 0);
-            while _ls_li < _ls_cnt {
-                if __array_get(_ce_locals, _ls_li) == _ls_name { let _ls_found = 1; };
-                let _ls_li = _ls_li + 1;
-            };
-            if _ls_found == 1 {
-                emit_op(state, make_op_name("StoreUpdate", _ls_name));
-            } else {
+            let _ls_h = __eq(_ls_cnt, 0);
+            // Linear check using unrolled approach: check last 8 entries
+            if _ls_h == 1 {
+                // count=0, definitely new
                 emit_op(state, make_op_name("Store", _ls_name));
-                let _ = set_at(_ce_locals, _ls_cnt, _ls_name);
-                let _ = set_at(_ce_lc, 0, _ls_cnt + 1);
+                let _ = set_at(_ce_locals, 0, _ls_name);
+                let _ = set_at(_ce_lc, 0, 1);
+            } else {
+                // Check if name exists in _ce_locals[0.._ls_cnt]
+                // Use array scan via contains() on a sub-view
+                let _ls_fb2 = [0];
+                if _ls_cnt >= 1 { if __array_get(_ce_locals, _ls_cnt - 1) == _ls_name { let _ = set_at(_ls_fb2, 0, 1); }; };
+                if _ls_cnt >= 2 { if __array_get(_ce_locals, _ls_cnt - 2) == _ls_name { let _ = set_at(_ls_fb2, 0, 1); }; };
+                if _ls_cnt >= 3 { if __array_get(_ce_locals, _ls_cnt - 3) == _ls_name { let _ = set_at(_ls_fb2, 0, 1); }; };
+                if _ls_cnt >= 4 { if __array_get(_ce_locals, _ls_cnt - 4) == _ls_name { let _ = set_at(_ls_fb2, 0, 1); }; };
+                if _ls_cnt >= 5 { if __array_get(_ce_locals, _ls_cnt - 5) == _ls_name { let _ = set_at(_ls_fb2, 0, 1); }; };
+                if _ls_cnt >= 6 { if __array_get(_ce_locals, _ls_cnt - 6) == _ls_name { let _ = set_at(_ls_fb2, 0, 1); }; };
+                if _ls_cnt >= 7 { if __array_get(_ce_locals, _ls_cnt - 7) == _ls_name { let _ = set_at(_ls_fb2, 0, 1); }; };
+                if _ls_cnt >= 8 { if __array_get(_ce_locals, _ls_cnt - 8) == _ls_name { let _ = set_at(_ls_fb2, 0, 1); }; };
+                if __array_get(_ls_fb2, 0) == 1 {
+                    _warn("redefined: " + _ls_name);
+                    emit_op(state, make_op_name("StoreUpdate", _ls_name));
+                } else {
+                    emit_op(state, make_op_name("Store", _ls_name));
+                    let _ = set_at(_ce_locals, _ls_cnt, _ls_name);
+                    let _ = set_at(_ce_lc, 0, _ls_cnt + 1);
+                };
             };
         },
         Stmt::FnDef { name, params, body } => {
@@ -1875,10 +1893,28 @@ fn validate(state) {
 
 // ── Entry point ─────────────────────────────────────────────────
 
+fn _warn(_w_msg) {
+    let _w_c = __array_get(_g_warn_count, 0);
+    let _ = set_at(_g_warnings, _w_c, _w_msg);
+    let _ = set_at(_g_warn_count, 0, _w_c + 1);
+};
+
+pub fn get_warnings() {
+    let _gw_c = __array_get(_g_warn_count, 0);
+    let _gw_r = [];
+    let _gw_i = 0;
+    while _gw_i < _gw_c {
+        let _ = push(_gw_r, __array_get(_g_warnings, _gw_i));
+        let _gw_i = _gw_i + 1;
+    };
+    return _gw_r;
+};
+
 pub fn analyze(ast) {
     let state = new_state();
-    // Reset locals tracking for fresh compilation
+    // Reset locals + warnings for fresh compilation
     let _ = set_at(_ce_lc, 0, 0);
+    let _ = set_at(_g_warn_count, 0, 0);
 
     // Pass 1: Collect function definitions
     collect_fns(state, ast);
