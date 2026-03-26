@@ -221,18 +221,67 @@ pub fn tokenize(source) {
                     push(tokens, Token { kind: TokenKind::Symbol { ch: "+" }, text: "+", line: line, col: col });
                     push(tokens, Token { kind: TokenKind::Ident { name: "__to_string" }, text: "__to_string", line: line, col: col });
                     push(tokens, Token { kind: TokenKind::Symbol { ch: "(" }, text: "(", line: line, col: col });
-                    // Tokenize expr inside {} (simple: just read ident/number until })
+                    // Tokenize expr inside {} — manual scan for ident.field and fn(args)
                     let _is_expr_start = pos;
                     while pos < src_len && char_at(source, pos) != "}" {
                         let pos = pos + 1;
                         let col = col + 1;
                     };
-                    // Emit the expr as ident
                     let _is_expr = __substr(source, _is_expr_start, pos);
-                    if is_digit(char_at(_is_expr, 0)) {
-                        push(tokens, Token { kind: TokenKind::Number { value: __to_number(_is_expr) }, text: _is_expr, line: line, col: col });
-                    } else {
-                        push(tokens, Token { kind: TokenKind::Ident { name: _is_expr }, text: _is_expr, line: line, col: col });
+                    // Split on "." to handle field access: config.name → config . name
+                    let _is_ei = 0;
+                    let _is_word = "";
+                    while _is_ei < len(_is_expr) {
+                        let _is_ec = char_at(_is_expr, _is_ei);
+                        if _is_ec == "." {
+                            if len(_is_word) > 0 {
+                                push(tokens, Token { kind: TokenKind::Ident { name: _is_word }, text: _is_word, line: line, col: col });
+                                let _is_word = "";
+                            };
+                            push(tokens, Token { kind: TokenKind::Symbol { ch: "." }, text: ".", line: line, col: col });
+                        } else {
+                            if _is_ec == "(" {
+                                if len(_is_word) > 0 {
+                                    push(tokens, Token { kind: TokenKind::Ident { name: _is_word }, text: _is_word, line: line, col: col });
+                                    let _is_word = "";
+                                };
+                                push(tokens, Token { kind: TokenKind::Symbol { ch: "(" }, text: "(", line: line, col: col });
+                            } else {
+                                if _is_ec == ")" {
+                                    if len(_is_word) > 0 {
+                                        if is_digit(char_at(_is_word, 0)) {
+                                            push(tokens, Token { kind: TokenKind::Number { value: __to_number(_is_word) }, text: _is_word, line: line, col: col });
+                                        } else {
+                                            push(tokens, Token { kind: TokenKind::Ident { name: _is_word }, text: _is_word, line: line, col: col });
+                                        };
+                                        let _is_word = "";
+                                    };
+                                    push(tokens, Token { kind: TokenKind::Symbol { ch: ")" }, text: ")", line: line, col: col });
+                                } else {
+                                    if _is_ec == "," {
+                                        if len(_is_word) > 0 {
+                                            if is_digit(char_at(_is_word, 0)) {
+                                                push(tokens, Token { kind: TokenKind::Number { value: __to_number(_is_word) }, text: _is_word, line: line, col: col });
+                                            } else {
+                                                push(tokens, Token { kind: TokenKind::Ident { name: _is_word }, text: _is_word, line: line, col: col });
+                                            };
+                                            let _is_word = "";
+                                        };
+                                        push(tokens, Token { kind: TokenKind::Symbol { ch: "," }, text: ",", line: line, col: col });
+                                    } else {
+                                        let _is_word = _is_word + _is_ec;
+                                    };
+                                };
+                            };
+                        };
+                        let _is_ei = _is_ei + 1;
+                    };
+                    if len(_is_word) > 0 {
+                        if is_digit(char_at(_is_word, 0)) {
+                            push(tokens, Token { kind: TokenKind::Number { value: __to_number(_is_word) }, text: _is_word, line: line, col: col });
+                        } else {
+                            push(tokens, Token { kind: TokenKind::Ident { name: _is_word }, text: _is_word, line: line, col: col });
+                        };
                     };
                     // Close __to_string()
                     push(tokens, Token { kind: TokenKind::Symbol { ch: ")" }, text: ")", line: line, col: col });
