@@ -10,28 +10,7 @@
 // String utilities (boot-compatible)
 // ════════════════════════════════════════════════════════════════
 
-// Substring check (case-sensitive, boot-compatible)
-fn _cl_has(_ch_text, _ch_word) {
-    let _ch_tl = len(_ch_text);
-    let _ch_wl = len(_ch_word);
-    if _ch_wl > _ch_tl { return 0; };
-    let _ch_i = 0;
-    while _ch_i <= (_ch_tl - _ch_wl) {
-        let _ch_m = 1;
-        let _ch_j = 0;
-        while _ch_j < _ch_wl {
-            if char_at(_ch_text, _ch_i + _ch_j) != char_at(_ch_word, _ch_j) {
-                _ch_m = 0; break;
-            };
-            let _ch_j = _ch_j + 1;
-        };
-        if _ch_m == 1 { return 1; };
-        let _ch_i = _ch_i + 1;
-    };
-    return 0;
-}
-
-// Case-insensitive substring check
+// Case-insensitive substring check (uses _nl_has from nlcompute.ol for case-sensitive)
 fn _cl_lower(_clc_code) {
     if _clc_code >= 65 { if _clc_code <= 90 { return _clc_code + 32; }; };
     return _clc_code;

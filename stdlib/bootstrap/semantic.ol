@@ -24,7 +24,7 @@ let _g_output = [];
 let _g_pos = 0;
 let _g_for_depth = 0;
 let __g_for_vars = ["", "", "", "", "", "", "", ""];  // max 8 nesting levels
-let _g_comp_depth = 0;
+let _g_semantic_comp_depth = 0;
 
 // ── IR Opcode representation ────────────────────────────────────
 // We represent opcodes as structs with an "op" tag string + args.
@@ -1291,7 +1291,7 @@ fn compile_expr(state, expr) {
             // Exit
             patch_jump(state, _cc_exit_jz_r, current_pos(state));
             emit_op(state, make_op_name("Load", _cc_result));
-            let _g_comp_depth = _g_comp_depth - 1;
+            let _g_semantic_comp_depth = _g_semantic_comp_depth - 1;
         },
         Expr::IfExpr { cond, then_expr, else_expr } => {
             compile_expr(state, cond);

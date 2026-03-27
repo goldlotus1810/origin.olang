@@ -74,7 +74,7 @@ type MatchArm {
 let _g_parse_error = 0;
 
 // ── ArrayComp globals (depth-indexed — arrays unsafe due to heap overlap) ──
-let _g_comp_depth = 0;
+let _g_parser_comp_depth = 0;
 // expr token ranges
 let __g_ce0s = 0; let __g_ce0e = 0;
 let __g_ce1s = 0; let __g_ce1e = 0;
@@ -448,8 +448,8 @@ fn parse_primary(p) {
                 };
                 // Save expr range: increment depth FIRST to prevent inner [ ] from
                 // overwriting our depth slot. Inner arrays use depth+1 slot (harmless).
-                let _pa_my_depth = _g_comp_depth;
-                let _g_comp_depth = _g_comp_depth + 1;
+                let _pa_my_depth = _g_parser_comp_depth;
+                let _g_parser_comp_depth = _g_parser_comp_depth + 1;
                 if _pa_my_depth == 0 { let __g_ce0s = p.pos; };
                 if _pa_my_depth == 1 { let __g_ce1s = p.pos; };
                 if _pa_my_depth == 2 { let __g_ce2s = p.pos; };
@@ -479,7 +479,7 @@ fn parse_primary(p) {
                     expect_symbol(p, "]");
                     // Save iter + filter + var to depth-indexed globals
                     // (expr range already saved above, before inner parse)
-                    let _pa_d = _g_comp_depth - 1;
+                    let _pa_d = _g_parser_comp_depth - 1;
                     if _pa_d == 0 {
                         let __g_ci0s = _pa_iter_start; let __g_ci0e = _pa_iter_end;
                         let __g_cf0s = _pa_filt_start; let __g_cf0e = _pa_filt_end;
@@ -505,7 +505,7 @@ fn parse_primary(p) {
                     return Expr::ArrayComp { var: _pa_cv, depth: _pa_d };
                 };
                 // Regular array literal — restore depth (was incremented speculatively)
-                let _g_comp_depth = _g_comp_depth - 1;
+                let _g_parser_comp_depth = _g_parser_comp_depth - 1;
                 let items = [_pa_first];
                 while is_symbol_tok(peek(p), ",") {
                     advance(p);
