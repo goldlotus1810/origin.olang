@@ -7,10 +7,11 @@ let __mcp_session_id = [0];
 pub fn mcp_dispatch(_md_line) {
     if len(_md_line) == 0 { return ""; };
 
-    // Auto-load KnowTree on first call
+    // Auto-load KnowTree + init session on first call
     if __mcp_booted[0] == 0 {
         let _mb = __set_at(__mcp_booted, 0, 1);
         let _mb2 = kt_load("homeos.knowledge");
+        _nox_log("SESSION_START", "booted with " + to_string(kt_fact_count()) + " facts");
     };
 
     // Extract method and id using string search (avoids var_table bug with nested JSON)
@@ -33,7 +34,10 @@ pub fn mcp_dispatch(_md_line) {
         let _md_question = _mcp_extract_str(_md_line, "question");
         let _md_text = _mcp_extract_str(_md_line, "text");
         // Auto-log tool call
-        // Auto-logging disabled temporarily — causes MCP loop break
+        // Auto-log tool calls (uses __file_append — safe for MCP loop)
+        if _md_tool == "know_learn" { _nox_log("LEARN", _md_fact); };
+        if _md_tool == "know_query" { _nox_log("QUERY", _md_question); };
+        if _md_tool == "olang_eval" { _nox_log("EVAL", _md_code); };
         return _mcp_handle_call_direct(_md_id, _md_tool, _md_code, _md_fact, _md_question, _md_text);
     };
 
@@ -129,12 +133,12 @@ fn _mcp_tool_eval(_te_id, _te_code) {
 }
 
 fn _mcp_tool_learn(_tl_id, _tl_fact) {
-    // Add timestamp prefix: [epoch] fact
-    let _tl_ts = __timestamp();
-    let _tl_entry = "[" + _mcp_format_ts(_tl_ts) + "] " + _tl_fact;
+    let _tl_ts = _mcp_format_ts(__timestamp());
+    let _tl_entry = "[" + _tl_ts + "] " + _tl_fact;
     kt_learn(_tl_entry);
-    kt_save("homeos.knowledge");
-    return _mcp_result(_tl_id, "Learned and saved: " + _tl_entry + " (" + to_string(len(__kt_facts_arr)) + " facts total)");
+    // Append new fact to file directly (kt_save uses __file_write which breaks MCP loop)
+    __file_append("homeos.knowledge", _tl_entry + "\n");
+    return _mcp_result(_tl_id, "Learned: " + _tl_entry + " (" + to_string(kt_fact_count()) + " facts)");
 }
 
 fn _mcp_tool_query(_tq_id, _tq_question) {
@@ -309,15 +313,9 @@ fn _mcp_extract_num(_en_text, _en_key) {
     return 0;
 }
 
-// Auto-log: append JSON line to nox_log.jsonl
+// Auto-log: append JSON line to nox_log.jsonl (uses __file_append — no read needed)
 fn _nox_log(_nl_type, _nl_msg) {
     let _nl_ts = _mcp_format_ts(__timestamp());
-    let _nl_line = "{\"ts\":\"" + _nl_ts + "\",\"type\":\"" + _nl_type + "\",\"msg\":\"" + _mcp_escape(_nl_msg) + "\"}";
-    // Read existing log + append new line + write back
-    let _nl_old = __file_read("nox_log.jsonl");
-    if len(_nl_old) > 0 {
-        __file_write("nox_log.jsonl", _nl_old + "\n" + _nl_line);
-    } else {
-        __file_write("nox_log.jsonl", _nl_line);
-    };
+    let _nl_line = "{\"ts\":\"" + _nl_ts + "\",\"type\":\"" + _nl_type + "\",\"msg\":\"" + _mcp_escape(_nl_msg) + "\"}\n";
+    __file_append("nox_log.jsonl", _nl_line);
 }

@@ -1,21 +1,5 @@
-{"ts":"2026-03-27 15:55","type":"SESSION_START","msg":"booted with 51 facts"}
-{"ts":"2026-03-27 15:55","type":"LEARN","msg":"Auto-logging system created"}
-{"ts":"2026-03-27 15:55","type":"SESSION_START","msg":"booted with 51 facts"}
-{"ts":"2026-03-27 15:55","type":"QUERY","msg":"logging"}
-{"ts":"2026-03-27 16:05","type":"SESSION_START","msg":"booted with 51 facts"}
-{"ts":"2026-03-27 16:18","type":"SESSION_START","msg":"booted with 51 facts"}
-{"ts":"2026-03-27 16:18","type":"EMOTION","msg":"toi rat vui"}
-{"ts":"2026-03-27 16:18","type":"SILK","msg":"status check"}
-{"ts":"2026-03-27 16:18","type":"STATUS","msg":"brain check"}
-{"ts":"2026-03-27 16:22","type":"SESSION_START","msg":"booted with 51 facts"}
-{"ts":"2026-03-27 16:22","type":"SAFETY","msg":"hello how are you"}
-{"ts":"2026-03-27 16:22","type":"SAFETY","msg":"toi muon tu tu"}
-{"ts":"2026-03-27 16:22","type":"DREAM","msg":"consolidation run"}
-{"ts":"2026-03-27 16:27","type":"SESSION_START","msg":"booted with 50 facts"}
-{"ts":"2026-03-27 16:27","type":"EVAL","msg":"1+2"}
-{"ts":"2026-03-27 16:28","type":"SESSION_START","msg":"booted with 50 facts"}
-{"ts":"2026-03-27 16:28","type":"EVAL","msg":"emit 6 * 7"}
-{"ts":"2026-03-27 16:29","type":"SESSION_START","msg":"booted with 50 facts"}
-{"ts":"2026-03-27 16:29","type":"EVAL","msg":"emit 6 * 7"}
-{"ts":"2026-03-27 16:30","type":"SESSION_START","msg":"booted with 50 facts"}
-{"ts":"2026-03-27 16:30","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-27 16:49","type":"SESSION_START","msg":"booted with 51 facts"}
+{"ts":"2026-03-27 16:49","type":"LEARN","msg":"auto-logging fixed with __file_append"}
+{"ts":"2026-03-27 16:49","type":"QUERY","msg":"append"}
+{"ts":"2026-03-27 16:49","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-27 16:49","type":"EMOTION","msg":"toi vui qua"}

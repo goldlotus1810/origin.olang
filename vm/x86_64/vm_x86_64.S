@@ -1698,6 +1698,12 @@ op_call:
     je      .call_utf8_len
     jmp     .call_not_builtin
 
+.builtin_slot_210:
+    movabs  $0xD219BD04DB53DED2, %rdx
+    cmp     %rdx, %rax
+    je      .call_file_append
+    jmp     .call_not_builtin
+
 .builtin_slot_212:
     movabs  $0x7551B73312F1D4D4, %rdx
     cmp     %rdx, %rax
@@ -7340,6 +7346,10 @@ op_ret:
     add     %rcx, %r13
     jmp     op_file_write
 
+.call_file_append:
+    add     %rcx, %r13
+    jmp     op_file_append
+
 # ── Raw byte buffer builtins ────────────────────────────────────────
 # Bytes buffers: stored as [size:8][raw_bytes:N] on heap
 # VM stack entry: ptr = heap_base, len = BYTES_MARKER (-5)
@@ -8655,7 +8665,11 @@ op_file_read:
     jmp     vm_loop
 
 op_file_write:
+    movl    $0x241, fwrite_flags(%rip)  # O_WRONLY|O_CREAT|O_TRUNC
+    jmp     .fwrite_common
 op_file_append:
+    movl    $0x441, fwrite_flags(%rip)  # O_WRONLY|O_CREAT|O_APPEND
+.fwrite_common:
     # Pop content, pop filename, write to file
     # Stack: [filename, content]
     mov     (%r14), %r8             # content ptr
@@ -8678,7 +8692,7 @@ op_file_append:
     movb    $0, (%rdi, %rcx)
     # Open/create file
     lea     sha_input(%rip), %rdi
-    mov     $0x241, %esi            # O_WRONLY|O_CREAT|O_TRUNC
+    mov     fwrite_flags(%rip), %esi  # O_WRONLY|O_CREAT|O_TRUNC or O_APPEND
     mov     $0644, %edx             # permissions
     mov     $SYS_OPEN, %eax
     syscall
@@ -10760,7 +10774,7 @@ builtin_jump_table:
     .quad   .builtin_slot_207
     .quad   .builtin_slot_208
     .quad   .call_not_builtin
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_210
     .quad   .call_not_builtin
     .quad   .builtin_slot_212
     .quad   .call_not_builtin
@@ -10911,6 +10925,8 @@ mcp_buf:
     .space 8                            # pointer to MCP line buffer on heap
 mcp_entered:
     .space 1                            # 1 = already entered MCP loop (skip pop)
+fwrite_flags:
+    .space 4                            # open flags for file write/append
 mcp_capture:
     .space 1                            # 1 = capture emit output to mcp_out_buf
 mcp_out_len:
