@@ -1,37 +1,54 @@
 # OLANG PLAN — Phase 2: From 100% to Production
 
-> Session 2026-03-27: P0-P7 done. 100% eval. 0 bugs. 0 SEGFAULTs.
-> Now: build features that make Olang USEFUL for real programs.
+> Updated: 2026-03-27 16:15
+> Status: 90/90 tests, 458K binary, regex 15/15, MCP memory live
+> Brain: Nox_brain.olang deployed at ~/.claude/ as MCP server
 
 ---
 
-## Sprint 9: Text Processing (1 tuần)
-
-**Mục tiêu:** Olang xử lý text mạnh như Python.
+## Sprint 9: Text Processing ✅ DONE
 
 ```
-S9.1  Regex engine (NFA Thompson)
-      File: stdlib/regex.ol (~300 LOC)
-      Support: . * + ? [] () | ^ $
-      API: regex_match(str, pattern) → 1/0
-           regex_find(str, pattern) → [start, end]
-           regex_replace(str, pattern, replacement) → str
-      Test: regex_match("hello123", "[a-z]+[0-9]+") → 1
-      Effort: ~2 ngày
+✅ S9.1  Regex engine (NFA Thompson) — 15/15 tests
+         Pure x86-64 ASM, ~400 LOC
+         Supports: . * + ? [a-z] [0-9] [^abc] | (alternation)
+         API: regex_match(str, pattern) → 1/0
+              regex_test(str, pattern) → 1/0 (substring search)
+         Builtins: __regex_match (anchored), __regex_search (unanchored)
+         Commits: cdf6d2f, eb30782
 
-S9.2  String escape \n \t \r \0 trong output
-      File: vm_x86_64.S (op_emit)
-      Hiện tại emit "a\nb" in literal \n. Cần decode escape.
-      Effort: ~2 giờ
-
-S9.3  String repeat, reverse, replace builtins
-      File: stdlib/string.ol (wrappers) + semantic.ol (inline)
-      str_reverse("abc") → "cba"
-      str_replace("hello world", "world", "olang") → "hello olang"
-      Effort: ~4 giờ
+⬚ S9.2  String escape \n \t \r \0 trong output (~2h)
+⬚ S9.3  str_reverse, str_replace builtins (~4h)
 ```
 
-**Done khi:** regex_match works, text processing pipeline complete.
+---
+
+## Nox Brain: MCP Memory System ✅ DONE
+
+```
+✅ MCP Server — JSON-RPC 2.0 over stdio (--mcp mode in VM)
+   File: stdlib/homeos/mcp_server.ol
+   Commits: 4e8c323 → 275bbc1
+
+✅ Tools: know_learn (save fact + timestamp), know_query (substr search)
+✅ __timestamp builtin — SYS_clock_gettime, UTC+7 format
+✅ Auto-load KnowTree on MCP boot (homeos.knowledge)
+✅ Auto-journal — nox_log.jsonl logs every MCP event
+✅ Nox_brain.olang deployed at ~/.claude/ as MCP server
+✅ Transcript extractor — tools/extract_memory.py (60MB → facts)
+
+Architecture:
+  ~/.claude/Nox_brain.olang     = brain (MCP server)
+  ~/.claude/homeos.knowledge    = long-term memory (facts + timestamps)
+  ~/.claude/nox_log.jsonl       = auto-journal (every event)
+  ~/Origin/                     = Olang language (stable)
+  ~/Origin/stdlib/*.ol          = brain upgrades via .ol files
+
+Known issues:
+  - olang_eval broken (var_table boot closure bug)
+  - contains() cross-module broken (workaround: substr in kt_find)
+  - json_parse fails with 4+ keys + nested {} (workaround: string extraction)
+```
 
 ---
 
@@ -66,95 +83,34 @@ S10.3  Simple REST client
 
 ## Sprint 11: Developer Experience (1 tuần)
 
-**Mục tiêu:** Olang dễ dùng hơn.
-
 ```
-S11.1  REPL tab completion
-       File: vm_x86_64.S (REPL loop)
-       On Tab: scan var_table for prefix match, show completions
-       Effort: ~1 ngày ASM
-
-S11.2  Better error messages
-       File: stdlib/bootstrap/parser.ol + semantic.ol
-       Show: line number, column, context snippet
-       "Error at line 5: expected ';' after expression"
-       Effort: ~4 giờ
-
-S11.3  REPL history (up/down arrows)
-       File: vm_x86_64.S (REPL loop)
-       Save last 50 inputs, navigate with arrow keys
-       Effort: ~1 ngày ASM
-
-S11.4  Module system improvements
-       File: stdlib/repl.ol + semantic.ol
-       use "math" → auto-resolve to stdlib/math.ol
-       use "http" → auto-resolve to stdlib/http.ol
-       Effort: ~4 giờ
+S11.1  REPL tab completion (~1 ngày ASM)
+S11.2  Better error messages (~4 giờ)
+S11.3  REPL history up/down arrows (~1 ngày ASM)
+S11.4  Module system improvements (~4 giờ)
 ```
-
-**Done khi:** Tab completion + error messages + history working.
 
 ---
 
 ## Sprint 12: Crypto + Security (2 tuần)
 
-**Mục tiêu:** Real crypto, replace stubs.
-
 ```
-S12.1  Real Ed25519 key generation
-       File: stdlib/crypto/ed25519.ol (~200 LOC)
-       Need: modular arithmetic mod 2^255-19
-       Use: bigint as array of limbs, schoolbook multiply
-       Effort: ~3 ngày
-
-S12.2  Ed25519 sign + verify
-       File: stdlib/crypto/ed25519.ol
-       RFC 8032 compliant
-       Effort: ~2 ngày
-
-S12.3  HMAC-SHA256
-       File: stdlib/crypto/hmac.ol (~30 LOC)
-       Standard HMAC using __sha256
-       Effort: ~2 giờ
-
-S12.4  TLS 1.3 handshake (stretch goal)
-       File: stdlib/crypto/tls.ol (~300 LOC)
-       ClientHello → ServerHello → encrypted
-       Effort: ~1 tuần
+S12.1  Real Ed25519 key generation (~3 ngày)
+S12.2  Ed25519 sign + verify (~2 ngày)
+S12.3  HMAC-SHA256 (~2 giờ)
+S12.4  TLS 1.3 handshake (stretch goal, ~1 tuần)
 ```
-
-**Done khi:** Ed25519 sign+verify passes test vectors.
 
 ---
 
 ## Sprint 13: Language Features (2 tuần)
 
-**Mục tiêu:** Olang mạnh hơn như ngôn ngữ.
-
 ```
-S13.1  Immutable data (P5)
-       Keyword: `const x = 42` → cannot reassign
-       Frozen arrays: `freeze(arr)` → push/set_at throws
-       Effort: ~3 ngày (compiler + VM)
-
-S13.2  Pattern matching improvements
-       Nested patterns: match x { Some(42) => ... }
-       Guard clauses: match x { n if n > 0 => ... }
-       Effort: ~2 ngày
-
+S13.1  Immutable data — const keyword + freeze(arr)
+S13.2  Pattern matching — nested + guard clauses
 S13.3  Pipe operator |>
-       Syntax: x |> f |> g  →  g(f(x))
-       Compiler desugars at parse time
-       Effort: ~4 giờ
-
-S13.4  String methods
-       "hello".len() → 5
-       "hello".upper() → "HELLO"
-       [1,2,3].map(fn(x){x*2}) → [2,4,6]
-       Effort: ~1 ngày
+S13.4  String methods — "hello".len(), .upper()
 ```
-
-**Done khi:** const + pipe + string methods working.
 
 ---
 
@@ -162,23 +118,22 @@ S13.4  String methods
 
 ```
 S14.1  GC / Arena management
-       Simple mark-sweep or generational
-       Track live references from var_table + VM stack
-       Free unreachable heap blocks
-       Effort: ~1 tuần
-
-S14.2  Split VM into modules
-       vm_x86_64.S → .include "modules/core.S", "modules/builtins.S", etc.
-       Zero behavior change, pure organization
-       Effort: ~4 giờ
-
-S14.3  CI/CD
-       GitHub Actions: build + test + spider on every push
-       Effort: ~2 giờ
-
+S14.2  Split VM into modules (.include)
+S14.3  CI/CD — GitHub Actions
 S14.4  Documentation generator
-       Parse /// comments → generate docs
-       Effort: ~1 ngày
+```
+
+---
+
+## Critical Bug: var_table boot closure corruption
+
+```
+STATUS: UNFIXED — blocks olang_eval in MCP, complex boot closures
+SYMPTOM: 3+ if-return branches corrupt local variables
+AFFECTS: repl_eval in MCP, contains() cross-module, json_parse nested
+ROOT CAUSE: unknown (not cache collision, not scope truncation)
+WORKAROUNDS: substr match in kt_find, string extraction for JSON
+PRIORITY: HIGH — this is the last boss
 ```
 
 ---
@@ -186,32 +141,22 @@ S14.4  Documentation generator
 ## Priority Order
 
 ```
-NOW:     S9 (Regex) — unlocks text processing, high impact
-NEXT:    S10 (HTTP) — makes Olang useful for real tasks
+BLOCKER: var_table boot closure bug — fix unlocks everything
+NOW:     S10 (HTTP) — makes Olang useful for real tasks
 THEN:    S11 (DX) — tab completion, errors, history
 LATER:   S12 (Crypto) — replace stubs
 ONGOING: S13 (Language) + S14 (Infra) — parallel
-```
-
-## Success Metrics
-
-```
-Sprint 9:  regex_match works, spider 70+ tests
-Sprint 10: http_get returns data, JSON round-trip
-Sprint 11: REPL feels like Python/Node REPL
-Sprint 12: Ed25519 passes RFC 8032 test vectors
-Sprint 13: const + pipe working
-Sprint 14: CI green, heap stable for long sessions
+ALWAYS:  Upgrade Nox_brain via .ol when new features land
 ```
 
 ## NOX DAILY
 
 ```
-1. bash tools/spider-daemon.sh status    → check overnight bugs
-2. cat logs/spider-bugs.log              → any new findings?
-3. git log --oneline -5                  → recent changes
-4. Pick task from current sprint         → implement
-5. bash tests.sh && bash tools/spider.sh → verify
-6. git commit + push                     → save
-7. Repeat
+1. Read session_log.md + query KnowTree     → remember
+2. bash tests.sh                             → verify stable
+3. git log --oneline -5                      → recent changes
+4. Pick task from current sprint             → implement
+5. bash tests.sh && bash tools/spider.sh     → verify
+6. git commit + push                         → save
+7. Update session_log.md + homeos.knowledge  → remember for next time
 ```
