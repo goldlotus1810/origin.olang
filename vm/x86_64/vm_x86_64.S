@@ -1230,6 +1230,9 @@ op_call:
     movabs  $0xAD9A9975BDE0C517, %rdx
     cmp     %rdx, %rax
     je      .call_tcp_recv
+    movabs  $0xF7B80C4062E48617, %rdx
+    cmp     %rdx, %rax
+    je      .call_regex_search
     jmp     .call_not_builtin
 
 .builtin_slot_24:
@@ -6143,6 +6146,7 @@ op_ret:
 # ═══════════════════════════════════════════════════════════════════════════
 .call_regex_match:
     add     %rcx, %r13
+    movb    $0, rx_search_mode(%rip)   # anchored match mode
     # Pop pattern (top), text (below)
     mov     (%r14), %rdi              # pattern ptr (u16 mols)
     mov     8(%r14), %rcx             # pattern mol_count
@@ -6194,18 +6198,33 @@ op_ret:
     #      rx_text has text bytes, r13 = text_len
 
     # ── Build NFA states ──
-    # Simple approach: each pattern char = 1 NFA state + 1 accept state
-    # State: [type:1, char:1, next1:2, next2:2] = 6 bytes
-    # type: 0=lit, 1=dot, 2=split, 3=match, 4=class_start
+    # State: [type:1, lo:1, hi:1, pad:1, next1:2, next2:2] = 8 bytes
+    # type: 0=lit(lo==hi), 1=dot, 2=split, 3=match, 4=range(lo..hi), 5=nrange
     lea     rx_nfa(%rip), %rbx        # rbx = NFA base
     xor     %r8d, %r8d                # r8 = state count
     xor     %r9d, %r9d                # r9 = pattern position
+    movl    $-1, rx_alt_patch(%rip)   # no alternation patch pending
 
 ._rx_build_loop:
     cmp     %ebp, %r9d
     jge     ._rx_build_done
     lea     rx_pattern(%rip), %rdi
     movzbl  (%rdi, %r9), %eax        # pattern byte
+
+    # Handle '[' character class
+    cmp     $'[', %al
+    je      ._rx_parse_class
+
+    # Handle '|' alternation
+    cmp     $'|', %al
+    je      ._rx_parse_alt
+
+    # Handle '(' group — skip for now, treat as literal
+    # Handle ')' — skip
+    cmp     $'(', %al
+    je      ._rx_skip_char
+    cmp     $')', %al
+    je      ._rx_skip_char
 
     # Check for quantifier after this char
     lea     1(%r9), %ecx
@@ -6234,18 +6253,136 @@ op_ret:
 ._rx_no_quant:
     inc     %r9d                       # advance past pattern char
 
-    # Determine state type
+    # Determine state type + lo/hi
+    xor     %edx, %edx                # edx = lo
     cmp     $'.', %al
     je      ._rx_type_dot
-    # Default: literal
+    # Literal: lo = hi = char
     mov     $0, %cl                    # type = lit
+    mov     %al, %dl                   # lo = char
+    mov     %al, %al                   # hi = char (already in al)
     jmp     ._rx_emit_state
 ._rx_type_dot:
     mov     $1, %cl                    # type = dot
+    mov     $1, %dl                    # lo = 1
+    mov     $255, %al                  # hi = 255
+    jmp     ._rx_emit_state
+
+._rx_skip_char:
+    inc     %r9d
+    jmp     ._rx_build_loop
+
+# ── Parse character class [a-z] [0-9] [^abc] ──
+._rx_parse_class:
+    inc     %r9d                       # skip [
+    mov     $4, %cl                    # type = class range
+    # Check negation ^
+    cmp     %ebp, %r9d
+    jge     ._rx_class_done
+    lea     rx_pattern(%rip), %rdi
+    movzbl  (%rdi, %r9), %eax
+    cmp     $'^', %al
+    jne     ._rx_class_first
+    mov     $5, %cl                    # type = negated class
+    inc     %r9d
+._rx_class_first:
+    # Read first char
+    cmp     %ebp, %r9d
+    jge     ._rx_class_done
+    movzbl  (%rdi, %r9), %edx         # lo byte
+    inc     %r9d
+    mov     %edx, %eax                # hi = lo (default: single char)
+    # Check for range a-z
+    cmp     %ebp, %r9d
+    jge     ._rx_class_close
+    movzbl  (%rdi, %r9), %esi
+    cmp     $'-', %esi
+    jne     ._rx_class_close
+    inc     %r9d                       # skip -
+    cmp     %ebp, %r9d
+    jge     ._rx_class_close
+    movzbl  (%rdi, %r9), %eax         # hi byte
+    inc     %r9d
+._rx_class_close:
+    # Skip to closing ]
+    cmp     %ebp, %r9d
+    jge     ._rx_class_done
+    lea     rx_pattern(%rip), %rdi
+    cmpb    $']', (%rdi, %r9)
+    jne     ._rx_class_close           # skip extra chars until ]
+    inc     %r9d                       # skip ]
+._rx_class_done:
+    # dl = lo, al = hi, cl = type (4 or 5)
+    # Check quantifier
+    xor     %r10d, %r10d
+    cmp     %ebp, %r9d
+    jge     ._rx_emit_state
+    lea     rx_pattern(%rip), %rdi
+    movzbl  (%rdi, %r9), %esi
+    cmp     $'*', %esi
+    jne     ._rx_cc_not_star
+    mov     $1, %r10d; inc %r9d; jmp ._rx_emit_state
+._rx_cc_not_star:
+    cmp     $'+', %esi
+    jne     ._rx_cc_not_plus
+    mov     $2, %r10d; inc %r9d; jmp ._rx_emit_state
+._rx_cc_not_plus:
+    cmp     $'?', %esi
+    jne     ._rx_emit_state
+    mov     $3, %r10d; inc %r9d
+    jmp     ._rx_emit_state
+
+# ── Parse alternation a|b ──
+# Strategy: shift existing states right by 1, insert split at 0.
+# Left branch last state → patched at build_done to point to accept.
+# Save left-branch-end in rx_alt_patch BSS.
+._rx_parse_alt:
+    inc     %r9d                       # skip |
+    # Shift all states [0..r8-1] right by 1
+    mov     %r8d, %ecx
+._rx_alt_shift:
+    dec     %ecx
+    jl      ._rx_alt_shifted
+    lea     (%rbx, %rcx, 8), %rsi
+    lea     8(%rsi), %rdi
+    movq    (%rsi), %rax
+    movq    %rax, (%rdi)
+    # Increment next1/next2 pointers
+    movzwl  4(%rdi), %eax
+    cmp     $0xFFFF, %eax
+    je      ._rx_alt_s1
+    inc     %eax
+    movw    %ax, 4(%rdi)
+._rx_alt_s1:
+    movzwl  6(%rdi), %eax
+    cmp     $0xFFFF, %eax
+    je      ._rx_alt_s2
+    inc     %eax
+    movw    %ax, 6(%rdi)
+._rx_alt_s2:
+    jmp     ._rx_alt_shift
+._rx_alt_shifted:
+    # Insert split at state 0
+    mov     %rbx, %rdi
+    movb    $2, (%rdi)                # type = split
+    movb    $0, 1(%rdi)
+    movb    $0, 2(%rdi)
+    movb    $0, 3(%rdi)
+    movw    $1, 4(%rdi)               # next1 = 1 (left branch)
+    inc     %r8d                       # account for split
+    # Left branch last state = r8-1 (the old last state, now shifted)
+    # Its next1 currently points to r8 (right branch start). Save for patching.
+    mov     %r8d, %eax
+    dec     %eax                       # last left branch state index
+    movl    %eax, rx_alt_patch(%rip)   # save for ._rx_build_done to patch
+    # Set split.next2 = r8 (right branch starts here)
+    movw    %r8w, 6(%rbx)             # split next2 = current r8
+    jmp     ._rx_build_loop
 
 ._rx_emit_state:
+    # cl = type, dl = lo, al = hi, r10 = quantifier
     # Create NFA state(s) based on quantifier
-    lea     (%rbx, %r8, 8), %rdi     # state ptr (8 bytes per state)
+    lea     (%rbx, %r8, 8), %rdi     # state ptr
     cmp     $0, %r10d
     je      ._rx_emit_plain
     cmp     $1, %r10d
@@ -6256,72 +6393,83 @@ op_ret:
     je      ._rx_emit_qmark
 
 ._rx_emit_plain:
-    # [type, char, next=r8+1, -1]
+    # [type, lo, hi, pad, next=r8+1, -1]
     movb    %cl, (%rdi)               # type
-    movb    %al, 1(%rdi)              # char
-    lea     1(%r8), %edx
-    movw    %dx, 2(%rdi)              # next1
-    movw    $-1, 4(%rdi)              # next2
+    movb    %dl, 1(%rdi)              # lo
+    movb    %al, 2(%rdi)              # hi
+    movb    $0, 3(%rdi)               # pad
+    lea     1(%r8), %esi
+    movw    %si, 4(%rdi)              # next1
+    movw    $-1, 6(%rdi)              # next2
     inc     %r8d
     jmp     ._rx_build_loop
 
 ._rx_emit_star:
-    # Split state: [2, 0, match_state, skip_state]
-    # Match state: [type, char, split_back, -1]
-    # split → match_state | skip (r8+2)
-    movb    $2, (%rdi)                # split type
+    # Split: [2,0,0,0, match, skip]
+    movb    $2, (%rdi)
     movb    $0, 1(%rdi)
-    lea     1(%r8), %edx
-    movw    %dx, 2(%rdi)              # next1 = match state
-    lea     2(%r8), %edx
-    movw    %dx, 4(%rdi)              # next2 = skip (state after)
+    movb    $0, 2(%rdi)
+    movb    $0, 3(%rdi)
+    lea     1(%r8), %esi
+    movw    %si, 4(%rdi)              # next1 = match state
+    lea     2(%r8), %esi
+    movw    %si, 6(%rdi)              # next2 = skip
     inc     %r8d
-    # Match state
+    # Match state: [type, lo, hi, 0, split_back, -1]
     lea     (%rbx, %r8, 8), %rdi
-    movb    %cl, (%rdi)               # type
-    movb    %al, 1(%rdi)              # char
-    lea     -1(%r8), %edx
-    movw    %dx, 2(%rdi)              # next1 = back to split
-    movw    $-1, 4(%rdi)
+    movb    %cl, (%rdi)
+    movb    %dl, 1(%rdi)
+    movb    %al, 2(%rdi)
+    movb    $0, 3(%rdi)
+    lea     -1(%r8), %esi
+    movw    %si, 4(%rdi)              # back to split
+    movw    $-1, 6(%rdi)
     inc     %r8d
     jmp     ._rx_build_loop
 
 ._rx_emit_plus:
-    # Match state: [type, char, split, -1]
-    # Split: [2, 0, match_back, skip]
-    movb    %cl, (%rdi)               # type (match first)
-    movb    %al, 1(%rdi)
-    lea     1(%r8), %edx
-    movw    %dx, 2(%rdi)              # next1 = split
-    movw    $-1, 4(%rdi)
+    # Match first: [type, lo, hi, 0, split, -1]
+    movb    %cl, (%rdi)
+    movb    %dl, 1(%rdi)
+    movb    %al, 2(%rdi)
+    movb    $0, 3(%rdi)
+    lea     1(%r8), %esi
+    movw    %si, 4(%rdi)
+    movw    $-1, 6(%rdi)
     inc     %r8d
-    # Split state
+    # Split: [2, 0, 0, 0, match_back, skip]
     lea     (%rbx, %r8, 8), %rdi
-    movb    $2, (%rdi)                # split
+    movb    $2, (%rdi)
     movb    $0, 1(%rdi)
-    lea     -1(%r8), %edx
-    movw    %dx, 2(%rdi)              # next1 = back to match
-    lea     1(%r8), %edx
-    movw    %dx, 4(%rdi)              # next2 = skip
+    movb    $0, 2(%rdi)
+    movb    $0, 3(%rdi)
+    lea     -1(%r8), %esi
+    movw    %si, 4(%rdi)
+    lea     1(%r8), %esi
+    movw    %si, 6(%rdi)
     inc     %r8d
     jmp     ._rx_build_loop
 
 ._rx_emit_qmark:
-    # Split: [2, 0, match, skip]
+    # Split: [2, 0, 0, 0, match, skip]
     movb    $2, (%rdi)
     movb    $0, 1(%rdi)
-    lea     1(%r8), %edx
-    movw    %dx, 2(%rdi)              # next1 = match
-    lea     2(%r8), %edx
-    movw    %dx, 4(%rdi)              # next2 = skip
+    movb    $0, 2(%rdi)
+    movb    $0, 3(%rdi)
+    lea     1(%r8), %esi
+    movw    %si, 4(%rdi)
+    lea     2(%r8), %esi
+    movw    %si, 6(%rdi)
     inc     %r8d
-    # Match state
+    # Match: [type, lo, hi, 0, continue, -1]
     lea     (%rbx, %r8, 8), %rdi
     movb    %cl, (%rdi)
-    movb    %al, 1(%rdi)
-    lea     1(%r8), %edx
-    movw    %dx, 2(%rdi)              # next = continue
-    movw    $-1, 4(%rdi)
+    movb    %dl, 1(%rdi)
+    movb    %al, 2(%rdi)
+    movb    $0, 3(%rdi)
+    lea     1(%r8), %esi
+    movw    %si, 4(%rdi)
+    movw    $-1, 6(%rdi)
     inc     %r8d
     jmp     ._rx_build_loop
 
@@ -6330,11 +6478,31 @@ op_ret:
     lea     (%rbx, %r8, 8), %rdi
     movb    $3, (%rdi)                # type = match/accept
     movb    $0, 1(%rdi)
-    movw    $-1, 2(%rdi)
-    movw    $-1, 4(%rdi)
+    movb    $0, 2(%rdi)
+    movb    $0, 3(%rdi)
+    movw    $-1, 4(%rdi)              # next1 = none
+    movw    $-1, 6(%rdi)              # next2 = none
     inc     %r8d
     # r8 = total state count, rbx = NFA base
 
+    # Patch alternation: if rx_alt_patch >= 0, fix left branch end → accept
+    movl    rx_alt_patch(%rip), %eax
+    cmp     $-1, %eax
+    je      ._rx_no_alt_patch
+    # State[eax].next1 = accept state (r8-1)
+    lea     (%rbx, %rax, 8), %rdi
+    lea     -1(%r8), %esi
+    movw    %si, 4(%rdi)              # patch next1 → accept
+    movl    $-1, rx_alt_patch(%rip)   # reset
+._rx_no_alt_patch:
+
+    # Check if search mode (called from __regex_search)
+    cmpb    $1, rx_search_mode(%rip)
+    jne     ._rx_match_sim
+    movb    $0, rx_search_mode(%rip)   # reset flag
+    jmp     ._rxs_simulate
+
+._rx_match_sim:
     # ── Simulate NFA (Thompson) ──
     # Two sets: current active states, next active states
     # Each set = bitmap (1 bit per state, max 256 states)
@@ -6388,22 +6556,41 @@ op_ret:
     mov     $0, %esi                   # match = 0
     cmp     $1, %edx                   # dot?
     je      ._rx_sim_dot_match
-    # Literal match
-    movzbl  1(%rdi), %edx             # state char
+    # Check match by type
+    cmp     $4, %edx                   # class range [a-z]?
+    je      ._rx_sim_class
+    cmp     $5, %edx                   # negated class [^a-z]?
+    je      ._rx_sim_nclass
+    # Literal match (type 0): lo == hi == char
+    movzbl  1(%rdi), %edx             # lo byte
     cmp     %eax, %edx
     jne     ._rx_sim_state_next
-    mov     $1, %esi
-    jmp     ._rx_sim_check_match
+    jmp     ._rx_sim_matched
+._rx_sim_class:
+    # Class match: lo <= byte <= hi
+    movzbl  1(%rdi), %edx             # lo
+    cmp     %edx, %eax
+    jl      ._rx_sim_state_next       # byte < lo
+    movzbl  2(%rdi), %edx             # hi
+    cmp     %edx, %eax
+    jg      ._rx_sim_state_next       # byte > hi
+    jmp     ._rx_sim_matched
+._rx_sim_nclass:
+    # Negated class: byte < lo || byte > hi
+    movzbl  1(%rdi), %edx             # lo
+    cmp     %edx, %eax
+    jl      ._rx_sim_matched          # byte < lo = match
+    movzbl  2(%rdi), %edx             # hi
+    cmp     %edx, %eax
+    jg      ._rx_sim_matched          # byte > hi = match
+    jmp     ._rx_sim_state_next       # in range = no match
 ._rx_sim_dot_match:
-    mov     $1, %esi
-._rx_sim_check_match:
-    test    %esi, %esi
-    jz      ._rx_sim_state_next
+._rx_sim_matched:
     # Match! Add next state(s) to next set
     push    %rcx
     push    %rax
     push    %r9
-    movzwl  2(%rdi), %edi             # next1
+    movzwl  4(%rdi), %edi             # next1 (offset 4 in new layout)
     cmp     $0xFFFF, %edi
     je      ._rx_sim_no_next
     # Temporarily swap r14/r15 so add_state writes to next set
@@ -6480,21 +6667,247 @@ op_ret:
     lea     (%rbx, %rdi, 8), %rax
     cmpb    $2, (%rax)
     jne     ._rx_add_ret
-    # Follow next1
+    # Follow next1 (offset 4 in new 8-byte layout)
     push    %rdi
-    movzwl  2(%rax), %edi
+    movzwl  4(%rax), %edi
     cmp     $0xFFFF, %edi
     je      ._rx_add_skip1
     call    ._rx_add_state
 ._rx_add_skip1:
     pop     %rdi
     lea     (%rbx, %rdi, 8), %rax
-    movzwl  4(%rax), %edi
+    movzwl  6(%rax), %edi
     cmp     $0xFFFF, %edi
     je      ._rx_add_ret
     call    ._rx_add_state
 ._rx_add_ret:
     ret
+
+# ═══════════════════════════════════════════════════════════════════════════
+# __regex_search(text, pattern) → 1/0
+# Like __regex_match but tries matching at each start position (unanchored).
+# Returns 1 if pattern matches anywhere in text.
+# ═══════════════════════════════════════════════════════════════════════════
+.call_regex_search:
+    add     %rcx, %r13
+    # Pop pattern (top), text (below) — same as __regex_match
+    mov     (%r14), %rdi              # pattern ptr
+    mov     8(%r14), %rcx             # pattern mol_count
+    mov     16(%r14), %rsi            # text ptr
+    mov     24(%r14), %rdx            # text mol_count
+    add     $32, %r14                 # pop 2
+
+    push    %rbx
+    push    %rbp
+    push    %r12
+    push    %r13
+    push    %r14
+    push    %r15
+
+    mov     %rsi, %r12               # r12 = text ptr
+    mov     %rdx, %r13               # r13 = text mol_count
+    mov     %rdi, %rsi               # rsi = pattern ptr
+    mov     %rcx, %rdx               # rdx = pattern mol_count
+
+    # Decode pattern → rx_pattern
+    lea     rx_pattern(%rip), %rdi
+    xor     %ecx, %ecx
+._rxs_decode_pat:
+    cmp     %rdx, %rcx
+    jge     ._rxs_pat_done
+    movzbl  (%rsi, %rcx, 2), %eax
+    movb    %al, (%rdi, %rcx)
+    inc     %rcx
+    jmp     ._rxs_decode_pat
+._rxs_pat_done:
+    mov     %ecx, %ebp               # rbp = pattern_len
+
+    # Decode text → rx_text
+    lea     rx_text(%rip), %rdi
+    mov     %r12, %rsi
+    xor     %ecx, %ecx
+._rxs_decode_text:
+    cmp     %r13, %rcx
+    jge     ._rxs_text_done
+    movzbl  (%rsi, %rcx, 2), %eax
+    movb    %al, (%rdi, %rcx)
+    inc     %rcx
+    jmp     ._rxs_decode_text
+._rxs_text_done:
+
+    # Build NFA (reuse same build code path)
+    lea     rx_nfa(%rip), %rbx
+    xor     %r8d, %r8d
+    xor     %r9d, %r9d
+    jmp     ._rxs_build_entry
+
+._rxs_build_entry:
+    # We jump into the shared NFA builder but return to our search loop
+    # Actually, simpler: just duplicate the build call via shared labels
+    # The builder uses: rbx=NFA base, r8=state count, r9=pat pos, rbp=pat len
+    # It builds into rx_nfa and returns at ._rx_build_done
+    # Problem: ._rx_build_done flows into simulation code for __regex_match
+    # Solution: save a flag and check it, or just inline the build
+    # Simplest: call the build loop but patch the return to our code
+    # Actually simplest: just jmp to ._rx_build_loop — it will build NFA
+    # then fall through to ._rx_build_done which goes to sim code.
+    # We need to intercept. Let me use a different approach.
+    # Store a search-mode flag in a BSS byte.
+    movb    $1, rx_search_mode(%rip)
+    jmp     ._rx_build_loop
+
+# Search-mode simulation: try from each start position
+._rxs_simulate:
+    xor     %r11d, %r11d              # r11 = start position in text
+
+._rxs_try_pos:
+    cmp     %r13d, %r11d
+    jg      ._rxs_not_found
+
+    # Init current set: zero + add state 0
+    lea     rx_cur_set(%rip), %r14
+    lea     rx_next_set(%rip), %r15
+    xor     %eax, %eax
+    mov     $4, %ecx
+    mov     %r14, %rdi
+    rep     stosq
+    mov     %r15, %rdi
+    xor     %eax, %eax
+    mov     $4, %ecx
+    rep     stosq
+    mov     $0, %edi
+    call    ._rx_add_state
+
+    # Check if accept already active (empty pattern matches)
+    xor     %ecx, %ecx
+._rxs_check_imm:
+    cmp     %r8d, %ecx
+    jge     ._rxs_sim_run
+    bt      %ecx, (%r14)
+    jnc     ._rxs_check_imm_next
+    lea     (%rbx, %rcx, 8), %rdi
+    cmpb    $3, (%rdi)
+    je      ._rxs_found
+._rxs_check_imm_next:
+    inc     %ecx
+    jmp     ._rxs_check_imm
+
+._rxs_sim_run:
+    # Run NFA sim from position r11
+    mov     %r11d, %r9d               # r9 = current text pos
+
+._rxs_sim_loop:
+    cmp     %r13d, %r9d
+    jge     ._rxs_next_pos            # no more text, no accept found
+
+    # Zero next set
+    push    %r9
+    mov     %r15, %rdi
+    xor     %eax, %eax
+    mov     $4, %ecx
+    rep     stosq
+    pop     %r9
+
+    # Get current text byte
+    lea     rx_text(%rip), %rdi
+    movzbl  (%rdi, %r9), %eax
+
+    # For each active state
+    xor     %ecx, %ecx
+._rxs_sim_state:
+    cmp     %r8d, %ecx
+    jge     ._rxs_sim_advance
+    bt      %ecx, (%r14)
+    jnc     ._rxs_sim_state_next
+
+    lea     (%rbx, %rcx, 8), %rdi
+    movzbl  (%rdi), %edx
+    cmp     $3, %edx
+    je      ._rxs_sim_state_next      # skip accept
+    cmp     $2, %edx
+    je      ._rxs_sim_state_next      # skip split
+
+    # Check match by type
+    mov     $0, %esi
+    cmp     $1, %edx                   # dot?
+    je      ._rxs_dot_match
+    cmp     $4, %edx                   # class?
+    je      ._rxs_class_match
+    cmp     $5, %edx                   # nclass?
+    je      ._rxs_nclass_match
+    # Literal
+    movzbl  1(%rdi), %edx
+    cmp     %eax, %edx
+    jne     ._rxs_sim_state_next
+    jmp     ._rxs_matched
+._rxs_dot_match:
+    jmp     ._rxs_matched
+._rxs_class_match:
+    movzbl  1(%rdi), %edx
+    cmp     %edx, %eax
+    jl      ._rxs_sim_state_next
+    movzbl  2(%rdi), %edx
+    cmp     %edx, %eax
+    jg      ._rxs_sim_state_next
+    jmp     ._rxs_matched
+._rxs_nclass_match:
+    movzbl  1(%rdi), %edx
+    cmp     %edx, %eax
+    jl      ._rxs_matched
+    movzbl  2(%rdi), %edx
+    cmp     %edx, %eax
+    jg      ._rxs_matched
+    jmp     ._rxs_sim_state_next
+
+._rxs_matched:
+    push    %rcx
+    push    %rax
+    push    %r9
+    movzwl  4(%rdi), %edi
+    cmp     $0xFFFF, %edi
+    je      ._rxs_no_next
+    xchg    %r14, %r15
+    call    ._rx_add_state
+    xchg    %r14, %r15
+._rxs_no_next:
+    pop     %r9
+    pop     %rax
+    pop     %rcx
+
+._rxs_sim_state_next:
+    inc     %ecx
+    jmp     ._rxs_sim_state
+
+._rxs_sim_advance:
+    xchg    %r14, %r15
+    # Check if accept state is in new current set (early accept)
+    xor     %ecx, %ecx
+._rxs_check_accept:
+    cmp     %r8d, %ecx
+    jge     ._rxs_no_accept
+    bt      %ecx, (%r14)
+    jnc     ._rxs_check_accept_next
+    lea     (%rbx, %rcx, 8), %rdi
+    cmpb    $3, (%rdi)
+    je      ._rxs_found
+._rxs_check_accept_next:
+    inc     %ecx
+    jmp     ._rxs_check_accept
+._rxs_no_accept:
+    inc     %r9d
+    jmp     ._rxs_sim_loop
+
+._rxs_next_pos:
+    inc     %r11d
+    jmp     ._rxs_try_pos
+
+._rxs_found:
+    mov     $1, %eax
+    jmp     ._rx_return
+
+._rxs_not_found:
+    xor     %eax, %eax
+    jmp     ._rx_return
 
 .call_file_read:
     add     %rcx, %r13
@@ -9907,6 +10320,10 @@ rx_cur_set:
     .space 32                           # active state bitmap (256 bits)
 rx_next_set:
     .space 32                           # next active state bitmap
+rx_search_mode:
+    .space 8                            # 1 = search mode (unanchored)
+rx_alt_patch:
+    .space 4                            # alternation left-branch patch index (-1 = none)
 fn_registry_count:
     .space 8                            # number of registered functions
 try_stack:
