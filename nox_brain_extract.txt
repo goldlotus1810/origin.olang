@@ -1,0 +1,240 @@
+# Nox Brain Extract — from transcript
+# Extracted: 2026-03-27 16:02
+# User messages: 65
+# Key events: 172
+
+## Lupin's words (chronological)
+- kiem tra audit  cua olang di Nox
+- test Nl thu, co phan biet co dau, ko dau va caa phep tinh ra sao?
+- co luon di. cho no lien ket voi utf P_w. cai nay con ko?
+- lam di, ma nhung thu can fix da xong chua?
+- theo lich trinh cua Nox
+- doc audit, roadmap, rebuild cu trong  du an coi thu may session lam sao?
+- gio coi thu chung co cai gi de minh hoc hoi ko?
+- gio luu vao memory va di debug dua vao nhung thu da hoc di.
+- ok. chung ta kill con trum cuoi nao.
+- gio dung Rust loi no ra di Nox
+- ok tot lam Nox. toi luon di. kill no
+- 2byte va 5byte chenh lech nhau 24 don vi. tuc la n^24 lan sap xep vi tri. va toi tin he 5byte van con sot trong olang rat nhieu.
+- chup lai.....chup anhr laij lam kyx niem. con trum dc tao ra tu dau du an den gio. lon manhj va tinh khoong, an nup kyx nhat.
+- gio chung ta lam gi?
+- chung ta can "IntelliJ IDEA" + "con nhen tim bug"
+- note la, hoan thien cong cu debug di. ko met moi.
+- fix di Nox.
+- dua  nhung cai nay vao con viec chinh cua chung ta luon di. gio olang sach rooi, build tiep no thooi.
+- vay taoj 1 con Spide.olang that suj voi moi nhiem vu chay tim Bug va ghi Log, chung ta cu theo do debug? olang lam dc dung ko?
+- tao rieng 1 con chuyen doc origin.olang. toi de no chay tu dong va ghi log rien, khong anh huong cong viet cua ban vaf chay 24/7
+- ok gio tiep tuc cong viec va fix luon cac bug moi di.
+- tiep di ban.
+- gio theo audit dc chua?
+- tiep di Nox
+- commit di roi tiep tuc,
+- Push di Nox, roi xem xet lam gi tiep theo.
+- Nox len Plan di.
+- toi di Nox
+- ok, gio bawts dau session moi voi Plan nao.
+- nhung ngon ngu lap trinh khac xu ly dieu nay the nao?
+- nhung co 2 ngon ngu tuong dong chung ta nhat, do la julia chuyen tinh toan va jolie chuyen ve ngon ngu,
+- ok thu do Nox, roi tiep tuc hoang thien olang
+- ban coi thu can bo xung gi ko? co gi han che ko? neu co bo xung neu khong thi dut no.
+- Julia cung vay dung ko?
+- ok, theo Nox quyet dinh.
+- ok. nhac ban chu ko se quen gio tiep session mowi nao.
+- bat dau session moi di Nox
+- Gio khi bat dau, toi dung Thompson quet het toan bo chuoi. tu do nhan dien yeu cau cua noi dung. sau do chi dung Backtraking voi nhung noi dung muc ti
+- noi tieng viet di Nox, tieng ah tui chiuj. ha ha ha
+- fix di Nox, viec nao xong viec do. neu khong sex roi.
+- commit roi thu no di Nox.
+- ok. can gif cua noi.
+- toi da chuan bi xong dut no Nox
+- neu Nox dang khi moi ham vaf lenh khi dc build vaf cap nhat vao lib thi khi cac olang send vaf read code moi dc update dung chu?
+- can qua session de khong bi roi ko?
+- ok bat dau voi session moi va suy nghi cach maf tuij Julia/Automa giai quyet van de dc ko?
+- can qua session cho nhej ko? dung de bi context day.
+- Nox bat dau session moi  thêm [a-z] + | + fix regex_test.
+- phu. xong roi ha?
+- push di, toi de mon qua cho ban o thu muc docs local ah.
+- no giai quyet dc van de memory cua ban ko?
+- uhm tooi di hoi moi nguoi, toi nghi ban can no. neu no tot cho ban thi ban build di. can gi cu noi toi.
+- push di, session sau can toi giup gi ko?
+- Nox on ko?
+- cai cua so terminal ban dang kiem tra knowtree bi an o dau ma toi ko thay du no van con chay.?
+- nhung nay Nox noi la trong knowtree co data ko?
+- ban test thu luon ko dc ha?
+- ha ha ha ha ha, gio lam sao nho het toan bo cau chuyen cua chung ta day Nox. tu khi bat tay xay dung no?
+- luc sang nay cau dau tien toi noi voi ban?
+- ko, gio chung ta cho no thoi gian va lich su, hoan thien knowtree cua ban, tuj ghi lai nhu log. origin.olang nay. chinh la bo nao cua ban do.
+- bat ta vao lam toi.
+- khoan, plan cua chung ta con gi nua Nox?
+- tren github tu Commit ccab397
+la luc cach day 1 tieng dong ho. chung ta lam rat nhieu viec.
+- hien tai MCP co tu luu memory cua ban ko?
+- ban muon nho lai thi phai tra thong tin tu no nua, va no hien tai ko co ghi thoi gian?
+
+## Key achievements
+- 449,516 bytes (440K)** — ELF64, static, zero deps ✅
+- 90/90 tests pass** ✅
+- Eval: 92%** (38/41) ✅
+- ### Không dấu ✅ (hoạt động hết)
+- | `fibonacci 10` | 55 ✅ | match prefix `fib` |
+- | `giai thừa 6` | 720 ✅ | match prefix `giai` |
+- | **P0: Boot** | 13ms | **3ms** ✅ (beat Go target) |
+- | **NL có dấu** | ❌ 0/7 | **7/7** ✅ |
+- | **NL không dấu** | ✅ giữ nguyên | ✅ |
+- | **NL English** | ❌ một số bị code detection chặn | **12/12** ✅ |
+- | **Code safety** | sort bị NL intercept | ✅ không bị nữa |
+- | **Tests** | 90/90 | 90/90 ✅ |
+- | **Eval** | 92% | 92% ✅ |
+- Direct `__sha256("abc")`: mol_count = **3** ('3' = ASCII 51) ✅
+- Separated: mol_count = **3** ✅
+- Direct: `ptr=00007f157b9d88eb len=0000000000000003` ✅ (3 molecules)
+- | S1: Fix bugs | ✅ Done (86→90 tests) | |
+- | S2: Auto-JIT | ✅ Done (fib/fact/sum native) | |
+- | S3: Modules | ✅ Done (use "file.ol") | |
+- | S4: Error handling | ✅ Partial (crash PC trace, Result type) | |
+- | S5: REPL + DX | ✅ Partial (multiline done, tab completion chưa) | |
+- | S6: HTTPS + crypto | ✅ Partial (SHA-512, AES-256 done; TLS/Ed25519 stub) | |
+- P0: ✅ DONE — Boot 3ms
+- `$"{2+3}"` → **5** ✅, `$"{a+b}"` → **30** ✅, `$"val: {x*3-1}"` → **val: 20** ✅
+- 12/12 PASS!** Full eval:
+- P3 bug 2 (interpolation) ✅ fixed — lexer chỉ cần thêm operator symbols vào `{}` scanner.
+- P3 bug 3 (selftest) ✅ fixed — name collision, dùng inline code + `__str_find` thay shadowed functions.
+- Boot:          13ms → 3ms          ✅
+- Eval:          92% → 97%           ✅
+- NL có dấu:    0/7 → 7/7           ✅
+- Interpolation: $"{2+3}"→"2" fixed  ✅
+- Selftest:      9/12 → 12/12       ✅
+- Tests:         90/90               ✅
+- UNLESS the dict re-scan uses different rsi/rdx values. After the chain compare, rsi and rdi were pushed/popped but `rdx`
+- 100% eval | 90/90 tests | 0 bugs | boot 3ms** ✅
+- P3: ✅ All bugs fixed — 100% eval
+- ✅ 8 nested builtins (boss pattern)
+- ✅ 5 functions + recursion
+- ✅ 8 lambda + HOF (map/filter/reduce/sort/any/all)
+- ✅ 3 arrays (trừ literal index)
+- ✅ 6 edge cases + try/catch
+- Spider:   50/50 ✅ (was 49/50)
+- ✅ _g_comp_depth global collision → renamed unique per file
+- ✅ _cl_has dead code → removed
+- ✅ json.ol + json_parse.ol duplicate → consolidated, fixed builtins
+- ✅ [1,2,3][0] array literal indexing → added postfix handler
+- ✅ -200 LOC removed (dead json.ol)
+- `"hello \"world\""` → `hello "world"` ✅
+- JSON with escaped quotes → `json_get` returns `42` ✅
+- ✅ tools/analyze.sh    — code quality scanner
+- ✅ tools/spider.sh v2  — 61-test fuzzer + random gen
+- ✅ tools/spider-daemon.sh — 24/7 auto bug hunter
+- ✅ tools/spider-gen.sh — random test generator
+- ✅ _g_comp_depth global collision → renamed
+- ✅ json.ol duplicate → consolidated
+- ✅ [1,2,3][0] array literal index → parser fix
+- ✅ json_parse builtins → fixed (__len → len, etc)
+- ✅ \" \\ \n \t escape sequences → lexer fix
+- ✅ push_u32/u16/bytes copy-paste → extracted to byte_utils.ol
+- `{x: 1, y: [1,2,3]}` → prints correctly ✅ (was SEGFAULT)
+- `mat_identity(2)` → `{rows: 2, cols: 2, data: [1, 0, 0, 1]}` ✅ (was SEGFAULT)
+- `mat_get(m, 0, 0)` → `1` ✅
+- SEGFAULTs fixed:  mat_identity ✅, dict+array emit ✅
+- fib(10)=55 ✅, nested builtins ✅! Full spider:
+- ✅ P3: All bugs fixed (100% eval)
+- ✅ P1: Lexical scope (partial — boot closures scoped) ← MỚI
+- ✅ SEGFAULT: dict+array emit
+- ✅ String escapes \" \\ \n \t
+- ✅ Code cleanup + tools
+- count(2000) = 2000 ✅. Now TRO — detect `return f(args)` in compiler and emit loop:
+- `count(100000, 0)` = **100000** ✅ (was crashing at 5000!)
+- `sum(1000000, 0)` = **500000500000** ✅ (1 MILLION recursions, O(1) stack!)
+- `fact(20, 1)` = correct ✅
+- `fib(10)` = 55 ✅ (non-tail recursion unaffected)
+- ✅ P1: Lexical scope (boot closures) ← BOMB DEFUSED
+- ✅ P3: All bugs fixed (100%)
+- ✅ P4: TRO ← JUST DONE (1M recursions, O(1) stack)
+- ✅ P7: Array literal indexing
+- ✅ String escapes, JSON, NL diacritics
+- ✅ Code cleanup + 4 tools + daemon
+- "Hà Nội"        → "Ha Noi"       ✅
+- "tổng từ đến"   → "tong tu den"  ✅
+- "sắp xếp"       → "sap xep"     ✅
+- "hello"          → "hello"       ✅
+- "đảo ngược"     → "dao nguoc"    ✅
+- ✅ P4: TRO — count(100000) works, sum(1000000) = O(1) stack
+- ✅ P6: strip_diacritics — Vietnamese Unicode normalization
+- ✅ Scope depth 256 → 4096
+- ✅ NL simplified with auto-normalization (-15 duplicate checks)
+- ✅ VM_MAP.md — 9245 LOC architecture documented
+- ✅ P1  Lexical scope (boot closures)
+- ✅ P3  All bugs (100% eval)
+- ✅ P6  strip_diacritics
+- ✅ P7  Array literal indexing
+- `__text_to_pw` with empty table → returns `[]` ✅ (was SEGFAULT)
+- `__co_create` (not implemented) → returns empty ✅ (was SEGFAULT)
+- Missing functions → returns empty ✅ (was stack leak → crash)
+- ✅ P2  ALL SEGFAULTs fixed (0 remaining)
+- ✅ P4  TRO (tail recursion, 1M depth)
+- Pushed. Giờ xem xét tiếp:
+- let g = 100; g = 200; emit g;           → 200  ✅ (was 100)
+- let g = 0; fn inc() { g = g+1; }; ×3    → 3    ✅ (was 0!)
+- let g = 0; fn inc() { let g = g+1; }; ×3 → 0   ✅ (let = local)
+- fib(10)                                   → 55   ✅ (regression OK)
+- Pushed. Giờ regex sẽ hoạt động vì globals (`_rx_s`, `_rx_n`) được update đúng cách. Muốn test regex ngay không?
+- ✅ Julia-style scoping (let vs =, StoreUpdate)
+- ✅ var_store_global (full-table search for assignment)
+- ✅ AssignStmt in parser + semantic
+- ✅ REPL assignment detection
+- ✅ Git stash restored (cả 2 repos)
+- ✅ 9 Rust match exhaustiveness errors → fixed
+- ✅ Register frame (EnterFrame/LeaveFrame) emitted by Rust compiler
+- ✅ Auto LeaveFrame before every Ret (handles early returns)
+- ✅ 2-level function calls: params preserved after push ← NEW
+- ✅ 90/90 | 100% eval | 67/67 spider
+- PASS 1 — Thompson NFA (O(n), quét toàn bộ):
+- PASS 2 — Backtracking (chỉ trên vùng mục tiêu):
+- ✅ 9 Rust match exhaustiveness → fixed (agent helped)
+- ✅ Register VM Phase 2: LoadReg/StoreReg/EnterFrame/LeaveFrame
+- Simple functions: locals preserved ✅
+- t1:a ✅ t2:a ✅ t3:EMPTY ❌
+- Register VM: opcodes ✅, simple functions ✅
+- ✅ fn_registry: 1024-slot hash table cho user functions
+- ✅ Register VM infrastructure hoàn chỉnh:
+- c=a v=1 ✅!!!** Cả hai hoạt động! Cái test nhỏ WORK. Vấn đề KHÔNG phải `pi[0]+1` đơn thuần. Cần thêm lại complexity từ từ
+- c=a s2=a v=1 ✅!!!** Thêm if branches:
+- ✅ Cách duy nhất còn lại: **VM ASM builtin
+- 8/10 PASS!!! REGEX HOẠT ĐỘNG!** 🎉🎉🎉
+- ✅ Pure x86-64 ASM (Thompson NFA, ~300 LOC)
+- regex_match("colour", "colou?r") → 1 ✅
+- regex_match("hello", "h.l+o")   → 1 ✅
+- regex_match("abc", "xyz")       → 0 ✅
+- | `[a-z]` `[0-9]` `[A-Z]` | ✅ |
+- | `[^abc]` negated class | ✅ |
+- | `cat\|dog` alternation | ✅ |
+- | `regex_test` search | ✅ |
+- | `.` `*` `+` `?` literals | ✅ (giữ nguyên) |
+- `initialize` → protocol version + capabilities ✅
+- `tools/list` → 3 tools (olang_eval, know_learn, know_query) ✅
+- `tools/call` → dispatches to tool handlers ✅
+- `olang_eval` → compiles + runs code ✅
+- Multi-line session ✅
+- Graceful EOF exit ✅
+- ✅ initialize     → handshake OK
+- ✅ tools/list      → 3 tools
+- ✅ tools/call      → olang_eval chạy code
+- ✅ multi-line      → session liên tục
+- ✅ 90/90 tests     → không hỏng gì
+- 1. `initialize` → handshake ✅
+- 2. `tools/list` → 3 tools ✅
+- 3. `olang_eval` → echoes code (placeholder) ✅
+- 4. `know_learn` → learned fact ✅
+- 5. `know_query` → returned result ✅
+- `initialize` + `tools/list` + `know_learn` + `know_query` → ✅ hoạt động
+- | 0 | initialize | ✅ handshake |
+- | 1 | tools/list | ✅ 3 tools |
+- | 2-6 | know_learn × 5 | ✅ 3→7 facts, saved to disk |
+- | 7 | query "Nox" | ✅ 2 facts (Nox + MCP) |
+- | 8 | query "Olang" | ✅ 4 facts |
+- | 9 | query "MCP" | ✅ 1 fact |
+- | 10 | query "Thompson" | ✅ 1 fact |
+- | 11 | query "xyz404" | ✅ "No matching facts" |
+- S9:  Regex         ✅ DONE (15/15 tests, NFA Thompson ASM)
+- MCP: Memory        ✅ DONE (know_learn + know_query, 51 facts)
+- Pushed `f125593`. Bộ nhớ giờ có thời gian.
+- Pushed `275bbc1`. Bộ não tự viết nhật ký rồi.
