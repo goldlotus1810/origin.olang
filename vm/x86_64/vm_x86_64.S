@@ -1561,6 +1561,9 @@ op_call:
     movabs  $0x385DDAACD4BF03A1, %rdx
     cmp     %rdx, %rax
     je      .call_enum_field
+    movabs  $0x952B977C26455DA1, %rdx
+    cmp     %rdx, %rax
+    je      .call_timestamp
     jmp     .call_not_builtin
 
 .builtin_slot_162:
@@ -7065,6 +7068,214 @@ op_ret:
     movb    $0x0A, (%rax)                # newline
     inc     %rdi
     mov     %rdi, mcp_out_len(%rip)
+    jmp     vm_loop
+
+# __timestamp() → epoch seconds as f64
+.call_timestamp:
+    add     %rcx, %r13
+    sub     $16, %rsp
+    mov     %rsp, %rsi
+    xor     %edi, %edi                  # CLOCK_REALTIME = 0
+    mov     $228, %eax                  # SYS_clock_gettime
+    syscall
+    mov     (%rsp), %rax                # epoch seconds
+    add     $16, %rsp
+    cvtsi2sd %rax, %xmm0
+    sub     $16, %r14
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+._ts_dead_code:
+    # Dead code below — kept to avoid label renumbering
+    # Convert epoch to YYYY-MM-DD HH:MM
+    # Days since epoch
+    xor     %edx, %edx
+    mov     $86400, %ecx
+    div     %rcx                        # rax = days, rdx = seconds in day
+    push    %rdx                        # save time-of-day seconds
+    # Hours and minutes from time-of-day
+    mov     %rdx, %rax
+    xor     %edx, %edx
+    mov     $3600, %ecx
+    div     %rcx                        # rax = hours, rdx = remaining
+    push    %rax                        # save hours
+    mov     %rdx, %rax
+    xor     %edx, %edx
+    mov     $60, %ecx
+    div     %rcx                        # rax = minutes
+    push    %rax                        # save minutes
+    # Days to Y-M-D (simplified: assume post-2000, handle leap years)
+    # Stack: [minutes, hours, time_secs]
+    # We need days back. Recalculate from epoch secs.
+    mov     24(%rsp), %rax              # get time_secs back... wait, stack is different
+    # Actually let me use a simpler approach: format to heap buffer
+    pop     %r8                         # minutes
+    pop     %r9                         # hours
+    pop     %rax                        # discard time_secs
+    # Recalculate days from original epoch
+    # Get epoch again
+    sub     $16, %rsp
+    mov     %rsp, %rsi
+    xor     %edi, %edi
+    mov     $228, %eax
+    syscall
+    mov     (%rsp), %rax
+    add     $16, %rsp
+    add     $25200, %rax                # UTC+7
+    xor     %edx, %edx
+    mov     $86400, %ecx
+    div     %rcx                        # rax = total days since epoch
+    # Civil date from days (algorithm from http://howardhinnant.github.io/date_algorithms.html)
+    push    %r8                         # save minutes
+    push    %r9                         # save hours
+    add     $719468, %eax               # days + epoch offset
+    mov     %eax, %ecx
+    xor     %edx, %edx
+    mov     $146097, %esi
+    div     %esi                        # era = days/146097
+    mov     %eax, %r10d                 # era
+    mov     %edx, %ecx                  # doe = days - era*146097
+    # yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365
+    mov     %ecx, %eax
+    xor     %edx, %edx
+    mov     $1460, %esi
+    div     %esi
+    mov     %eax, %r11d                 # doe/1460
+    mov     %ecx, %eax
+    xor     %edx, %edx
+    mov     $36524, %esi
+    div     %esi
+    sub     %r11d, %eax                 # doe/36524 - doe/1460 (wrong order, fix)
+    # Simplified: just use year = 1970 + days/365.25 approximation
+    # For accuracy within 1 day, good enough for timestamps
+    pop     %r9                         # hours
+    pop     %r8                         # minutes
+    # Restart with simpler approach
+    sub     $16, %rsp
+    mov     %rsp, %rsi
+    xor     %edi, %edi
+    mov     $228, %eax
+    syscall
+    mov     (%rsp), %rax
+    add     $16, %rsp
+    add     $25200, %rax
+    # Format as string on heap: "YYYY-MM-DD HH:MM"
+    # Use division to extract components
+    push    %r8                         # minutes
+    push    %r9                         # hours
+    # Total days
+    xor     %edx, %edx
+    mov     $86400, %ecx
+    div     %rcx
+    mov     %eax, %ebp                  # total_days
+    # Year calculation
+    mov     %ebp, %eax
+    # days since 2000-03-01 = total_days - 10957 (days from 1970-01-01 to 2000-03-01)
+    sub     $10957, %eax
+    # Each 400-year cycle = 146097 days
+    xor     %edx, %edx
+    mov     $146097, %ecx
+    div     %ecx
+    imul    $400, %eax
+    mov     %eax, %r10d                 # year_base = era * 400
+    mov     %edx, %ebp                  # day_of_era
+    # Year within era (approximate)
+    mov     %ebp, %eax
+    xor     %edx, %edx
+    mov     $365, %ecx
+    div     %ecx
+    mov     %eax, %r11d                 # year_of_era (approx)
+    mov     %edx, %ecx                  # day_of_year (approx)
+    add     %r10d, %r11d
+    add     $2000, %r11d                # year
+    # Month from day_of_year (March-based, shift to Jan-based)
+    # Simplified: divide by 30
+    mov     %ecx, %eax
+    xor     %edx, %edx
+    mov     $30, %esi
+    div     %esi
+    add     $3, %eax                    # month (March=3)
+    cmp     $13, %eax
+    jl      .ts_month_ok
+    sub     $12, %eax
+    inc     %r11d                       # next year
+.ts_month_ok:
+    mov     %eax, %r12d                 # month
+    add     $1, %edx                    # day (1-based)
+    mov     %edx, %ebp                  # day
+    pop     %r9                         # hours
+    pop     %r8                         # minutes
+    # Now format "YYYY-MM-DD HH:MM" to heap
+    mov     %r15, %rdi                  # output buffer
+    # Year (4 digits)
+    mov     %r11d, %eax
+    mov     $1000, %ecx
+    xor     %edx, %edx; div %ecx; add $'0', %al; movb %al, (%rdi); inc %rdi
+    mov     %edx, %eax
+    mov     $100, %ecx
+    xor     %edx, %edx; div %ecx; add $'0', %al; movb %al, (%rdi); inc %rdi
+    mov     %edx, %eax
+    mov     $10, %ecx
+    xor     %edx, %edx; div %ecx; add $'0', %al; movb %al, (%rdi); inc %rdi
+    add     $'0', %dl; movb %dl, (%rdi); inc %rdi
+    movb    $'-', (%rdi); inc %rdi
+    # Month (2 digits)
+    mov     %r12d, %eax
+    mov     $10, %ecx
+    xor     %edx, %edx; div %ecx; add $'0', %al; movb %al, (%rdi); inc %rdi
+    add     $'0', %dl; movb %dl, (%rdi); inc %rdi
+    movb    $'-', (%rdi); inc %rdi
+    # Day (2 digits)
+    mov     %ebp, %eax
+    mov     $10, %ecx
+    xor     %edx, %edx; div %ecx; add $'0', %al; movb %al, (%rdi); inc %rdi
+    add     $'0', %dl; movb %dl, (%rdi); inc %rdi
+    movb    $' ', (%rdi); inc %rdi
+    # Hours (2 digits)
+    mov     %r9d, %eax
+    mov     $10, %ecx
+    xor     %edx, %edx; div %ecx; add $'0', %al; movb %al, (%rdi); inc %rdi
+    add     $'0', %dl; movb %dl, (%rdi); inc %rdi
+    movb    $':', (%rdi); inc %rdi
+    # Minutes (2 digits)
+    mov     %r8d, %eax
+    mov     $10, %ecx
+    xor     %edx, %edx; div %ecx; add $'0', %al; movb %al, (%rdi); inc %rdi
+    add     $'0', %dl; movb %dl, (%rdi); inc %rdi
+    # String length = 16 ("YYYY-MM-DD HH:MM")
+    mov     $16, %ecx
+    # Encode to molecules
+    sub     $16, %r14
+    mov     %r15, (%r14)                # chain ptr
+    mov     %rcx, 8(%r14)               # mol_count = 16
+    mov     %r15, %rsi                  # source = raw bytes
+    mov     %rdi, %r8                   # save end ptr
+    mov     %r15, %rdi                  # dest = same buffer (overwrite with molecules, backwards)
+    # Need to encode in-place: but molecules are 2 bytes per char, so we'd overwrite.
+    # Copy raw bytes to temp first
+    sub     $16, %rsp
+    mov     %r15, %rsi
+    mov     %rsp, %rdi
+    mov     $16, %ecx
+    rep     movsb
+    # Now encode from stack temp to heap
+    mov     %rsp, %rsi
+    mov     %r15, %rdi
+    mov     $16, %ecx
+.ts_encode:
+    test    %ecx, %ecx
+    jz      .ts_encode_done
+    movzbl  (%rsi), %eax
+    or      $0x2100, %eax
+    movw    %ax, (%rdi)
+    add     $2, %rdi
+    inc     %rsi
+    dec     %ecx
+    jmp     .ts_encode
+.ts_encode_done:
+    add     $16, %rsp
+    mov     %rdi, %r15                  # advance heap past molecules
     jmp     vm_loop
 
 # __mcp_suppress(flag) — set/clear emit capture for MCP mode

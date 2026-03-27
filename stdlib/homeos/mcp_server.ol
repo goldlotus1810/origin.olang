@@ -83,9 +83,12 @@ fn _mcp_tool_eval(_te_id, _te_code) {
 }
 
 fn _mcp_tool_learn(_tl_id, _tl_fact) {
-    kt_learn(_tl_fact);
+    // Add timestamp prefix: [epoch] fact
+    let _tl_ts = __timestamp();
+    let _tl_entry = "[" + _mcp_format_ts(_tl_ts) + "] " + _tl_fact;
+    kt_learn(_tl_entry);
     kt_save("homeos.knowledge");
-    return _mcp_result(_tl_id, "Learned and saved: " + _tl_fact + " (" + to_string(len(__kt_facts_arr)) + " facts total)");
+    return _mcp_result(_tl_id, "Learned and saved: " + _tl_entry + " (" + to_string(len(__kt_facts_arr)) + " facts total)");
 }
 
 fn _mcp_tool_query(_tq_id, _tq_question) {
@@ -144,6 +147,28 @@ fn _mcp_escape(_me_s) {
         _me_i = _me_i + 1;
     };
     return _me_out;
+}
+
+// Format epoch seconds → "YYYY-MM-DD HH:MM" (UTC+7)
+fn _mcp_format_ts(_ft_epoch) {
+    let _ft_t = _ft_epoch + 25200;
+    let _ft_days = __floor(_ft_t / 86400);
+    let _ft_sod = _ft_t % 86400;
+    let _ft_h = __floor(_ft_sod / 3600);
+    let _ft_m = __floor((_ft_sod % 3600) / 60);
+    // Days to date (simplified from 2000-03-01)
+    let _ft_d2 = _ft_days - 10957;
+    let _ft_y = __floor(_ft_d2 / 365.25) + 2000;
+    let _ft_doy = _ft_d2 - __floor((_ft_y - 2000) * 365.25);
+    let _ft_mo = __floor(_ft_doy / 30.44) + 1;
+    let _ft_dd = _ft_doy - __floor((_ft_mo - 1) * 30.44) + 1;
+    return to_string(__floor(_ft_y)) + "-" + _mcp_pad2(__floor(_ft_mo)) + "-" + _mcp_pad2(__floor(_ft_dd)) + " " + _mcp_pad2(__floor(_ft_h)) + ":" + _mcp_pad2(__floor(_ft_m));
+}
+
+fn _mcp_pad2(_p_n) {
+    let _p_i = __floor(_p_n);
+    if _p_i < 10 { return "0" + to_string(_p_i); };
+    return to_string(_p_i);
 }
 
 // Extract string value for a given key from raw JSON text
