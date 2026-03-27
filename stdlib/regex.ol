@@ -2,6 +2,12 @@
 // Supports: . * + ? [chars] [^chars] () | \d \w \s
 // API: regex_match(text, pattern), regex_test(text, pattern), regex_search(text, pattern)
 
+// Helper: advance pi and update state count (isolates set_at from caller vars)
+fn _rx_advance_pi(_ap_s, _ap_pi, _ap_id) {
+    set_at(_ap_s, 0, _ap_id + 1);
+    set_at(_ap_pi, 0, _ap_pi[0] + 1);
+}
+
 // Build NFA in a flat array: [count, type0,ch0,out1_0,out2_0, type1,...]
 // Types: 0=lit, 1=dot, 2=split, 3=match, 4=class, 5=nclass
 
@@ -188,11 +194,10 @@ fn _rx_atom_q(_a_s, _a_p, _a_pi) {
         return -1;
     };
 
-    // Literal character — push FIRST, advance pi AFTER (avoids register corruption)
+    // Literal character — advance pi via separate function to avoid var corruption
     let _a_id = _a_s[0];
     let _ = __array_push(_a_s, 0); let _ = __array_push(_a_s, _a_ch); let _ = __array_push(_a_s, -1); let _ = __array_push(_a_s, -1);
-    set_at(_a_s, 0, _a_id + 1);
-    set_at(_a_pi, 0, _a_pi[0]+1);
+    _rx_advance_pi(_a_s, _a_pi, _a_id);
     return _rx_quant(_a_s, _a_p, _a_pi, _a_id * 100000 + _a_id);
 }
 

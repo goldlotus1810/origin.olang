@@ -934,7 +934,20 @@ op_store:
     pop     %r8
     pop     %rcx
     add     %rcx, %r13
-    call    var_store_hash              # frame-limited search
+    # Also register in fn_registry if value is a closure
+    push    %rax
+    push    %r8
+    push    %r9
+    mov     %r9, %rcx
+    and     $0xFFFF, %ecx
+    cmp     $CLOSURE_MARKER, %cx
+    jne     .op_store_not_closure
+    call    fn_reg_store               # register closure in fn_registry
+.op_store_not_closure:
+    pop     %r9
+    pop     %r8
+    pop     %rax
+    call    var_store_hash              # also store in var_table (backward compat)
     jmp     vm_loop
 
 op_store_upd:
@@ -1737,10 +1750,65 @@ op_call:
 
 
 .call_not_builtin:
-    # ── Not a builtin: try var_table lookup ──
-    # rax still has the hash from hash_name
-    # Check JIT cache first: if native code exists for this hash → call directly
+    # ── Not a builtin: try fn_registry first, then var_table ──
+    # rax = hash from hash_name, rcx = name_len
+    # Check fn_registry (O(1) hash lookup for user-defined functions)
+    push    %rcx                        # save name_len
     push    %rax                        # save hash
+    call    fn_reg_lookup               # rax=hash → r8=ptr, r9=len, CF=found?
+    jc      .fn_reg_miss                # CF=1 → not in registry
+    # Found in fn_registry! r8=closure_ptr, r9=closure_len
+    pop     %rax                        # discard saved hash
+    pop     %rcx                        # restore name_len
+    add     %rcx, %r13                  # skip name bytes
+    # Check if it's a closure (same logic as .call_not_builtin)
+    mov     %r9, %rsi
+    and     $0xFFFF, %esi
+    cmp     $CLOSURE_MARKER, %si
+    jne     .call_skip                  # not a closure → skip
+    # It's a closure — call it (same as existing closure dispatch)
+    mov     %r8, %rax                   # body_pc
+    push    %r12
+    push    %r13
+    mov     %rax, %rdi
+    lea     boot_bc_base(%rip), %rsi
+    cmp     (%rsi), %r12
+    jne     .fnr_do_scope
+    lea     closure_depth(%rip), %rsi
+    cmpq    $0, (%rsi)
+    je      .fnr_skip_scope
+.fnr_do_scope:
+    lea     closure_depth(%rip), %rax
+    mov     (%rax), %rcx
+    push    %rdi
+    lea     var_table_base(%rip), %rsi
+    mov     (%rsi), %rsi
+    mov     (%rsi), %rdx
+    lea     scope_frame_ptrs(%rip), %rax
+    mov     %rdx, (%rax, %rcx, 8)
+    lea     closure_depth(%rip), %rax
+    incq    (%rax)
+    pop     %rdi
+.fnr_skip_scope:
+    bt      $63, %rdi
+    jc      .fnr_eval_closure
+    lea     boot_bc_base(%rip), %rsi
+    mov     (%rsi), %r12
+    mov     %edi, %r13d
+    jmp     vm_loop
+.fnr_eval_closure:
+    btr     $63, %rdi
+    lea     eval_bc_base(%rip), %rax
+    mov     (%rax), %r12
+    sub     %r12, %rdi
+    mov     %edi, %r13d
+    jmp     vm_loop
+
+.fn_reg_miss:
+    pop     %rax                        # restore hash
+    pop     %rcx                        # restore name_len
+    # Fall through to JIT cache + var_table lookup
+    push    %rax                        # save hash (for existing code below)
     lea     jit_cache(%rip), %rdx
     mov     %rax, %rsi
     and     $0x1F, %esi                 # 32 slots
@@ -7846,6 +7914,81 @@ var_table_init:
     add     $REG_STACK_SIZE, %r15       # reserve 4MB
     ret
 
+# ── Function Registry: register + lookup ──
+# fn_reg_store: rax=hash, r8=body_pc (as ptr), r9=param_count (as len/marker)
+# Registers function in fn_registry for O(1) lookup by Call opcode.
+fn_reg_store:
+    push    %rbx
+    lea     fn_registry(%rip), %rbx
+    # Slot = hash & 0x3FF (1024 slots)
+    mov     %rax, %rcx
+    and     $0x3FF, %ecx
+    imul    $24, %ecx
+    # Check if slot is empty (hash == 0)
+    cmpq    $0, (%rbx, %rcx)
+    jne     .frs_collision
+    # Empty slot: write entry
+    mov     %rax, (%rbx, %rcx)         # hash
+    mov     %r8, 8(%rbx, %rcx)        # body_pc (closure ptr)
+    mov     %r9, 16(%rbx, %rcx)       # param_count (closure len/marker)
+    pop     %rbx
+    ret
+.frs_collision:
+    # Slot occupied: check if same hash (update)
+    cmp     %rax, (%rbx, %rcx)
+    jne     .frs_chain
+    # Same hash: update
+    mov     %r8, 8(%rbx, %rcx)
+    mov     %r9, 16(%rbx, %rcx)
+    pop     %rbx
+    ret
+.frs_chain:
+    # Different hash: linear probe (find next empty)
+    add     $24, %ecx
+    and     $0x5FF8, %ecx              # wrap within 1024 slots × 24
+    cmpq    $0, (%rbx, %rcx)
+    jne     .frs_chain
+    mov     %rax, (%rbx, %rcx)
+    mov     %r8, 8(%rbx, %rcx)
+    mov     %r9, 16(%rbx, %rcx)
+    pop     %rbx
+    ret
+
+# fn_reg_lookup: rax=hash → r8=body_pc, r9=param_count. CF=1 if not found.
+fn_reg_lookup:
+    push    %rbx
+    lea     fn_registry(%rip), %rbx
+    mov     %rax, %rcx
+    and     $0x3FF, %ecx
+    imul    $24, %ecx
+    # Check slot
+    cmpq    $0, (%rbx, %rcx)
+    je      .frl_not_found
+    cmp     %rax, (%rbx, %rcx)
+    jne     .frl_probe
+    # Found!
+    mov     8(%rbx, %rcx), %r8        # body_pc
+    mov     16(%rbx, %rcx), %r9       # param_count
+    pop     %rbx
+    clc                                # CF=0 = found
+    ret
+.frl_probe:
+    add     $24, %ecx
+    and     $0x5FF8, %ecx
+    cmpq    $0, (%rbx, %rcx)
+    je      .frl_not_found
+    cmp     %rax, (%rbx, %rcx)
+    jne     .frl_probe
+    mov     8(%rbx, %rcx), %r8
+    mov     16(%rbx, %rcx), %r9
+    pop     %rbx
+    clc
+    ret
+.frl_not_found:
+    pop     %rbx
+    stc                                # CF=1 = not found
+    ret
+
 # var_store_global: rax=hash, r8=val_ptr, r9=val_len
 # Like var_store_hash but searches ENTIRE table (frame_start=0).
 # Used by StoreUpdate (x = val) — Julia-style global variable update.
@@ -9386,6 +9529,12 @@ reg_frame_ptr:
     .space 8                            # next free position on register stack
 reg_cur_frame:
     .space 8                            # current frame base (for LoadReg/StoreReg)
+# ── Function Registry (user-defined functions, separate from var_table) ──
+# 1024 slots × 24 bytes = [hash:8][body_pc:8][param_count:4][flags:4]
+fn_registry:
+    .space 24576                        # 1024 × 24 bytes
+fn_registry_count:
+    .space 8                            # number of registered functions
 try_stack:
     .space 256                          # 16 try frames × 16 bytes (catch_PC:8 + saved_r14:8)
 try_depth:
