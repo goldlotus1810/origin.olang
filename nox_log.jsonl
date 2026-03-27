@@ -3,3 +3,18 @@
 {"ts":"2026-03-27 18:33","type":"LEARN","msg":"emit capture issue documented"}
 {"ts":"2026-03-27 18:33","type":"QUERY","msg":"Nox"}
 {"ts":"2026-03-27 18:33","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-27 18:46","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-27 18:46","type":"EVAL","msg":"emit len(\\\"hello\\\")"}
+{"ts":"2026-03-27 18:46","type":"QUERY","msg":"Nox"}
+{"ts":"2026-03-27 18:47","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-27 18:47","type":"QUERY","msg":"Lupin"}
+{"ts":"2026-03-27 18:47","type":"QUERY","msg":"boss"}
+{"ts":"2026-03-27 18:47","type":"QUERY","msg":"regex"}
+{"ts":"2026-03-27 18:47","type":"QUERY","msg":"remember"}
+{"ts":"2026-03-27 18:47","type":"QUERY","msg":"brain"}
+{"ts":"2026-03-27 18:50","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-27 18:50","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-27 18:50","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-27 18:50","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-27 18:50","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-27 18:50","type":"STATUS","msg":"brain check"}
