@@ -131,6 +131,10 @@ run_round() {
     run "esc:backslash" 'emit "a\\\\b";' 'a\\b'
     run "esc:len" 'emit len("\"");' "1"
 
+    # ── Dict with arrays (was SEGFAULT) ──
+    run "dict:arr_val" 'emit {x: 1, y: [1,2,3]};' "{x: 1, y: [1, 2, 3]}"
+    run "dict:struct" 'emit {rows: 2, data: [1,0,0,1]};' "{rows: 2, data: [1, 0, 0, 1]}"
+
     # ── Edge cases ──
     run "edge:empty" 'emit len("");' "0"
     run "edge:zero" 'emit 0;' "0"

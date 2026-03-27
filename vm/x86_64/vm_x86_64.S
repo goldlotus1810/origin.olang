@@ -6879,6 +6879,12 @@ op_emit:
     mov     24(%rbp), %rdx             # val len/marker
     cmp     $F64_MARKER, %rdx
     je      .emit_dict_val_f64
+    cmp     $ARRAY_MARKER, %rdx
+    je      .emit_dict_val_array
+    cmp     $DICT_MARKER, %rdx
+    je      .emit_dict_val_dict
+    cmp     $CLOSURE_MARKER, %rdx
+    je      .emit_dict_val_fn
     # String value: decode u16
     mov     16(%rbp), %rsi             # val ptr
     test    %rdx, %rdx
@@ -6915,6 +6921,91 @@ op_emit:
     mov     $SYS_WRITE, %eax
     syscall
     pop     %rax
+    jmp     .emit_dict_val_done
+.emit_dict_val_array:
+    # Print array contents inline: [e0, e1, ...]
+    mov     16(%rbp), %rsi             # array ptr
+    test    %rsi, %rsi
+    jz      .emit_dict_val_done
+    # Follow forward ptrs
+._edva_fwd:
+    cmpq    $ARRAY_FORWARD_MARKER, (%rsi)
+    jne     ._edva_start
+    mov     8(%rsi), %rsi
+    jmp     ._edva_fwd
+._edva_start:
+    push    %rsi
+    lea     str_lbracket(%rip), %rsi
+    mov     $1, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    pop     %rsi
+    mov     (%rsi), %rcx               # count
+    test    %rcx, %rcx
+    jz      ._edva_close
+    lea     8(%rsi), %rdi              # first elem ptr
+    xor     %r8d, %r8d                 # index
+._edva_elem:
+    push    %rcx
+    push    %rdi
+    push    %r8
+    # Comma if not first
+    test    %r8d, %r8d
+    jz      ._edva_nocomma
+    push    %rdi
+    lea     str_comma_space(%rip), %rsi
+    mov     $2, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    pop     %rdi
+._edva_nocomma:
+    mov     8(%rdi), %rdx
+    cmp     $F64_MARKER, %rdx
+    je      ._edva_f64
+    # String elem: skip (print "...")
+    jmp     ._edva_next
+._edva_f64:
+    movq    (%rdi), %xmm0
+    call    f64_to_ascii
+    mov     %r15, %rsi
+    mov     %eax, %edx
+    mov     $1, %edi
+    push    %rax
+    mov     $SYS_WRITE, %eax
+    syscall
+    pop     %rax
+._edva_next:
+    pop     %r8
+    pop     %rdi
+    pop     %rcx
+    inc     %r8d
+    add     $16, %rdi
+    cmp     %ecx, %r8d
+    jb      ._edva_elem
+._edva_close:
+    push    %rdi
+    lea     str_rbracket(%rip), %rsi
+    mov     $1, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    pop     %rdi
+    jmp     .emit_dict_val_done
+.emit_dict_val_dict:
+    lea     str_dict_placeholder(%rip), %rsi
+    mov     $6, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    jmp     .emit_dict_val_done
+.emit_dict_val_fn:
+    lea     str_fn(%rip), %rsi
+    mov     $8, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
 .emit_dict_val_done:
     pop     %rbp                        # restore entry ptr
     pop     %rax                        # restore index
@@ -8783,9 +8874,11 @@ str_array_open:  .ascii "[array "
 str_bracket_nl:  .ascii "]\n"
 str_empty_array: .ascii "[]\n\0"
 str_lbracket:    .ascii "["
+str_rbracket:    .ascii "]"
 str_rbracket_nl: .ascii "]\n"
 str_comma_space: .ascii ", "
 str_dict_open:   .ascii "{dict "
+str_dict_placeholder: .ascii "{...}"
 str_brace_nl:    .ascii "}\n"
 str_empty_dict:  .ascii "{}\n\0"
 str_lbrace:      .ascii "{"
