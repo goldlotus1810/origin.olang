@@ -18,6 +18,7 @@ let _break_patches = [];
 let _continue_patches = [];
 let _ce_locals = __array_with_cap(256);
 let _ce_lc = [0];
+let __const_names = [];
 let _g_warnings = [];
 let _g_warn_count = [0];
 let _g_output = [];
@@ -1487,6 +1488,12 @@ fn compile_expr(state, expr) {
 
 fn compile_stmt(state, stmt) {
     match stmt {
+        Stmt::ConstStmt { name, value } => {
+            // const = immutable let — Store + register as const
+            compile_expr(state, value);
+            emit_op(state, make_op_name("Store", name));
+            push(__const_names, name);
+        },
         Stmt::LetStmt { name, value } => {
             let _ls_name = name;
             push(_ce_stack, _ls_name);
@@ -1626,8 +1633,19 @@ fn compile_stmt(state, stmt) {
             };
         },
         Stmt::AssignStmt { name, value } => {
-            // Reassignment: x = val → StoreUpdate (full-table search, Julia-style)
+            // Check const: reject reassignment of const variables
             let _as_name = name;
+            let _as_is_const = 0;
+            let _as_ci = 0;
+            while _as_ci < len(__const_names) {
+                if __const_names[_as_ci] == _as_name { _as_is_const = 1; _as_ci = len(__const_names); };
+                _as_ci = _as_ci + 1;
+            };
+            if _as_is_const == 1 {
+                emit "Error: cannot reassign const '" + _as_name + "'";
+                return;
+            };
+            // Reassignment: x = val → StoreUpdate (full-table search, Julia-style)
             push(_ce_stack, _as_name);
             compile_expr(state, value);
             let _as_name = pop(_ce_stack);

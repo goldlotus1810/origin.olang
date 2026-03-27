@@ -816,6 +816,16 @@ pub fn parse_stmt(p) {
         return Stmt::UseStmt { path: path };
     };
 
+    // const name = expr; (immutable binding)
+    if tok.text == "const" {
+        advance(p);
+        let _ps_cname = expect_ident(p);
+        expect_symbol(p, "=");
+        let _ps_cval = parse_expr(p);
+        if is_symbol_tok(peek(p), ";") { advance(p); };
+        return Stmt::ConstStmt { name: _ps_cname, value: _ps_cval };
+    };
+
     // let name = expr;
     if is_keyword_tok(tok, "let") {
         advance(p);

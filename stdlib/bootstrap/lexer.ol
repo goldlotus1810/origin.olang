@@ -22,7 +22,7 @@ type Token {
 
 // ── Keyword table ────────────────────────────────────────────────
 let KEYWORDS = [
-    "let", "fn", "if", "else", "loop", "while", "for", "in",
+    "let", "const", "fn", "if", "else", "loop", "while", "for", "in",
     "return", "break", "continue", "emit", "type", "union",
     "impl", "trait", "match", "try", "catch", "spawn", "select",
     "timeout", "from", "use", "mod", "pub", "true", "false",
