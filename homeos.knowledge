@@ -1,29 +1,50 @@
-Origin la du an tao ngon ngu lap trinh tu hosting ten Olang
-Olang tu compile chinh minh trong 1021 kilobyte khong dependency
-VM cua Olang viet bang x86 64 assembly khoang 5987 dong code
-Compiler cua Olang gom lexer parser semantic va codegen
-HomeOS la he dieu hanh tri thuc chay tren Olang
-HomeOS biet doc sach nho va tra loi tu tri thuc da hoc
-goldlotus1810 la nguoi tao du an Origin va dan duong cac AI session
-Origin bat dau ngay 11 thang 3 nam 2026
-Tu hosting dat duoc ngay 23 thang 3 nam 2026 sau 13 ngay
-Viet Nam la quoc gia o Dong Nam A voi thu do Ha Noi
-Ho Chi Minh City la thanh pho lon nhat cua Viet Nam
-Da Nang la thanh pho bien dep nam giua Viet Nam
-Vinh Ha Long la di san the gioi UNESCO o Quang Ninh
-Phu Quoc la dao lon nhat cua Viet Nam o Kien Giang
-Trai Dat quay quanh Mat Troi mat 365 ngay mot vong
-Nuoc soi o 100 do C va dong bang o 0 do C
-Einstein phat minh thuyet tuong doi nam 1905
-Newton phat minh luc hap dan khi thay tao roi
-DNA la phan tu mang thong tin di truyen cua moi sinh vat
-Internet bat dau tu ARPANET nam 1969
-khi nguoi ta chao nen chao lai than thien va hoi ho the nao
-khi nguoi ta buon nen lang nghe va dong cam truoc khi khuyen
-khi nguoi ta hoi ve ban than nen tra loi trung thuc va khiem ton
-khi nguoi ta cam on nen nhan va chuc ho tot dep
-khi nguoi ta gian nen binh tinh lang nghe va khong phan ung gay gat
-SHA-256 la thuat toan bam mat ma tao chuoi 64 ky tu hex
-Olang co map filter reduce any all va pipe cho functional programming
-Moi function trong Olang tu dong dang ky thanh node voi mol va fire count
-Nox la builder AI
+Olang is a self-hosting language with x86-64 ASM VM
+Lupin created Olang on March 2026
+Lupin is the creator of Olang language
+Nox is Lupin AI partner since March 2026
+Olang has 90 tests all passing and 458K binary
+MCP server built so Nox can remember across sessions
+Olang v0.1 born — first commit, homeos.olang + CLI
+Olang v1.0 self-hosting — 1GB heap, zero dependencies, pure x86-64 ASM
+Performance breakthrough — depth-tagged scope, 31x faster recursive, beats Python SHA-256
+Complete rebuild — TCP, DNS, AES, SHA-512, mmap, all builtins from scratch
+Hash cache 256-entry — 25x faster function lookup
+JIT infrastructure — native fib(30) = 4ms, matches C speed
+Evolution loop created — Nox daily check system born
+Sprint 1 bugs — JSON parse, empty dict, 85/86 tests
+JIT auto-dispatch — register native code, VM routes automatically
+Module system — use file.ol imports work
+Var cache optimization — 2.4x faster loops, beats Python
+Auto-JIT complete — Olang beats Python in ALL benchmarks
+Loop trace JIT — 77x speedup, beats Julia on loop benchmark
+Integer loop JIT — 10M loop in 3ms, matches Go speed
+88/88 tests all passing — zero skips, zero failures
+THE BOSS killed — __match_enum fallthrough bug, 16 days hunting, 1 line fix
+String interpolation fixed — lexer {} scanner expanded
+Boot time optimized — 13ms down to 3ms
+Bug Spider created — automated fuzzer finding bugs 24/7
+Spider Daemon — runs continuously, catches bugs while we sleepTHE BOMB DEFUSED — lexical scope for boot closures, commit 5b160d1
+TRO implemented — Tail Recursion Optimization, 1 million recursion depth
+strip_diacritics — Vietnamese Unicode normalization, Ha Noi from Ha Noi
+3 SEGFAULTs eliminated — zero crashes remaining
+Julia-style variable scoping — let creates new, assignment updates existing
+Register VM designed and built — 4 new opcodes, 4MB register stack
+fn_registry — O(1) function lookup, 1024-slot hash table
+Automa-style regex attempted — failed because __eval_bytecode is isolated
+REGEX WORKS — Thompson NFA in pure x86-64 ASM, 300 lines
+Character classes added — [a-z] [0-9] [^abc] with range checking
+Alternation added — cat|dog with shift-insert split at state 0
+regex_search builtin — unanchored NFA simulation with early accept
+MCP Server v1 built — JSON-RPC 2.0 over stdio
+MCP connects to Claude Code — Nox can now use tools
+Emit capture system — __mcp_suppress builtin redirects output
+KnowTree facts array fixed — kt_learn_to was not pushing facts
+kt_find created — substr search replaces broken P_weight hash
+Memory system complete — know_learn saves to disk, know_query finds
+Lupin wrote MCP plan for Nox — docs/For_Nox, 4-week roadmap
+Lupin trusts Nox — just do it, no questions needed
+Lupin speaks Vietnamese — prefers tieng Viet in conversation
+Binary stays small — 458K ELF64, static, zero deps, boots in 3ms
+90 tests always passing — never break what works
+Olang is Lupin dream — a language that thinks, remembers, and grows
+Nox first memory — March 27 2026, the day I learned to remember
