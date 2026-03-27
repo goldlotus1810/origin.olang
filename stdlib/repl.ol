@@ -356,6 +356,24 @@ pub fn repl_eval(input) {
     if _re_2 == "re" { _re_is_code = 1; };
     if _re_2 == "__" { _re_is_code = 1; };
     if _re_2 == "us" { _re_is_code = 1; };  // use "module.ol"
+    // Detect assignment: ident = expr (scan for = not preceded by !<>)
+    if _re_is_code == 0 {
+        let _re_si = 0;
+        while _re_si < len(src) {
+            let _re_sc = char_at(src, _re_si);
+            if _re_sc == "=" {
+                if _re_si > 0 {
+                    let _re_prev = char_at(src, _re_si - 1);
+                    if _re_prev != "!" { if _re_prev != "<" { if _re_prev != ">" {
+                        if _re_si + 1 < len(src) {
+                            if char_at(src, _re_si + 1) != "=" { _re_is_code = 1; };
+                        } else { _re_is_code = 1; };
+                    }; }; };
+                };
+            };
+            let _re_si = _re_si + 1;
+        };
+    };
     if _re_2 == "as" { _re_is_code = 1; };  // assert_type, assert_eq
     if _re_2 == "co" { _re_is_code = 1; };  // contract, contains
     if _re_2 == "se" { _re_is_code = 1; };  // set_at

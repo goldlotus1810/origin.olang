@@ -32,6 +32,7 @@ union Expr {
 
 union Stmt {
     LetStmt { name: Str, value: Expr },
+    AssignStmt { name: Str, value: Expr },
     ExprStmt { expr: Expr },
     FnDef { name: Str, params: Vec[Str], body: Vec[Stmt] },
     IfStmt { cond: Expr, then_block: Vec[Stmt], else_block: Vec[Stmt] },
@@ -1116,13 +1117,13 @@ pub fn parse_stmt(p) {
             if _ps_found_eq == 1 {
                 // Assignment detected. Parse LHS tokens → determine assign type.
                 if _ps_eq_pos == (p.pos + 1) {
-                    // Simple: name = expr
+                    // Simple: name = expr (REASSIGNMENT, not new binding)
                     let _ps_aname = name;
                     advance(p); // consume name
                     advance(p); // consume =
                     let _ps_aval = parse_expr(p);
                     if is_symbol_tok(peek(p), ";") { advance(p); };
-                    return Stmt::LetStmt { name: _ps_aname, value: _ps_aval };
+                    return Stmt::AssignStmt { name: _ps_aname, value: _ps_aval };
                 } else {
                     // Complex LHS: name.field = expr, name[i] = expr, name.a[i].b = expr
                     // Parse LHS as expression (up to =)

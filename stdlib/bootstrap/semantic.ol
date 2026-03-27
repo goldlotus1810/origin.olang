@@ -178,12 +178,23 @@ fn emit_load(state, _el_name) {
 
 fn emit_store(state, _es_name) {
     let _es_len = len(_es_name);
-    _emit_byte(state, 19);
+    _emit_byte(state, 19);       // opcode 0x13 = Store (frame-limited)
     _emit_byte(state, _es_len);
     let _es_i = 0;
     while _es_i < _es_len {
         _emit_byte(state, __char_code(char_at(_es_name, _es_i)));
         let _es_i = _es_i + 1;
+    };
+}
+
+fn emit_store_upd(state, _esu_name) {
+    let _esu_len = len(_esu_name);
+    _emit_byte(state, 28);       // opcode 0x1C = StoreUpdate (full-table search)
+    _emit_byte(state, _esu_len);
+    let _esu_i = 0;
+    while _esu_i < _esu_len {
+        _emit_byte(state, __char_code(char_at(_esu_name, _esu_i)));
+        let _esu_i = _esu_i + 1;
     };
 }
 
@@ -238,6 +249,7 @@ fn emit_op(state, _op) {
     if _eo_tag == "Push" { emit_push_str(state, _eo_name); return; };
     if _eo_tag == "Load" { emit_load(state, _eo_name); return; };
     if _eo_tag == "Store" { emit_store(state, _eo_name); return; };
+    if _eo_tag == "StoreUpdate" { emit_store_upd(state, _eo_name); return; };
     if _eo_tag == "LoadLocal" { emit_load(state, _eo_name); return; };
     if _eo_tag == "Call" { emit_call(state, _eo_name); return; };
     if _eo_tag == "Jmp" { emit_jmp(state, _eo_val); return; };
@@ -1612,6 +1624,14 @@ fn compile_stmt(state, stmt) {
                 compile_expr(state, value);
                 emit_op(state, make_op_simple("Ret"));
             };
+        },
+        Stmt::AssignStmt { name, value } => {
+            // Reassignment: x = val → StoreUpdate (full-table search, Julia-style)
+            let _as_name = name;
+            push(_ce_stack, _as_name);
+            compile_expr(state, value);
+            let _as_name = pop(_ce_stack);
+            emit_op(state, make_op_name("StoreUpdate", _as_name));
         },
         Stmt::EmitStmt { expr } => {
             compile_expr(state, expr);

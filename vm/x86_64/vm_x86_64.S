@@ -828,8 +828,7 @@ op_load_local:
     jmp     vm_loop
 
 op_store:
-op_store_upd:
-    # [0x33/0x39, name_len_u8, name_bytes...]
+    # [0x33, name_len_u8, name_bytes...] — frame-limited (creates local)
     movzbl  (%r12, %r13), %ecx         # name_len
     inc     %r13
     lea     (%r12, %r13), %rdi         # name ptr
@@ -837,7 +836,6 @@ op_store_upd:
     mov     (%r14), %r8
     mov     8(%r14), %r9
     add     $16, %r14
-    # Inline hash cache check
     push    %rcx
     push    %r8
     push    %r9
@@ -846,17 +844,47 @@ op_store_upd:
     and     $0xFF, %esi
     shl     $4, %esi
     cmp     %rdi, (%rax, %rsi)
-    jne     .op_store_hash_miss
+    jne     .op_store_hash_miss_local
     mov     8(%rax, %rsi), %rax
-    jmp     .op_store_have_hash
-.op_store_hash_miss:
+    jmp     .op_store_have_hash_local
+.op_store_hash_miss_local:
     call    hash_name
-.op_store_have_hash:
+.op_store_have_hash_local:
     pop     %r9
     pop     %r8
     pop     %rcx
     add     %rcx, %r13
-    call    var_store_hash              # rax=hash, r8=ptr, r9=len
+    call    var_store_hash              # frame-limited search
+    jmp     vm_loop
+
+op_store_upd:
+    # [0x39, name_len_u8, name_bytes...] — FULL search (updates existing, Julia-style)
+    movzbl  (%r12, %r13), %ecx         # name_len
+    inc     %r13
+    lea     (%r12, %r13), %rdi         # name ptr
+    mov     %ecx, %edx
+    mov     (%r14), %r8
+    mov     8(%r14), %r9
+    add     $16, %r14
+    push    %rcx
+    push    %r8
+    push    %r9
+    lea     hn_cache(%rip), %rax
+    mov     %rdi, %rsi
+    and     $0xFF, %esi
+    shl     $4, %esi
+    cmp     %rdi, (%rax, %rsi)
+    jne     .osu_hash_miss
+    mov     8(%rax, %rsi), %rax
+    jmp     .osu_have_hash
+.osu_hash_miss:
+    call    hash_name
+.osu_have_hash:
+    pop     %r9
+    pop     %r8
+    pop     %rcx
+    add     %rcx, %r13
+    call    var_store_global            # FULL table search (not frame-limited)
     jmp     vm_loop
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -7727,6 +7755,47 @@ var_table_init:
     movq    $0, (%rcx)
     # Reserve 4MB for shadow stack (deep recursion snapshots)
     add     $0x400000, %r15
+    ret
+
+# var_store_global: rax=hash, r8=val_ptr, r9=val_len
+# Like var_store_hash but searches ENTIRE table (frame_start=0).
+# Used by StoreUpdate (x = val) — Julia-style global variable update.
+var_store_global:
+    push    %rbx
+    lea     var_table_base(%rip), %rbx
+    mov     (%rbx), %rbx               # table base
+    mov     (%rbx), %rcx               # total count
+    test    %rcx, %rcx
+    jle     .vsg_new
+    # Reverse search from LAST entry to 0 (full table, no frame limit)
+    lea     -1(%rcx), %rdx
+    imul    $24, %rdx
+    lea     8(%rbx, %rdx), %rdi
+    mov     %rcx, %rdx                  # loop count = all entries
+.vsg_search:
+    cmp     (%rdi), %rax
+    jne     .vsg_next
+    # Found — update in place
+    mov     %r8, 8(%rdi)
+    mov     %r9, 16(%rdi)
+    pop     %rbx
+    ret
+.vsg_next:
+    sub     $24, %rdi
+    dec     %rdx
+    jnz     .vsg_search
+.vsg_new:
+    # Not found anywhere — append as new entry
+    lea     var_table_base(%rip), %rbx
+    mov     (%rbx), %rbx
+    mov     (%rbx), %rcx
+    imul    $24, %rcx, %rdx
+    lea     8(%rbx, %rdx), %rdi
+    mov     %rax, (%rdi)
+    mov     %r8, 8(%rdi)
+    mov     %r9, 16(%rdi)
+    incq    (%rbx)
+    pop     %rbx
     ret
 
 # ── Hash-based variable table ──
