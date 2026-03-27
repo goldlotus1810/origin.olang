@@ -38,6 +38,12 @@
 .equ ARRAY_INIT_CAP, 512
 .equ ARRAY_FORWARD_MARKER, -2      # sentinel: array relocated
 
+# ── Register frame constants ──
+.equ REG_MAX_SLOTS,  64             # max locals per function
+.equ REG_SLOT_SIZE,  16             # [ptr:8][len:8] per slot
+.equ REG_FRAME_SIZE, 1024           # REG_MAX_SLOTS * REG_SLOT_SIZE
+.equ REG_STACK_SIZE, 0x400000       # 4MB register stack (4096 frames)
+
 # ── Syscall numbers ─────────────────────────────────────────────────────
 .equ SYS_READ,      0
 .equ SYS_WRITE,     1
@@ -420,7 +426,7 @@ dispatch_codegen:
 .cg_not_builtin:
     lea     codegen_table(%rip), %rcx
     movzbl  %al, %eax
-    cmp     $0x26, %al
+    cmp     $0x2A, %al
     jae     op_unknown
     movslq  (%rcx, %rax, 4), %rdx
     add     %rcx, %rdx
@@ -467,6 +473,10 @@ codegen_table:
     .long op_nop        - codegen_table # 0x23 Ffi (stub)
     .long cg_call_closure - codegen_table # 0x24 CallClosure
     .long cg_closure      - codegen_table # 0x25 Closure
+    .long op_load_reg     - codegen_table # 0x26 LoadReg(u8 slot)
+    .long op_store_reg    - codegen_table # 0x27 StoreReg(u8 slot)
+    .long op_enter_frame  - codegen_table # 0x28 EnterFrame(u8 num_slots)
+    .long op_leave_frame  - codegen_table # 0x29 LeaveFrame
 .section .text
 
 # codegen Push: [chain_len:2 u16 LE][chain_bytes:N] → push raw bytes as chain
@@ -544,6 +554,76 @@ cg_closure:
 
     # Jump over body
     add     %eax, %r13d                 # PC += body_len
+    jmp     vm_loop
+
+# ── Register frame opcodes (Julia/Lua-style) ──────────────────────────
+
+# EnterFrame(u8 num_slots): allocate register frame with N slots
+# Format: [0x28][num_slots:1]
+# Saves old reg_cur_frame + old reg_frame_ptr on CPU stack.
+op_enter_frame:
+    movzbl  (%r12, %r13), %eax         # num_slots
+    inc     %r13
+    # Save old state on CPU stack
+    lea     reg_cur_frame(%rip), %rcx
+    push    (%rcx)                      # save old cur_frame
+    lea     reg_frame_ptr(%rip), %rdx
+    push    (%rdx)                      # save old frame_ptr
+    # New frame base = current frame_ptr
+    mov     (%rdx), %rdi               # new frame base
+    mov     %rdi, (%rcx)               # reg_cur_frame = new base
+    # Bump frame_ptr past this frame
+    movzbl  %al, %eax
+    shl     $4, %eax                   # bytes = num_slots * 16
+    add     %rax, %rdi
+    mov     %rdi, (%rdx)               # frame_ptr += N*16
+    # Zero the frame (fast: use rep stosq)
+    mov     (%rcx), %rdi               # frame base
+    shr     $3, %eax                   # qword count = bytes / 8
+    mov     %eax, %ecx
+    xor     %eax, %eax
+    rep     stosq
+    jmp     vm_loop
+
+# LeaveFrame: deallocate current register frame
+# Format: [0x29]
+op_leave_frame:
+    pop     %rax                        # restore old frame_ptr
+    lea     reg_frame_ptr(%rip), %rcx
+    mov     %rax, (%rcx)
+    pop     %rax                        # restore old cur_frame
+    lea     reg_cur_frame(%rip), %rcx
+    mov     %rax, (%rcx)
+    jmp     vm_loop
+
+# LoadReg(u8 slot): push register value onto VM stack
+# Format: [0x26][slot:1]
+op_load_reg:
+    movzbl  (%r12, %r13), %eax         # slot
+    inc     %r13
+    lea     reg_cur_frame(%rip), %rcx
+    mov     (%rcx), %rcx               # frame base
+    shl     $4, %eax                   # byte offset = slot * 16
+    sub     $16, %r14                  # push onto VM stack
+    mov     (%rcx, %rax), %rdx         # val_ptr
+    mov     %rdx, (%r14)
+    mov     8(%rcx, %rax), %rdx        # val_len
+    mov     %rdx, 8(%r14)
+    jmp     vm_loop
+
+# StoreReg(u8 slot): pop VM stack into register
+# Format: [0x27][slot:1]
+op_store_reg:
+    movzbl  (%r12, %r13), %eax         # slot
+    inc     %r13
+    lea     reg_cur_frame(%rip), %rcx
+    mov     (%rcx), %rcx               # frame base
+    shl     $4, %eax                   # byte offset = slot * 16
+    mov     (%r14), %rdx               # val_ptr from VM stack
+    mov     %rdx, (%rcx, %rax)
+    mov     8(%r14), %rdx              # val_len from VM stack
+    mov     %rdx, 8(%rcx, %rax)
+    add     $16, %r14                  # pop VM stack
     jmp     vm_loop
 
 # codegen CallClosure: [name_len:1][name:N][arity:1]
@@ -7755,6 +7835,15 @@ var_table_init:
     movq    $0, (%rcx)
     # Reserve 4MB for shadow stack (deep recursion snapshots)
     add     $0x400000, %r15
+    # Initialize register frame stack (4MB on heap)
+    mov     %r15, %rax
+    lea     reg_frame_base(%rip), %rcx
+    mov     %rax, (%rcx)
+    lea     reg_frame_ptr(%rip), %rcx
+    mov     %rax, (%rcx)                # frame_ptr = base (empty)
+    lea     reg_cur_frame(%rip), %rcx
+    mov     %rax, (%rcx)                # cur_frame = base
+    add     $REG_STACK_SIZE, %r15       # reserve 4MB
     ret
 
 # var_store_global: rax=hash, r8=val_ptr, r9=val_len
@@ -9290,6 +9379,13 @@ _save_rbx:
 scope_frame_ptrs:
     .space 32768                        # 4096 frame pointers × 8 bytes (max recursion depth)
     .align 8
+# ── Register frame stack ──
+reg_frame_base:
+    .space 8                            # register stack base on heap
+reg_frame_ptr:
+    .space 8                            # next free position on register stack
+reg_cur_frame:
+    .space 8                            # current frame base (for LoadReg/StoreReg)
 try_stack:
     .space 256                          # 16 try frames × 16 bytes (catch_PC:8 + saved_r14:8)
 try_depth:
