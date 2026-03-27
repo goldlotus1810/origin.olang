@@ -332,7 +332,7 @@ pub fn tokenize(source) {
             let two = substr(source, pos, pos + 2);
             if two == "==" || two == "!=" || two == "<=" || two == ">="
                 || two == "=>" || two == "->" || two == "::" || two == "&&" || two == "||"
-                || two == "<<" || two == ">>" {
+                || two == "<<" || two == ">>" || two == "|>" {
                 push(tokens, Token {
                     kind: TokenKind::Symbol { ch: two },
                     text: two,

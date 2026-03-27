@@ -674,7 +674,14 @@ fn parse_expr_prec(p, min_prec) {
 }
 
 pub fn parse_expr(p) {
-    return parse_expr_prec(p, 1);
+    let _pe_result = parse_expr_prec(p, 1);
+    // Handle pipe operator: x |> f |> g → g(f(x))
+    while is_symbol_tok(peek(p), "|>") {
+        advance(p);
+        let _pe_func = parse_expr_prec(p, 1);
+        _pe_result = Expr::Call { callee: _pe_func, args: [_pe_result] };
+    };
+    return _pe_result;
 }
 
 // ── Match expression parsing ────────────────────────────────────
