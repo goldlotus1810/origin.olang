@@ -9630,6 +9630,37 @@ op_halt:
     mov     $SYS_WRITE, %eax
     syscall
 
+    # Check if stdin is a terminal (for raw mode)
+    # isatty(0) via ioctl(0, TCGETS, &termios)
+    lea     repl_termios_old(%rip), %rdx
+    mov     $0x5401, %esi               # TCGETS
+    xor     %edi, %edi                  # fd = stdin
+    mov     $16, %eax                   # SYS_ioctl
+    syscall
+    test    %rax, %rax
+    jnz     .repl_no_raw                # not a terminal → skip raw mode
+    # Save old termios, set raw mode
+    lea     repl_termios_old(%rip), %rsi
+    lea     repl_termios_raw(%rip), %rdi
+    mov     $60, %ecx
+    rep     movsb                        # copy old → raw
+    # Clear ICANON(0x2) and ECHO(0x8) in c_lflag (offset 12)
+    lea     repl_termios_raw(%rip), %rdi
+    movl    12(%rdi), %eax
+    and     $~0x0A, %eax                # clear ICANON|ECHO
+    movl    %eax, 12(%rdi)
+    # Set VMIN=1, VTIME=0 in c_cc (offset 17)
+    movb    $1, 23(%rdi)                # c_cc[VMIN=6] at offset 17+6=23
+    movb    $0, 22(%rdi)                # c_cc[VTIME=5] at offset 17+5=22
+    # Apply raw termios
+    lea     repl_termios_raw(%rip), %rdx
+    mov     $0x5402, %esi               # TCSETS
+    xor     %edi, %edi                  # fd = stdin
+    mov     $16, %eax                   # SYS_ioctl
+    syscall
+    movb    $1, repl_raw_mode(%rip)     # flag: raw mode active
+.repl_no_raw:
+
     # ── REPL loop: read line → compile → execute ─────────────────
 .repl_loop:
     # Restore heap to previous checkpoint (free temp allocations from last turn)
@@ -9651,7 +9682,7 @@ op_halt:
     mov     $SYS_WRITE, %eax
     syscall
 
-    # Read line from stdin (byte-by-byte until newline, for pipe compatibility)
+    # Read line from stdin (raw mode: handle Tab, Backspace, arrows)
     mov     %r15, %rsi                  # buf = heap ptr
     xor     %ecx, %ecx                  # bytes read = 0
 .repl_read_byte:
@@ -9667,10 +9698,233 @@ op_halt:
     pop     %rcx
     test    %rax, %rax
     jle     .repl_read_done             # EOF or error
-    cmpb    $0x0A, (%rsi, %rcx)        # newline?
+    movzbl  (%rsi, %rcx), %eax         # read byte
+
+    # Check raw mode keys
+    cmpb    $1, repl_raw_mode(%rip)
+    jne     .repl_raw_skip
+
+    # Backspace (0x7F or 0x08)
+    cmp     $0x7F, %eax
+    je      .repl_backspace
+    cmp     $0x08, %eax
+    je      .repl_backspace
+
+    # Tab (0x09) — autocomplete
+    cmp     $0x09, %eax
+    je      .repl_tab
+
+    # Enter (0x0D in raw mode)
+    cmp     $0x0D, %eax
+    je      .repl_raw_enter
+
+    # ESC (0x1B) — start of arrow key sequence
+    cmp     $0x1B, %eax
+    je      .repl_esc_seq
+
+    # Ctrl-C (0x03) → exit
+    cmp     $0x03, %eax
+    je      .repl_read_done
+
+    # Ctrl-D (0x04) → exit
+    cmp     $0x04, %eax
+    je      .repl_read_done
+
+    # Regular printable char → echo it
+    push    %rcx
+    push    %rsi
+    lea     (%rsi, %rcx), %rsi
+    mov     $1, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    pop     %rsi
+    pop     %rcx
+    inc     %ecx
+    cmp     $4095, %ecx
+    jl      .repl_read_byte
+    jmp     .repl_read_newline
+
+.repl_raw_enter:
+    # Echo newline
+    push    %rcx
+    push    %rsi
+    lea     str_newline(%rip), %rsi
+    mov     $1, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    pop     %rsi
+    pop     %rcx
+    jmp     .repl_read_newline
+
+.repl_backspace:
+    test    %ecx, %ecx
+    jz      .repl_read_byte             # nothing to delete
+    dec     %ecx
+    # Echo: backspace + space + backspace (erase char)
+    push    %rcx
+    push    %rsi
+    lea     repl_bs_seq(%rip), %rsi     # "\b \b"
+    mov     $3, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    pop     %rsi
+    pop     %rcx
+    jmp     .repl_read_byte
+
+.repl_esc_seq:
+    # Read 2 more bytes for arrow key: ESC [ A/B/C/D
+    push    %rcx
+    push    %rsi
+    sub     $2, %rsp
+    mov     %rsp, %rsi
+    mov     $2, %edx
+    xor     %edi, %edi
+    mov     $SYS_READ, %eax
+    syscall
+    movzbl  (%rsp), %eax
+    movzbl  1(%rsp), %edx
+    add     $2, %rsp
+    pop     %rsi
+    pop     %rcx
+    cmp     $'[', %eax
+    jne     .repl_read_byte             # not arrow key
+    cmp     $'A', %edx
+    je      .repl_history_up
+    cmp     $'B', %edx
+    je      .repl_history_down
+    jmp     .repl_read_byte             # left/right → ignore for now
+
+.repl_history_up:
+    # TODO: implement history navigation
+    jmp     .repl_read_byte
+.repl_history_down:
+    jmp     .repl_read_byte
+
+.repl_tab:
+    # Tab completion: find prefix in var_table
+    test    %ecx, %ecx
+    jz      .repl_read_byte             # empty → skip
+    # Save current buffer state
+    push    %rcx
+    push    %rsi
+    # Find word start (scan backwards for space or start)
+    mov     %ecx, %r8d                  # r8 = end of word
+    dec     %r8d
+.repl_tab_word_start:
+    cmp     $0, %r8d
+    jl      .repl_tab_found_start
+    cmpb    $' ', (%rsi, %r8)
+    je      .repl_tab_found_start2
+    dec     %r8d
+    jmp     .repl_tab_word_start
+.repl_tab_found_start2:
+    inc     %r8d                         # skip the space
+.repl_tab_found_start:
+    cmp     $0, %r8d
+    jge     .repl_tab_search
+    xor     %r8d, %r8d
+.repl_tab_search:
+    # r8 = start of current word, ecx = end
+    # Word = buf[r8..ecx]
+    lea     (%rsi, %r8), %rdi           # word ptr
+    mov     %ecx, %r9d
+    sub     %r8d, %r9d                  # word len
+    # Scan var_table for prefix match
+    mov     var_table_base(%rip), %rbx
+    mov     (%rbx), %r10               # entry count
+    lea     8(%rbx), %rbx               # skip count header
+    xor     %r11d, %r11d               # match count
+    # First match ptr saved in repl_tab_match
+    movq    $0, repl_tab_match(%rip)
+    movq    $0, repl_tab_match_len(%rip)
+.repl_tab_scan:
+    cmp     %r10, %r11
+    jge     .repl_tab_done
+    # Entry: [hash:8, ptr:8, len+flags:8] = 24 bytes
+    lea     (%rbx, %r11, 8), %rax
+    lea     (%rax, %r11, 8), %rax
+    lea     (%rax, %r11, 8), %rax       # entry = base + i*24
+    mov     8(%rax), %r12               # name ptr (molecules)
+    movzwl  16(%rax), %r13d             # name len (lower 16 bits)
+    and     $0xFFFF, %r13d
+    # Compare prefix: word[0..r9] vs name[0..r9]
+    cmp     %r9d, %r13d
+    jl      .repl_tab_scan_next         # name shorter than prefix
+    # Compare r9 bytes
+    push    %rdi
+    push    %r9
+    xor     %edx, %edx
+.repl_tab_cmp:
+    cmp     %r9d, %edx
+    jge     .repl_tab_match_found
+    movzbl  (%rdi, %rdx), %eax         # prefix byte
+    movzbl  (%r12, %rdx, 2), %ecx     # name molecule low byte
+    cmp     %eax, %ecx
+    jne     .repl_tab_cmp_fail
+    inc     %edx
+    jmp     .repl_tab_cmp
+.repl_tab_cmp_fail:
+    pop     %r9
+    pop     %rdi
+    jmp     .repl_tab_scan_next
+.repl_tab_match_found:
+    pop     %r9
+    pop     %rdi
+    # Save first match
+    cmpq    $0, repl_tab_match(%rip)
+    jne     .repl_tab_has_match
+    mov     %r12, repl_tab_match(%rip)
+    mov     %r13, repl_tab_match_len(%rip)
+.repl_tab_has_match:
+.repl_tab_scan_next:
+    inc     %r11
+    jmp     .repl_tab_scan
+.repl_tab_done:
+    # If we found a match, complete the word
+    cmpq    $0, repl_tab_match(%rip)
+    je      .repl_tab_no_match
+    mov     repl_tab_match(%rip), %r12
+    mov     repl_tab_match_len(%rip), %r13
+    pop     %rsi
+    pop     %rcx
+    # Append remaining chars of match to buffer
+    mov     %r9d, %edx                  # edx = prefix len (already typed)
+.repl_tab_append:
+    cmp     %r13d, %edx
+    jge     .repl_tab_append_done
+    movzbl  (%r12, %rdx, 2), %eax     # molecule low byte
+    movb    %al, (%rsi, %rcx)          # append to buffer
+    # Echo the char
+    push    %rcx
+    push    %rsi
+    push    %rdx
+    lea     (%rsi, %rcx), %rsi
+    mov     $1, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    pop     %rdx
+    pop     %rsi
+    pop     %rcx
+    inc     %ecx
+    inc     %edx
+    jmp     .repl_tab_append
+.repl_tab_append_done:
+    jmp     .repl_read_byte
+.repl_tab_no_match:
+    pop     %rsi
+    pop     %rcx
+    jmp     .repl_read_byte
+
+.repl_raw_skip:
+    # Non-raw mode: original behavior
+    cmp     $0x0A, %eax                 # newline?
     je      .repl_read_newline
-    inc     %rcx
-    cmp     $4095, %rcx                 # max length
+    inc     %ecx
+    cmp     $4095, %ecx
     jl      .repl_read_byte
 .repl_read_newline:
     # Multiline: check bracket balance before accepting line
@@ -10172,6 +10426,15 @@ op_halt:
     # Flow: trampoline → Halt → .halt_mcp → .mcp_read_line (loop)
 
 .repl_exit:
+    # Restore terminal settings if raw mode was active
+    cmpb    $1, repl_raw_mode(%rip)
+    jne     .repl_exit_print
+    lea     repl_termios_old(%rip), %rdx
+    mov     $0x5402, %esi               # TCSETS
+    xor     %edi, %edi                  # fd = stdin
+    mov     $16, %eax                   # SYS_ioctl
+    syscall
+.repl_exit_print:
     # Print goodbye
     lea     msg_bye(%rip), %rsi
     mov     $4, %edx
@@ -10231,6 +10494,7 @@ print_hex_u64:
 .section .rodata
 
 dev_null_path: .asciz "/dev/null"
+repl_bs_seq: .byte 0x08, 0x20, 0x08       # backspace + space + backspace
 proc_self_exe:
     .asciz "/proc/self/exe"
 
@@ -11011,6 +11275,16 @@ mcp_out_mols:
     .space 16384                        # molecule encoding buffer (8K chars × 2 bytes)
 mcp_fmt_tmp:
     .space 64                           # temp buffer for f64 formatting in capture mode
+repl_termios_old:
+    .space 60                           # saved terminal settings
+repl_termios_raw:
+    .space 60                           # raw mode terminal settings
+repl_raw_mode:
+    .space 1                            # 1 = raw mode active
+repl_tab_match:
+    .space 8                            # ptr to first matching name
+repl_tab_match_len:
+    .space 8                            # length of matching name
 jit_cache:
     .space 512                          # 32 slots × [hash:8][ptr:8] = 16 bytes each
 profile_counters:
