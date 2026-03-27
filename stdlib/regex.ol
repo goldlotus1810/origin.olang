@@ -1,242 +1,308 @@
-// stdlib/regex.ol — NFA regex engine (Thompson's construction)
-// Supports: . * + ? [] [^] () | \d \w \s
-// State passed as mutable array to avoid global mutation issues.
+// stdlib/regex.ol — Regex engine (simplified, minimal call depth)
+// Supports: . * + ? [chars] [^chars] () | \d \w \s
+// API: regex_match(text, pattern), regex_test(text, pattern), regex_search(text, pattern)
 
-// State array: s[0]=count, s[1..]=flat state data (4 per state: type,ch,out1,out2)
+// Build NFA in a flat array: [count, type0,ch0,out1_0,out2_0, type1,...]
 // Types: 0=lit, 1=dot, 2=split, 3=match, 4=class, 5=nclass
-// Fragment encoding: start*100000 + end
 
-fn _rx_ns(s, t, c, o1, o2) {
-    let _id = s[0];
-    push(s, t); push(s, c); push(s, o1); push(s, o2);
-    set_at(s, 0, _id + 1);
-    return _id;
-}
-fn _rx_t(s, id) { return s[1 + id*4]; }
-fn _rx_c(s, id) { return s[1 + id*4+1]; }
-fn _rx_o1(s, id) { return s[1 + id*4+2]; }
-fn _rx_o2(s, id) { return s[1 + id*4+3]; }
-fn _rx_so1(s, id, v) { set_at(s, 1 + id*4+2, v); }
-fn _rx_so2(s, id, v) { set_at(s, 1 + id*4+3, v); }
+pub fn regex_match(_rm_text, _rm_pat) {
+    let _s = [0];   // state array
+    let _pi = [0];  // pattern position
 
-fn _rx_fs(f) { return __floor(f / 100000); }
-fn _rx_fe(f) { return f - __floor(f / 100000) * 100000; }
+    // ── COMPILE: pattern → NFA ──
+    let _start = _rx_build(_s, _rm_pat, _pi);
 
-// Parse atom
-fn _rx_pa(s, p, pi) {
-    if pi[0] >= len(p) { return -1; };
-    let _c = char_at(p, pi[0]);
-    if _c == ")" || _c == "|" { return -1; };
-    if _c == "(" {
-        set_at(pi, 0, pi[0]+1);
-        let _f = _rx_pl(s, p, pi);
-        if pi[0] < len(p) { if char_at(p, pi[0]) == ")" { set_at(pi, 0, pi[0]+1); }; };
-        return _f;
-    };
-    if _c == "[" {
-        set_at(pi, 0, pi[0]+1);
-        let _neg = 0;
-        if pi[0] < len(p) { if char_at(p, pi[0]) == "^" { let _neg = 1; set_at(pi, 0, pi[0]+1); }; };
-        let _chars = "";
-        while pi[0] < len(p) {
-            if char_at(p, pi[0]) == "]" { break; };
-            let _cc = char_at(p, pi[0]); set_at(pi, 0, pi[0]+1);
-            if pi[0] < len(p) { if char_at(p, pi[0]) == "-" {
-                set_at(pi, 0, pi[0]+1);
-                if pi[0] < len(p) {
-                    let _e = char_at(p, pi[0]); set_at(pi, 0, pi[0]+1);
-                    let _f = __char_code(_cc); let _t = __char_code(_e);
-                    while _f <= _t { _chars = _chars + __chr(_f); let _f = _f + 1; };
-                    continue;
-                };
-            }; };
-            _chars = _chars + _cc;
-        };
-        if pi[0] < len(p) { set_at(pi, 0, pi[0]+1); }; // skip ]
-        let _tp = 4; if _neg == 1 { let _tp = 5; };
-        let _id = _rx_ns(s, _tp, _chars, -1, -1);
-        return _id * 100000 + _id;
-    };
-    if _c == "." { set_at(pi, 0, pi[0]+1); let _id = _rx_ns(s, 1, "", -1, -1); return _id*100000+_id; };
-    if _c == "\\" {
-        set_at(pi, 0, pi[0]+1);
-        if pi[0] < len(p) {
-            let _ec = char_at(p, pi[0]); set_at(pi, 0, pi[0]+1);
-            if _ec == "d" { let _id = _rx_ns(s, 4, "0123456789", -1, -1); return _id*100000+_id; };
-            if _ec == "w" { let _id = _rx_ns(s, 4, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_", -1, -1); return _id*100000+_id; };
-            if _ec == "s" { let _id = _rx_ns(s, 4, " ", -1, -1); return _id*100000+_id; };
-            let _id = _rx_ns(s, 0, _ec, -1, -1); return _id*100000+_id;
-        };
-        return -1;
-    };
-    set_at(pi, 0, pi[0]+1);
-    let _id = _rx_ns(s, 0, _c, -1, -1);
-    return _id*100000+_id;
-}
-
-// Parse quantifier: atom followed by * + ?
-fn _rx_pq(s, p, pi) {
-    let _f = _rx_pa(s, p, pi);
-    if _f == -1 { return -1; };
-    if pi[0] >= len(p) { return _f; };
-    let _q = char_at(p, pi[0]);
-    let _fs = _rx_fs(_f); let _fe = _rx_fe(_f);
-    if _q == "*" { set_at(pi, 0, pi[0]+1);
-        let _sp = _rx_ns(s, 2, "", _fs, -1);
-        _rx_so1(s, _fe, _sp);
-        return _sp*100000+_sp;
-    };
-    if _q == "+" { set_at(pi, 0, pi[0]+1);
-        let _sp = _rx_ns(s, 2, "", _fs, -1);
-        _rx_so1(s, _fe, _sp);
-        return _fs*100000+_sp;
-    };
-    if _q == "?" { set_at(pi, 0, pi[0]+1);
-        let _sp = _rx_ns(s, 2, "", _fs, -1);
-        return _sp*100000+_fe;
-    };
-    return _f;
-}
-
-// Parse concatenation
-fn _rx_pc(s, p, pi) {
-    let _f = _rx_pq(s, p, pi);
-    if _f == -1 { return -1; };
-    let _fs = _rx_fs(_f); let _fe = _rx_fe(_f);
-    while pi[0] < len(p) {
-        let _ch = char_at(p, pi[0]);
-        if _ch == ")" || _ch == "|" { break; };
-        let _nf = _rx_pq(s, p, pi);
-        if _nf == -1 { break; };
-        let _ns = _rx_fs(_nf); let _ne = _rx_fe(_nf);
-        if _rx_o1(s, _fe) == -1 { _rx_so1(s, _fe, _ns); } else { _rx_so2(s, _fe, _ns); };
-        let _fe = _ne;
-    };
-    return _fs*100000+_fe;
-}
-
-// Parse alternation
-fn _rx_pl(s, p, pi) {
-    let _f = _rx_pc(s, p, pi);
-    if _f == -1 { return -1; };
-    let _fs = _rx_fs(_f); let _fe = _rx_fe(_f);
-    while pi[0] < len(p) {
-        if char_at(p, pi[0]) != "|" { break; };
-        set_at(pi, 0, pi[0]+1);
-        let _rf = _rx_pc(s, p, pi);
-        if _rf == -1 { break; };
-        let _rs = _rx_fs(_rf); let _re = _rx_fe(_rf);
-        let _sp = _rx_ns(s, 2, "", _fs, _rs);
-        let _mg = _rx_ns(s, 2, "", -1, -1);
-        if _rx_o1(s, _fe) == -1 { _rx_so1(s, _fe, _mg); } else { _rx_so2(s, _fe, _mg); };
-        if _rx_o1(s, _re) == -1 { _rx_so1(s, _re, _mg); } else { _rx_so2(s, _re, _mg); };
-        let _fs = _sp; let _fe = _mg;
-    };
-    return _fs*100000+_fe;
-}
-
-fn _rx_compile(pat) {
-    let _s = [0]; // state array: [count, ...data]
-    let _pi = [0]; // position as mutable ref
-    let _f = _rx_pl(_s, pat, _pi);
-    if _f == -1 { _rx_ns(_s, 3, "", -1, -1); return _s; };
-    let _m = _rx_ns(_s, 3, "", -1, -1);
-    let _fe = _rx_fe(_f);
-    if _rx_o1(_s, _fe) == -1 { _rx_so1(_s, _fe, _m); } else { _rx_so2(_s, _fe, _m); };
-    // Store start state at the returned array (use _f's start)
-    push(_s, _rx_fs(_f)); // last element = start state
-    return _s;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// NFA Simulation
-// ═══════════════════════════════════════════════════════════════
-
-fn _rx_incls(ch, cls) {
-    let _i = 0;
-    while _i < len(cls) { if char_at(cls, _i) == ch { return 1; }; let _i = _i + 1; };
+    // ── SIMULATE: NFA on text ──
+    let _end = _rx_run(_s, _start, _rm_text, 0);
+    if _end == len(_rm_text) { return 1; };
     return 0;
 }
 
-fn _rx_addst(s, set, seen, sid, n) {
-    let _stk = [sid];
-    while len(_stk) > 0 {
-        let _cur = pop(_stk);
-        if _cur < 0 { continue; };
-        if _cur >= n { continue; };
-        if seen[_cur] == 1 { continue; };
-        set_at(seen, _cur, 1);
-        if _rx_t(s, _cur) == 2 {
-            push(_stk, _rx_o1(s, _cur));
-            push(_stk, _rx_o2(s, _cur));
-        } else {
-            push(set, _cur);
-        };
+pub fn regex_test(_rt_text, _rt_pat) {
+    let _s = [0];
+    let _pi = [0];
+    let _start = _rx_build(_s, _rt_pat, _pi);
+    let _i = 0;
+    while _i < len(_rt_text) {
+        let _end = _rx_run(_s, _start, _rt_text, _i);
+        if _end >= 0 { return 1; };
+        let _i = _i + 1;
     };
-}
-
-fn _rx_sim(s, start, text, from) {
-    let _n = s[0];
-    let _cur = [];
-    let _seen = [];
-    let _i = 0; while _i < _n { push(_seen, 0); let _i = _i + 1; };
-    _rx_addst(s, _cur, _seen, start, _n);
-    let _ti = from;
-    let _tlen = len(text);
-    let _matched = -1;
-    let _ci = 0;
-    while _ci < len(_cur) { if _rx_t(s, _cur[_ci]) == 3 { let _matched = _ti; }; let _ci = _ci + 1; };
-    while _ti < _tlen {
-        if len(_cur) == 0 { return _matched; };
-        let _ch = char_at(text, _ti);
-        let _next = [];
-        let _nseen = [];
-        let _ni = 0; while _ni < _n { push(_nseen, 0); let _ni = _ni + 1; };
-        let _j = 0;
-        while _j < len(_cur) {
-            let _sid = _cur[_j];
-            let _tp = _rx_t(s, _sid);
-            let _ok = 0;
-            if _tp == 0 { if _rx_c(s, _sid) == _ch { let _ok = 1; }; };
-            if _tp == 1 { let _ok = 1; };
-            if _tp == 4 { if _rx_incls(_ch, _rx_c(s, _sid)) == 1 { let _ok = 1; }; };
-            if _tp == 5 { if _rx_incls(_ch, _rx_c(s, _sid)) == 0 { let _ok = 1; }; };
-            if _ok == 1 { _rx_addst(s, _next, _nseen, _rx_o1(s, _sid), _n); };
-            let _j = _j + 1;
-        };
-        let _cur = _next;
-        let _ti = _ti + 1;
-        let _ci = 0;
-        while _ci < len(_cur) { if _rx_t(s, _cur[_ci]) == 3 { let _matched = _ti; }; let _ci = _ci + 1; };
-    };
-    return _matched;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// Public API
-// ═══════════════════════════════════════════════════════════════
-
-pub fn regex_match(text, pattern) {
-    let _s = _rx_compile(pattern);
-    let _start = _s[len(_s)-1]; // start state stored at end
-    let _end = _rx_sim(_s, _start, text, 0);
-    if _end == len(text) { return 1; };
     return 0;
 }
 
-pub fn regex_search(text, pattern) {
-    let _s = _rx_compile(pattern);
-    let _start = _s[len(_s)-1];
+pub fn regex_search(_rs_text, _rs_pat) {
+    let _s = [0];
+    let _pi = [0];
+    let _start = _rx_build(_s, _rs_pat, _pi);
     let _i = 0;
-    while _i < len(text) {
-        let _end = _rx_sim(_s, _start, text, _i);
+    while _i < len(_rs_text) {
+        let _end = _rx_run(_s, _start, _rs_text, _i);
         if _end >= 0 { return {start: _i, end: _end}; };
         let _i = _i + 1;
     };
     return -1;
 }
 
-pub fn regex_test(text, pattern) {
-    if regex_search(text, pattern) == -1 { return 0; };
-    return 1;
+// ═══════════════════════════════════════════════════════════════
+// NFA Builder — single function, no deep call chains
+// ═══════════════════════════════════════════════════════════════
+
+fn _rx_build(_b_s, _b_pat, _b_pi) {
+    // Parse and build NFA in one pass
+    let _b_frag = _rx_expr(_b_s, _b_pat, _b_pi);
+    if _b_frag < 0 {
+        // Empty pattern → match anything
+        let _b_m = _b_s[0];
+        let _ = __array_push(_b_s, 3); let _ = __array_push(_b_s, ""); let _ = __array_push(_b_s, -1); let _ = __array_push(_b_s, -1);
+        set_at(_b_s, 0, _b_m + 1);
+        return _b_m;
+    };
+    // Add match state
+    let _b_m = _b_s[0];
+    let _ = __array_push(_b_s, 3); let _ = __array_push(_b_s, ""); let _ = __array_push(_b_s, -1); let _ = __array_push(_b_s, -1);
+    set_at(_b_s, 0, _b_m + 1);
+    // Patch fragment end → match
+    let _b_fe = _b_frag - __floor(_b_frag / 100000) * 100000;
+    if _b_s[1 + _b_fe*4 + 2] == -1 { set_at(_b_s, 1 + _b_fe*4 + 2, _b_m); }
+    else { set_at(_b_s, 1 + _b_fe*4 + 3, _b_m); };
+    return __floor(_b_frag / 100000);
+}
+
+// Parse alternation: concat | concat | ...
+fn _rx_expr(_e_s, _e_p, _e_pi) {
+    let _e_f = _rx_seq(_e_s, _e_p, _e_pi);
+    if _e_f < 0 { return -1; };
+    while _e_pi[0] < len(_e_p) {
+        if char_at(_e_p, _e_pi[0]) != "|" { return _e_f; };
+        set_at(_e_pi, 0, _e_pi[0] + 1);
+        let _e_rf = _rx_seq(_e_s, _e_p, _e_pi);
+        if _e_rf < 0 { return _e_f; };
+        // Split node
+        let _e_fs = __floor(_e_f / 100000);
+        let _e_fe = _e_f - _e_fs * 100000;
+        let _e_rs = __floor(_e_rf / 100000);
+        let _e_re = _e_rf - _e_rs * 100000;
+        let _e_sp = _e_s[0];
+        let _ = __array_push(_e_s, 2); let _ = __array_push(_e_s, ""); let _ = __array_push(_e_s, _e_fs); let _ = __array_push(_e_s, _e_rs);
+        set_at(_e_s, 0, _e_sp + 1);
+        let _e_mg = _e_s[0];
+        let _ = __array_push(_e_s, 2); let _ = __array_push(_e_s, ""); let _ = __array_push(_e_s, -1); let _ = __array_push(_e_s, -1);
+        set_at(_e_s, 0, _e_mg + 1);
+        if _e_s[1+_e_fe*4+2] == -1 { set_at(_e_s, 1+_e_fe*4+2, _e_mg); } else { set_at(_e_s, 1+_e_fe*4+3, _e_mg); };
+        if _e_s[1+_e_re*4+2] == -1 { set_at(_e_s, 1+_e_re*4+2, _e_mg); } else { set_at(_e_s, 1+_e_re*4+3, _e_mg); };
+        let _e_f = _e_sp * 100000 + _e_mg;
+    };
+    return _e_f;
+}
+
+// Parse concatenation: quant quant ...
+fn _rx_seq(_q_s, _q_p, _q_pi) {
+    let _q_f = _rx_atom_q(_q_s, _q_p, _q_pi);
+    if _q_f < 0 { return -1; };
+    while _q_pi[0] < len(_q_p) {
+        let _q_ch = char_at(_q_p, _q_pi[0]);
+        if _q_ch == ")" { return _q_f; };
+        if _q_ch == "|" { return _q_f; };
+        let _q_nf = _rx_atom_q(_q_s, _q_p, _q_pi);
+        if _q_nf < 0 { return _q_f; };
+        let _q_fs = __floor(_q_f / 100000);
+        let _q_fe = _q_f - _q_fs * 100000;
+        let _q_ns = __floor(_q_nf / 100000);
+        let _q_ne = _q_nf - _q_ns * 100000;
+        if _q_s[1+_q_fe*4+2] == -1 { set_at(_q_s, 1+_q_fe*4+2, _q_ns); }
+        else { set_at(_q_s, 1+_q_fe*4+3, _q_ns); };
+        let _q_f = _q_fs * 100000 + _q_ne;
+    };
+    return _q_f;
+}
+
+// Parse atom + optional quantifier (*, +, ?)
+fn _rx_atom_q(_a_s, _a_p, _a_pi) {
+    if _a_pi[0] >= len(_a_p) { return -1; };
+    let _a_ch = char_at(_a_p, _a_pi[0]);
+
+    // Skip meta chars
+    if _a_ch == ")" { return -1; };
+    if _a_ch == "|" { return -1; };
+
+    // Group
+    if _a_ch == "(" {
+        set_at(_a_pi, 0, _a_pi[0] + 1);
+        let _a_f = _rx_expr(_a_s, _a_p, _a_pi);
+        if _a_pi[0] < len(_a_p) { if char_at(_a_p, _a_pi[0]) == ")" { set_at(_a_pi, 0, _a_pi[0]+1); }; };
+        return _rx_quant(_a_s, _a_p, _a_pi, _a_f);
+    };
+
+    // Character class [...]
+    if _a_ch == "[" {
+        set_at(_a_pi, 0, _a_pi[0] + 1);
+        let _a_neg = 0;
+        if _a_pi[0] < len(_a_p) { if char_at(_a_p, _a_pi[0]) == "^" { let _a_neg = 1; set_at(_a_pi, 0, _a_pi[0]+1); }; };
+        let _a_chars = "";
+        while _a_pi[0] < len(_a_p) {
+            if char_at(_a_p, _a_pi[0]) == "]" { break; };
+            let _a_cc = char_at(_a_p, _a_pi[0]); set_at(_a_pi, 0, _a_pi[0]+1);
+            if _a_pi[0] < len(_a_p) { if char_at(_a_p, _a_pi[0]) == "-" {
+                set_at(_a_pi, 0, _a_pi[0]+1);
+                if _a_pi[0] < len(_a_p) {
+                    let _a_e = char_at(_a_p, _a_pi[0]); set_at(_a_pi, 0, _a_pi[0]+1);
+                    let _a_from = __char_code(_a_cc); let _a_to = __char_code(_a_e);
+                    while _a_from <= _a_to { _a_chars = _a_chars + __chr(_a_from); _a_from = _a_from + 1; };
+                    continue;
+                };
+            }; };
+            _a_chars = _a_chars + _a_cc;
+        };
+        if _a_pi[0] < len(_a_p) { set_at(_a_pi, 0, _a_pi[0]+1); }; // skip ]
+        let _a_tp = 4; if _a_neg == 1 { let _a_tp = 5; };
+        let _a_id = _a_s[0];
+        let _ = __array_push(_a_s, _a_tp); let _ = __array_push(_a_s, _a_chars); let _ = __array_push(_a_s, -1); let _ = __array_push(_a_s, -1);
+        set_at(_a_s, 0, _a_id + 1);
+        return _rx_quant(_a_s, _a_p, _a_pi, _a_id * 100000 + _a_id);
+    };
+
+    // Dot
+    if _a_ch == "." {
+        set_at(_a_pi, 0, _a_pi[0]+1);
+        let _a_id = _a_s[0];
+        let _ = __array_push(_a_s, 1); let _ = __array_push(_a_s, ""); let _ = __array_push(_a_s, -1); let _ = __array_push(_a_s, -1);
+        set_at(_a_s, 0, _a_id + 1);
+        return _rx_quant(_a_s, _a_p, _a_pi, _a_id * 100000 + _a_id);
+    };
+
+    // Escape
+    if _a_ch == "\\" {
+        set_at(_a_pi, 0, _a_pi[0]+1);
+        if _a_pi[0] < len(_a_p) {
+            let _a_ec = char_at(_a_p, _a_pi[0]); set_at(_a_pi, 0, _a_pi[0]+1);
+            let _a_id = _a_s[0];
+            if _a_ec == "d" { let _ = __array_push(_a_s, 4); let _ = __array_push(_a_s, "0123456789"); }
+            else { if _a_ec == "w" { let _ = __array_push(_a_s, 4); let _ = __array_push(_a_s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"); }
+            else { if _a_ec == "s" { let _ = __array_push(_a_s, 4); let _ = __array_push(_a_s, " "); }
+            else { let _ = __array_push(_a_s, 0); let _ = __array_push(_a_s, _a_ec); }; }; };
+            let _ = __array_push(_a_s, -1); let _ = __array_push(_a_s, -1);
+            set_at(_a_s, 0, _a_id + 1);
+            return _rx_quant(_a_s, _a_p, _a_pi, _a_id * 100000 + _a_id);
+        };
+        return -1;
+    };
+
+    // Literal character
+    set_at(_a_pi, 0, _a_pi[0]+1);
+    let _a_id = _a_s[0];
+    let _ = __array_push(_a_s, 0); let _ = __array_push(_a_s, _a_ch); let _ = __array_push(_a_s, -1); let _ = __array_push(_a_s, -1);
+    set_at(_a_s, 0, _a_id + 1);
+    return _rx_quant(_a_s, _a_p, _a_pi, _a_id * 100000 + _a_id);
+}
+
+// Apply quantifier (*, +, ?) to fragment
+fn _rx_quant(_rq_s, _rq_p, _rq_pi, _rq_f) {
+    if _rq_pi[0] >= len(_rq_p) { return _rq_f; };
+    let _rq_q = char_at(_rq_p, _rq_pi[0]);
+    let _rq_fs = __floor(_rq_f / 100000);
+    let _rq_fe = _rq_f - _rq_fs * 100000;
+    if _rq_q == "*" {
+        set_at(_rq_pi, 0, _rq_pi[0]+1);
+        let _rq_sp = _rq_s[0];
+        let _ = __array_push(_rq_s, 2); let _ = __array_push(_rq_s, ""); let _ = __array_push(_rq_s, _rq_fs); let _ = __array_push(_rq_s, -1);
+        set_at(_rq_s, 0, _rq_sp + 1);
+        set_at(_rq_s, 1+_rq_fe*4+2, _rq_sp);
+        return _rq_sp * 100000 + _rq_sp;
+    };
+    if _rq_q == "+" {
+        set_at(_rq_pi, 0, _rq_pi[0]+1);
+        let _rq_sp = _rq_s[0];
+        let _ = __array_push(_rq_s, 2); let _ = __array_push(_rq_s, ""); let _ = __array_push(_rq_s, _rq_fs); let _ = __array_push(_rq_s, -1);
+        set_at(_rq_s, 0, _rq_sp + 1);
+        set_at(_rq_s, 1+_rq_fe*4+2, _rq_sp);
+        return _rq_fs * 100000 + _rq_sp;
+    };
+    if _rq_q == "?" {
+        set_at(_rq_pi, 0, _rq_pi[0]+1);
+        let _rq_sp = _rq_s[0];
+        let _ = __array_push(_rq_s, 2); let _ = __array_push(_rq_s, ""); let _ = __array_push(_rq_s, _rq_fs); let _ = __array_push(_rq_s, -1);
+        set_at(_rq_s, 0, _rq_sp + 1);
+        return _rq_sp * 100000 + _rq_fe;
+    };
+    return _rq_f;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NFA Simulation
+// ═══════════════════════════════════════════════════════════════
+
+fn _rx_run(_r_s, _r_start, _r_text, _r_from) {
+    let _r_n = _r_s[0];
+    if _r_n == 0 { return -1; };
+    let _r_cur = [];
+    let _r_seen = [];
+    let _r_i = 0; while _r_i < _r_n { let _ = __array_push(_r_seen, 0); _r_i = _r_i + 1; };
+    // Add start state (follow epsilon/split transitions)
+    let _r_stk = [_r_start];
+    while len(_r_stk) > 0 {
+        let _r_sid = __array_pop(_r_stk);
+        if _r_sid >= 0 { if _r_sid < _r_n { if _r_seen[_r_sid] == 0 {
+            set_at(_r_seen, _r_sid, 1);
+            if _r_s[1+_r_sid*4] == 2 { // split
+                let _ = __array_push(_r_stk, _r_s[1+_r_sid*4+2]);
+                let _ = __array_push(_r_stk, _r_s[1+_r_sid*4+3]);
+            } else {
+                let _ = __array_push(_r_cur, _r_sid);
+            };
+        }; }; };
+    };
+    let _r_ti = _r_from;
+    let _r_tlen = len(_r_text);
+    let _r_matched = -1;
+    // Check for match in initial set
+    let _r_ci = 0;
+    while _r_ci < len(_r_cur) { if _r_s[1+_r_cur[_r_ci]*4] == 3 { _r_matched = _r_ti; }; _r_ci = _r_ci + 1; };
+    // Process each character
+    while _r_ti < _r_tlen {
+        if len(_r_cur) == 0 { return _r_matched; };
+        let _r_ch = char_at(_r_text, _r_ti);
+        let _r_next = [];
+        let _r_nseen = [];
+        let _r_ni = 0; while _r_ni < _r_n { let _ = __array_push(_r_nseen, 0); _r_ni = _r_ni + 1; };
+        let _r_j = 0;
+        while _r_j < len(_r_cur) {
+            let _r_sid = _r_cur[_r_j];
+            let _r_tp = _r_s[1+_r_sid*4];
+            let _r_ok = 0;
+            if _r_tp == 0 { if _r_s[1+_r_sid*4+1] == _r_ch { _r_ok = 1; }; }; // lit
+            if _r_tp == 1 { _r_ok = 1; }; // dot
+            if _r_tp == 4 { // class
+                let _r_cls = _r_s[1+_r_sid*4+1]; let _r_ki = 0;
+                while _r_ki < len(_r_cls) { if char_at(_r_cls, _r_ki) == _r_ch { _r_ok = 1; }; _r_ki = _r_ki + 1; };
+            };
+            if _r_tp == 5 { // nclass
+                _r_ok = 1; let _r_cls = _r_s[1+_r_sid*4+1]; let _r_ki = 0;
+                while _r_ki < len(_r_cls) { if char_at(_r_cls, _r_ki) == _r_ch { _r_ok = 0; }; _r_ki = _r_ki + 1; };
+            };
+            if _r_ok == 1 {
+                // Add next state (follow epsilon)
+                let _r_nxt = _r_s[1+_r_sid*4+2];
+                let _r_stk2 = [_r_nxt];
+                while len(_r_stk2) > 0 {
+                    let _r_ns = __array_pop(_r_stk2);
+                    if _r_ns >= 0 { if _r_ns < _r_n { if _r_nseen[_r_ns] == 0 {
+                        set_at(_r_nseen, _r_ns, 1);
+                        if _r_s[1+_r_ns*4] == 2 {
+                            let _ = __array_push(_r_stk2, _r_s[1+_r_ns*4+2]);
+                            let _ = __array_push(_r_stk2, _r_s[1+_r_ns*4+3]);
+                        } else {
+                            let _ = __array_push(_r_next, _r_ns);
+                        };
+                    }; }; };
+                };
+            };
+            _r_j = _r_j + 1;
+        };
+        _r_cur = _r_next;
+        _r_ti = _r_ti + 1;
+        _r_ci = 0;
+        while _r_ci < len(_r_cur) { if _r_s[1+_r_cur[_r_ci]*4] == 3 { _r_matched = _r_ti; }; _r_ci = _r_ci + 1; };
+    };
+    return _r_matched;
 }
