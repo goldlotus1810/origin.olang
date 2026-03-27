@@ -18,3 +18,52 @@
 {"ts":"2026-03-27 18:50","type":"EMOTION","msg":"toi vui"}
 {"ts":"2026-03-27 18:50","type":"SAFETY","msg":"hello"}
 {"ts":"2026-03-27 18:50","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-27 18:56","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-27 18:56","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-27 18:56","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-27 18:56","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-27 18:56","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-27 18:56","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-27 19:02","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-27 19:02","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-27 19:02","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-27 19:02","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-27 19:02","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-27 19:02","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 05:51","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 05:51","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 05:51","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 05:51","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 05:51","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 05:51","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 06:22","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 06:22","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 06:22","type":"QUERY","msg":"Nox"}
+{"ts":"2026-03-28 06:22","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 06:22","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 06:22","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 06:23","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 06:23","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 06:23","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 06:23","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 06:23","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 06:23","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 06:26","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 06:27","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 06:27","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 06:27","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 06:27","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 06:27","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 06:27","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 06:34","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 06:34","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 06:34","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 06:34","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 06:34","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 06:34","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 06:34","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 06:34","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 06:34","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 06:34","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 06:34","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 06:34","type":"STATUS","msg":"brain check"}

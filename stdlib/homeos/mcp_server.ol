@@ -131,7 +131,7 @@ fn _mcp_tool_eval(_te_id, _te_code) {
     let _te_saved = __stdout_off();
     let _te_repl = repl_eval(_te_code);
     __stdout_on(_te_saved);
-    if len(_te_repl) == 0 { return _mcp_result(_te_id, "(executed)"); };
+    if len(_te_repl) == 0 { return _mcp_result(_te_id, "ok"); };
     return _mcp_result(_te_id, _te_repl);
 }
 

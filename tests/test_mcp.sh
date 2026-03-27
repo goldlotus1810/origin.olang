@@ -31,7 +31,7 @@ RESPONSE=$(printf '%s\n' \
 echo "═══ MCP SERVER TEST ═══"
 check "initialize"     "protocolVersion" 0
 check "tools/list"     "olang_eval" 1
-check "olang_eval"     "executed" 2
+check "olang_eval"     "ok" 2
 check "know_learn"     "Learned" 3
 check "know_query"     "12345" 4
 check "emotion_encode" "Emotion 5D" 5
