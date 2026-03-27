@@ -9756,6 +9756,47 @@ op_halt:
     syscall
     pop     %rsi
     pop     %rcx
+    # Save to history (if non-empty)
+    test    %ecx, %ecx
+    jz      .repl_read_newline
+    push    %rcx
+    push    %rsi
+    # Copy line to history buffer
+    movl    repl_hist_off(%rip), %r8d
+    lea     repl_hist_buf(%rip), %rdi
+    add     %r8, %rdi
+    mov     %ecx, %edx                  # line len
+    push    %rdx
+    mov     %rsi, %r9                   # source
+.repl_hist_copy:
+    test    %edx, %edx
+    jz      .repl_hist_save_entry
+    movb    (%r9), %al
+    movb    %al, (%rdi)
+    inc     %r9
+    inc     %rdi
+    dec     %edx
+    jmp     .repl_hist_copy
+.repl_hist_save_entry:
+    pop     %rdx                        # line len
+    # Save entry: [offset, len]
+    movl    repl_hist_count(%rip), %eax
+    cmp     $50, %eax
+    jge     .repl_hist_skip_save        # max 50 entries
+    lea     repl_hist_entries(%rip), %rdi
+    shl     $3, %eax                    # entry_idx * 8
+    movl    %r8d, (%rdi, %rax)          # offset
+    movl    %edx, 4(%rdi, %rax)         # len
+    incl    repl_hist_count(%rip)
+    # Advance write offset
+    add     %edx, %r8d
+    and     $0xFFF, %r8d                # wrap at 4096
+    movl    %r8d, repl_hist_off(%rip)
+.repl_hist_skip_save:
+    # Reset navigation position
+    movl    $-1, repl_hist_pos(%rip)
+    pop     %rsi
+    pop     %rcx
     jmp     .repl_read_newline
 
 .repl_backspace:
@@ -9798,9 +9839,168 @@ op_halt:
     jmp     .repl_read_byte             # left/right → ignore for now
 
 .repl_history_up:
-    # TODO: implement history navigation
-    jmp     .repl_read_byte
+    # Navigate to previous history entry
+    movl    repl_hist_count(%rip), %eax
+    test    %eax, %eax
+    jz      .repl_read_byte             # no history
+    movl    repl_hist_pos(%rip), %edx
+    cmp     $-1, %edx
+    jne     .repl_hist_up_dec
+    mov     %eax, %edx                  # start at last entry
+.repl_hist_up_dec:
+    dec     %edx
+    jl      .repl_read_byte             # already at oldest
+    movl    %edx, repl_hist_pos(%rip)
+    jmp     .repl_hist_load
+
 .repl_history_down:
+    movl    repl_hist_pos(%rip), %edx
+    cmp     $-1, %edx
+    je      .repl_read_byte             # already at new line
+    inc     %edx
+    movl    repl_hist_count(%rip), %eax
+    cmp     %eax, %edx
+    jge     .repl_hist_clear_line       # past newest → clear line
+    movl    %edx, repl_hist_pos(%rip)
+    jmp     .repl_hist_load
+
+.repl_hist_clear_line:
+    # Clear current line, back to empty prompt
+    movl    $-1, repl_hist_pos(%rip)
+    # Erase current line: \r + prompt + spaces + \r + prompt
+    push    %rcx
+    push    %rsi
+    mov     $'\r', %al
+    lea     repl_bs_seq(%rip), %rdi     # reuse as temp
+    movb    %al, (%rdi)
+    mov     %rdi, %rsi
+    mov     $1, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    # Print prompt
+    lea     msg_prompt(%rip), %rsi
+    mov     $4, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    # Print spaces to clear old text
+    pop     %rsi
+    pop     %rcx
+    push    %rcx
+    push    %rsi
+.repl_hist_clear_chars:
+    test    %ecx, %ecx
+    jz      .repl_hist_clear_done
+    lea     repl_bs_seq+1(%rip), %rsi   # space char
+    mov     $1, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    dec     %ecx
+    jmp     .repl_hist_clear_chars
+.repl_hist_clear_done:
+    # Move cursor back to after prompt
+    mov     $'\r', %al
+    lea     repl_bs_seq(%rip), %rdi
+    movb    %al, (%rdi)
+    mov     %rdi, %rsi
+    mov     $1, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    lea     msg_prompt(%rip), %rsi
+    mov     $4, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    pop     %rsi
+    pop     %rcx
+    xor     %ecx, %ecx                  # empty line
+    jmp     .repl_read_byte
+
+.repl_hist_load:
+    # Load history entry at position edx → replace current line
+    # First erase current line
+    push    %rdx                        # save hist pos
+    # \r + prompt + spaces + \r + prompt
+    push    %rcx
+    push    %rsi
+    mov     $'\r', %al
+    lea     repl_bs_seq(%rip), %rdi
+    movb    %al, (%rdi)
+    mov     %rdi, %rsi
+    mov     $1, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    lea     msg_prompt(%rip), %rsi
+    mov     $4, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    pop     %rsi
+    pop     %rcx
+    # Clear old chars
+    push    %rcx
+    push    %rsi
+.repl_hist_load_clear:
+    test    %ecx, %ecx
+    jz      .repl_hist_load_cleared
+    lea     repl_bs_seq+1(%rip), %rsi   # space
+    mov     $1, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    dec     %ecx
+    jmp     .repl_hist_load_clear
+.repl_hist_load_cleared:
+    # \r + prompt again
+    mov     $'\r', %al
+    lea     repl_bs_seq(%rip), %rdi
+    movb    %al, (%rdi)
+    mov     %rdi, %rsi
+    mov     $1, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    lea     msg_prompt(%rip), %rsi
+    mov     $4, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    pop     %rsi                        # buf base
+    pop     %rcx                        # old len (discard)
+    pop     %rdx                        # hist pos
+    # Get entry offset + len
+    lea     repl_hist_entries(%rip), %rdi
+    mov     %edx, %eax
+    shl     $3, %eax
+    movl    (%rdi, %rax), %r8d          # offset in hist_buf
+    movl    4(%rdi, %rax), %ecx         # len
+    # Copy history text to input buffer
+    lea     repl_hist_buf(%rip), %r9
+    add     %r8, %r9                    # source
+    push    %rcx
+    xor     %edx, %edx
+.repl_hist_load_copy:
+    cmp     %ecx, %edx
+    jge     .repl_hist_load_echo
+    movb    (%r9, %rdx), %al
+    movb    %al, (%rsi, %rdx)
+    inc     %edx
+    jmp     .repl_hist_load_copy
+.repl_hist_load_echo:
+    pop     %rcx
+    # Echo the history line
+    push    %rcx
+    push    %rsi
+    mov     %rcx, %rdx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+    pop     %rsi
+    pop     %rcx
     jmp     .repl_read_byte
 
 .repl_tab:
@@ -11285,6 +11485,16 @@ repl_tab_match:
     .space 8                            # ptr to first matching name
 repl_tab_match_len:
     .space 8                            # length of matching name
+repl_hist_buf:
+    .space 4096                         # history text storage (circular)
+repl_hist_off:
+    .space 4                            # write offset in hist_buf
+repl_hist_entries:
+    .space 800                          # 50 entries × [offset:4, len:4] = 16 bytes, use 800
+repl_hist_count:
+    .space 4                            # number of entries stored
+repl_hist_pos:
+    .space 4                            # current navigation position (-1 = new line)
 jit_cache:
     .space 512                          # 32 slots × [hash:8][ptr:8] = 16 bytes each
 profile_counters:
