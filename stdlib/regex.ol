@@ -188,11 +188,11 @@ fn _rx_atom_q(_a_s, _a_p, _a_pi) {
         return -1;
     };
 
-    // Literal character
-    set_at(_a_pi, 0, _a_pi[0]+1);
+    // Literal character — push FIRST, advance pi AFTER (avoids register corruption)
     let _a_id = _a_s[0];
     let _ = __array_push(_a_s, 0); let _ = __array_push(_a_s, _a_ch); let _ = __array_push(_a_s, -1); let _ = __array_push(_a_s, -1);
     set_at(_a_s, 0, _a_id + 1);
+    set_at(_a_pi, 0, _a_pi[0]+1);
     return _rx_quant(_a_s, _a_p, _a_pi, _a_id * 100000 + _a_id);
 }
 
@@ -308,8 +308,41 @@ fn _rx_run(_r_s, _r_start, _r_text, _r_from) {
 }
 
 pub fn regex_debug() {
-    let s = [0];
-    let pi = [0];
-    let f = _rx_atom_q(s, "a", pi);
-    return "s0=" + __to_string(s[0]) + " s2=" + s[2] + " f=" + __to_string(f);
+    // Test 1: direct push (works)
+    let s1 = [0];
+    let c1 = char_at("abc", 0);
+    let _ = __array_push(s1, 0);
+    let _ = __array_push(s1, c1);
+    let r1 = "t1:" + s1[2];
+
+    // Test 2: with if branches before push
+    let s2 = [0];
+    let c2 = char_at("abc", 0);
+    if c2 == "(" { return "bad"; };
+    if c2 == "[" { return "bad"; };
+    if c2 == "." { return "bad"; };
+    let _ = __array_push(s2, 0);
+    let _ = __array_push(s2, c2);
+    let r2 = "t2:" + s2[2];
+
+    // Test 3a: just pi[0] + 1 (no set_at)
+    let s3a = [0];
+    let pi3a = [0];
+    let c3a = char_at("abc", pi3a[0]);
+    if c3a == "(" { return "bad"; };
+    let _upd3a = pi3a[0] + 1;
+    let _ = __array_push(s3a, 0);
+    let _ = __array_push(s3a, c3a);
+    let r3a = "t3a:" + s3a[2] + "(upd=" + __to_string(_upd3a) + ")";
+
+    // Test 3b: with id3 (no set_at)
+    let s3b = [0];
+    let c3b = char_at("abc", 0);
+    if c3b == "(" { return "bad"; };
+    let id3b = s3b[0];
+    let _ = __array_push(s3b, 0);
+    let _ = __array_push(s3b, c3b);
+    let r3b = "t3b:" + s3b[2];
+
+    return r1 + " " + r2 + " " + r3a + " " + r3b;
 }

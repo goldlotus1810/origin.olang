@@ -35,3 +35,12 @@
 [2026-03-27 11:59:05] REBUILD detected — new binary (465461 bytes)
 [2026-03-27 12:01:05] REBUILD detected — new binary (465750 bytes)
 [2026-03-27 12:03:06] REBUILD detected — new binary (465750 bytes)
+[2026-03-27 12:07:08] REBUILD detected — new binary (466261 bytes)
+[2026-03-27 12:08:08] REBUILD detected — new binary (466345 bytes)
+[2026-03-27 12:10:10] REBUILD detected — new binary (466359 bytes)
+[2026-03-27 12:11:10] REBUILD detected — new binary (466396 bytes)
+[2026-03-27 12:15:12] REBUILD detected — new binary (467349 bytes)
+[2026-03-27 12:24:20] R10: 49/49 ALL CLEAN
+[2026-03-27 12:29:22] REBUILD detected — new binary (398752 bytes)
+[2026-03-27 12:29:23] R1: 12/49 FAIL=37 CRASH=0
+[2026-03-27 12:30:24] R2: 10/49 FAIL=39 CRASH=0
