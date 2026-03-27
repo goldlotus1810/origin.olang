@@ -1614,6 +1614,9 @@ op_call:
     movabs  $0x476FB46E82B22CB0, %rdx
     cmp     %rdx, %rax
     je      .call_array_pop
+    movabs  $0xFE7CDB1931FA9AB0, %rdx
+    cmp     %rdx, %rax
+    je      .call_regex_match
     jmp     .call_not_builtin
 
 .builtin_slot_178:
@@ -6133,6 +6136,366 @@ op_ret:
     mov     %rcx, 8(%r14)            # mol count (64)
     jmp     vm_loop
 
+# ═══════════════════════════════════════════════════════════════════════════
+# __regex_match(text, pattern) → 1/0
+# Thompson NFA simulation in pure ASM. Supports: . * + ? [a-z]
+# Uses rx_* BSS buffers for NFA states and active set tracking.
+# ═══════════════════════════════════════════════════════════════════════════
+.call_regex_match:
+    add     %rcx, %r13
+    # Pop pattern (top), text (below)
+    mov     (%r14), %rdi              # pattern ptr (u16 mols)
+    mov     8(%r14), %rcx             # pattern mol_count
+    mov     16(%r14), %rsi            # text ptr (u16 mols)
+    mov     24(%r14), %rdx            # text mol_count
+    add     $32, %r14                 # pop 2
+
+    push    %rbx
+    push    %rbp
+    push    %r12
+    push    %r13
+    push    %r14
+    push    %r15
+
+    # Save text info
+    mov     %rsi, %r12               # r12 = text ptr
+    mov     %rdx, %r13               # r13 = text mol_count
+    # Pattern info
+    mov     %rdi, %rsi               # rsi = pattern ptr
+    mov     %rcx, %rdx               # rdx = pattern mol_count
+
+    # ── Build NFA from pattern ──
+    # Decode pattern mols → ASCII bytes in rx_pattern BSS
+    lea     rx_pattern(%rip), %rdi
+    xor     %ecx, %ecx
+._rx_decode_pat:
+    cmp     %rdx, %rcx
+    jge     ._rx_pat_done
+    movzbl  (%rsi, %rcx, 2), %eax
+    movb    %al, (%rdi, %rcx)
+    inc     %rcx
+    jmp     ._rx_decode_pat
+._rx_pat_done:
+    mov     %ecx, %ebp               # rbp = pattern_len (ASCII bytes)
+
+    # Decode text mols → ASCII bytes in rx_text BSS
+    lea     rx_text(%rip), %rdi
+    mov     %r12, %rsi
+    xor     %ecx, %ecx
+._rx_decode_text:
+    cmp     %r13, %rcx
+    jge     ._rx_text_done
+    movzbl  (%rsi, %rcx, 2), %eax
+    movb    %al, (%rdi, %rcx)
+    inc     %rcx
+    jmp     ._rx_decode_text
+._rx_text_done:
+    # Now: rx_pattern has pattern bytes, rbp = pat_len
+    #      rx_text has text bytes, r13 = text_len
+
+    # ── Build NFA states ──
+    # Simple approach: each pattern char = 1 NFA state + 1 accept state
+    # State: [type:1, char:1, next1:2, next2:2] = 6 bytes
+    # type: 0=lit, 1=dot, 2=split, 3=match, 4=class_start
+    lea     rx_nfa(%rip), %rbx        # rbx = NFA base
+    xor     %r8d, %r8d                # r8 = state count
+    xor     %r9d, %r9d                # r9 = pattern position
+
+._rx_build_loop:
+    cmp     %ebp, %r9d
+    jge     ._rx_build_done
+    lea     rx_pattern(%rip), %rdi
+    movzbl  (%rdi, %r9), %eax        # pattern byte
+
+    # Check for quantifier after this char
+    lea     1(%r9), %ecx
+    xor     %r10d, %r10d              # r10 = quantifier (0=none, 1=*, 2=+, 3=?)
+    cmp     %ebp, %ecx
+    jge     ._rx_no_quant
+    movzbl  (%rdi, %rcx), %edx
+    cmp     $'*', %edx
+    je      ._rx_quant_star
+    cmp     $'+', %edx
+    je      ._rx_quant_plus
+    cmp     $'?', %edx
+    je      ._rx_quant_qmark
+    jmp     ._rx_no_quant
+._rx_quant_star:
+    mov     $1, %r10d
+    inc     %r9d
+    jmp     ._rx_no_quant
+._rx_quant_plus:
+    mov     $2, %r10d
+    inc     %r9d
+    jmp     ._rx_no_quant
+._rx_quant_qmark:
+    mov     $3, %r10d
+    inc     %r9d
+._rx_no_quant:
+    inc     %r9d                       # advance past pattern char
+
+    # Determine state type
+    cmp     $'.', %al
+    je      ._rx_type_dot
+    # Default: literal
+    mov     $0, %cl                    # type = lit
+    jmp     ._rx_emit_state
+._rx_type_dot:
+    mov     $1, %cl                    # type = dot
+
+._rx_emit_state:
+    # Create NFA state(s) based on quantifier
+    lea     (%rbx, %r8, 8), %rdi     # state ptr (8 bytes per state)
+    cmp     $0, %r10d
+    je      ._rx_emit_plain
+    cmp     $1, %r10d
+    je      ._rx_emit_star
+    cmp     $2, %r10d
+    je      ._rx_emit_plus
+    cmp     $3, %r10d
+    je      ._rx_emit_qmark
+
+._rx_emit_plain:
+    # [type, char, next=r8+1, -1]
+    movb    %cl, (%rdi)               # type
+    movb    %al, 1(%rdi)              # char
+    lea     1(%r8), %edx
+    movw    %dx, 2(%rdi)              # next1
+    movw    $-1, 4(%rdi)              # next2
+    inc     %r8d
+    jmp     ._rx_build_loop
+
+._rx_emit_star:
+    # Split state: [2, 0, match_state, skip_state]
+    # Match state: [type, char, split_back, -1]
+    # split → match_state | skip (r8+2)
+    movb    $2, (%rdi)                # split type
+    movb    $0, 1(%rdi)
+    lea     1(%r8), %edx
+    movw    %dx, 2(%rdi)              # next1 = match state
+    lea     2(%r8), %edx
+    movw    %dx, 4(%rdi)              # next2 = skip (state after)
+    inc     %r8d
+    # Match state
+    lea     (%rbx, %r8, 8), %rdi
+    movb    %cl, (%rdi)               # type
+    movb    %al, 1(%rdi)              # char
+    lea     -1(%r8), %edx
+    movw    %dx, 2(%rdi)              # next1 = back to split
+    movw    $-1, 4(%rdi)
+    inc     %r8d
+    jmp     ._rx_build_loop
+
+._rx_emit_plus:
+    # Match state: [type, char, split, -1]
+    # Split: [2, 0, match_back, skip]
+    movb    %cl, (%rdi)               # type (match first)
+    movb    %al, 1(%rdi)
+    lea     1(%r8), %edx
+    movw    %dx, 2(%rdi)              # next1 = split
+    movw    $-1, 4(%rdi)
+    inc     %r8d
+    # Split state
+    lea     (%rbx, %r8, 8), %rdi
+    movb    $2, (%rdi)                # split
+    movb    $0, 1(%rdi)
+    lea     -1(%r8), %edx
+    movw    %dx, 2(%rdi)              # next1 = back to match
+    lea     1(%r8), %edx
+    movw    %dx, 4(%rdi)              # next2 = skip
+    inc     %r8d
+    jmp     ._rx_build_loop
+
+._rx_emit_qmark:
+    # Split: [2, 0, match, skip]
+    movb    $2, (%rdi)
+    movb    $0, 1(%rdi)
+    lea     1(%r8), %edx
+    movw    %dx, 2(%rdi)              # next1 = match
+    lea     2(%r8), %edx
+    movw    %dx, 4(%rdi)              # next2 = skip
+    inc     %r8d
+    # Match state
+    lea     (%rbx, %r8, 8), %rdi
+    movb    %cl, (%rdi)
+    movb    %al, 1(%rdi)
+    lea     1(%r8), %edx
+    movw    %dx, 2(%rdi)              # next = continue
+    movw    $-1, 4(%rdi)
+    inc     %r8d
+    jmp     ._rx_build_loop
+
+._rx_build_done:
+    # Add accept state
+    lea     (%rbx, %r8, 8), %rdi
+    movb    $3, (%rdi)                # type = match/accept
+    movb    $0, 1(%rdi)
+    movw    $-1, 2(%rdi)
+    movw    $-1, 4(%rdi)
+    inc     %r8d
+    # r8 = total state count, rbx = NFA base
+
+    # ── Simulate NFA (Thompson) ──
+    # Two sets: current active states, next active states
+    # Each set = bitmap (1 bit per state, max 256 states)
+    lea     rx_cur_set(%rip), %r14     # WARNING: reusing r14 temporarily
+    lea     rx_next_set(%rip), %r15    # WARNING: reusing r15 temporarily
+
+    # Initialize: add state 0 to current set (follow epsilon/splits)
+    xor     %eax, %eax
+    mov     $4, %ecx
+    mov     %r14, %rdi
+    rep     stosq                      # zero 32 bytes (256 bits)
+    mov     $0, %edi                   # start state = 0
+    call    ._rx_add_state
+
+    # Process each text byte
+    xor     %r9d, %r9d                # r9 = text position
+._rx_sim_loop:
+    cmp     %r13d, %r9d
+    jge     ._rx_sim_done
+
+    # Zero next set
+    push    %r9
+    mov     %r15, %rdi
+    xor     %eax, %eax
+    mov     $4, %ecx
+    rep     stosq
+    pop     %r9
+
+    # Get current text byte
+    lea     rx_text(%rip), %rdi
+    movzbl  (%rdi, %r9), %eax        # current byte
+
+    # For each active state in current set
+    xor     %ecx, %ecx                # state index
+._rx_sim_state:
+    cmp     %r8d, %ecx
+    jge     ._rx_sim_advance
+    # Check if state is active (bit test)
+    bt      %ecx, (%r14)
+    jnc     ._rx_sim_state_next
+
+    # State is active — check if it matches current byte
+    lea     (%rbx, %rcx, 8), %rdi    # state ptr
+    movzbl  (%rdi), %edx              # type
+    cmp     $3, %edx                   # accept?
+    je      ._rx_sim_state_next       # skip accept states in processing
+    cmp     $2, %edx                   # split? (shouldn't be — splits resolved by add_state)
+    je      ._rx_sim_state_next
+
+    # Check match
+    mov     $0, %esi                   # match = 0
+    cmp     $1, %edx                   # dot?
+    je      ._rx_sim_dot_match
+    # Literal match
+    movzbl  1(%rdi), %edx             # state char
+    cmp     %eax, %edx
+    jne     ._rx_sim_state_next
+    mov     $1, %esi
+    jmp     ._rx_sim_check_match
+._rx_sim_dot_match:
+    mov     $1, %esi
+._rx_sim_check_match:
+    test    %esi, %esi
+    jz      ._rx_sim_state_next
+    # Match! Add next state(s) to next set
+    push    %rcx
+    push    %rax
+    push    %r9
+    movzwl  2(%rdi), %edi             # next1
+    cmp     $0xFFFF, %edi
+    je      ._rx_sim_no_next
+    # Temporarily swap r14/r15 so add_state writes to next set
+    xchg    %r14, %r15
+    call    ._rx_add_state
+    xchg    %r14, %r15
+._rx_sim_no_next:
+    pop     %r9
+    pop     %rax
+    pop     %rcx
+
+._rx_sim_state_next:
+    inc     %ecx
+    jmp     ._rx_sim_state
+
+._rx_sim_advance:
+    # Swap current ↔ next
+    xchg    %r14, %r15
+    inc     %r9d
+    jmp     ._rx_sim_loop
+
+._rx_sim_done:
+    # Check if any accept state is active in current set
+    xor     %eax, %eax                # result = 0
+    xor     %ecx, %ecx
+._rx_check_accept:
+    cmp     %r8d, %ecx
+    jge     ._rx_return
+    bt      %ecx, (%r14)
+    jnc     ._rx_check_next
+    lea     (%rbx, %rcx, 8), %rdi
+    cmpb    $3, (%rdi)
+    jne     ._rx_check_next
+    mov     $1, %eax                   # found accept!
+._rx_check_next:
+    inc     %ecx
+    jmp     ._rx_check_accept
+
+._rx_return:
+    # Restore VM registers
+    pop     %r15
+    pop     %r14
+    pop     %r13
+    pop     %r12
+    pop     %rbp
+    pop     %rbx
+    # Push result as f64
+    sub     $16, %r14
+    test    %eax, %eax
+    jz      ._rx_push_zero
+    mov     $0x3FF0000000000000, %rax  # 1.0
+    mov     %rax, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+._rx_push_zero:
+    xor     %eax, %eax
+    mov     %rax, (%r14)                # 0.0 bits
+    movq    $F64_MARKER, 8(%r14)        # mark as f64
+    jmp     vm_loop
+
+# Helper: add state to active set (r14), following epsilon/splits
+# edi = state id, rbx = NFA base, r8 = state count, r14 = set bitmap
+._rx_add_state:
+    cmp     %r8d, %edi
+    jge     ._rx_add_ret
+    cmp     $0, %edi
+    jl      ._rx_add_ret
+    # Already in set?
+    bt      %edi, (%r14)
+    jc      ._rx_add_ret
+    # Add to set
+    bts     %edi, (%r14)
+    # If split state, follow both branches
+    lea     (%rbx, %rdi, 8), %rax
+    cmpb    $2, (%rax)
+    jne     ._rx_add_ret
+    # Follow next1
+    push    %rdi
+    movzwl  2(%rax), %edi
+    cmp     $0xFFFF, %edi
+    je      ._rx_add_skip1
+    call    ._rx_add_state
+._rx_add_skip1:
+    pop     %rdi
+    lea     (%rbx, %rdi, 8), %rax
+    movzwl  4(%rax), %edi
+    cmp     $0xFFFF, %edi
+    je      ._rx_add_ret
+    call    ._rx_add_state
+._rx_add_ret:
+    ret
+
 .call_file_read:
     add     %rcx, %r13
     jmp     op_file_read
@@ -9533,6 +9896,17 @@ reg_cur_frame:
 # 1024 slots × 24 bytes = [hash:8][body_pc:8][param_count:4][flags:4]
 fn_registry:
     .space 24576                        # 1024 × 24 bytes
+# ── Regex NFA buffers ──
+rx_pattern:
+    .space 1024                         # decoded pattern bytes
+rx_text:
+    .space 65536                        # decoded text bytes
+rx_nfa:
+    .space 2048                         # NFA states: 256 × 8 bytes
+rx_cur_set:
+    .space 32                           # active state bitmap (256 bits)
+rx_next_set:
+    .space 32                           # next active state bitmap
 fn_registry_count:
     .space 8                            # number of registered functions
 try_stack:
