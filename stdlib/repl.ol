@@ -117,7 +117,14 @@ fn _expand_use(_eu_src) {
         if char_at(_eu_src, _eu_after) == " " { _eu_after = _eu_after + 1; };
     };
     // Read file content for inline expansion
+    // Auto-resolve: try path as-is, then stdlib/<name>.ol, then stdlib/homeos/<name>.ol
     let _eu_content = __file_read(_eu_path);
+    if len(_eu_content) == 0 {
+        _eu_content = __file_read("stdlib/" + _eu_path + ".ol");
+    };
+    if len(_eu_content) == 0 {
+        _eu_content = __file_read("stdlib/homeos/" + _eu_path + ".ol");
+    };
     let _eu_prefix = __substr(_eu_src, 0, _eu_pos);
     let _eu_rest = __substr(_eu_src, _eu_after, len(_eu_src));
     return _eu_prefix + _eu_content + " " + _eu_rest;
