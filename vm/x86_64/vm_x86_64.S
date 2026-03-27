@@ -7314,19 +7314,18 @@ op_ret:
     jne     .mcp_sup_no_strip
     dec     %rcx
 .mcp_sup_no_strip:
-    # Encode to string molecules on heap
+    # Encode to string molecules in BSS buffer (not heap — avoids conflict)
     sub     $16, %r14
-    mov     %r15, (%r14)                # chain ptr = heap
+    lea     mcp_out_mols(%rip), %rdi    # BSS molecule buffer
+    mov     %rdi, (%r14)                # chain ptr = BSS buffer
     mov     %rcx, 8(%r14)               # mol_count
-    # Encode each byte as 0x2100 | byte
     xor     %edx, %edx
 .mcp_sup_encode:
     cmp     %rcx, %rdx
     jge     .mcp_sup_encode_done
     movzbl  (%rsi, %rdx), %eax
     or      $0x2100, %eax
-    movw    %ax, (%r15)
-    add     $2, %r15
+    movw    %ax, (%rdi, %rdx, 2)
     inc     %rdx
     jmp     .mcp_sup_encode
 .mcp_sup_encode_done:
@@ -7334,7 +7333,8 @@ op_ret:
 .mcp_sup_empty:
     # Return empty string
     sub     $16, %r14
-    mov     %r15, (%r14)
+    lea     mcp_out_mols(%rip), %rdi
+    mov     %rdi, (%r14)
     movq    $0, 8(%r14)
     jmp     vm_loop
 
@@ -10946,6 +10946,8 @@ mcp_out_len:
     .space 8                            # current length of captured output
 mcp_out_buf:
     .space 8192                         # captured emit output buffer (8KB)
+mcp_out_mols:
+    .space 16384                        # molecule encoding buffer (8K chars × 2 bytes)
 jit_cache:
     .space 512                          # 32 slots × [hash:8][ptr:8] = 16 bytes each
 profile_counters:

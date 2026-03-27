@@ -129,8 +129,11 @@ fn _mcp_handle_call_direct(_hc_id, _hc_tool, _hc_code, _hc_fact, _hc_question, _
 }
 
 fn _mcp_tool_eval(_te_id, _te_code) {
+    // repl_eval runs code but __eval_bytecode emit doesn't output
+    // __mcp_suppress works for direct emit but not nested eval
+    // Accept limitation: eval executes code, returns repl_eval result
     let _te_repl = repl_eval(_te_code);
-    if len(_te_repl) == 0 { _te_repl = "(executed)"; };
+    if len(_te_repl) == 0 { return _mcp_result(_te_id, "(executed)"); };
     return _mcp_result(_te_id, _te_repl);
 }
 

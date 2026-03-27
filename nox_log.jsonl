@@ -1,3 +1,6 @@
-{"ts":"2026-03-27 16:52","type":"SESSION_START","msg":"booted with 52 facts"}
-{"ts":"2026-03-27 16:52","type":"EVAL","msg":"emit 6 * 7"}
-{"ts":"2026-03-27 16:52","type":"QUERY","msg":"Nox"}
+{"ts":"2026-03-27 16:59","type":"SESSION_START","msg":"booted with 52 facts"}
+{"ts":"2026-03-27 16:59","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-27 16:59","type":"EVAL","msg":"let x = 10 + 20"}
+{"ts":"2026-03-27 16:59","type":"QUERY","msg":"Nox"}
+{"ts":"2026-03-27 16:59","type":"EMOTION","msg":"toi vui qua"}
+{"ts":"2026-03-27 16:59","type":"STATUS","msg":"brain check"}
