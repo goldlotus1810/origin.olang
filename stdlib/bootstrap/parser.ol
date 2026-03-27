@@ -189,6 +189,15 @@ fn is_symbol_tok(tok, sym) {
     };
 }
 
+fn _skip_to_sync(p) {
+    // Error recovery: skip tokens until ; or } or EOF
+    while !is_eof(peek(p)) {
+        if is_symbol_tok(peek(p), ";") { advance(p); return; };
+        if is_symbol_tok(peek(p), "}") { return; };
+        advance(p);
+    };
+}
+
 fn is_eof(tok) {
     match tok.kind {
         TokenKind::Eof => { return true; },
@@ -659,13 +668,13 @@ fn parse_primary(p) {
             };
             emit "Parse error at line " + __to_string(tok.line) + ": unexpected symbol '" + ch + "'";
             let _g_parse_error = 1;
-            advance(p);
+            _skip_to_sync(p);
             return Expr::NumLit { value: 0 };
         },
         _ => {
             emit "Parse error at line " + __to_string(tok.line) + ": unexpected token '" + tok.text + "'";
             let _g_parse_error = 1;
-            advance(p);
+            _skip_to_sync(p);
             return Expr::NumLit { value: 0 };
         },
     };

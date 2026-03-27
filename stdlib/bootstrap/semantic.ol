@@ -1339,6 +1339,7 @@ fn compile_expr(state, expr) {
             let __g_mej4 = -1; let __g_mej5 = -1; let __g_mej6 = -1; let __g_mej7 = -1;
             let ai = 0;
             let _m_num_arms = len(arms);
+            if _m_num_arms > 8 { emit "Error: match too many arms (max 8)"; };
             while ai < _m_num_arms {
                 // Read pattern + body token range from GLOBALS (dict fields corrupt)
                 let _m_pattern = "";
@@ -1488,6 +1489,7 @@ fn compile_expr(state, expr) {
             restore_locals(state, _lm_saved);
             // Patch body_len
             let _lm_body_len = current_pos(state) - _lm_closure_pos - 6;
+            if _lm_body_len < 0 { _lm_body_len = 0; };
             let _lm_bpos = _lm_closure_pos + 2;
             set_at(_g_output, _lm_bpos, _lm_body_len % 256);
             set_at(_g_output, _lm_bpos + 1, (_lm_body_len / 256) % 256);
@@ -1786,6 +1788,7 @@ fn compile_stmt(state, stmt) {
             if _g_for_depth == 6 { let _fl_var = __g_fv6; let _fl_is = __g_fi6s; let _fl_ie = __g_fi6e; };
             if _g_for_depth == 7 { let _fl_var = __g_fv7; let _fl_is = __g_fi7s; let _fl_ie = __g_fi7e; };
             // Lower for-in to while loop with UNIQUE names per depth
+            if _g_for_depth >= 8 { emit "Error: for-in nesting too deep (max 8)"; };
             let _fl_d = __to_string(_g_for_depth);
             let _fl_arr = "__for_" + _fl_d + "_arr";
             let _fl_len = "__for_" + _fl_d + "_len";
