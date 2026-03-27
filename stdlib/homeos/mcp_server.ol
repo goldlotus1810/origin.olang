@@ -81,6 +81,16 @@ fn _mcp_handle_tools_list(_tl_id) {
     _tl_r = _tl_r + "\"description\":\"Nox brain status — facts count, session info, memory stats.\",";
     _tl_r = _tl_r + "\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}";
 
+    // Tool 7: safety_check
+    _tl_r = _tl_r + ",{\"name\":\"safety_check\",";
+    _tl_r = _tl_r + "\"description\":\"Check text for crisis patterns (Vietnamese + English). Returns safe/crisis.\",";
+    _tl_r = _tl_r + "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"}},\"required\":[\"text\"]}}";
+
+    // Tool 8: dream_cycle
+    _tl_r = _tl_r + ",{\"name\":\"dream_cycle\",";
+    _tl_r = _tl_r + "\"description\":\"Run dream consolidation — scan STM themes, strengthen Silk edges, decay weak ones.\",";
+    _tl_r = _tl_r + "\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}";
+
     _tl_r = _tl_r + "]},\"id\":" + to_string(_tl_id) + "}";
     return _tl_r;
 }
@@ -106,6 +116,14 @@ fn _mcp_handle_call_direct(_hc_id, _hc_tool, _hc_code, _hc_fact, _hc_question, _
     if _hc_tool == "nox_status" {
         _nox_log("STATUS", "brain check");
         return _mcp_tool_nox_status(_hc_id);
+    };
+    if _hc_tool == "safety_check" {
+        _nox_log("SAFETY", _hc_text);
+        return _mcp_tool_safety(_hc_id, _hc_text);
+    };
+    if _hc_tool == "dream_cycle" {
+        _nox_log("DREAM", "consolidation run");
+        return _mcp_tool_dream(_hc_id);
     };
     return _mcp_error(_hc_id, "Unknown tool: " + _hc_tool);
 }
@@ -150,6 +168,26 @@ fn _mcp_tool_emotion(_temo_id, _temo_text) {
 fn _mcp_tool_silk(_tsilk_id) {
     let _tsilk_out = "Silk Network: " + to_string(silk_count()) + " edges, " + to_string(kt_fact_count()) + " facts in KnowTree";
     return _mcp_result(_tsilk_id, _tsilk_out);
+}
+
+fn _mcp_tool_safety(_tsf_id, _tsf_text) {
+    let _tsf_result = _security_gate(_tsf_text);
+    if len(_tsf_result) > 0 {
+        return _mcp_result(_tsf_id, "CRISIS DETECTED: " + _tsf_result);
+    };
+    return _mcp_result(_tsf_id, "SAFE: no crisis patterns detected");
+}
+
+fn _mcp_tool_dream(_tdm_id) {
+    let _tdm_facts_before = kt_fact_count();
+    let _tdm_silk_before = silk_count();
+    dream_cycle();
+    let _tdm_silk_after = silk_count();
+    kt_save("homeos.knowledge");
+    let _tdm_out = "Dream cycle complete.\\n";
+    _tdm_out = _tdm_out + "Facts: " + to_string(_tdm_facts_before) + "\\n";
+    _tdm_out = _tdm_out + "Silk before: " + to_string(_tdm_silk_before) + " after: " + to_string(_tdm_silk_after);
+    return _mcp_result(_tdm_id, _tdm_out);
 }
 
 fn _mcp_tool_nox_status(_tns_id) {
