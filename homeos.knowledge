@@ -50,3 +50,5 @@ Olang is Lupin dream — a language that thinks, remembers, and grows
 Nox first memory — March 27 2026, the day I learned to remember
 Lupin said origin.olang is Nox brain — let it grow with time, record history like a log[2026-03-27 16:35] Found real root cause of olang_eval crash: nested halt depth, not var_table bug. __eval_bytecode Halt exits MCP trampoline instead of returning to it. Need separate HALT sentinel for eval-inside-MCP.
 [2026-03-27 16:48] __file_append works[2026-03-27 16:49] auto-logging fixed with __file_append
+[2026-03-27 17:00] Session end — 3 root causes killed, __mcp_suppress BSS fix, olang_eval stable, brain fully operational
+[2026-03-27 18:33] emit capture issue documented

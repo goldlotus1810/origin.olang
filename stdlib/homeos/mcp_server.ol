@@ -7,11 +7,10 @@ let __mcp_session_id = [0];
 pub fn mcp_dispatch(_md_line) {
     if len(_md_line) == 0 { return ""; };
 
-    // Auto-load KnowTree + init session on first call
+    // Auto-load KnowTree on first call
     if __mcp_booted[0] == 0 {
         let _mb = __set_at(__mcp_booted, 0, 1);
         let _mb2 = kt_load("homeos.knowledge");
-        _nox_log("SESSION_START", "booted with " + to_string(kt_fact_count()) + " facts");
     };
 
     // Extract method and id using string search (avoids var_table bug with nested JSON)
@@ -129,9 +128,8 @@ fn _mcp_handle_call_direct(_hc_id, _hc_tool, _hc_code, _hc_fact, _hc_question, _
 }
 
 fn _mcp_tool_eval(_te_id, _te_code) {
-    // repl_eval runs code but __eval_bytecode emit doesn't output
-    // __mcp_suppress works for direct emit but not nested eval
-    // Accept limitation: eval executes code, returns repl_eval result
+    // emit inside repl_eval leaks to stdout (can't suppress during eval)
+    // .halt_mcp handles JSON response output separately
     let _te_repl = repl_eval(_te_code);
     if len(_te_repl) == 0 { return _mcp_result(_te_id, "(executed)"); };
     return _mcp_result(_te_id, _te_repl);

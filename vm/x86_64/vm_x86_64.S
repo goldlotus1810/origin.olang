@@ -6967,11 +6967,10 @@ op_ret:
 
 .emit_cap_f64:
     # Format number to capture buffer
-    # Use the existing f64 format logic but redirect output
-    # For simplicity: format to heap, then copy to capture buffer
+    # Use BSS temp buffer (not heap — heap in use by repl_eval)
     push    %rsi
     movq    (%rsi), %xmm0               # load f64 value
-    mov     %r15, %rdi                   # temp buffer on heap
+    lea     mcp_fmt_tmp(%rip), %rdi      # BSS temp buffer
     # Check if integer
     cvttsd2si %xmm0, %rax
     cvtsi2sd %rax, %xmm1
@@ -7049,15 +7048,16 @@ op_ret:
     jmp     .emit_cap_ff_rev
 
 .emit_cap_f64_done:
-    # rdi = end of formatted number, r15 = start
+    # rdi = end of formatted number, mcp_fmt_tmp = start
     mov     %rdi, %rcx
-    sub     %r15, %rcx                   # length
-    pop     %rsi
+    lea     mcp_fmt_tmp(%rip), %rsi
+    sub     %rsi, %rcx                   # length
+    pop     %rsi                         # discard saved rsi
     # Copy to capture buffer
     mov     mcp_out_len(%rip), %rdi
     lea     mcp_out_buf(%rip), %rax
     add     %rdi, %rax
-    mov     %r15, %rsi
+    lea     mcp_fmt_tmp(%rip), %rsi
     push    %rcx
 .emit_cap_copy:
     test    %rcx, %rcx
@@ -7303,39 +7303,12 @@ op_ret:
     movq    $F64_MARKER, 8(%r14)
     jmp     vm_loop
 .mcp_sup_off:
-    # Turn OFF capture, return captured text as string
+    # Turn OFF capture, return 0
     movb    $0, mcp_capture(%rip)
-    mov     mcp_out_len(%rip), %rcx
-    test    %rcx, %rcx
-    jz      .mcp_sup_empty
-    # Strip trailing newline if present
-    lea     mcp_out_buf(%rip), %rsi
-    cmpb    $0x0A, -1(%rsi, %rcx)
-    jne     .mcp_sup_no_strip
-    dec     %rcx
-.mcp_sup_no_strip:
-    # Encode to string molecules in BSS buffer (not heap — avoids conflict)
     sub     $16, %r14
-    lea     mcp_out_mols(%rip), %rdi    # BSS molecule buffer
-    mov     %rdi, (%r14)                # chain ptr = BSS buffer
-    mov     %rcx, 8(%r14)               # mol_count
-    xor     %edx, %edx
-.mcp_sup_encode:
-    cmp     %rcx, %rdx
-    jge     .mcp_sup_encode_done
-    movzbl  (%rsi, %rdx), %eax
-    or      $0x2100, %eax
-    movw    %ax, (%rdi, %rdx, 2)
-    inc     %rdx
-    jmp     .mcp_sup_encode
-.mcp_sup_encode_done:
-    jmp     vm_loop
-.mcp_sup_empty:
-    # Return empty string
-    sub     $16, %r14
-    lea     mcp_out_mols(%rip), %rdi
-    mov     %rdi, (%r14)
-    movq    $0, 8(%r14)
+    xor     %eax, %eax
+    mov     %rax, (%r14)
+    movq    $F64_MARKER, 8(%r14)
     jmp     vm_loop
 
 .call_file_read:
@@ -9545,12 +9518,43 @@ op_halt:
     jmp     .repl_loop                  # back to REPL prompt
 
 .halt_mcp:
-    # MCP trampoline: pop sentinel + saved context, return to MCP loop
+    # MCP trampoline: pop sentinel + saved context
     add     $8, %rsp                    # skip sentinel
     pop     %rbx                        # restore bytecode size
     pop     %r13                        # restore PC
     pop     %r12                        # restore bytecode base
-    jmp     .mcp_read_line              # back to MCP stdin reader
+    movb    $0, mcp_capture(%rip)       # re-enable emit for response output
+    # Write mcp_dispatch result from VM stack to stdout
+    mov     (%r14), %rsi               # chain ptr
+    mov     8(%r14), %rdx              # mol_count
+    add     $16, %r14                  # pop
+    test    %rdx, %rdx
+    jz      .halt_mcp_done             # empty result → skip output
+    # Decode string molecules → ASCII on heap, then write
+    mov     %r15, %rdi                  # temp decode buffer
+    mov     %rdx, %rcx
+.halt_mcp_decode:
+    test    %rcx, %rcx
+    jz      .halt_mcp_write
+    movzwl  (%rsi), %eax
+    movb    %al, (%rdi)
+    add     $2, %rsi
+    inc     %rdi
+    dec     %rcx
+    jmp     .halt_mcp_decode
+.halt_mcp_write:
+    mov     %r15, %rsi                  # buf
+    mov     $1, %edi                    # stdout
+    mov     $SYS_WRITE, %eax
+    syscall
+    # Write newline
+    lea     str_newline(%rip), %rsi
+    mov     $1, %edx
+    mov     $1, %edi
+    mov     $SYS_WRITE, %eax
+    syscall
+.halt_mcp_done:
+    jmp     .mcp_read_line
 
 
 .halt_boot:
@@ -10087,9 +10091,8 @@ op_halt:
     movb    $1, 14(%r15)               # arity = 1
     add     $15, %r15
 
-    # Emit + Halt (op_emit appends \n; inner emits suppressed by mcp_capture)
-    movb    $0x06, (%r15)               # Emit the mcp_dispatch result
-    inc     %r15
+    # Halt only — mcp_dispatch result stays on VM stack
+    # .halt_mcp will write it to stdout directly (bypasses mcp_capture)
     movb    $0x0F, (%r15)               # Halt
     inc     %r15
 
@@ -10948,6 +10951,8 @@ mcp_out_buf:
     .space 8192                         # captured emit output buffer (8KB)
 mcp_out_mols:
     .space 16384                        # molecule encoding buffer (8K chars × 2 bytes)
+mcp_fmt_tmp:
+    .space 64                           # temp buffer for f64 formatting in capture mode
 jit_cache:
     .space 512                          # 32 slots × [hash:8][ptr:8] = 16 bytes each
 profile_counters:
