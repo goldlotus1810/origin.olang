@@ -1824,8 +1824,12 @@ op_call:
     jmp     vm_loop
 
 .call_skip:
-    
+    # Function not found — push empty result to keep stack balanced
     add     %rcx, %r13
+    sub     $16, %r14
+    xor     %eax, %eax
+    mov     %rax, (%r14)
+    mov     %rax, 8(%r14)
     jmp     vm_loop
 
 # ── Math builtins ────────────────────────────────────────────────────────
@@ -5097,6 +5101,30 @@ op_call:
 # __text_to_pw(str, tbl) → array [pw, freq, ...]
 .call_text_to_pw:
     add     %rcx, %r13
+    # Guard: if tbl is empty/null, return empty array
+    mov     8(%r14), %rax              # tbl marker
+    cmp     $ARRAY_MARKER, %rax
+    jne     .ttp_guard_check_bytes
+    # tbl is an array — check if empty
+    mov     (%r14), %rax
+    test    %rax, %rax
+    jz      .ttp_empty_result
+    cmpq    $0, (%rax)                 # array count == 0?
+    je      .ttp_empty_result
+    jmp     .ttp_guard_ok
+.ttp_guard_check_bytes:
+    cmp     $-5, %rax                  # BYTES_MARKER?
+    je      .ttp_guard_ok
+    # Not array, not bytes — invalid
+.ttp_empty_result:
+    add     $32, %r14                  # pop both args
+    sub     $16, %r14
+    mov     %r15, (%r14)               # empty array
+    movq    $0, (%r15)                 # count = 0
+    add     $8, %r15
+    movq    $ARRAY_MARKER, 8(%r14)
+    jmp     vm_loop
+.ttp_guard_ok:
     push    %r12
     mov     (%r14), %r9
     add     $16, %r14
