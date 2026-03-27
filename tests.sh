@@ -315,11 +315,11 @@ run_olang_test "array/literal" \
 
 run_olang_test "array/push_get" \
     'let a = []; __push(a, 42); let v = __array_get(a, 0); emit v;' \
-    "[42]42"
+    "42"
 
 run_olang_test "array/set_at" \
     'let a = [1, 2, 3]; __set_at(a, 1, 99); let v = __array_get(a, 1); emit v;' \
-    "[1, 99, 3]99"
+    "99"
 
 # 2.8 Dict
 run_olang_test "dict/create_get" \
