@@ -1,0 +1,9 @@
+[2026-03-27 09:17:35] round=1 pass=75 fail=2 crash=0 total=77 fixed=57 fuzz=20
+
+[2026-03-27 09:17:35] FAIL json:str | got '0' want 'hello' | code: emit json_parse("\"hello\"");
+[2026-03-27 09:17:35] FAIL json:obj | got '⦿ bye' want '42' | code: let o=json_parse("{\"x\":42}"); emit json_get(o,"x");
+[2026-03-27 09:19:26] round=1 pass=56 fail=0 crash=0 total=56 fixed=56 fuzz=0
+[2026-03-27 09:19:35] round=1 pass=86 fail=0 crash=0 total=86 fixed=56 fuzz=30
+[2026-03-27 09:19:46] round=1 pass=76 fail=0 crash=0 total=76 fixed=56 fuzz=20
+[2026-03-27 09:19:46] round=2 pass=76 fail=0 crash=0 total=76 fixed=56 fuzz=20
+[2026-03-27 09:19:46] round=3 pass=76 fail=0 crash=0 total=76 fixed=56 fuzz=20
