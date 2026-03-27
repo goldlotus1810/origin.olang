@@ -66,6 +66,21 @@ fn _mcp_handle_tools_list(_tl_id) {
     _tl_r = _tl_r + "\"description\":\"Query HomeOS knowledge. Returns matching facts.\",";
     _tl_r = _tl_r + "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"question\":{\"type\":\"string\"}},\"required\":[\"question\"]}}";
 
+    // Tool 4: emotion_encode
+    _tl_r = _tl_r + ",{\"name\":\"emotion_encode\",";
+    _tl_r = _tl_r + "\"description\":\"Encode text to 5D emotion coordinates (S,R,V,A,T). Understands Vietnamese.\",";
+    _tl_r = _tl_r + "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"}},\"required\":[\"text\"]}}";
+
+    // Tool 5: silk_status
+    _tl_r = _tl_r + ",{\"name\":\"silk_status\",";
+    _tl_r = _tl_r + "\"description\":\"View Silk neural network status — edge count, memory stats.\",";
+    _tl_r = _tl_r + "\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}";
+
+    // Tool 6: nox_status
+    _tl_r = _tl_r + ",{\"name\":\"nox_status\",";
+    _tl_r = _tl_r + "\"description\":\"Nox brain status — facts count, session info, memory stats.\",";
+    _tl_r = _tl_r + "\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}";
+
     _tl_r = _tl_r + "]},\"id\":" + to_string(_tl_id) + "}";
     return _tl_r;
 }
@@ -79,6 +94,18 @@ fn _mcp_handle_call_direct(_hc_id, _hc_tool, _hc_code, _hc_fact, _hc_question, _
     };
     if _hc_tool == "know_query" {
         return _mcp_tool_query(_hc_id, _hc_question);
+    };
+    if _hc_tool == "emotion_encode" {
+        _nox_log("EMOTION", _hc_text);
+        return _mcp_tool_emotion(_hc_id, _hc_text);
+    };
+    if _hc_tool == "silk_status" {
+        _nox_log("SILK", "status check");
+        return _mcp_tool_silk(_hc_id);
+    };
+    if _hc_tool == "nox_status" {
+        _nox_log("STATUS", "brain check");
+        return _mcp_tool_nox_status(_hc_id);
     };
     return _mcp_error(_hc_id, "Unknown tool: " + _hc_tool);
 }
@@ -112,6 +139,27 @@ fn _mcp_tool_query(_tq_id, _tq_question) {
         _tq_i = _tq_i + 1;
     };
     return _mcp_result(_tq_id, _tq_out);
+}
+
+fn _mcp_tool_emotion(_temo_id, _temo_text) {
+    let _temo_r = text_emotion_v2(_temo_text);
+    let _temo_out = "Emotion 5D: S=" + to_string(_temo_r.s) + " R=" + to_string(_temo_r.r) + " V=" + to_string(_temo_r.v) + " A=" + to_string(_temo_r.a) + " T=" + to_string(_temo_r.t);
+    return _mcp_result(_temo_id, _temo_out);
+}
+
+fn _mcp_tool_silk(_tsilk_id) {
+    let _tsilk_out = "Silk Network: " + to_string(silk_count()) + " edges, " + to_string(kt_fact_count()) + " facts in KnowTree";
+    return _mcp_result(_tsilk_id, _tsilk_out);
+}
+
+fn _mcp_tool_nox_status(_tns_id) {
+    let _tns_ts = _mcp_format_ts(__timestamp());
+    let _tns_out = "Nox Brain Status [" + _tns_ts + "]\\n";
+    _tns_out = _tns_out + "Facts: " + to_string(kt_fact_count()) + "\\n";
+    _tns_out = _tns_out + "Silk edges: " + to_string(silk_count()) + "\\n";
+    _tns_out = _tns_out + "KnowTree: " + kt_stats() + "\\n";
+    _tns_out = _tns_out + "Binary: Nox_brain.olang at ~/.claude/";
+    return _mcp_result(_tns_id, _tns_out);
 }
 
 fn _mcp_result(_mr_id, _mr_text) {
