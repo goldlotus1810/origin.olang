@@ -306,3 +306,10 @@ fn _rx_run(_r_s, _r_start, _r_text, _r_from) {
     };
     return _r_matched;
 }
+
+pub fn regex_debug() {
+    let s = [0];
+    let pi = [0];
+    let f = _rx_atom_q(s, "a", pi);
+    return "s0=" + __to_string(s[0]) + " s2=" + s[2] + " f=" + __to_string(f);
+}
