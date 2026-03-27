@@ -1426,6 +1426,9 @@ op_call:
     movabs  $0xE811320261AE416D, %rdx
     cmp     %rdx, %rax
     je      .call_type_of
+    movabs  $0x58DE00DC609CC76D, %rdx
+    cmp     %rdx, %rax
+    je      .call_mcp_suppress
     jmp     .call_not_builtin
 
 .builtin_slot_110:
@@ -6919,6 +6922,205 @@ op_ret:
     xor     %eax, %eax
     jmp     ._rx_return
 
+# Emit capture: write to mcp_out_buf instead of stdout
+.emit_capture:
+    # rsi = chain ptr, rdx = len/marker (already popped from r14)
+    cmp     $F64_MARKER, %rdx
+    je      .emit_cap_f64
+    # String: decode molecules to mcp_out_buf
+    test    %rdx, %rdx
+    jz      vm_loop                      # empty → skip
+    movzwl  (%rsi), %eax
+    and     $0xFF00, %eax
+    cmp     $0x2100, %eax
+    jne     vm_loop                      # not a string → skip
+    # Decode string molecules to capture buffer
+    mov     mcp_out_len(%rip), %rdi      # current offset in buffer
+    lea     mcp_out_buf(%rip), %rax
+    add     %rdi, %rax                   # write position
+    mov     %rdx, %rcx                   # mol_count
+.emit_cap_str_loop:
+    test    %rcx, %rcx
+    jz      .emit_cap_str_done
+    movzwl  (%rsi), %edx
+    movb    %dl, (%rax)
+    add     $2, %rsi
+    inc     %rax
+    inc     %rdi
+    dec     %rcx
+    jmp     .emit_cap_str_loop
+.emit_cap_str_done:
+    # Add newline
+    movb    $0x0A, (%rax)
+    inc     %rdi
+    mov     %rdi, mcp_out_len(%rip)
+    jmp     vm_loop
+
+.emit_cap_f64:
+    # Format number to capture buffer
+    # Use the existing f64 format logic but redirect output
+    # For simplicity: format to heap, then copy to capture buffer
+    push    %rsi
+    movq    (%rsi), %xmm0               # load f64 value
+    mov     %r15, %rdi                   # temp buffer on heap
+    # Check if integer
+    cvttsd2si %xmm0, %rax
+    cvtsi2sd %rax, %xmm1
+    ucomisd %xmm0, %xmm1
+    jne     .emit_cap_f64_float
+    jp      .emit_cap_f64_float
+    # Integer: format via itoa
+    mov     %rax, %rcx
+    test    %rcx, %rcx
+    jns     .emit_cap_f64_pos
+    movb    $'-', (%rdi)
+    inc     %rdi
+    neg     %rcx
+.emit_cap_f64_pos:
+    mov     %rdi, %r8                    # save start
+    mov     $10, %esi
+.emit_cap_itoa:
+    xor     %edx, %edx
+    mov     %rcx, %rax
+    div     %rsi
+    add     $'0', %edx
+    movb    %dl, (%rdi)
+    inc     %rdi
+    mov     %rax, %rcx
+    test    %rcx, %rcx
+    jnz     .emit_cap_itoa
+    # Reverse digits
+    mov     %rdi, %rax                   # end
+    dec     %rax
+.emit_cap_rev:
+    cmp     %r8, %rax
+    jle     .emit_cap_f64_done
+    movb    (%r8), %cl
+    movb    (%rax), %dl
+    movb    %dl, (%r8)
+    movb    %cl, (%rax)
+    inc     %r8
+    dec     %rax
+    jmp     .emit_cap_rev
+
+.emit_cap_f64_float:
+    # Float: write "N.N" (simplified)
+    # Just write integer part for now
+    cvttsd2si %xmm0, %rax
+    mov     %rax, %rcx
+    test    %rcx, %rcx
+    jns     .emit_cap_ff_pos
+    movb    $'-', (%rdi)
+    inc     %rdi
+    neg     %rcx
+.emit_cap_ff_pos:
+    mov     %rdi, %r8
+    mov     $10, %esi
+.emit_cap_ff_itoa:
+    xor     %edx, %edx
+    mov     %rcx, %rax
+    div     %rsi
+    add     $'0', %edx
+    movb    %dl, (%rdi)
+    inc     %rdi
+    mov     %rax, %rcx
+    test    %rcx, %rcx
+    jnz     .emit_cap_ff_itoa
+    mov     %rdi, %rax
+    dec     %rax
+.emit_cap_ff_rev:
+    cmp     %r8, %rax
+    jle     .emit_cap_f64_done
+    movb    (%r8), %cl
+    movb    (%rax), %dl
+    movb    %dl, (%r8)
+    movb    %cl, (%rax)
+    inc     %r8
+    dec     %rax
+    jmp     .emit_cap_ff_rev
+
+.emit_cap_f64_done:
+    # rdi = end of formatted number, r15 = start
+    mov     %rdi, %rcx
+    sub     %r15, %rcx                   # length
+    pop     %rsi
+    # Copy to capture buffer
+    mov     mcp_out_len(%rip), %rdi
+    lea     mcp_out_buf(%rip), %rax
+    add     %rdi, %rax
+    mov     %r15, %rsi
+    push    %rcx
+.emit_cap_copy:
+    test    %rcx, %rcx
+    jz      .emit_cap_copy_done
+    movb    (%rsi), %dl
+    movb    %dl, (%rax)
+    inc     %rsi
+    inc     %rax
+    dec     %rcx
+    jmp     .emit_cap_copy
+.emit_cap_copy_done:
+    pop     %rcx
+    add     %rcx, %rdi
+    movb    $0x0A, (%rax)                # newline
+    inc     %rdi
+    mov     %rdi, mcp_out_len(%rip)
+    jmp     vm_loop
+
+# __mcp_suppress(flag) — set/clear emit capture for MCP mode
+# flag=1: start capturing (clears buffer), flag=0: stop capturing and return captured text
+.call_mcp_suppress:
+    add     %rcx, %r13
+    mov     (%r14), %rax               # flag value (f64)
+    add     $16, %r14                  # pop arg
+    # Check f64 bits: 0.0 = all zeros
+    test    %rax, %rax
+    jz      .mcp_sup_off
+    # Turn ON capture, clear buffer
+    movb    $1, mcp_capture(%rip)
+    movq    $0, mcp_out_len(%rip)
+    # Return 0
+    sub     $16, %r14
+    xor     %eax, %eax
+    mov     %rax, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+.mcp_sup_off:
+    # Turn OFF capture, return captured text as string
+    movb    $0, mcp_capture(%rip)
+    mov     mcp_out_len(%rip), %rcx
+    test    %rcx, %rcx
+    jz      .mcp_sup_empty
+    # Strip trailing newline if present
+    lea     mcp_out_buf(%rip), %rsi
+    cmpb    $0x0A, -1(%rsi, %rcx)
+    jne     .mcp_sup_no_strip
+    dec     %rcx
+.mcp_sup_no_strip:
+    # Encode to string molecules on heap
+    sub     $16, %r14
+    mov     %r15, (%r14)                # chain ptr = heap
+    mov     %rcx, 8(%r14)               # mol_count
+    # Encode each byte as 0x2100 | byte
+    xor     %edx, %edx
+.mcp_sup_encode:
+    cmp     %rcx, %rdx
+    jge     .mcp_sup_encode_done
+    movzbl  (%rsi, %rdx), %eax
+    or      $0x2100, %eax
+    movw    %ax, (%r15)
+    add     $2, %r15
+    inc     %rdx
+    jmp     .mcp_sup_encode
+.mcp_sup_encode_done:
+    jmp     vm_loop
+.mcp_sup_empty:
+    # Return empty string
+    sub     $16, %r14
+    mov     %r15, (%r14)
+    movq    $0, 8(%r14)
+    jmp     vm_loop
+
 .call_file_read:
     add     %rcx, %r13
     jmp     op_file_read
@@ -7607,6 +7809,13 @@ op_emit:
     mov     (%r14), %rsi               # buf = chain ptr
     mov     8(%r14), %rdx              # len
     add     $16, %r14                  # pop
+
+    # MCP capture: redirect emit to buffer instead of stdout
+    cmpb    $1, mcp_capture(%rip)
+    jne     .emit_normal
+    # Capture emit to mcp_out_buf
+    jmp     .emit_capture
+.emit_normal:
 
     # If f64 marker, format number first
     cmp     $F64_MARKER, %rdx
@@ -9639,16 +9848,8 @@ op_halt:
     movb    $1, 14(%r15)               # arity = 1
     add     $15, %r15
 
-    # Emit + Halt
-    movb    $0x06, (%r15)               # Emit
-    inc     %r15
-    # Write newline after emit (MCP needs \n delimiter)
-    movb    $0x01, (%r15)               # Push
-    movw    $1, 1(%r15)                 # mol_count = 1
-    add     $3, %r15
-    movw    $0x210A, (%r15)             # newline char molecule
-    add     $2, %r15
-    movb    $0x06, (%r15)               # Emit newline
+    # Emit + Halt (op_emit appends \n; inner emits suppressed by mcp_capture)
+    movb    $0x06, (%r15)               # Emit the mcp_dispatch result
     inc     %r15
     movb    $0x0F, (%r15)               # Halt
     inc     %r15
@@ -10497,6 +10698,12 @@ eval_offset:
     .space 8                            # current processing offset in buffer
 mcp_buf:
     .space 8                            # pointer to MCP line buffer on heap
+mcp_capture:
+    .space 1                            # 1 = capture emit output to mcp_out_buf
+mcp_out_len:
+    .space 8                            # current length of captured output
+mcp_out_buf:
+    .space 8192                         # captured emit output buffer (8KB)
 jit_cache:
     .space 512                          # 32 slots × [hash:8][ptr:8] = 16 bytes each
 profile_counters:

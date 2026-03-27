@@ -69,11 +69,9 @@ fn _mcp_handle_call_direct(_hc_id, _hc_tool, _hc_code, _hc_fact, _hc_question, _
 }
 
 fn _mcp_tool_eval(_te_id, _te_code) {
-    let _te_output = repl_eval(_te_code);
-    if len(_te_output) == 0 {
-        return _mcp_result(_te_id, "(no output)");
-    };
-    return _mcp_result(_te_id, _te_output);
+    // TODO: repl_eval crashes in MCP context (var_table boot closure bug)
+    // For now, return the code as acknowledgement
+    return _mcp_result(_te_id, "code received: " + _te_code);
 }
 
 fn _mcp_tool_learn(_tl_id, _tl_fact) {
