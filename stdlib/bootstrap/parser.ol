@@ -236,7 +236,25 @@ fn parse_primary(p) {
         },
         TokenKind::StringLit { value } => {
             advance(p);
-            return Expr::StrLit { value: value };
+            let _pp_result = Expr::StrLit { value: value };
+            // Method call on string: "hello".len() → len("hello")
+            while is_symbol_tok(peek(p), ".") {
+                advance(p);
+                let _pp_mfield = expect_ident(p);
+                if is_symbol_tok(peek(p), "(") {
+                    advance(p);
+                    let _pp_margs = [_pp_result];
+                    while !is_symbol_tok(peek(p), ")") && !is_eof(peek(p)) {
+                        push(_pp_margs, parse_expr(p));
+                        if is_symbol_tok(peek(p), ",") { advance(p); };
+                    };
+                    expect_symbol(p, ")");
+                    _pp_result = Expr::Call { callee: Expr::Ident { name: _pp_mfield }, args: _pp_margs };
+                } else {
+                    _pp_result = Expr::FieldAccess { object: _pp_result, field: _pp_mfield };
+                };
+            };
+            return _pp_result;
         },
         TokenKind::Keyword { name } => {
             // true/false literals
@@ -413,7 +431,24 @@ fn parse_primary(p) {
                     };
                     expect_symbol(p, ")");
                     let _pp_saved = pop(_pb_stack);
-                    let _pp_result = Expr::Call { callee: _pp_saved, args: _pp_call_args };
+                    // Method call desugar: obj.method(args) → method(obj, args)
+                    let _pp_is_method = 0;
+                    match _pp_saved {
+                        Expr::FieldAccess { object, field } => {
+                            let _pp_margs = [object];
+                            let _pp_mi = 0;
+                            while _pp_mi < len(_pp_call_args) {
+                                push(_pp_margs, _pp_call_args[_pp_mi]);
+                                _pp_mi = _pp_mi + 1;
+                            };
+                            let _pp_result = Expr::Call { callee: Expr::Ident { name: field }, args: _pp_margs };
+                            let _pp_is_method = 1;
+                        },
+                        _ => {},
+                    };
+                    if _pp_is_method == 0 {
+                        let _pp_result = Expr::Call { callee: _pp_saved, args: _pp_call_args };
+                    };
                 };
             };
 
