@@ -1,0 +1,3 @@
+[2026-03-27 09:46:08] FAIL fixed:fib10 | got '9' want '55' | fn fib(n){if n<2{return n;};return fib(n-1)+fib(n-2);}; emit fib(10);
+[2026-03-27 09:46:08] FAIL fixed:nl_fib | got '-80' want '55' | fib 10
+[2026-03-27 09:46:08] FAIL fn:fib(18) | got '474' want '2584' | fn fib(n){if n<2{return n;};return fib(n-1)+fib(n-2);}; emit fib(18);

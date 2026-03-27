@@ -1773,12 +1773,17 @@ op_call:
     add     %rcx, %r13                  # PC past name bytes
     push    %r12                        # save bytecode base (CPU stack)
     push    %r13                        # save return address (CPU stack)
-    # Scope save: snapshot var_table to heap scope stack.
-    # Only for nested eval closures (boot closures don't need scoping).
-    mov     %rax, %rdi                  # save body_pc (full 64-bit, may have bit 63 flag)
+    # Scope save: save var_table count so we can truncate on return.
+    # Skip ONLY for boot top-level (r12==boot_bc_base AND depth==0).
+    # Boot closures called from eval (depth>0) need scoping for recursive calls.
+    mov     %rax, %rdi                  # save body_pc
     lea     boot_bc_base(%rip), %rsi
     cmp     (%rsi), %r12
-    je      .closure_skip_scope
+    jne     .closure_do_scope           # eval context → always scope
+    lea     closure_depth(%rip), %rsi
+    cmpq    $0, (%rsi)
+    je      .closure_skip_scope         # boot + depth==0 → skip
+.closure_do_scope:
 
     # FAST scope save: just save var_table count (NO memcpy!)
     # depth_stack[depth] = current count → 1 store, 8 bytes
@@ -5593,15 +5598,10 @@ op_ret:
     pop     %rax                        # saved PC
     pop     %r12                        # saved bytecode base
     mov     %eax, %r13d                 # PC = return address
-    # Scope restore: ONLY if returning TO eval context (not boot→boot)
-    # Check: is restored r12 the eval buffer? If r12 == boot_bc_base → boot context → skip
-    lea     boot_bc_base(%rip), %rdi
-    cmp     (%rdi), %r12
-    je      vm_loop                     # returning to boot → no scope restore needed
-    # FAST scope restore: just truncate var_table count (NO memcpy!)
+    # Scope restore: truncate var_table if depth > 0
     lea     closure_depth(%rip), %rsi
     cmpq    $0, (%rsi)
-    je      vm_loop
+    je      vm_loop                     # depth==0 (boot top-level) → no scope to restore
     decq    (%rsi)                      # depth--
     # Check skip_scope_restore flag (module loading)
     lea     skip_scope_restore(%rip), %rax
