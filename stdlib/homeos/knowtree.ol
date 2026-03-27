@@ -66,6 +66,7 @@ pub fn kt_learn(_kl_text) {
 pub fn kt_learn_to(_klt_text, _klt_branch) {
     _kt_ensure_init();
     let _ = __set_at(__kt_fact_count, 0, __array_get(__kt_fact_count, 0) + 1);
+    push(__kt_facts_arr, _klt_text);
     // Split into words using substr, store each word's P_weight
     let _klt_tlen = len(_klt_text);
     let _klt_st = [0];
@@ -173,6 +174,37 @@ pub fn kt_stats() {
            __to_string(__array_get(__kt_fact_count, 0)) + " facts";
 }
 
+pub fn kt_find(_kf_query, _kf_max) {
+    let _kf_out = [];
+    let _kf_i = 0;
+    let _kf_flen = len(__kt_facts_arr);
+    while _kf_i < _kf_flen {
+        let _kf_fact = __kt_facts_arr[_kf_i];
+        // Word-by-word match: split query and check each word
+        let _kf_qi = 0;
+        let _kf_qlen = len(_kf_query);
+        let _kf_found = 0;
+        // Check if any word in fact starts with or equals query
+        while _kf_qi <= len(_kf_fact) - _kf_qlen {
+            if substr(_kf_fact, _kf_qi, _kf_qi + _kf_qlen) == _kf_query {
+                _kf_found = 1;
+                _kf_qi = len(_kf_fact);
+            };
+            _kf_qi = _kf_qi + 1;
+        };
+        if _kf_found == 1 {
+            push(_kf_out, _kf_fact);
+            if len(_kf_out) >= _kf_max { return _kf_out; };
+        };
+        _kf_i = _kf_i + 1;
+    };
+    return _kf_out;
+}
+
+pub fn kt_fact_count() {
+    return len(__kt_facts_arr);
+}
+
 // ════════════════════════════════════════════════════════════════
 // Save / Load
 // ════════════════════════════════════════════════════════════════
@@ -181,9 +213,9 @@ pub fn kt_save(_ks_path) {
     let _ks_out = "";
     let _ks_i = 0;
     while _ks_i < len(__kt_facts_arr) {
-        if _ks_i > 0 { let _ks_out = _ks_out + "\n"; };
-        let _ks_out = _ks_out + __array_get(__kt_facts_arr, _ks_i);
-        let _ks_i = _ks_i + 1;
+        if _ks_i > 0 { _ks_out = _ks_out + "\n"; };
+        _ks_out = _ks_out + __array_get(__kt_facts_arr, _ks_i);
+        _ks_i = _ks_i + 1;
     };
     __file_write(_ks_path, _ks_out);
     return "Saved " + __to_string(len(__kt_facts_arr)) + " facts to " + _ks_path;

@@ -84,18 +84,21 @@ fn _mcp_tool_eval(_te_id, _te_code) {
 
 fn _mcp_tool_learn(_tl_id, _tl_fact) {
     kt_learn(_tl_fact);
-    return _mcp_result(_tl_id, "Learned: " + _tl_fact);
+    kt_save("homeos.knowledge");
+    return _mcp_result(_tl_id, "Learned and saved: " + _tl_fact + " (" + to_string(len(__kt_facts_arr)) + " facts total)");
 }
 
 fn _mcp_tool_query(_tq_id, _tq_question) {
-    let _tq_results = kt_search(_tq_question, 5);
+    let _tq_results = kt_find(_tq_question, 10);
+    let _tq_total = kt_fact_count();
     if len(_tq_results) == 0 {
-        return _mcp_result(_tq_id, "No matching knowledge found.");
+        return _mcp_result(_tq_id, "No matching facts for: " + _tq_question + " (" + to_string(_tq_total) + " facts)");
     };
     let _tq_out = "";
     let _tq_i = 0;
     while _tq_i < len(_tq_results) {
-        _tq_out = _tq_out + _tq_results[_tq_i] + "; ";
+        if _tq_i > 0 { _tq_out = _tq_out + "\\n"; };
+        _tq_out = _tq_out + _tq_results[_tq_i];
         _tq_i = _tq_i + 1;
     };
     return _mcp_result(_tq_id, _tq_out);
