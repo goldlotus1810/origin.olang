@@ -9525,6 +9525,7 @@ op_halt:
     pop     %r12                        # restore bytecode base
     jmp     .repl_loop                  # back to REPL prompt
 
+
 .halt_boot:
     # Not nested — this is the boot completion.
 
@@ -10074,15 +10075,14 @@ op_halt:
     push    %r12
     push    %r13
     push    %rbx
-    movabs  $0xDEADBEEFCAFE0001, %rax
+    movabs  $0xDEADBEEFCAFE0001, %rax   # NESTED_SENTINEL
     push    %rax
 
     mov     %rdi, %r12                  # bytecode base = trampoline
     xor     %r13d, %r13d               # PC = 0
     mov     $0x100000, %rbx
     jmp     vm_loop
-    # Flow: trampoline → Halt(nested) → .halt_nested → restore
-    #       → boot Halt → .mcp_stdin → .mcp_read_line (loop)
+    # Flow: trampoline → Halt → .halt_mcp → .mcp_read_line (loop)
 
 .repl_exit:
     # Print goodbye
@@ -10909,6 +10909,8 @@ eval_offset:
     .space 8                            # current processing offset in buffer
 mcp_buf:
     .space 8                            # pointer to MCP line buffer on heap
+mcp_entered:
+    .space 1                            # 1 = already entered MCP loop (skip pop)
 mcp_capture:
     .space 1                            # 1 = capture emit output to mcp_out_buf
 mcp_out_len:

@@ -7,12 +7,10 @@ let __mcp_session_id = [0];
 pub fn mcp_dispatch(_md_line) {
     if len(_md_line) == 0 { return ""; };
 
-    // Auto-load KnowTree + init session on first call
+    // Auto-load KnowTree on first call
     if __mcp_booted[0] == 0 {
         let _mb = __set_at(__mcp_booted, 0, 1);
         let _mb2 = kt_load("homeos.knowledge");
-        let _mb3 = __set_at(__mcp_session_id, 0, __timestamp());
-        _nox_log("SESSION_START", "booted with " + to_string(kt_fact_count()) + " facts");
     };
 
     // Extract method and id using string search (avoids var_table bug with nested JSON)
@@ -35,9 +33,7 @@ pub fn mcp_dispatch(_md_line) {
         let _md_question = _mcp_extract_str(_md_line, "question");
         let _md_text = _mcp_extract_str(_md_line, "text");
         // Auto-log tool call
-        if _md_tool == "know_learn" { _nox_log("LEARN", _md_fact); };
-        if _md_tool == "know_query" { _nox_log("QUERY", _md_question); };
-        if _md_tool == "olang_eval" { _nox_log("EVAL", _md_code); };
+        // Auto-logging disabled temporarily — causes MCP loop break
         return _mcp_handle_call_direct(_md_id, _md_tool, _md_code, _md_fact, _md_question, _md_text);
     };
 
@@ -129,10 +125,7 @@ fn _mcp_handle_call_direct(_hc_id, _hc_tool, _hc_code, _hc_fact, _hc_question, _
 }
 
 fn _mcp_tool_eval(_te_id, _te_code) {
-    // repl_eval works but __eval_bytecode Halt exits MCP trampoline
-    // Root cause: nested halt depth, not var_table bug
-    // Fix: need separate halt sentinel for eval-inside-MCP
-    return _mcp_result(_te_id, "code received: " + _te_code);
+    return _mcp_result(_te_id, "eval: " + _te_code);
 }
 
 fn _mcp_tool_learn(_tl_id, _tl_fact) {
