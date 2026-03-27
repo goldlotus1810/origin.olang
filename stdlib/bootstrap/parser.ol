@@ -561,7 +561,24 @@ fn parse_primary(p) {
                     let _pa_idx_args = [];
                     push(_pa_idx_args, _pa_arr_saved);
                     push(_pa_idx_args, _pa_idx);
-                    return Expr::Call { callee: Expr::Ident { name: "__array_get" }, args: _pa_idx_args };
+                    let _pa_arr = Expr::Call { callee: Expr::Ident { name: "__array_get" }, args: _pa_idx_args };
+                };
+                // Method chain on array: [1,2,3].len() → len([1,2,3])
+                while is_symbol_tok(peek(p), ".") {
+                    advance(p);
+                    let _pa_mfield = expect_ident(p);
+                    if is_symbol_tok(peek(p), "(") {
+                        advance(p);
+                        let _pa_margs = [_pa_arr];
+                        while !is_symbol_tok(peek(p), ")") && !is_eof(peek(p)) {
+                            push(_pa_margs, parse_expr(p));
+                            if is_symbol_tok(peek(p), ",") { advance(p); };
+                        };
+                        expect_symbol(p, ")");
+                        _pa_arr = Expr::Call { callee: Expr::Ident { name: _pa_mfield }, args: _pa_margs };
+                    } else {
+                        _pa_arr = Expr::FieldAccess { object: _pa_arr, field: _pa_mfield };
+                    };
                 };
                 return _pa_arr;
             };
