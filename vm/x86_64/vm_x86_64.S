@@ -454,7 +454,7 @@ codegen_table:
     .long op_nop        - codegen_table # 0x16 Fuse
     .long op_nop        - codegen_table # 0x17 ScopeBegin
     .long op_nop        - codegen_table # 0x18 ScopeEnd
-    .long op_push_mol   - codegen_table # 0x19 PushMol
+    .long cg_push_mol   - codegen_table # 0x19 PushMol (codegen: 2 bytes u16 LE)
     .long op_try_begin  - codegen_table # 0x1A TryBegin
     .long op_catch_end  - codegen_table # 0x1B CatchEnd
     .long op_store_upd  - codegen_table # 0x1C StoreUpdate
@@ -729,7 +729,7 @@ op_push_num:
     jmp     vm_loop
 
 op_push_mol:
-    # [0x36, S, R, V, A, T] — 5 bytes
+    # ir.rs format: [0x36, S, R, V, A, T] — 5 bytes
     mov     %r15, %rdi                  # dest = heap
     lea     (%r12, %r13), %rsi         # src
     mov     $5, %edx
@@ -740,6 +740,37 @@ op_push_mol:
     movq    $5, 8(%r14)                 # len = 5
     add     $5, %r15                    # bump heap
     add     $5, %r13                    # PC += 5
+    jmp     vm_loop
+
+cg_push_mol:
+    # codegen format: [0x19, lo:1, hi:1] — 2 bytes (packed u16 LE)
+    # Read u16, unpack to 5 dimension bytes, write to heap
+    movzwl  (%r12, %r13), %eax         # packed u16 LE
+    add     $2, %r13                    # PC += 2
+    # Unpack: S=(bits>>12)&0xF, R=(bits>>8)&0xF, V=(bits>>5)&7, A=(bits>>2)&7, T=bits&3
+    mov     %eax, %ecx
+    shr     $12, %ecx
+    movb    %cl, (%r15)                 # S
+    mov     %eax, %ecx
+    shr     $8, %ecx
+    and     $0xF, %ecx
+    movb    %cl, 1(%r15)               # R
+    mov     %eax, %ecx
+    shr     $5, %ecx
+    and     $7, %ecx
+    movb    %cl, 2(%r15)               # V
+    mov     %eax, %ecx
+    shr     $2, %ecx
+    and     $7, %ecx
+    movb    %cl, 3(%r15)               # A
+    mov     %eax, %ecx
+    and     $3, %ecx
+    movb    %cl, 4(%r15)               # T
+    # Push chain (5 bytes on heap, mol_count=5)
+    sub     $16, %r14
+    mov     %r15, (%r14)
+    movq    $5, 8(%r14)
+    add     $5, %r15
     jmp     vm_loop
 
 op_dup:
@@ -3483,6 +3514,7 @@ op_call:
     pop     %rdi
     pop     %rsi
     je      .match_enum_true
+    jmp     .match_enum_false           # chain compare failed → no match
 
 # Dict format: scan entries for tag (key_ptr=0, key_len=0), compare value
 .match_enum_dict:

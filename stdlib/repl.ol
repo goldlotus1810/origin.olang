@@ -124,8 +124,7 @@ fn _expand_use(_eu_src) {
 }
 
 pub fn repl_eval(input) {
-  // Auto-learn on first call
-  _boot_learn();
+  // _boot_learn() deferred to NL path — not needed for code execution
   // Strip trailing newline if present (use ASM builtin __str_trim)
   let src = __str_trim(input);
   if len(src) == 0 { return ""; }
@@ -152,6 +151,7 @@ pub fn repl_eval(input) {
   if len(src) > 8 {
     if __substr(src, 0, 8) == "respond " {
       let _rr_text = __substr(src, 8, len(src));
+      _boot_learn();
       return agent_respond(_rr_text);
     };
   }
@@ -322,38 +322,13 @@ pub fn repl_eval(input) {
     };
   }
 
-  // NL → code conversion (before code detection, using only builtins)
-  if len(src) >= 4 {
-    let _re_p3 = __substr(src, 0, 3);
-    let _re_p4 = __substr(src, 0, 4);
-    // Extract all numbers from text into _re_nlist
-    let _re_nlist = [];
-    let _re_ntmp = "";
-    let _re_nk = 0;
-    while _re_nk < len(src) {
-      let _re_nch = __char_code(char_at(src, _re_nk));
-      if _re_nch >= 48 { if _re_nch <= 57 { let _re_ntmp = _re_ntmp + char_at(src, _re_nk); }; };
-      if _re_nch < 48 || _re_nch > 57 { if len(_re_ntmp) > 0 { let _ = push(_re_nlist, _re_ntmp); let _re_ntmp = ""; }; };
-      let _re_nk = _re_nk + 1;
-    };
-    if len(_re_ntmp) > 0 { let _ = push(_re_nlist, _re_ntmp); };
-    // Extract array [...] from text
-    let _re_earr = "";
-    let _re_ek = 0;
-    while _re_ek < len(src) { if char_at(src, _re_ek) == "[" { let _re_earr = __substr(src, _re_ek, len(src)); }; let _re_ek = _re_ek + 1; };
-
-    if _re_p3 == "fib" { if len(_re_nlist) > 0 { let src = "fn _fib(n) { if n < 2 { return n; }; return _fib(n-1) + _fib(n-2); }; emit _fib(" + _re_nlist[0] + ");"; }; };
-    if _re_p3 == "sap" || _re_p4 == "sort" { if len(_re_earr) > 0 { let src = "emit sort(" + _re_earr + ");"; }; };
-    if _re_p4 == "giai" || _re_p4 == "fact" { if len(_re_nlist) > 0 { let src = "fn _fact(n) { if n < 2 { return 1; }; return n * _fact(n-1); }; emit _fact(" + _re_nlist[0] + ");"; }; };
-    if _re_p3 == "dao" || _re_p3 == "rev" { if len(_re_earr) > 0 { let src = "let _a = " + _re_earr + "; let _r = []; let _i = len(_a) - 1; while _i >= 0 { let _ = push(_r, _a[_i]); let _i = _i - 1; }; emit _r;"; }; };
-    if _re_p3 == "tin" || _re_p3 == "sum" { if len(_re_nlist) >= 2 { let src = "emit " + _re_nlist[1] + " * (" + _re_nlist[1] + " + 1) / 2 - (" + _re_nlist[0] + " - 1) * " + _re_nlist[0] + " / 2;"; }; };
-    if _re_p3 == "can" || _re_p4 == "sqrt" { if len(_re_nlist) > 0 { let src = "emit __isqrt(" + _re_nlist[0] + ");"; }; };
-    if _re_p2 == "so" || _re_p4 == "prim" { if len(_re_nlist) > 0 { let src = "fn _is_p(n) { if n < 2 { return 0; }; let d = 2; while d * d <= n { if n % d == 0 { return 0; }; let d = d + 1; }; return 1; }; let r = []; let i = 2; while i < " + _re_nlist[0] + " { if _is_p(i) == 1 { let _ = push(r, i); }; let i = i + 1; }; emit r;"; }; };
-    if _re_p3 == "tic" || _re_p4 == "prod" { if len(_re_nlist) >= 2 { let src = "fn _prod(a, b) { if a > b { return 1; }; return a * _prod(a + 1, b); }; emit _prod(" + _re_nlist[0] + ", " + _re_nlist[1] + ");"; }; };
+  // NL → code conversion (first-word match, runs before code detection)
+  if len(src) >= 3 {
+    let _re_nlcode = nl_to_code(src);
+    if len(_re_nlcode) > 0 { let src = _re_nlcode; };
   };
 
   // Check if input looks like code (starts with keyword or symbol)
-  // If not → treat as natural text conversation
   let _re_first = char_at(src, 0);
   let _re_is_code = 0;
   // Code starts with: letter (let/fn/if/emit/match/try/for/while/type/union)
@@ -383,7 +358,6 @@ pub fn repl_eval(input) {
     if _re_2 == "as" { _re_is_code = 1; };  // assert_type, assert_eq
     if _re_2 == "co" { _re_is_code = 1; };  // contract, contains
     if _re_2 == "se" { _re_is_code = 1; };  // set_at
-    if _re_2 == "so" { _re_is_code = 1; };  // sort
     if _re_2 == "fi" { _re_is_code = 1; };  // filter
     if _re_2 == "pi" { _re_is_code = 1; };  // pipe
   };
@@ -397,6 +371,8 @@ pub fn repl_eval(input) {
         if src == "chao" || src == "Chao" || src == "xin chao" || src == "Xin chao" { return smart_greet(stm_count()); };
         if src == "bye" || src == "Bye" || src == "tam biet" { return smart_goodbye(stm_count()); };
     };
+    // Load KnowTree only when NL processing is needed (not for code)
+    _boot_learn();
     return agent_respond(src);
   }
 
@@ -427,6 +403,7 @@ pub fn repl_eval(input) {
   // Parse error → try agent, or show helpful message
   if _g_parse_error == 1 {
     let _g_parse_error = 0;
+    _boot_learn();
     return agent_respond(src);
   }
 

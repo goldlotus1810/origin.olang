@@ -1,5 +1,25 @@
 // homeos/nlcompute.ol — Natural Language → Olang Code → Result
 // Vietnamese + English support. Pattern matching approach.
+// Supports both diacritics (tổng, sắp xếp) and ASCII (tong, sap xep).
+
+// ═══════════════════════════════════════════════════════════════
+// Helper: check if first word of text matches (for NL dispatch)
+// ═══════════════════════════════════════════════════════════════
+fn _nl_first(_nf_text, _nf_word) {
+    let _nf_wl = len(_nf_word);
+    if len(_nf_text) < _nf_wl { return 0; };
+    let _nf_j = 0;
+    while _nf_j < _nf_wl {
+        if char_at(_nf_text, _nf_j) != char_at(_nf_word, _nf_j) { return 0; };
+        let _nf_j = _nf_j + 1;
+    };
+    // After match: must be end of string or space
+    if len(_nf_text) == _nf_wl { return 1; };
+    let _nf_after = char_at(_nf_text, _nf_wl);
+    if _nf_after == " " { return 1; };
+    if _nf_after == "[" { return 1; };
+    return 0;
+};
 
 // ═══════════════════════════════════════════════════════════════
 // Helper: check if text contains word (boot-compatible)
@@ -76,11 +96,13 @@ fn _nl_extract_array(_ea_text) {
 pub fn nl_to_code(_nc_input) {
     let _nc_s = __str_trim(_nc_input);
 
-    // Tổng/sum: "tinh tong tu X den Y" / "sum from X to Y"
-    if _nl_has(_nc_s, "tong") == 1 || _nl_has(_nc_s, "sum") == 1 {
-        let _nc_from = _nl_num_after(_nc_s, "tu");
+    // Tổng/sum: "tính tổng từ X đến Y" / "tinh tong tu X den Y" / "sum from X to Y"
+    if _nl_has(_nc_s, "tong") == 1 || _nl_has(_nc_s, "tổng") == 1 || _nl_first(_nc_s, "sum") == 1 {
+        let _nc_from = _nl_num_after(_nc_s, "từ");
+        if _nc_from == 0 { let _nc_from = _nl_num_after(_nc_s, "tu"); };
         if _nc_from == 0 { let _nc_from = _nl_num_after(_nc_s, "from"); };
-        let _nc_to = _nl_num_after(_nc_s, "den");
+        let _nc_to = _nl_num_after(_nc_s, "đến");
+        if _nc_to == 0 { let _nc_to = _nl_num_after(_nc_s, "den"); };
         if _nc_to == 0 { let _nc_to = _nl_num_after(_nc_s, "to"); };
         if _nc_to > 0 {
             // Use Gauss formula: sum(a..b) = b*(b+1)/2 - (a-1)*a/2
@@ -88,8 +110,8 @@ pub fn nl_to_code(_nc_input) {
         };
     };
 
-    // Sắp xếp/sort: "sap xep [...]" / "sort [...]"
-    if _nl_has(_nc_s, "sap xep") == 1 || _nl_has(_nc_s, "sort") == 1 {
+    // Sắp xếp/sort: "sắp xếp [...]" / "sap xep [...]" / "sort [...]"
+    if _nl_first(_nc_s, "sắp") == 1 || _nl_first(_nc_s, "sap") == 1 || _nl_first(_nc_s, "sort") == 1 {
         let _nc_arr = _nl_extract_array(_nc_s);
         if len(_nc_arr) > 0 {
             return "emit sort(" + _nc_arr + ");";
@@ -97,7 +119,7 @@ pub fn nl_to_code(_nc_input) {
     };
 
     // Fibonacci: "fibonacci X" / "fib X"
-    if _nl_has(_nc_s, "fibonacci") == 1 || _nl_has(_nc_s, "fib ") == 1 {
+    if _nl_first(_nc_s, "fibonacci") == 1 || _nl_first(_nc_s, "fib") == 1 {
         let _nc_n = _nl_num_after(_nc_s, "fibonacci");
         if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "fib"); };
         if _nc_n > 0 {
@@ -105,48 +127,60 @@ pub fn nl_to_code(_nc_input) {
         };
     };
 
-    // Giai thừa/factorial: "giai thua X" / "factorial X"
-    if _nl_has(_nc_s, "giai thua") == 1 || _nl_has(_nc_s, "factorial") == 1 {
-        let _nc_n = _nl_num_after(_nc_s, "giai thua");
+    // Giai thừa/factorial: "giải thừa X" / "giai thua X" / "factorial X" / "fact X"
+    if _nl_first(_nc_s, "giải") == 1 || _nl_first(_nc_s, "giai") == 1 || _nl_first(_nc_s, "factorial") == 1 || _nl_first(_nc_s, "fact") == 1 {
+        let _nc_n = _nl_num_after(_nc_s, "giải thừa");
+        if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "giai thua"); };
         if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "factorial"); };
+        if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "fact"); };
         if _nc_n > 0 {
             return "fn _fact(n) { if n < 2 { return 1; }; return n * _fact(n-1); }; emit _fact(" + __to_string(_nc_n) + ");";
         };
     };
 
-    // Số nguyên tố/prime: "so nguyen to nho hon X" / "primes under X"
-    if _nl_has(_nc_s, "nguyen to") == 1 || _nl_has(_nc_s, "prime") == 1 {
-        let _nc_n = _nl_num_after(_nc_s, "hon");
+    // Số nguyên tố/prime: "số nguyên tố nhỏ hơn X" / "so nguyen to nho hon X" / "primes under X"
+    if _nl_has(_nc_s, "nguyên tố") == 1 || _nl_has(_nc_s, "nguyen to") == 1 || _nl_first(_nc_s, "primes") == 1 || _nl_first(_nc_s, "prime") == 1 || _nl_first(_nc_s, "prim") == 1 {
+        let _nc_n = _nl_num_after(_nc_s, "hơn");
+        if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "hon"); };
         if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "under"); };
+        if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "dưới"); };
         if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "duoi"); };
+        if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "prim"); };
+        if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "prime"); };
+        if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "primes"); };
         if _nc_n > 0 {
             return "fn _is_p(n) { if n < 2 { return 0; }; let d = 2; while d * d <= n { if n % d == 0 { return 0; }; let d = d + 1; }; return 1; }; let r = []; let i = 2; while i < " + __to_string(_nc_n) + " { if _is_p(i) == 1 { let _ = push(r, i); }; let i = i + 1; }; emit r;";
         };
     };
 
-    // Đảo ngược/reverse: "dao nguoc [...]" / "reverse [...]"
-    if _nl_has(_nc_s, "dao nguoc") == 1 || _nl_has(_nc_s, "reverse") == 1 {
+    // Đảo ngược/reverse: "đảo ngược [...]" / "dao nguoc [...]" / "reverse [...]"
+    if _nl_first(_nc_s, "đảo") == 1 || _nl_first(_nc_s, "dao") == 1 || _nl_first(_nc_s, "reverse") == 1 || _nl_first(_nc_s, "rev") == 1 {
         let _nc_arr = _nl_extract_array(_nc_s);
         if len(_nc_arr) > 0 {
             return "let _a = " + _nc_arr + "; let _r = []; let _i = len(_a) - 1; while _i >= 0 { let _ = push(_r, _a[_i]); let _i = _i - 1; }; emit _r;";
         };
     };
 
-    // Tích/product: "tich tu X den Y" / "product from X to Y"
-    if _nl_has(_nc_s, "tich") == 1 || _nl_has(_nc_s, "product") == 1 {
-        let _nc_from = _nl_num_after(_nc_s, "tu");
+    // Tích/product: "tích từ X đến Y" / "tich tu X den Y" / "product from X to Y"
+    if _nl_first(_nc_s, "tích") == 1 || _nl_first(_nc_s, "tich") == 1 || _nl_first(_nc_s, "product") == 1 {
+        let _nc_from = _nl_num_after(_nc_s, "từ");
+        if _nc_from == 0 { let _nc_from = _nl_num_after(_nc_s, "tu"); };
         if _nc_from == 0 { let _nc_from = _nl_num_after(_nc_s, "from"); };
-        let _nc_to = _nl_num_after(_nc_s, "den");
+        let _nc_to = _nl_num_after(_nc_s, "đến");
+        if _nc_to == 0 { let _nc_to = _nl_num_after(_nc_s, "den"); };
         if _nc_to == 0 { let _nc_to = _nl_num_after(_nc_s, "to"); };
         if _nc_to > 0 {
             return "fn _prod(a, b) { if a > b { return 1; }; return a * _prod(a + 1, b); }; emit _prod(" + __to_string(_nc_from) + ", " + __to_string(_nc_to) + ");";
         };
     };
 
-    // Căn bậc 2/sqrt: "can bac 2 cua X" / "sqrt X"
-    if _nl_has(_nc_s, "can bac") == 1 || _nl_has(_nc_s, "sqrt") == 1 {
-        let _nc_n = _nl_num_after(_nc_s, "cua");
+    // Căn bậc 2/sqrt: "căn bậc 2 của X" / "can bac 2 cua X" / "sqrt X" / "can X"
+    if _nl_first(_nc_s, "căn") == 1 || _nl_first(_nc_s, "can") == 1 || _nl_first(_nc_s, "sqrt") == 1 {
+        let _nc_n = _nl_num_after(_nc_s, "của");
+        if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "cua"); };
         if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "sqrt"); };
+        if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "căn"); };
+        if _nc_n == 0 { let _nc_n = _nl_num_after(_nc_s, "can"); };
         if _nc_n > 0 {
             return "emit __isqrt(" + __to_string(_nc_n) + ");";
         };

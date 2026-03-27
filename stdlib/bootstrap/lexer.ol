@@ -228,50 +228,58 @@ pub fn tokenize(source) {
                         let col = col + 1;
                     };
                     let _is_expr = __substr(source, _is_expr_start, pos);
-                    // Split on "." to handle field access: config.name → config . name
+                    // Tokenize expr inside {} — handle idents, numbers, operators, field access, calls
                     let _is_ei = 0;
                     let _is_word = "";
                     while _is_ei < len(_is_expr) {
                         let _is_ec = char_at(_is_expr, _is_ei);
-                        if _is_ec == "." {
+                        let _is_cc = __char_code(_is_ec);
+                        // Check if this char is a symbol/operator
+                        let _is_sym = 0;
+                        if _is_ec == "." { _is_sym = 1; };
+                        if _is_ec == "(" { _is_sym = 1; };
+                        if _is_ec == ")" { _is_sym = 1; };
+                        if _is_ec == "," { _is_sym = 1; };
+                        if _is_ec == "[" { _is_sym = 1; };
+                        if _is_ec == "]" { _is_sym = 1; };
+                        if _is_ec == "+" { _is_sym = 1; };
+                        if _is_ec == "-" { _is_sym = 1; };
+                        if _is_ec == "*" { _is_sym = 1; };
+                        if _is_ec == "/" { _is_sym = 1; };
+                        if _is_ec == "%" { _is_sym = 1; };
+                        if _is_ec == "<" { _is_sym = 1; };
+                        if _is_ec == ">" { _is_sym = 1; };
+                        if _is_ec == "=" { _is_sym = 1; };
+                        if _is_ec == "!" { _is_sym = 1; };
+                        if _is_ec == "&" { _is_sym = 1; };
+                        if _is_ec == "|" { _is_sym = 1; };
+                        if _is_ec == "^" { _is_sym = 1; };
+                        if _is_sym == 1 {
+                            // Flush accumulated word as ident or number
                             if len(_is_word) > 0 {
-                                push(tokens, Token { kind: TokenKind::Ident { name: _is_word }, text: _is_word, line: line, col: col });
+                                if is_digit(char_at(_is_word, 0)) {
+                                    push(tokens, Token { kind: TokenKind::Number { value: __to_number(_is_word) }, text: _is_word, line: line, col: col });
+                                } else {
+                                    push(tokens, Token { kind: TokenKind::Ident { name: _is_word }, text: _is_word, line: line, col: col });
+                                };
                                 let _is_word = "";
                             };
-                            push(tokens, Token { kind: TokenKind::Symbol { ch: "." }, text: ".", line: line, col: col });
+                            // Emit the symbol token
+                            push(tokens, Token { kind: TokenKind::Symbol { ch: _is_ec }, text: _is_ec, line: line, col: col });
                         } else {
-                            if _is_ec == "(" {
+                            if _is_cc == 32 {
+                                // Space: flush word, skip
                                 if len(_is_word) > 0 {
-                                    push(tokens, Token { kind: TokenKind::Ident { name: _is_word }, text: _is_word, line: line, col: col });
+                                    if is_digit(char_at(_is_word, 0)) {
+                                        push(tokens, Token { kind: TokenKind::Number { value: __to_number(_is_word) }, text: _is_word, line: line, col: col });
+                                    } else {
+                                        push(tokens, Token { kind: TokenKind::Ident { name: _is_word }, text: _is_word, line: line, col: col });
+                                    };
                                     let _is_word = "";
                                 };
-                                push(tokens, Token { kind: TokenKind::Symbol { ch: "(" }, text: "(", line: line, col: col });
                             } else {
-                                if _is_ec == ")" {
-                                    if len(_is_word) > 0 {
-                                        if is_digit(char_at(_is_word, 0)) {
-                                            push(tokens, Token { kind: TokenKind::Number { value: __to_number(_is_word) }, text: _is_word, line: line, col: col });
-                                        } else {
-                                            push(tokens, Token { kind: TokenKind::Ident { name: _is_word }, text: _is_word, line: line, col: col });
-                                        };
-                                        let _is_word = "";
-                                    };
-                                    push(tokens, Token { kind: TokenKind::Symbol { ch: ")" }, text: ")", line: line, col: col });
-                                } else {
-                                    if _is_ec == "," {
-                                        if len(_is_word) > 0 {
-                                            if is_digit(char_at(_is_word, 0)) {
-                                                push(tokens, Token { kind: TokenKind::Number { value: __to_number(_is_word) }, text: _is_word, line: line, col: col });
-                                            } else {
-                                                push(tokens, Token { kind: TokenKind::Ident { name: _is_word }, text: _is_word, line: line, col: col });
-                                            };
-                                            let _is_word = "";
-                                        };
-                                        push(tokens, Token { kind: TokenKind::Symbol { ch: "," }, text: ",", line: line, col: col });
-                                    } else {
-                                        let _is_word = _is_word + _is_ec;
-                                    };
-                                };
+                                // Accumulate word character
+                                let _is_word = _is_word + _is_ec;
                             };
                         };
                         let _is_ei = _is_ei + 1;
