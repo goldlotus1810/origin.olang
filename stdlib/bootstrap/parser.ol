@@ -805,6 +805,10 @@ fn parse_match_expr(p) {
         if _ma_idx == 1 { let __g_ma1_pat = pattern; let __g_ma1_bs = _ma_body_start; let __g_ma1_be = _ma_body_end; };
         if _ma_idx == 2 { let __g_ma2_pat = pattern; let __g_ma2_bs = _ma_body_start; let __g_ma2_be = _ma_body_end; };
         if _ma_idx == 3 { let __g_ma3_pat = pattern; let __g_ma3_bs = _ma_body_start; let __g_ma3_be = _ma_body_end; };
+        if _ma_idx == 4 { let __g_ma4_pat = pattern; let __g_ma4_bs = _ma_body_start; let __g_ma4_be = _ma_body_end; };
+        if _ma_idx == 5 { let __g_ma5_pat = pattern; let __g_ma5_bs = _ma_body_start; let __g_ma5_be = _ma_body_end; };
+        if _ma_idx == 6 { let __g_ma6_pat = pattern; let __g_ma6_bs = _ma_body_start; let __g_ma6_be = _ma_body_end; };
+        if _ma_idx == 7 { let __g_ma7_pat = pattern; let __g_ma7_bs = _ma_body_start; let __g_ma7_be = _ma_body_end; };
         let __g_ma_tokens = p.tokens;
         push(arms, MatchArm { pattern: pattern, bindings: bindings, body: body });
         if is_symbol_tok(peek(p), ",") { advance(p); };

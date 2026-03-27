@@ -1336,6 +1336,7 @@ fn compile_expr(state, expr) {
             emit_op(state, make_op_name("Store", subj_name));
             push_local(state, subj_name);
             let __g_mej0 = -1; let __g_mej1 = -1; let __g_mej2 = -1; let __g_mej3 = -1;
+            let __g_mej4 = -1; let __g_mej5 = -1; let __g_mej6 = -1; let __g_mej7 = -1;
             let ai = 0;
             let _m_num_arms = len(arms);
             while ai < _m_num_arms {
@@ -1347,6 +1348,10 @@ fn compile_expr(state, expr) {
                 if ai == 1 { let _m_pattern = __g_ma1_pat; let _m_body_s = __g_ma1_bs; let _m_body_e = __g_ma1_be; };
                 if ai == 2 { let _m_pattern = __g_ma2_pat; let _m_body_s = __g_ma2_bs; let _m_body_e = __g_ma2_be; };
                 if ai == 3 { let _m_pattern = __g_ma3_pat; let _m_body_s = __g_ma3_bs; let _m_body_e = __g_ma3_be; };
+                if ai == 4 { let _m_pattern = __g_ma4_pat; let _m_body_s = __g_ma4_bs; let _m_body_e = __g_ma4_be; };
+                if ai == 5 { let _m_pattern = __g_ma5_pat; let _m_body_s = __g_ma5_bs; let _m_body_e = __g_ma5_be; };
+                if ai == 6 { let _m_pattern = __g_ma6_pat; let _m_body_s = __g_ma6_bs; let _m_body_e = __g_ma6_be; };
+                if ai == 7 { let _m_pattern = __g_ma7_pat; let _m_body_s = __g_ma7_bs; let _m_body_e = __g_ma7_be; };
                 let _m_bindings = _m_bindings;
                 let _m_body = _m_body;
                 if _m_pattern != "_" {
@@ -1392,6 +1397,10 @@ fn compile_expr(state, expr) {
                     if ai == 1 { let __g_mej1 = _mej_pos; };
                     if ai == 2 { let __g_mej2 = _mej_pos; };
                     if ai == 3 { let __g_mej3 = _mej_pos; };
+                    if ai == 4 { let __g_mej4 = _mej_pos; };
+                    if ai == 5 { let __g_mej5 = _mej_pos; };
+                    if ai == 6 { let __g_mej6 = _mej_pos; };
+                    if ai == 7 { let __g_mej7 = _mej_pos; };
                     emit_jmp(state, 0);              // end-Jmp (patched later)
                     let _m_body_begin = current_pos(state);
                     patch_jump(state, _m_skip_jmp, _m_body_begin);
@@ -1418,6 +1427,10 @@ fn compile_expr(state, expr) {
                     if ai == 1 { let __g_mej1 = _mej_pos; };
                     if ai == 2 { let __g_mej2 = _mej_pos; };
                     if ai == 3 { let __g_mej3 = _mej_pos; };
+                    if ai == 4 { let __g_mej4 = _mej_pos; };
+                    if ai == 5 { let __g_mej5 = _mej_pos; };
+                    if ai == 6 { let __g_mej6 = _mej_pos; };
+                    if ai == 7 { let __g_mej7 = _mej_pos; };
                     emit_jmp(state, 0);
                     let _m_wbody_begin = current_pos(state);
                     patch_jump(state, _m_wskip, _m_wbody_begin);
@@ -1443,6 +1456,10 @@ fn compile_expr(state, expr) {
             if __g_mej1 >= 0 { patch_jump(state, __g_mej1, _m_end); };
             if __g_mej2 >= 0 { patch_jump(state, __g_mej2, _m_end); };
             if __g_mej3 >= 0 { patch_jump(state, __g_mej3, _m_end); };
+            if __g_mej4 >= 0 { patch_jump(state, __g_mej4, _m_end); };
+            if __g_mej5 >= 0 { patch_jump(state, __g_mej5, _m_end); };
+            if __g_mej6 >= 0 { patch_jump(state, __g_mej6, _m_end); };
+            if __g_mej7 >= 0 { patch_jump(state, __g_mej7, _m_end); };
         },
         Expr::Lambda { params, body } => {
             // Lambda expression: fn(params) { body } → emit Closure like FnDef but no Store
