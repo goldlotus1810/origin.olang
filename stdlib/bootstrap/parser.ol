@@ -965,6 +965,10 @@ pub fn parse_stmt(p) {
         if _g_for_depth == 1 { let __g_fv1 = _ps_fvar; };
         if _g_for_depth == 2 { let __g_fv2 = _ps_fvar; };
         if _g_for_depth == 3 { let __g_fv3 = _ps_fvar; };
+        if _g_for_depth == 4 { let __g_fv4 = _ps_fvar; };
+        if _g_for_depth == 5 { let __g_fv5 = _ps_fvar; };
+        if _g_for_depth == 6 { let __g_fv6 = _ps_fvar; };
+        if _g_for_depth == 7 { let __g_fv7 = _ps_fvar; };
         // expect "in" keyword
         advance(p);
         // Save iter token range (iter Expr gets corrupted by inner ForStmt dicts)
@@ -975,6 +979,10 @@ pub fn parse_stmt(p) {
         if _g_for_depth == 1 { let __g_fi1s = _ps_fi_start; let __g_fi1e = _ps_fi_end; };
         if _g_for_depth == 2 { let __g_fi2s = _ps_fi_start; let __g_fi2e = _ps_fi_end; };
         if _g_for_depth == 3 { let __g_fi3s = _ps_fi_start; let __g_fi3e = _ps_fi_end; };
+        if _g_for_depth == 4 { let __g_fi4s = _ps_fi_start; let __g_fi4e = _ps_fi_end; };
+        if _g_for_depth == 5 { let __g_fi5s = _ps_fi_start; let __g_fi5e = _ps_fi_end; };
+        if _g_for_depth == 6 { let __g_fi6s = _ps_fi_start; let __g_fi6e = _ps_fi_end; };
+        if _g_for_depth == 7 { let __g_fi7s = _ps_fi_start; let __g_fi7e = _ps_fi_end; };
         let __g_fi_tokens = p.tokens;
         let _g_for_depth = _g_for_depth + 1;
         let _ps_fbody = parse_block(p);

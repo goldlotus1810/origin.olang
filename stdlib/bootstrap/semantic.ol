@@ -1781,6 +1781,10 @@ fn compile_stmt(state, stmt) {
             if _g_for_depth == 1 { let _fl_var = __g_fv1; let _fl_is = __g_fi1s; let _fl_ie = __g_fi1e; };
             if _g_for_depth == 2 { let _fl_var = __g_fv2; let _fl_is = __g_fi2s; let _fl_ie = __g_fi2e; };
             if _g_for_depth == 3 { let _fl_var = __g_fv3; let _fl_is = __g_fi3s; let _fl_ie = __g_fi3e; };
+            if _g_for_depth == 4 { let _fl_var = __g_fv4; let _fl_is = __g_fi4s; let _fl_ie = __g_fi4e; };
+            if _g_for_depth == 5 { let _fl_var = __g_fv5; let _fl_is = __g_fi5s; let _fl_ie = __g_fi5e; };
+            if _g_for_depth == 6 { let _fl_var = __g_fv6; let _fl_is = __g_fi6s; let _fl_ie = __g_fi6e; };
+            if _g_for_depth == 7 { let _fl_var = __g_fv7; let _fl_is = __g_fi7s; let _fl_ie = __g_fi7e; };
             // Lower for-in to while loop with UNIQUE names per depth
             let _fl_d = __to_string(_g_for_depth);
             let _fl_arr = "__for_" + _fl_d + "_arr";
@@ -1849,6 +1853,10 @@ fn compile_stmt(state, stmt) {
             if _fl_my_depth == 1 { let __g_fl_inc1 = _fl_inc; let __g_fl_jz1 = _fl_jz; };
             if _fl_my_depth == 2 { let __g_fl_inc2 = _fl_inc; let __g_fl_jz2 = _fl_jz; };
             if _fl_my_depth == 3 { let __g_fl_inc3 = _fl_inc; let __g_fl_jz3 = _fl_jz; };
+            if _fl_my_depth == 4 { let __g_fl_inc4 = _fl_inc; let __g_fl_jz4 = _fl_jz; };
+            if _fl_my_depth == 5 { let __g_fl_inc5 = _fl_inc; let __g_fl_jz5 = _fl_jz; };
+            if _fl_my_depth == 6 { let __g_fl_inc6 = _fl_inc; let __g_fl_jz6 = _fl_jz; };
+            if _fl_my_depth == 7 { let __g_fl_inc7 = _fl_inc; let __g_fl_jz7 = _fl_jz; };
 
             // Compile body (save/restore for nested for loops)
             let _fl_bi = 0;
@@ -1867,6 +1875,10 @@ fn compile_stmt(state, stmt) {
             if _fl_rd == 1 { let _fl_inc = __g_fl_inc1; let _fl_jz = __g_fl_jz1; };
             if _fl_rd == 2 { let _fl_inc = __g_fl_inc2; let _fl_jz = __g_fl_jz2; };
             if _fl_rd == 3 { let _fl_inc = __g_fl_inc3; let _fl_jz = __g_fl_jz3; };
+            if _fl_rd == 4 { let _fl_inc = __g_fl_inc4; let _fl_jz = __g_fl_jz4; };
+            if _fl_rd == 5 { let _fl_inc = __g_fl_inc5; let _fl_jz = __g_fl_jz5; };
+            if _fl_rd == 6 { let _fl_inc = __g_fl_inc6; let _fl_jz = __g_fl_jz6; };
+            if _fl_rd == 7 { let _fl_inc = __g_fl_inc7; let _fl_jz = __g_fl_jz7; };
 
             // Patch continue → increment section
             let _fl_cp = 0;
