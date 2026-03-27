@@ -1383,6 +1383,12 @@ op_call:
     je      .call_f64_to_le_bytes
     jmp     .call_not_builtin
 
+.builtin_slot_94:
+    movabs  $0x4D895C13E625765E, %rdx
+    cmp     %rdx, %rax
+    je      .call_stdout_off
+    jmp     .call_not_builtin
+
 .builtin_slot_95:
     movabs  $0x79C07AA57E23765F, %rdx
     cmp     %rdx, %rax
@@ -1708,6 +1714,12 @@ op_call:
     movabs  $0x7551B73312F1D4D4, %rdx
     cmp     %rdx, %rax
     je      .call_bit_and
+    jmp     .call_not_builtin
+
+.builtin_slot_228:
+    movabs  $0x33D6385F6238A2E4, %rdx
+    cmp     %rdx, %rax
+    je      .call_stdout_on
     jmp     .call_not_builtin
 
 .builtin_slot_233:
@@ -7319,6 +7331,51 @@ op_ret:
     add     %rcx, %r13
     jmp     op_file_write
 
+# __stdout_off() → saved_fd (dup stdout, redirect to /dev/null)
+.call_stdout_off:
+    add     %rcx, %r13
+    mov     $1, %edi
+    mov     $32, %eax                   # SYS_dup
+    syscall
+    mov     %eax, %r8d                  # saved fd
+    lea     dev_null_path(%rip), %rdi
+    mov     $1, %esi                    # O_WRONLY
+    xor     %edx, %edx
+    mov     $2, %eax                    # SYS_open
+    syscall
+    mov     %eax, %r9d                  # null fd
+    mov     %r9d, %edi
+    mov     $1, %esi
+    mov     $33, %eax                   # SYS_dup2
+    syscall
+    mov     %r9d, %edi
+    mov     $3, %eax                    # SYS_close
+    syscall
+    cvtsi2sd %r8d, %xmm0
+    sub     $16, %r14
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+# __stdout_on(saved_fd) → restore stdout
+.call_stdout_on:
+    add     %rcx, %r13
+    movq    (%r14), %xmm0
+    add     $16, %r14
+    cvttsd2si %xmm0, %edi
+    push    %rdi
+    mov     $1, %esi
+    mov     $33, %eax                   # SYS_dup2
+    syscall
+    pop     %rdi
+    mov     $3, %eax                    # SYS_close
+    syscall
+    sub     $16, %r14
+    xor     %eax, %eax
+    mov     %rax, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
 .call_file_append:
     add     %rcx, %r13
     jmp     op_file_append
@@ -10173,6 +10230,7 @@ print_hex_u64:
 
 .section .rodata
 
+dev_null_path: .asciz "/dev/null"
 proc_self_exe:
     .asciz "/proc/self/exe"
 
@@ -10674,7 +10732,7 @@ builtin_jump_table:
     .quad   .builtin_slot_91
     .quad   .call_not_builtin
     .quad   .call_not_builtin
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_94
     .quad   .builtin_slot_95
     .quad   .call_not_builtin
     .quad   .builtin_slot_97
@@ -10808,7 +10866,7 @@ builtin_jump_table:
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .call_not_builtin
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_228
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .call_not_builtin
