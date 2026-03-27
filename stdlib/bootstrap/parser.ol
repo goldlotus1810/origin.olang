@@ -514,7 +514,20 @@ fn parse_primary(p) {
                     };
                 };
                 expect_symbol(p, "]");
-                return Expr::ArrayLit { items: items };
+                // Check for postfix [index] on array literal: [1,2,3][0]
+                let _pa_arr = Expr::ArrayLit { items: items };
+                if is_symbol_tok(peek(p), "[") {
+                    advance(p);
+                    push(_pb_stack, _pa_arr);
+                    let _pa_idx = parse_expr(p);
+                    let _pa_arr_saved = pop(_pb_stack);
+                    expect_symbol(p, "]");
+                    let _pa_idx_args = [];
+                    push(_pa_idx_args, _pa_arr_saved);
+                    push(_pa_idx_args, _pa_idx);
+                    return Expr::Call { callee: Expr::Ident { name: "__array_get" }, args: _pa_idx_args };
+                };
+                return _pa_arr;
             };
             // Molecular literal: { S=1 R=2 V=128 A=128 T=3 }
             // Also handles dict literal attempt: { key: val } → error + skip
