@@ -146,6 +146,7 @@ pub fn repl_eval(input) {
   if src == "diagnose" || src == "diag" { return self_diagnostic(); }
   if src == "benchmark" || src == "bench" { return self_benchmark(); }
   if src == "selftest" { return self_test(); }
+  if src == "spider" { return spider(); }
 
   // Respond command: full agent pipeline with memory → response
   if len(src) > 8 {
