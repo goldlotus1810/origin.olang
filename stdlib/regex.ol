@@ -313,41 +313,19 @@ fn _rx_run(_r_s, _r_start, _r_text, _r_from) {
 }
 
 pub fn regex_debug() {
-    // Test 1: direct push (works)
-    let s1 = [0];
-    let c1 = char_at("abc", 0);
-    let _ = __array_push(s1, 0);
-    let _ = __array_push(s1, c1);
-    let r1 = "t1:" + s1[2];
-
-    // Test 2: with if branches before push
-    let s2 = [0];
-    let c2 = char_at("abc", 0);
-    if c2 == "(" { return "bad"; };
-    if c2 == "[" { return "bad"; };
-    if c2 == "." { return "bad"; };
-    let _ = __array_push(s2, 0);
-    let _ = __array_push(s2, c2);
-    let r2 = "t2:" + s2[2];
-
-    // Test 3a: just pi[0] + 1 (no set_at)
-    let s3a = [0];
-    let pi3a = [0];
-    let c3a = char_at("abc", pi3a[0]);
-    if c3a == "(" { return "bad"; };
-    let _upd3a = pi3a[0] + 1;
-    let _ = __array_push(s3a, 0);
-    let _ = __array_push(s3a, c3a);
-    let r3a = "t3a:" + s3a[2] + "(upd=" + __to_string(_upd3a) + ")";
-
-    // Test 3b: with id3 (no set_at)
-    let s3b = [0];
-    let c3b = char_at("abc", 0);
-    if c3b == "(" { return "bad"; };
-    let id3b = s3b[0];
-    let _ = __array_push(s3b, 0);
-    let _ = __array_push(s3b, c3b);
-    let r3b = "t3b:" + s3b[2];
-
-    return r1 + " " + r2 + " " + r3a + " " + r3b;
+    let p = "abc";
+    let s = [0];
+    let pi = [0];
+    let c = char_at(p, pi[0]);
+    // Single check instead of multiple if-returns (3+ if-returns corrupts locals)
+    let _is_meta = 0;
+    if c == ")" { _is_meta = 1; };
+    if c == "|" { _is_meta = 1; };
+    if c == "(" { _is_meta = 1; };
+    if c == "[" { _is_meta = 1; };
+    if c == "." { _is_meta = 1; };
+    if _is_meta == 1 { return "bad"; };
+    let _ = __array_push(s, 0);
+    let _ = __array_push(s, c);
+    return "c=" + c + " s2=" + s[2];
 }
