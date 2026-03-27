@@ -7,7 +7,7 @@ pub fn int_to_str(val) {
   let digits = "";
   while val > 0 {
     let d = val - (val / 10) * 10;  // val % 10
-    digits = char_from_code(48 + d) + digits;
+    digits = __chr(48 + d) + digits;
     val = val / 10;
   }
   if neg { return "-" + digits; }
@@ -19,7 +19,7 @@ pub fn f64_to_str(val, decimals) {
   let neg = val < 0.0;
   if neg { val = 0.0 - val; }
 
-  let int_part = floor(val);
+  let int_part = __floor(val);
   let frac_part = val - int_part;
 
   let result = int_to_str(int_part);
@@ -29,7 +29,7 @@ pub fn f64_to_str(val, decimals) {
   let i = 0;
   while i < decimals {
     frac_part = frac_part * 10.0;
-    let digit = floor(frac_part);
+    let digit = __floor(frac_part);
     if digit > 9 { digit = 9; }
     result = result + int_to_str(digit);
     frac_part = frac_part - digit;
@@ -68,13 +68,13 @@ pub fn hex(val) {
 
 pub fn to_string(val) {
   // Generic to_string: detect type and convert
-  if typeof(val) == "number" {
-    if val == floor(val) { return int_to_str(val); }
+  if type_of(val) == "number" {
+    if val == __floor(val) { return int_to_str(val); }
     return f64_to_str(val, 6);
   }
   return "" + val;
 }
 
-fn char_from_code(code) {
+fn __chr(code) {
   return __chr(code);
 }

@@ -1510,17 +1510,13 @@ fn compile_stmt(state, stmt) {
                 let _ = set_at(_ce_locals, 0, _ls_name);
                 let _ = set_at(_ce_lc, 0, 1);
             } else {
-                // Check if name exists in _ce_locals[0.._ls_cnt]
-                // Use array scan via contains() on a sub-view
+                // Check if name exists in _ce_locals[0.._ls_cnt] — full scan (was 8-entry limit)
                 let _ls_fb2 = [0];
-                if _ls_cnt >= 1 { if __array_get(_ce_locals, _ls_cnt - 1) == _ls_name { let _ = set_at(_ls_fb2, 0, 1); }; };
-                if _ls_cnt >= 2 { if __array_get(_ce_locals, _ls_cnt - 2) == _ls_name { let _ = set_at(_ls_fb2, 0, 1); }; };
-                if _ls_cnt >= 3 { if __array_get(_ce_locals, _ls_cnt - 3) == _ls_name { let _ = set_at(_ls_fb2, 0, 1); }; };
-                if _ls_cnt >= 4 { if __array_get(_ce_locals, _ls_cnt - 4) == _ls_name { let _ = set_at(_ls_fb2, 0, 1); }; };
-                if _ls_cnt >= 5 { if __array_get(_ce_locals, _ls_cnt - 5) == _ls_name { let _ = set_at(_ls_fb2, 0, 1); }; };
-                if _ls_cnt >= 6 { if __array_get(_ce_locals, _ls_cnt - 6) == _ls_name { let _ = set_at(_ls_fb2, 0, 1); }; };
-                if _ls_cnt >= 7 { if __array_get(_ce_locals, _ls_cnt - 7) == _ls_name { let _ = set_at(_ls_fb2, 0, 1); }; };
-                if _ls_cnt >= 8 { if __array_get(_ce_locals, _ls_cnt - 8) == _ls_name { let _ = set_at(_ls_fb2, 0, 1); }; };
+                let _ls_si = _ls_cnt - 1;
+                while _ls_si >= 0 {
+                    if __array_get(_ce_locals, _ls_si) == _ls_name { let _ = set_at(_ls_fb2, 0, 1); _ls_si = 0 - 1; };
+                    _ls_si = _ls_si - 1;
+                };
                 if __array_get(_ls_fb2, 0) == 1 {
                     _warn("redefined: " + _ls_name);
                     emit_op(state, make_op_name("StoreUpdate", _ls_name));
@@ -1837,11 +1833,15 @@ fn compile_stmt(state, stmt) {
             if _fl_my_depth == 2 { let __g_fl_inc2 = _fl_inc; let __g_fl_jz2 = _fl_jz; };
             if _fl_my_depth == 3 { let __g_fl_inc3 = _fl_inc; let __g_fl_jz3 = _fl_jz; };
 
-            // Compile body
+            // Compile body (save/restore for nested for loops)
             let _fl_bi = 0;
             while _fl_bi < len(body) {
+                push(_ce_stack, body);
+                push(_ce_stack, _fl_bi);
                 compile_stmt(state, body[_fl_bi]);
-                let _fl_bi = _fl_bi + 1;
+                _fl_bi = pop(_ce_stack);
+                body = pop(_ce_stack);
+                _fl_bi = _fl_bi + 1;
             };
 
             // Restore _fl_inc and _fl_jz (re-compute depth from _g_for_depth)

@@ -1,5 +1,5 @@
 let ok = 1;
-let q = char_from_code(34);
+let q = __chr(34);
 let s = "{";
 let s = s + q;
 let s = s + "x";
