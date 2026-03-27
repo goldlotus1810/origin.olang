@@ -10519,6 +10519,8 @@ op_halt:
     add     $0x10000, %r15              # reserve 64KB
 
 .mcp_read_line:
+    # Note: heap checkpoint disabled for MCP — repl_eval allocates
+    # persistent closures that must not be freed between requests
     # Read one line from stdin (byte by byte into buffer)
     mov     mcp_buf(%rip), %r8          # buffer base
     xor     %ecx, %ecx                  # offset = 0
@@ -11461,6 +11463,8 @@ eval_offset:
     .space 8                            # current processing offset in buffer
 mcp_buf:
     .space 8                            # pointer to MCP line buffer on heap
+mcp_heap_checkpoint:
+    .space 8                            # heap pointer saved between MCP requests
 mcp_entered:
     .space 1                            # 1 = already entered MCP loop (skip pop)
 fwrite_flags:
