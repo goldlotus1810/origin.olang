@@ -1,0 +1,4 @@
+{"ts":"2026-03-27 15:55","type":"SESSION_START","msg":"booted with 51 facts"}
+{"ts":"2026-03-27 15:55","type":"LEARN","msg":"Auto-logging system created"}
+{"ts":"2026-03-27 15:55","type":"SESSION_START","msg":"booted with 51 facts"}
+{"ts":"2026-03-27 15:55","type":"QUERY","msg":"logging"}

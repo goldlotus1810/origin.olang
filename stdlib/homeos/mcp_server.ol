@@ -2,14 +2,17 @@
 // Called by VM --mcp mode for each stdin line
 
 let __mcp_booted = [0];
+let __mcp_session_id = [0];
 
 pub fn mcp_dispatch(_md_line) {
     if len(_md_line) == 0 { return ""; };
 
-    // Auto-load KnowTree on first call
+    // Auto-load KnowTree + init session on first call
     if __mcp_booted[0] == 0 {
         let _mb = __set_at(__mcp_booted, 0, 1);
         let _mb2 = kt_load("homeos.knowledge");
+        let _mb3 = __set_at(__mcp_session_id, 0, __timestamp());
+        _nox_log("SESSION_START", "booted with " + to_string(kt_fact_count()) + " facts");
     };
 
     // Extract method and id using string search (avoids var_table bug with nested JSON)
@@ -31,6 +34,10 @@ pub fn mcp_dispatch(_md_line) {
         let _md_fact = _mcp_extract_str(_md_line, "fact");
         let _md_question = _mcp_extract_str(_md_line, "question");
         let _md_text = _mcp_extract_str(_md_line, "text");
+        // Auto-log tool call
+        if _md_tool == "know_learn" { _nox_log("LEARN", _md_fact); };
+        if _md_tool == "know_query" { _nox_log("QUERY", _md_question); };
+        if _md_tool == "olang_eval" { _nox_log("EVAL", _md_code); };
         return _mcp_handle_call_direct(_md_id, _md_tool, _md_code, _md_fact, _md_question, _md_text);
     };
 
@@ -220,4 +227,17 @@ fn _mcp_extract_num(_en_text, _en_key) {
         _en_i = _en_i + 1;
     };
     return 0;
+}
+
+// Auto-log: append JSON line to nox_log.jsonl
+fn _nox_log(_nl_type, _nl_msg) {
+    let _nl_ts = _mcp_format_ts(__timestamp());
+    let _nl_line = "{\"ts\":\"" + _nl_ts + "\",\"type\":\"" + _nl_type + "\",\"msg\":\"" + _mcp_escape(_nl_msg) + "\"}";
+    // Read existing log + append new line + write back
+    let _nl_old = __file_read("nox_log.jsonl");
+    if len(_nl_old) > 0 {
+        __file_write("nox_log.jsonl", _nl_old + "\n" + _nl_line);
+    } else {
+        __file_write("nox_log.jsonl", _nl_line);
+    };
 }
