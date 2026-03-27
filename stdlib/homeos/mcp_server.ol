@@ -129,8 +129,9 @@ fn _mcp_handle_call_direct(_hc_id, _hc_tool, _hc_code, _hc_fact, _hc_question, _
 }
 
 fn _mcp_tool_eval(_te_id, _te_code) {
-    // TODO: repl_eval crashes in MCP context (var_table boot closure bug)
-    // For now, return the code as acknowledgement
+    // repl_eval works but __eval_bytecode Halt exits MCP trampoline
+    // Root cause: nested halt depth, not var_table bug
+    // Fix: need separate halt sentinel for eval-inside-MCP
     return _mcp_result(_te_id, "code received: " + _te_code);
 }
 
