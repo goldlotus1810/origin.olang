@@ -104,26 +104,7 @@ pub fn make_origin_header_arch(vm_off, vm_sz, bc_off, bc_sz, kn_off, kn_sz, flag
   return buf;
 }
 
-// ── Byte helpers ──
-
-fn push_bytes(buf, bytes) {
-  let i = 0;
-  while i < len(bytes) {
-    push(buf, bytes[i]);
-    i = i + 1;
-  }
-}
-
-fn push_u16(buf, val) {
-  push(buf, val % 256);
-  push(buf, (val / 256) % 256);
-}
-
-fn push_u32(buf, val) {
-  push(buf, val % 256);
-  push(buf, (val / 256) % 256);
-  push(buf, (val / 65536) % 256);
-  push(buf, (val / 16777216) % 256);
+// Byte helpers: use shared byte_utils.ol (push_bytes, push_u16, push_u32)
 }
 
 fn push_u64(buf, val) {

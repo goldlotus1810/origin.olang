@@ -168,16 +168,27 @@ pub fn tokenize(source) {
             continue;
         };
 
-        // String literals
+        // String literals (with escape sequences: \" \\ \n \t)
         if ch == "\"" {
             let start = pos;
             let start_col = col;
             let pos = pos + 1;
             let col = col + 1;
+            let _sl_val = "";
+            let _sl_has_esc = 0;
             while pos < src_len && char_at(source, pos) != "\"" {
                 if char_at(source, pos) == "\\" {
+                    let _sl_has_esc = 1;
                     let pos = pos + 1;
                     let col = col + 1;
+                    if pos < src_len {
+                        let _sl_ec = char_at(source, pos);
+                        if _sl_ec == "n" { _sl_val = _sl_val + "\n"; }
+                        else { if _sl_ec == "t" { _sl_val = _sl_val + "\t"; }
+                        else { _sl_val = _sl_val + _sl_ec; }; };
+                    };
+                } else {
+                    _sl_val = _sl_val + char_at(source, pos);
                 };
                 let pos = pos + 1;
                 let col = col + 1;
@@ -185,7 +196,9 @@ pub fn tokenize(source) {
             let pos = pos + 1; // closing quote
             let col = col + 1;
             let text = substr(source, start, pos);
-            let value = substr(source, start + 1, pos - 1);
+            // Use unescaped value if escape sequences found, otherwise raw substr
+            let value = _sl_val;
+            if _sl_has_esc == 0 { let value = substr(source, start + 1, pos - 1); };
             push(tokens, Token {
                 kind: TokenKind::StringLit { value: value },
                 text: text,

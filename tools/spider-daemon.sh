@@ -167,6 +167,7 @@ daemon_run() {
     echo "pass,fail,crash,total,timestamp" >> "$STATSFILE" 2>/dev/null
 
     local round=0
+    local last_hash=""
     while true; do
         round=$((round + 1))
         local total_p=0 total_f=0 total_c=0
@@ -177,6 +178,15 @@ daemon_run() {
             sleep 30
             continue
         fi
+
+        # Detect binary change — log rebuild
+        local cur_hash=$(md5sum "$BIN" 2>/dev/null | awk '{print $1}')
+        if [ -n "$last_hash" ] && [ "$cur_hash" != "$last_hash" ]; then
+            local size=$(wc -c < "$BIN")
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] REBUILD detected — new binary ($size bytes)" >> "$LOGFILE"
+            round=1
+        fi
+        last_hash="$cur_hash"
 
         # Run fixed tests
         read fp ff fc <<< $(run_fixed)

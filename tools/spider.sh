@@ -123,6 +123,13 @@ run_round() {
     run "json:arr" 'emit json_parse("[1,2,3]");' "[1, 2, 3]"
     run "json:num" 'emit json_parse("42");' "42"
     run "json:bool" 'emit json_parse("true");' "1"
+    run "json:obj" 'let j="{\"x\":42}"; emit json_get(json_parse(j),"x");' "42"
+    run "json:str" 'let j="\"hello\""; emit json_parse(j);' "hello"
+
+    # ── String escape ──
+    run "esc:quote" 'emit "hello \"world\"";' 'hello "world"'
+    run "esc:backslash" 'emit "a\\\\b";' 'a\\b'
+    run "esc:len" 'emit len("\"");' "1"
 
     # ── Edge cases ──
     run "edge:empty" 'emit len("");' "0"
