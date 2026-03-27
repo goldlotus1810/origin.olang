@@ -125,12 +125,12 @@ fn expect_symbol(p, sym) {
     match tok.kind {
         TokenKind::Symbol { ch } => {
             if ch != sym {
-                emit "Parse error: expected '" + sym + "' got '" + ch + "'";
+                emit "Parse error at line " + __to_string(tok.line) + ": expected '" + sym + "' got '" + ch + "'";
                 let _g_parse_error = 1;
             };
         },
         _ => {
-            emit "Parse error: expected symbol '" + sym + "'";
+            emit "Parse error at line " + __to_string(tok.line) + ": expected symbol '" + sym + "'";
             let _g_parse_error = 1;
         },
     };
@@ -149,7 +149,7 @@ fn expect_ident(p) {
                 TokenKind::Keyword { name } => { return name; },
                 _ => {},
             };
-            emit "Parse error: expected identifier at pos " + __to_string(p.pos) + " got '" + tok.text + "'";
+            emit "Parse error at line " + __to_string(tok.line) + ": expected identifier, got '" + tok.text + "'";
             let _g_parse_error = 1;
             return "";
         },
@@ -605,13 +605,13 @@ fn parse_primary(p) {
                 let packed = mol_new(s, r, v, a, t);
                 return Expr::MolLiteral { packed: packed };
             };
-            emit "Parse error: unexpected symbol '" + ch + "' at pos " + __to_string(p.pos) + " line " + __to_string(tok.line);
+            emit "Parse error at line " + __to_string(tok.line) + ": unexpected symbol '" + ch + "'";
             let _g_parse_error = 1;
             advance(p);
             return Expr::NumLit { value: 0 };
         },
         _ => {
-            emit "Parse error: unexpected token: " + tok.text + " at pos " + __to_string(p.pos);
+            emit "Parse error at line " + __to_string(tok.line) + ": unexpected token '" + tok.text + "'";
             let _g_parse_error = 1;
             advance(p);
             return Expr::NumLit { value: 0 };
