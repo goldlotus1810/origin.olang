@@ -9191,7 +9191,7 @@ loop_jit_cache:
 _save_rbx:
     .space 8                            # temp save for rbx
 scope_frame_ptrs:
-    .space 2048                         # 256 frame pointers × 8 bytes (max recursion depth)
+    .space 32768                        # 4096 frame pointers × 8 bytes (max recursion depth)
     .align 8
 try_stack:
     .space 256                          # 16 try frames × 16 bytes (catch_PC:8 + saved_r14:8)

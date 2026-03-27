@@ -131,6 +131,12 @@ run_round() {
     run "esc:backslash" 'emit "a\\\\b";' 'a\\b'
     run "esc:len" 'emit len("\"");' "1"
 
+    # ── TRO (Tail Recursion Optimization) ──
+    run "tro:count" 'fn c(n,a){if n==0{return a;};return c(n-1,a+1);}; emit c(10000,0);' "10000"
+    run "tro:sum" 'fn s(n,a){if n==0{return a;};return s(n-1,a+n);}; emit s(10000,0);' "50005000"
+    run "tro:fact" 'fn f(n,a){if n<2{return a;};return f(n-1,n*a);}; emit f(10,1);' "3628800"
+    run "tro:nontail" 'fn fib(n){if n<2{return n;};return fib(n-1)+fib(n-2);}; emit fib(10);' "55"
+
     # ── Dict with arrays (was SEGFAULT) ──
     run "dict:arr_val" 'emit {x: 1, y: [1,2,3]};' "{x: 1, y: [1, 2, 3]}"
     run "dict:struct" 'emit {rows: 2, data: [1,0,0,1]};' "{rows: 2, data: [1, 0, 0, 1]}"

@@ -26,6 +26,11 @@ let _g_for_depth = 0;
 let __g_for_vars = ["", "", "", "", "", "", "", ""];  // max 8 nesting levels
 let _g_semantic_comp_depth = 0;
 
+// ── TRO (Tail Recursion Optimization) context ──
+let _g_tro_fn = "";        // current function name (empty = not in fn)
+let _g_tro_params = [];    // current function parameter names
+let _g_tro_start = 0;      // bytecode position of function body start (after param stores)
+
 // ── IR Opcode representation ────────────────────────────────────
 // We represent opcodes as structs with an "op" tag string + args.
 // The Rust VM will interpret these when we bridge.
@@ -1524,6 +1529,13 @@ fn compile_stmt(state, stmt) {
                 push_local(state, _fn_params[_fn_pi]);
                 let _fn_pi = _fn_pi - 1;
             };
+            // Set TRO context (save previous)
+            let _fn_prev_tro_fn = _g_tro_fn;
+            let _fn_prev_tro_params = _g_tro_params;
+            let _fn_prev_tro_start = _g_tro_start;
+            let _g_tro_fn = _fn_name;
+            let _g_tro_params = _fn_params;
+            let _g_tro_start = current_pos(state);
             // Compile body
             let _fn_bi = 0;
             while _fn_bi < len(_fn_body) {
@@ -1534,6 +1546,10 @@ fn compile_stmt(state, stmt) {
             emit_op(state, make_op_name("Push", ""));
             emit_op(state, make_op_simple("Ret"));
             restore_locals(state, _fn_saved);
+            // Restore TRO context
+            let _g_tro_fn = _fn_prev_tro_fn;
+            let _g_tro_params = _fn_prev_tro_params;
+            let _g_tro_start = _fn_prev_tro_start;
             // Patch Closure body_len (in bytes)
             // Closure instruction = [0x25][param_count:1][body_len:4] = 6 bytes
             let _fn_body_len = current_pos(state) - _fn_closure_pos - 6;
@@ -1551,8 +1567,51 @@ fn compile_stmt(state, stmt) {
             emit_op(state, make_op_simple("Pop"));
         },
         Stmt::ReturnStmt { value } => {
-            compile_expr(state, value);
-            emit_op(state, make_op_simple("Ret"));
+            // TRO: if return value is a call to the SAME function → loop
+            let _rt_is_tro = 0;
+            if len(_g_tro_fn) > 0 {
+                match value {
+                    Expr::Call { callee, args } => {
+                        match callee {
+                            Expr::Ident { name } => {
+                                if name == _g_tro_fn {
+                                    if len(args) == len(_g_tro_params) {
+                                        let _rt_is_tro = 1;
+                                        // Compile args, store to params, jump to body start
+                                        let _rt_ai = 0;
+                                        let _rt_nargs = len(args);
+                                        // Compile all args first (before overwriting params)
+                                        while _rt_ai < _rt_nargs {
+                                            push(_ce_stack, args);
+                                            push(_ce_stack, _rt_ai);
+                                            push(_ce_stack, _rt_nargs);
+                                            compile_expr(state, args[_rt_ai]);
+                                            let _rt_nargs = pop(_ce_stack);
+                                            let _rt_ai = pop(_ce_stack);
+                                            let args = pop(_ce_stack);
+                                            let _rt_ai = _rt_ai + 1;
+                                        };
+                                        // Store args to params in reverse order
+                                        let _rt_pi = _rt_nargs - 1;
+                                        while _rt_pi >= 0 {
+                                            emit_op(state, make_op_name("Store", _g_tro_params[_rt_pi]));
+                                            let _rt_pi = _rt_pi - 1;
+                                        };
+                                        // Jump to function body start
+                                        emit_jmp(state, _g_tro_start);
+                                    };
+                                };
+                            },
+                            _ => {},
+                        };
+                    },
+                    _ => {},
+                };
+            };
+            if _rt_is_tro == 0 {
+                compile_expr(state, value);
+                emit_op(state, make_op_simple("Ret"));
+            };
         },
         Stmt::EmitStmt { expr } => {
             compile_expr(state, expr);
