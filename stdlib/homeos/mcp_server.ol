@@ -129,7 +129,9 @@ fn _mcp_handle_call_direct(_hc_id, _hc_tool, _hc_code, _hc_fact, _hc_question, _
 }
 
 fn _mcp_tool_eval(_te_id, _te_code) {
-    return _mcp_result(_te_id, "eval: " + _te_code);
+    let _te_repl = repl_eval(_te_code);
+    if len(_te_repl) == 0 { _te_repl = "(executed)"; };
+    return _mcp_result(_te_id, _te_repl);
 }
 
 fn _mcp_tool_learn(_tl_id, _tl_fact) {

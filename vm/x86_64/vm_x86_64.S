@@ -9514,6 +9514,7 @@ op_halt:
     # Sentinels: 0xDEAD_BEEF_CAFE_0001 = eval_bytecode, 0002 = REPL trampoline
     .equ NESTED_SENTINEL, 0xDEADBEEFCAFE0001
     .equ REPL_SENTINEL,   0xDEADBEEFCAFE0002
+    .equ MCP_SENTINEL,    0xDEADBEEFCAFE0003
     mov     (%rsp), %rax               # PEEK (not pop)
 
     movabs  $NESTED_SENTINEL, %rdx
@@ -9523,6 +9524,10 @@ op_halt:
     movabs  $REPL_SENTINEL, %rdx
     cmp     %rdx, %rax
     je      .halt_repl                  # REPL trampoline → restore + repl_loop
+
+    movabs  $MCP_SENTINEL, %rdx
+    cmp     %rdx, %rax
+    je      .halt_mcp                   # MCP trampoline → restore + mcp_read_line
 
     jmp     .halt_boot                  # not nested → boot completion
 
@@ -9538,6 +9543,14 @@ op_halt:
     pop     %r13                        # restore PC
     pop     %r12                        # restore bytecode base
     jmp     .repl_loop                  # back to REPL prompt
+
+.halt_mcp:
+    # MCP trampoline: pop sentinel + saved context, return to MCP loop
+    add     $8, %rsp                    # skip sentinel
+    pop     %rbx                        # restore bytecode size
+    pop     %r13                        # restore PC
+    pop     %r12                        # restore bytecode base
+    jmp     .mcp_read_line              # back to MCP stdin reader
 
 
 .halt_boot:
@@ -10085,11 +10098,11 @@ op_halt:
     mov     %r15, %rcx
     sub     %rdi, %rcx
 
-    # Execute as nested bytecode
+    # Execute as nested bytecode with MCP sentinel
     push    %r12
     push    %r13
     push    %rbx
-    movabs  $0xDEADBEEFCAFE0001, %rax   # NESTED_SENTINEL
+    movabs  $0xDEADBEEFCAFE0003, %rax   # MCP_SENTINEL
     push    %rax
 
     mov     %rdi, %r12                  # bytecode base = trampoline
