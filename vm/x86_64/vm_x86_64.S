@@ -103,6 +103,16 @@ _start:
     jmp     .do_open
 
 .not_eval:
+    # Check if argv[1] == "--mcp" (bytes: 2d 2d 6d 63 70 00)
+    mov     16(%rsp), %rdi
+    cmpl    $0x636d2d2d, (%rdi)         # "--mc" little-endian
+    jne     .not_mcp
+    movzwl  4(%rdi), %eax
+    cmp     $0x0070, %eax               # "p\0"
+    jne     .not_mcp
+    movb    $2, eval_mode(%rip)         # mode 2 = MCP
+    jmp     .open_self
+.not_mcp:
     mov     16(%rsp), %rdi              # argv[1] = filename
     jmp     .do_open
 .open_self:
@@ -9099,8 +9109,10 @@ op_halt:
     # Not nested — this is the boot completion.
 
     # Check eval_mode: if set, process stdin and exit (no REPL)
-    cmpb    $0, eval_mode(%rip)
-    jne     .eval_stdin
+    cmpb    $1, eval_mode(%rip)
+    je      .eval_stdin
+    cmpb    $2, eval_mode(%rip)
+    je      .mcp_stdin
 
     # Print greeting
     lea     msg_greeting(%rip), %rsi
@@ -9531,6 +9543,134 @@ op_halt:
     mov     $SYS_EXIT, %eax
     xor     %edi, %edi                  # exit code 0
     syscall
+
+# ── --mcp mode: read stdin line-by-line, call mcp_dispatch, loop ─────
+.mcp_stdin:
+    pop     %rax                        # pop halt value
+
+    # Allocate 64KB line buffer on heap (once)
+    cmpq    $0, mcp_buf(%rip)
+    jne     .mcp_read_line
+    mov     %r15, %rax
+    mov     %rax, mcp_buf(%rip)
+    add     $0x10000, %r15              # reserve 64KB
+
+.mcp_read_line:
+    # Read one line from stdin (byte by byte into buffer)
+    mov     mcp_buf(%rip), %r8          # buffer base
+    xor     %ecx, %ecx                  # offset = 0
+.mcp_read_byte:
+    lea     (%r8, %rcx), %rsi          # buf + offset
+    mov     $1, %edx                    # read 1 byte
+    xor     %edi, %edi                  # fd = stdin
+    push    %rcx
+    push    %r8
+    mov     $SYS_READ, %eax
+    syscall
+    pop     %r8
+    pop     %rcx
+    test    %rax, %rax
+    jle     .eval_exit                  # EOF or error → exit
+    cmpb    $0x0A, (%r8, %rcx)         # newline?
+    je      .mcp_got_line
+    inc     %ecx
+    cmp     $0xFFF0, %ecx              # safety limit
+    jge     .mcp_got_line
+    jmp     .mcp_read_byte
+
+.mcp_got_line:
+    # rcx = line length (not including \n)
+    test    %ecx, %ecx
+    jz      .mcp_read_line             # skip empty lines
+
+    # Strip \r if present
+    cmpb    $0x0D, -1(%r8, %rcx)
+    jne     .mcp_no_cr
+    dec     %ecx
+    test    %ecx, %ecx
+    jz      .mcp_read_line
+.mcp_no_cr:
+
+    # Look up mcp_dispatch function
+    mov     %r8, %rdi                   # line ptr
+    mov     %rcx, %r9                   # save line length
+    push    %r9
+    push    %r8
+    lea     bname_mcp_dispatch(%rip), %rdi
+    mov     $12, %edx                   # len("mcp_dispatch")
+    call    hash_name
+    call    var_load_hash
+    mov     %rdx, %rsi
+    and     $0xFFFF, %esi
+    pop     %r8                         # restore line ptr
+    pop     %r9                         # restore line len
+    cmp     $CLOSURE_MARKER, %si
+    jne     .mcp_read_line              # mcp_dispatch not found → skip
+
+    # Build trampoline: Push(line_string) → CallClosure(mcp_dispatch, 1) → Emit → Halt
+    mov     %r15, %rdi                  # trampoline base
+    push    %rdi
+    movb    $0x01, (%r15)               # Push opcode
+    movw    %r9w, 1(%r15)               # mol_count = string length
+    add     $3, %r15
+
+    # Encode each byte as string molecule (0x2100 | byte)
+    xor     %ecx, %ecx
+.mcp_encode_loop:
+    cmp     %r9d, %ecx
+    jge     .mcp_encode_done
+    movzbl  (%r8, %rcx), %eax
+    or      $0x2100, %eax
+    movw    %ax, (%r15)
+    add     $2, %r15
+    inc     %ecx
+    jmp     .mcp_encode_loop
+.mcp_encode_done:
+
+    # CallClosure "mcp_dispatch" arity=1
+    movb    $0x24, (%r15)               # CallClosure opcode
+    movb    $12, 1(%r15)                # name length
+    push    %r9
+    lea     bname_mcp_dispatch(%rip), %rsi
+    lea     2(%r15), %rdi
+    mov     $12, %ecx
+    rep     movsb
+    pop     %r9
+    movb    $1, 14(%r15)               # arity = 1
+    add     $15, %r15
+
+    # Emit + Halt
+    movb    $0x06, (%r15)               # Emit
+    inc     %r15
+    # Write newline after emit (MCP needs \n delimiter)
+    movb    $0x01, (%r15)               # Push
+    movw    $1, 1(%r15)                 # mol_count = 1
+    add     $3, %r15
+    movw    $0x210A, (%r15)             # newline char molecule
+    add     $2, %r15
+    movb    $0x06, (%r15)               # Emit newline
+    inc     %r15
+    movb    $0x0F, (%r15)               # Halt
+    inc     %r15
+
+    # Calculate trampoline size
+    pop     %rdi                        # trampoline base
+    mov     %r15, %rcx
+    sub     %rdi, %rcx
+
+    # Execute as nested bytecode
+    push    %r12
+    push    %r13
+    push    %rbx
+    movabs  $0xDEADBEEFCAFE0001, %rax
+    push    %rax
+
+    mov     %rdi, %r12                  # bytecode base = trampoline
+    xor     %r13d, %r13d               # PC = 0
+    mov     $0x100000, %rbx
+    jmp     vm_loop
+    # Flow: trampoline → Halt(nested) → .halt_nested → restore
+    #       → boot Halt → .mcp_stdin → .mcp_read_line (loop)
 
 .repl_exit:
     # Print goodbye
@@ -9992,6 +10132,7 @@ str_comma_sp:    .ascii ", "
 
 # ── REPL function name ──────────────────────────────────────────────────
 bname_repl_eval: .ascii "repl_eval"
+bname_mcp_dispatch: .ascii "mcp_dispatch"
 
 
 # ── BUILTIN JUMP TABLE (256 entries × 8 bytes = 2KB) ──────────────────
@@ -10354,6 +10495,8 @@ eval_total:
     .space 8                            # total bytes read from stdin
 eval_offset:
     .space 8                            # current processing offset in buffer
+mcp_buf:
+    .space 8                            # pointer to MCP line buffer on heap
 jit_cache:
     .space 512                          # 32 slots × [hash:8][ptr:8] = 16 bytes each
 profile_counters:
