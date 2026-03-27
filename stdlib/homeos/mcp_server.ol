@@ -1,8 +1,16 @@
 // homeos/mcp_server.ol — MCP Protocol Handler (JSON-RPC 2.0 over stdio)
 // Called by VM --mcp mode for each stdin line
 
+let __mcp_booted = [0];
+
 pub fn mcp_dispatch(_md_line) {
     if len(_md_line) == 0 { return ""; };
+
+    // Auto-load KnowTree on first call
+    if __mcp_booted[0] == 0 {
+        let _mb = __set_at(__mcp_booted, 0, 1);
+        let _mb2 = kt_load("homeos.knowledge");
+    };
 
     // Extract method and id using string search (avoids var_table bug with nested JSON)
     let _md_method = _mcp_extract_str(_md_line, "method");
