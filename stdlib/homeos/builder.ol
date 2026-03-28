@@ -114,7 +114,8 @@ fn compile_dir(_cd_dir, _cd_output) {
     // Skip known-crashing files in --build mode (compiler limitation)
     let _cd_skip = 0;
     if len(__str_find(_cd_fname, "sort.ol")) > 0 { _cd_skip = 1; };
-    if len(__str_find(_cd_fname, "editor/main")) > 0 { _cd_skip = 1; };
+    if len(__str_find(_cd_fname, "_compile_one")) > 0 { _cd_skip = 1; };
+    if len(__str_find(_cd_fname, "_run_compile")) > 0 { _cd_skip = 1; };
     if _cd_skip == 1 { emit "  " + _cd_fname + " → SKIP (known)"; _cd_i = _cd_i + 1; } else {
     emit "  [#" + __to_string(_cd_i) + " heap=" + __to_string(__heap_used()) + "]";
     let _cd_src = file_read_string(_cd_fname);
