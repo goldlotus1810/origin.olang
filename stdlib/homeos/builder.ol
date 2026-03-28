@@ -129,12 +129,17 @@ let _cd_max_files = [999];   // Set to N for testing, 999 for unlimited
 fn compile_dir(_xcd_dir, _xcd_output) {
   let _xcd_flist = list_ol_files(_xcd_dir);
   let _xcd_idx = 0;
-  while _xcd_idx < len(_xcd_flist) {
-    let _xcd_fname = _xcd_flist[_xcd_idx];
-    let _xcd_src = file_read_string(_xcd_fname);
+  let _xcd_total = len(_xcd_flist);
+  while _xcd_idx < _xcd_total {
+    // Re-read file list each iteration (compile_source corrupts heap strings)
+    emit "    dir=" + _xcd_dir + " len=" + __to_string(len(_xcd_dir));
+    let _xcd_fresh = list_ol_files(_xcd_dir);
+    emit "    fresh files=" + __to_string(len(_xcd_fresh));
+    let _xcd_src = __file_read(_xcd_fresh[_xcd_idx]);
+    emit "    src len=" + __to_string(len(_xcd_src));
     let _xcd_bc = compile_source(_xcd_src);
     let _xcd_bclen = len(_xcd_bc);
-    emit "  " + _xcd_fname + " → " + __to_string(_xcd_bclen) + " bytes";
+    emit "  #" + __to_string(_xcd_idx) + " → " + __to_string(_xcd_bclen) + " bytes";
     if _xcd_bclen > 0 {
       if __floor(_xcd_bc[_xcd_bclen - 1]) == 15 { set_at(_xcd_bc, _xcd_bclen - 1, 18); };
       let _xcd_base = len(_xcd_output);
