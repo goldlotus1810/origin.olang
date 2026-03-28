@@ -1490,23 +1490,46 @@ fn compile_expr(state, expr) {
             let _lm_pcnt = len(_lm_params);
             let _lm_closure_pos = current_pos(state);
             emit_op(state, make_op_num("Closure", _lm_pcnt));
-            // Store params (reversed for stack order)
+            // Register frame for lambda
+            let _lm_slot_map = [];
+            _emit_byte(state, 0x28);               // EnterFrame
+            let _lm_enter_pos = current_pos(state);
+            _emit_byte(state, _lm_pcnt);
+            // Save outer register state
+            push(_ce_stack, __g_fn_slot_map);
+            push(_ce_stack, __g_fn_in_function);
+            // Store params into registers + var_table
             let _lm_saved = save_locals(state);
             let _lm_pi = _lm_pcnt - 1;
             while _lm_pi >= 0 {
+                push(_lm_slot_map, _lm_params[_lm_pi]);
+                emit_op(state, make_op_simple("Dup"));
+                _emit_byte(state, 0x27);
+                _emit_byte(state, len(_lm_slot_map) - 1);
                 emit_op(state, make_op_name("Store", _lm_params[_lm_pi]));
                 push_local(state, _lm_params[_lm_pi]);
                 let _lm_pi = _lm_pi - 1;
             };
+            let __g_fn_slot_map = _lm_slot_map;
+            let __g_fn_in_function = 1;
             // Compile body
             let _lm_bi = 0;
             while _lm_bi < len(_lm_body) {
                 compile_stmt(state, _lm_body[_lm_bi]);
                 let _lm_bi = _lm_bi + 1;
             };
-            // Default return
+            // Default return with LeaveFrame
             emit_op(state, make_op_name("Push", ""));
+            _emit_byte(state, 0x29);               // LeaveFrame
             emit_op(state, make_op_simple("Ret"));
+            // Patch EnterFrame slot count
+            let _lm_total = len(__g_fn_slot_map);
+            if _lm_total > _lm_pcnt {
+                set_at(_g_output, _lm_enter_pos, _lm_total);
+            };
+            // Restore outer register state
+            let __g_fn_in_function = pop(_ce_stack);
+            let __g_fn_slot_map = pop(_ce_stack);
             restore_locals(state, _lm_saved);
             // Patch body_len
             let _lm_body_len = current_pos(state) - _lm_closure_pos - 6;
@@ -1611,6 +1634,8 @@ fn compile_stmt(state, stmt) {
             };
             // Save register state for nested fn compilation
             push(_ce_stack, _fn_slot_map);
+            push(_ce_stack, __g_fn_in_function);
+            push(_ce_stack, __g_fn_slot_map);
             let __g_fn_slot_map = _fn_slot_map;
             let __g_fn_in_function = 1;
             // Set TRO context (save previous)
@@ -1630,10 +1655,11 @@ fn compile_stmt(state, stmt) {
             emit_op(state, make_op_name("Push", ""));
             _emit_byte(state, 0x29);               // LeaveFrame
             emit_op(state, make_op_simple("Ret"));
-            let __g_fn_in_function = 0;
-            _fn_slot_map = pop(_ce_stack);
-            // Patch EnterFrame slot count (may have grown with let locals)
+            // Restore outer function's register state
             let _fn_total_slots = len(__g_fn_slot_map);
+            let __g_fn_slot_map = pop(_ce_stack);
+            let __g_fn_in_function = pop(_ce_stack);
+            _fn_slot_map = pop(_ce_stack);
             if _fn_total_slots > _fn_pcnt {
                 set_at(_g_output, _fn_enter_pos, _fn_total_slots);
             };
