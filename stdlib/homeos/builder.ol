@@ -111,7 +111,8 @@ fn compile_dir(_cd_dir, _cd_output) {
   let _cd_i = 0;
   while _cd_i < len(_cd_files) {
     let _cd_fname = _cd_files[_cd_i];
-    let _cd_bc = compile_source_file(_cd_fname);
+    let _cd_src = file_read_string(_cd_fname);
+    let _cd_bc = compile_source(_cd_src);
     let _cd_bclen = len(_cd_bc);
     emit "  " + _cd_fname + " → " + __to_string(_cd_bclen) + " bytes";
     if _cd_bclen > 0 {
@@ -121,15 +122,18 @@ fn compile_dir(_cd_dir, _cd_output) {
   };
 };
 
-fn compile_source_file(_csf_path) {
-  // Write path to temp, run compile subprocess
-  emit "    compiling: " + _csf_path;
-  __file_write("/tmp/_olang_src_path.tmp", _csf_path);
-  let _csf_cmd = "sh stdlib/homeos/_run_compile.sh";
-  emit "    running subprocess...";
-  __system(_csf_cmd);
-  emit "    reading result...";
-  return __file_read("/tmp/_olang_bc.tmp");
+fn compile_source(_cs_src) {
+  reset_compiler();
+  let _cs_tokens = tokenize(_cs_src);
+  let _cs_ntok = len(_cs_tokens);
+  let _cs_parser = { tokens: _cs_tokens, pos: 0 };
+  let _cs_ast = [];
+  while _cs_parser.pos < _cs_ntok {
+    let _cs_peek = _cs_tokens[_cs_parser.pos];
+    if _cs_peek.text == "" { _cs_parser.pos = _cs_ntok; }
+    else { push(_cs_ast, parse_stmt(_cs_parser)); };
+  };
+  return compile_isolated(_cs_ast);
 };
 
 fn list_ol_files(_lof_dir) {

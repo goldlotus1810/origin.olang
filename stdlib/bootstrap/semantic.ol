@@ -35,6 +35,7 @@ let _g_warn_count = [0];
 let _g_output = [];
 let _g_pos = 0;
 let _g_for_depth = 0;
+let _g_ci_box = [0, 0];
 let __g_for_vars = ["", "", "", "", "", "", "", ""];  // max 8 nesting levels
 let _g_semantic_comp_depth = 0;
 
@@ -128,7 +129,7 @@ fn new_state() {
 // Direct bytecode emission — no IR buffer, no heap corruption
 fn _emit_byte(state, _eb_val) {
     set_at(_g_output, _g_pos, _eb_val);
-    let _g_pos = _g_pos + 1;
+    _g_pos = _g_pos + 1;
 }
 
 fn _emit_u32_le(state, _eu_val) {
@@ -2221,6 +2222,11 @@ pub fn analyze(ast) {
     // Validate
     validate(state);
 
+    // Save _g_pos and _g_output ref to box for compile_isolated
+    set_at(_g_ci_box, 0, _g_pos);
+    if len(_g_ci_box) < 2 { push(_g_ci_box, _g_output); }
+    else { set_at(_g_ci_box, 1, _g_output); };
+
     return state;
 }
 
@@ -2244,8 +2250,7 @@ pub fn reset_compiler() {
     let _g_pos = 0;
 }
 
-// Mutable box for passing compile result size through scope boundaries
-let _g_ci_box = [0];
+// Mutable box defined at top of file (line 38)
 
 // Isolated compilation: fresh buffer, compile, extract via box, restore
 pub fn compile_isolated(_ci_ast) {
@@ -2261,13 +2266,14 @@ pub fn compile_isolated(_ci_ast) {
     // So we save _g_pos into the output array header (position 0 = size marker)
     // HACK: wrap analyze in a helper that saves _g_pos to _g_ci_box
     _ci_analyze_and_save(_ci_ast);
-    // Read result size from box (survives scope restore because array is on heap)
+    // Read result from box
     let _ci_size = _g_ci_box[0];
-    // Extract bytecode from fresh buffer
+    let _ci_output_ref = _g_ci_box[1];
+    // Extract bytecode from the CORRECT output buffer (saved in box)
     let _ci_result = [];
     let _ci_i = 0;
     while _ci_i < _ci_size {
-        push(_ci_result, __array_get(_g_output, _ci_i));
+        push(_ci_result, __array_get(_ci_output_ref, _ci_i));
         _ci_i = _ci_i + 1;
     };
     // Restore outer state
@@ -2277,7 +2283,7 @@ pub fn compile_isolated(_ci_ast) {
 }
 
 fn _ci_analyze_and_save(_cias_ast) {
+    // analyze() saves _g_pos + _g_output to _g_ci_box at its end
     analyze(_cias_ast);
-    // Save _g_pos to mutable box BEFORE this function returns (and scope restores)
-    set_at(_g_ci_box, 0, _g_pos);
+    // DO NOT save _g_pos here — it's already been scope-restored to old value
 }
