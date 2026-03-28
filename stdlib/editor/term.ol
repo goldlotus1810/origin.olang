@@ -1,6 +1,6 @@
-// editor/term.ol — Terminal ANSI control + key decode
+// editor/term.ol — Terminal ANSI control
 
-let ESC = __chr(27);
+fn _esc() { return __chr(27); }
 
 pub fn term_cols() {
     let _ts = __term_size();
@@ -12,48 +12,18 @@ pub fn term_rows() {
     return _ts % 10000;
 }
 
-pub fn term_clear() {
-    __write_raw(ESC + "[2J" + ESC + "[H");
-}
+pub fn term_clear() { __write_raw(_esc() + "[2J" + _esc() + "[H"); }
+pub fn term_goto(_r, _c) { __write_raw(_esc() + "[" + __to_string(_r) + ";" + __to_string(_c) + "H"); }
+pub fn term_hide_cursor() { __write_raw(_esc() + "[?25l"); }
+pub fn term_show_cursor() { __write_raw(_esc() + "[?25h"); }
+pub fn term_color(_fg) { __write_raw(_esc() + "[38;5;" + __to_string(_fg) + "m"); }
+pub fn term_bg(_bg) { __write_raw(_esc() + "[48;5;" + __to_string(_bg) + "m"); }
+pub fn term_reset() { __write_raw(_esc() + "[0m"); }
+pub fn term_bold() { __write_raw(_esc() + "[1m"); }
+pub fn term_write(_t) { __write_raw(_t); }
 
-pub fn term_goto(_row, _col) {
-    __write_raw(ESC + "[" + __to_string(_row) + ";" + __to_string(_col) + "H");
-}
-
-pub fn term_hide_cursor() {
-    __write_raw(ESC + "[?25l");
-}
-
-pub fn term_show_cursor() {
-    __write_raw(ESC + "[?25h");
-}
-
-pub fn term_color(_fg) {
-    __write_raw(ESC + "[38;5;" + __to_string(_fg) + "m");
-}
-
-pub fn term_bg(_bg) {
-    __write_raw(ESC + "[48;5;" + __to_string(_bg) + "m");
-}
-
-pub fn term_reset() {
-    __write_raw(ESC + "[0m");
-}
-
-pub fn term_bold() {
-    __write_raw(ESC + "[1m");
-}
-
-pub fn term_write(_text) {
-    __write_raw(_text);
-}
-
-pub fn term_fill_line(_text, _width) {
-    let _len = len(_text);
-    __write_raw(_text);
-    let _i = _len;
-    while _i < _width {
-        __write_raw(" ");
-        _i = _i + 1;
-    };
+pub fn term_fill_line(_t, _w) {
+    __write_raw(_t);
+    let _i = len(_t);
+    while _i < _w { __write_raw(" "); _i = _i + 1; };
 }
