@@ -147,21 +147,24 @@ pub fn repl_eval(input) {
     if _ld_n > 0 { return "Loaded " + __to_string(_ld_n) + " facts. " + kt_stats(); };
     return "No homeos.knowledge file found.";
   }
-  // Debug: test parsing step by step
+  // Debug: test match manually
   if src == "dbg_parse" {
     let _dbg_t = tokenize("emit 42;");
-    emit "tokens=" + __to_string(len(_dbg_t));
-    let _dbg_pp = { tokens: _dbg_t, pos: 0 };
-    let _dbg_tok = peek(_dbg_pp);
-    emit "peek text=" + _dbg_tok.text;
-    // Test is_keyword_tok
-    emit "is_kw_tok(emit)=" + __to_string(is_keyword_tok(_dbg_tok, "emit"));
+    let _dbg_tok = _dbg_t[0];
+    let _dbg_k = _dbg_tok.kind;
+    // Manual match: replicate what is_keyword_tok does
+    let _dbg_m = __match_enum(_dbg_k, "TokenKind::Keyword");
+    emit "match=" + __to_string(_dbg_m);
+    if _dbg_m == 1 {
+      // Extract name field
+      let _dbg_name = __enum_field(_dbg_k, 0);
+      emit "name=" + _dbg_name;
+      emit "name==emit? " + __to_string(_dbg_name == "emit");
+    };
+    // Now test the ACTUAL is_keyword_tok
+    emit "is_kw_tok=" + __to_string(is_keyword_tok(_dbg_tok, "emit"));
+    // Bypass: use tok.text instead
     emit "tok.text==emit? " + __to_string(_dbg_tok.text == "emit");
-    // Test simple tok.text comparison (what parse_stmt uses for some checks)
-    emit "calling parse_expr with pos=1...";
-    let _dbg_pp2 = { tokens: _dbg_t, pos: 1 };
-    let _dbg_expr = parse_expr(_dbg_pp2);
-    emit "parse_expr DONE pos=" + __to_string(_dbg_pp2.pos);
     return "OK";
   };
   if src == "help" {
@@ -465,7 +468,7 @@ pub fn repl_eval(input) {
     _re_wi = _re_wi + 1;
   };
 
-  // Phase 4: Bytecode in _g_output (pre-filled array with set_at, no push)
+  // Phase 4: Bytecode in _g_output
   let bc = _g_output;
   if _g_pos_box[0] == 0 { return ""; }
 

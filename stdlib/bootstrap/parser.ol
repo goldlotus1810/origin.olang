@@ -157,40 +157,30 @@ fn expect_ident(p) {
 }
 
 fn is_keyword_tok(tok, kw) {
-    match tok.kind {
-        TokenKind::Keyword { name } => {
-            return name == kw;
-        },
-        _ => {
-            return false;
-        },
+    // Bypass match compilation — use __match_enum directly
+    if __match_enum(tok.kind, "TokenKind::Keyword") == 1 {
+        let _ikt_name = __enum_field(tok.kind, 0);
+        return _ikt_name == kw;
     };
+    return false;
 }
 
 fn is_string_tok(tok) {
-    match tok.kind {
-        TokenKind::StringLit { value } => {
-            return value;
-        },
-        _ => {
-            return false;
-        },
+    if __match_enum(tok.kind, "TokenKind::StringLit") == 1 {
+        return __enum_field(tok.kind, 0);
     };
+    return false;
 }
 
 fn is_symbol_tok(tok, sym) {
-    match tok.kind {
-        TokenKind::Symbol { ch } => {
-            return ch == sym;
-        },
-        _ => {
-            return false;
-        },
+    if __match_enum(tok.kind, "TokenKind::Symbol") == 1 {
+        let _ist_ch = __enum_field(tok.kind, 0);
+        return _ist_ch == sym;
     };
+    return false;
 }
 
 fn _skip_to_sync(p) {
-    // Error recovery: skip tokens until ; or } or EOF
     while !is_eof(peek(p)) {
         if is_symbol_tok(peek(p), ";") { advance(p); return; };
         if is_symbol_tok(peek(p), "}") { return; };
@@ -199,10 +189,8 @@ fn _skip_to_sync(p) {
 }
 
 fn is_eof(tok) {
-    match tok.kind {
-        TokenKind::Eof => { return true; },
-        _ => { return false; },
-    };
+    if __match_enum(tok.kind, "TokenKind::Eof") == 1 { return true; };
+    return false;
 }
 
 fn is_ident_tok(tok) {

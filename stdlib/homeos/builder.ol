@@ -169,11 +169,9 @@ fn compile_dir(_xcd_dir, _xcd_output) {
 };
 
 fn compile_source(_cs_src) {
-  emit "  [cs] src len=" + __to_string(len(_cs_src));
   reset_compiler();
   let _cs_tokens = tokenize(_cs_src);
   let _cs_ntok = len(_cs_tokens);
-  emit "  [cs] tokens=" + __to_string(_cs_ntok);
   let _cs_parser = { tokens: _cs_tokens, pos: 0 };
   let _cs_ast = [];
   let _cs_errors = 0;
@@ -183,17 +181,12 @@ fn compile_source(_cs_src) {
     else {
       let _cs_prev_pos = _cs_parser.pos;
       try { push(_cs_ast, parse_stmt(_cs_parser)); }
-      catch { _cs_errors = _cs_errors + 1; emit "  [cs] parse error #" + __to_string(_cs_errors); };
-      // If parser didn't advance, skip token to prevent infinite loop
+      catch { _cs_errors = _cs_errors + 1; };
       if _cs_parser.pos == _cs_prev_pos { _cs_parser.pos = _cs_parser.pos + 1; };
-      // Bail after too many errors
       if _cs_errors > 10 { _cs_parser.pos = _cs_ntok; };
     };
   };
-  emit "  [cs] ast=" + __to_string(len(_cs_ast)) + " errors=" + __to_string(_cs_errors);
-  let _cs_result = compile_isolated(_cs_ast);
-  emit "  [cs] result=" + __to_string(len(_cs_result));
-  return _cs_result;
+  return compile_isolated(_cs_ast);
 };
 
 fn list_ol_files(_lof_dir) {
