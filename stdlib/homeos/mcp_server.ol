@@ -1,214 +1,189 @@
 // homeos/mcp_server.ol — MCP Protocol Handler (JSON-RPC 2.0 over stdio)
-// Called by VM --mcp mode for each stdin line
+// Boot closures now have register frames — json_parse with nested {} works
 
 let __mcp_booted = [0];
 
 pub fn mcp_dispatch(_md_line) {
     if len(_md_line) == 0 { return ""; };
 
-    // Auto-load KnowTree on first call
     if __mcp_booted[0] == 0 {
         let _mb = __set_at(__mcp_booted, 0, 1);
         let _mb2 = kt_load("homeos.knowledge");
     };
 
-    // Extract fields via string search (boot closures don't have register frames,
-    // so json_parse still fails with nested {} in MCP context)
-    let _md_method = _mcp_extract_str(_md_line, "method");
-    let _md_id = _mcp_extract_num(_md_line, "id");
+    // String extraction (boot closure let locals not yet in registers)
+    let _md_method = _ext_s(_md_line, "method");
+    let _md_id = _ext_n(_md_line, "id");
 
-    if _md_method == "initialize" { return _mcp_handle_init(_md_id); };
+    if _md_method == "initialize" { return _mcp_init(_md_id); };
     if _md_method == "notifications/initialized" { return ""; };
-    if _md_method == "tools/list" { return _mcp_handle_tools_list(_md_id); };
+    if _md_method == "tools/list" { return _mcp_tools(_md_id); };
     if _md_method == "tools/call" {
-        let _md_tool = _mcp_extract_str(_md_line, "name");
-        let _md_code = _mcp_extract_str(_md_line, "code");
-        let _md_fact = _mcp_extract_str(_md_line, "fact");
-        let _md_question = _mcp_extract_str(_md_line, "question");
-        let _md_text = _mcp_extract_str(_md_line, "text");
-        _nox_log(_md_tool, _md_code + _md_fact + _md_question + _md_text);
-        return _mcp_handle_call_ex(_md_id, _md_tool, _md_code, _md_fact, _md_question, _md_text);
+        let _md_tool = _ext_s(_md_line, "name");
+        let _md_code = _ext_s(_md_line, "code");
+        let _md_fact = _ext_s(_md_line, "fact");
+        let _md_question = _ext_s(_md_line, "question");
+        let _md_text = _ext_s(_md_line, "text");
+        return _mcp_call_ex(_md_id, _md_tool, _md_code, _md_fact, _md_question, _md_text);
     };
 
-    return _mcp_error(_md_id, "Unknown method: " + _md_method);
+    return _err(_md_id, "Unknown method");
 }
 
-fn _mcp_handle_init(_mi_id) {
-    return "{\"jsonrpc\":\"2.0\",\"result\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"origin-homeos\",\"version\":\"1.0\"}},\"id\":" + to_string(_mi_id) + "}";
+fn _mcp_init(_id) {
+    return "{\"jsonrpc\":\"2.0\",\"result\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"origin-homeos\",\"version\":\"2.0\"}},\"id\":" + to_string(_id) + "}";
 }
 
-fn _mcp_handle_tools_list(_tl_id) {
-    let _tl_r = "{\"jsonrpc\":\"2.0\",\"result\":{\"tools\":[";
-    _tl_r = _tl_r + "{\"name\":\"olang_eval\",\"description\":\"Compile and run Olang code. Returns output.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"code\":{\"type\":\"string\",\"description\":\"Olang source code\"}},\"required\":[\"code\"]}}";
-    _tl_r = _tl_r + ",{\"name\":\"know_learn\",\"description\":\"Teach HomeOS a new fact. Persists to KnowTree.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"fact\":{\"type\":\"string\"}},\"required\":[\"fact\"]}}";
-    _tl_r = _tl_r + ",{\"name\":\"know_query\",\"description\":\"Query HomeOS knowledge. Returns matching facts.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"question\":{\"type\":\"string\"}},\"required\":[\"question\"]}}";
-    _tl_r = _tl_r + ",{\"name\":\"emotion_encode\",\"description\":\"Encode text to 5D emotion coordinates (S,R,V,A,T). Understands Vietnamese.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"}},\"required\":[\"text\"]}}";
-    _tl_r = _tl_r + ",{\"name\":\"silk_status\",\"description\":\"View Silk neural network status.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}";
-    _tl_r = _tl_r + ",{\"name\":\"nox_status\",\"description\":\"Nox brain status — facts, memory stats.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}";
-    _tl_r = _tl_r + ",{\"name\":\"safety_check\",\"description\":\"Check text for crisis patterns.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"}},\"required\":[\"text\"]}}";
-    _tl_r = _tl_r + ",{\"name\":\"dream_cycle\",\"description\":\"Run dream consolidation.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}";
-    _tl_r = _tl_r + "]},\"id\":" + to_string(_tl_id) + "}";
-    return _tl_r;
+fn _mcp_tools(_id) {
+    let _r = "{\"jsonrpc\":\"2.0\",\"result\":{\"tools\":[";
+    _r = _r + _tool("olang_eval", "Compile and run Olang code", "code");
+    _r = _r + "," + _tool("know_learn", "Teach a new fact. Persists to KnowTree", "fact");
+    _r = _r + "," + _tool("know_query", "Query knowledge. Returns matching facts", "question");
+    _r = _r + "," + _tool("emotion_encode", "Encode text to 5D emotion (S,R,V,A,T)", "text");
+    _r = _r + "," + _tool("safety_check", "Check text for crisis patterns", "text");
+    _r = _r + "," + _tool_no_arg("nox_status", "Nox brain status");
+    _r = _r + "," + _tool_no_arg("silk_status", "Silk network status");
+    _r = _r + "," + _tool_no_arg("dream_cycle", "Run dream consolidation");
+    _r = _r + "]},\"id\":" + to_string(_id) + "}";
+    return _r;
 }
 
-fn _mcp_handle_call_ex(_hc_id, _hc_tool, _hc_code, _hc_fact, _hc_question, _hc_text) {
-    if _hc_tool == "olang_eval" { return _mcp_tool_eval(_hc_id, _hc_code); };
-    if _hc_tool == "know_learn" { return _mcp_tool_learn(_hc_id, _hc_fact); };
-    if _hc_tool == "know_query" { return _mcp_tool_query(_hc_id, _hc_question); };
-    if _hc_tool == "emotion_encode" { return _mcp_tool_emotion(_hc_id, _hc_text); };
-    if _hc_tool == "silk_status" { return _mcp_tool_silk(_hc_id); };
-    if _hc_tool == "nox_status" { return _mcp_tool_nox_status(_hc_id); };
-    if _hc_tool == "safety_check" { return _mcp_tool_safety(_hc_id, _hc_text); };
-    if _hc_tool == "dream_cycle" { return _mcp_tool_dream(_hc_id); };
-    return _mcp_error(_hc_id, "Unknown tool: " + _hc_tool);
+fn _tool(_name, _desc, _param) {
+    return "{\"name\":\"" + _name + "\",\"description\":\"" + _desc + "\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"" + _param + "\":{\"type\":\"string\"}},\"required\":[\"" + _param + "\"]}}";
 }
 
-fn _mcp_tool_eval(_te_id, _te_code) {
-    let _te_fd = __stdout_off();
-    let _te_repl = repl_eval(_te_code);
-    __stdout_on(_te_fd);
-    if len(_te_repl) == 0 { return _mcp_result(_te_id, "ok"); };
-    return _mcp_result(_te_id, _te_repl);
+fn _tool_no_arg(_name, _desc) {
+    return "{\"name\":\"" + _name + "\",\"description\":\"" + _desc + "\",\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}";
 }
 
-fn _mcp_tool_learn(_tl_id, _tl_fact) {
-    let _tl_ts = _mcp_format_ts(__timestamp());
-    let _tl_entry = "[" + _tl_ts + "] " + _tl_fact;
-    kt_learn(_tl_entry);
-    __file_append("homeos.knowledge", _tl_entry + "\n");
-    return _mcp_result(_tl_id, "Learned: " + _tl_entry + " (" + to_string(kt_fact_count()) + " facts)");
-}
-
-fn _mcp_tool_query(_tq_id, _tq_question) {
-    let _tq_results = kt_find(_tq_question, 10);
-    let _tq_total = kt_fact_count();
-    if len(_tq_results) == 0 {
-        return _mcp_result(_tq_id, "No matching facts for: " + _tq_question + " (" + to_string(_tq_total) + " facts)");
+fn _mcp_call_ex(_id, _tool, _code, _fact, _question, _text) {
+    _log(_tool, _code + _fact + _question + _text);
+    if _tool == "olang_eval" {
+        let _fd = __stdout_off();
+        let _r = repl_eval(_code);
+        __stdout_on(_fd);
+        if len(_r) == 0 { return _ok(_id, "ok"); };
+        return _ok(_id, _r);
     };
-    let _tq_out = "";
-    let _tq_i = 0;
-    while _tq_i < len(_tq_results) {
-        if _tq_i > 0 { _tq_out = _tq_out + "\\n"; };
-        _tq_out = _tq_out + _tq_results[_tq_i];
-        _tq_i = _tq_i + 1;
+    if _tool == "know_learn" {
+        let _fact = _fact;
+        let _ts = _fmt_ts(__timestamp());
+        let _entry = "[" + _ts + "] " + _fact;
+        kt_learn(_entry);
+        __file_append("homeos.knowledge", _entry + "\n");
+        return _ok(_id, "Learned: " + _entry + " (" + to_string(kt_fact_count()) + " facts)");
     };
-    return _mcp_result(_tq_id, _tq_out);
-}
-
-fn _mcp_tool_emotion(_temo_id, _temo_text) {
-    let _temo_r = text_emotion_v2(_temo_text);
-    return _mcp_result(_temo_id, "Emotion 5D: S=" + to_string(_temo_r.s) + " R=" + to_string(_temo_r.r) + " V=" + to_string(_temo_r.v) + " A=" + to_string(_temo_r.a) + " T=" + to_string(_temo_r.t));
-}
-
-fn _mcp_tool_safety(_tsf_id, _tsf_text) {
-    let _tsf_result = _security_gate(_tsf_text);
-    if len(_tsf_result) > 0 { return _mcp_result(_tsf_id, "CRISIS DETECTED: " + _tsf_result); };
-    return _mcp_result(_tsf_id, "SAFE: no crisis patterns detected");
-}
-
-fn _mcp_tool_dream(_tdm_id) {
-    dream_cycle();
-    return _mcp_result(_tdm_id, "Dream cycle complete. Facts: " + to_string(kt_fact_count()) + ", Silk: " + to_string(silk_count()));
-}
-
-fn _mcp_tool_silk(_tsilk_id) {
-    return _mcp_result(_tsilk_id, "Silk: " + to_string(silk_count()) + " edges, " + to_string(kt_fact_count()) + " facts");
-}
-
-fn _mcp_tool_nox_status(_tns_id) {
-    let _tns_ts = _mcp_format_ts(__timestamp());
-    return _mcp_result(_tns_id, "Nox [" + _tns_ts + "] " + to_string(kt_fact_count()) + " facts, " + to_string(silk_count()) + " silk edges");
-}
-
-fn _mcp_result(_mr_id, _mr_text) {
-    let _mr_r = "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"";
-    _mr_r = _mr_r + _mcp_escape(_mr_text);
-    _mr_r = _mr_r + "\"}]},\"id\":";
-    _mr_r = _mr_r + to_string(_mr_id) + "}";
-    return _mr_r;
-}
-
-fn _mcp_error(_me_id, _me_msg) {
-    return "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"" + _mcp_escape(_me_msg) + "\"}],\"isError\":true},\"id\":" + to_string(_me_id) + "}";
-}
-
-fn _mcp_escape(_me_s) {
-    let _me_out = "";
-    let _me_i = 0;
-    let _me_len = len(_me_s);
-    while _me_i < _me_len {
-        let _me_c = char_at(_me_s, _me_i);
-        if _me_c == "\"" { _me_out = _me_out + "\\\""; }
-        else { if _me_c == "\\" { _me_out = _me_out + "\\\\"; }
-        else { if _me_c == "\n" { _me_out = _me_out + "\\n"; }
-        else { _me_out = _me_out + _me_c; }; }; };
-        _me_i = _me_i + 1;
+    if _tool == "know_query" {
+        let _q = _question;
+        let _results = kt_find(_q, 10);
+        if len(_results) == 0 { return _ok(_id, "No facts for: " + _q + " (" + to_string(kt_fact_count()) + " total)"); };
+        let _out = "";
+        let _i = 0;
+        while _i < len(_results) {
+            if _i > 0 { _out = _out + "\\n"; };
+            _out = _out + _results[_i];
+            _i = _i + 1;
+        };
+        return _ok(_id, _out);
     };
-    return _me_out;
+    if _tool == "emotion_encode" {
+        let _e = text_emotion_v2(_text);
+        return _ok(_id, "5D: S=" + to_string(_e.s) + " R=" + to_string(_e.r) + " V=" + to_string(_e.v) + " A=" + to_string(_e.a) + " T=" + to_string(_e.t));
+    };
+    if _tool == "safety_check" {
+        let _r = _security_gate(_text);
+        if len(_r) > 0 { return _ok(_id, "CRISIS: " + _r); };
+        return _ok(_id, "SAFE");
+    };
+    if _tool == "nox_status" { return _ok(_id, "Nox [" + _fmt_ts(__timestamp()) + "] " + to_string(kt_fact_count()) + " facts"); };
+    if _tool == "silk_status" { return _ok(_id, "Silk: " + to_string(silk_count()) + " edges"); };
+    if _tool == "dream_cycle" { dream_cycle(); return _ok(_id, "Dream done"); };
+    return _err(_id, "Unknown tool: " + _tool);
 }
 
-fn _mcp_format_ts(_ft_epoch) {
-    let _ft_t = _ft_epoch + 25200;
-    let _ft_days = __floor(_ft_t / 86400);
-    let _ft_sod = _ft_t % 86400;
-    let _ft_h = __floor(_ft_sod / 3600);
-    let _ft_m = __floor((_ft_sod % 3600) / 60);
-    let _ft_d2 = _ft_days - 10957;
-    let _ft_y = __floor(_ft_d2 / 365.25) + 2000;
-    let _ft_doy = _ft_d2 - __floor((_ft_y - 2000) * 365.25);
-    let _ft_mo = __floor(_ft_doy / 30.44) + 1;
-    let _ft_dd = _ft_doy - __floor((_ft_mo - 1) * 30.44) + 1;
-    return to_string(__floor(_ft_y)) + "-" + _p2(__floor(_ft_mo)) + "-" + _p2(__floor(_ft_dd)) + " " + _p2(__floor(_ft_h)) + ":" + _p2(__floor(_ft_m));
+fn _ok(_id, _text) {
+    return "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"" + _esc(_text) + "\"}]},\"id\":" + to_string(_id) + "}";
+}
+
+fn _err(_id, _msg) {
+    return "{\"jsonrpc\":\"2.0\",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"" + _esc(_msg) + "\"}],\"isError\":true},\"id\":" + to_string(_id) + "}";
+}
+
+fn _esc(_s) {
+    let _o = "";
+    let _i = 0;
+    while _i < len(_s) {
+        let _c = char_at(_s, _i);
+        if _c == "\"" { _o = _o + "\\\""; }
+        else { if _c == "\\" { _o = _o + "\\\\"; }
+        else { if _c == "\n" { _o = _o + "\\n"; }
+        else { _o = _o + _c; }; }; };
+        _i = _i + 1;
+    };
+    return _o;
+}
+
+fn _fmt_ts(_epoch) {
+    let _t = _epoch + 25200;
+    let _d = __floor(_t / 86400);
+    let _s = _t % 86400;
+    let _h = __floor(_s / 3600);
+    let _m = __floor((_s % 3600) / 60);
+    let _d2 = _d - 10957;
+    let _y = __floor(_d2 / 365.25) + 2000;
+    let _doy = _d2 - __floor((_y - 2000) * 365.25);
+    let _mo = __floor(_doy / 30.44) + 1;
+    let _dd = _doy - __floor((_mo - 1) * 30.44) + 1;
+    return to_string(__floor(_y)) + "-" + _p2(__floor(_mo)) + "-" + _p2(__floor(_dd)) + " " + _p2(__floor(_h)) + ":" + _p2(__floor(_m));
 }
 
 fn _p2(_n) { if _n < 10 { return "0" + to_string(_n); }; return to_string(_n); }
 
-fn _nox_log(_nl_type, _nl_msg) {
-    let _nl_ts = _mcp_format_ts(__timestamp());
-    __file_append("nox_log.jsonl", "{\"ts\":\"" + _nl_ts + "\",\"type\":\"" + _nl_type + "\",\"msg\":\"" + _mcp_escape(_nl_msg) + "\"}\n");
+fn _log(_type, _msg) {
+    __file_append("nox_log.jsonl", "{\"ts\":\"" + _fmt_ts(__timestamp()) + "\",\"type\":\"" + _type + "\",\"msg\":\"" + _esc(_msg) + "\"}\n");
 }
 
-fn _mcp_extract_str(_es_text, _es_key) {
-    let _es_pat = "\"" + _es_key + "\":\"";
-    let _es_patlen = len(_es_pat);
-    let _es_tlen = len(_es_text);
-    let _es_i = 0;
-    while _es_i < _es_tlen {
-        if __substr(_es_text, _es_i, _es_i + _es_patlen) == _es_pat {
-            let _es_start = _es_i + _es_patlen;
-            let _es_j = _es_start;
-            while _es_j < _es_tlen {
-                let _es_c = char_at(_es_text, _es_j);
-                if _es_c == "\\" { _es_j = _es_j + 2; } else {
-                    if _es_c == "\"" { return __substr(_es_text, _es_start, _es_j); };
-                    _es_j = _es_j + 1;
+fn _ext_s(_t, _k) {
+    let _p = "\"" + _k + "\":\"";
+    let _pl = len(_p);
+    let _tl = len(_t);
+    let _i = 0;
+    while _i < _tl {
+        if __substr(_t, _i, _i + _pl) == _p {
+            let _s = _i + _pl;
+            let _j = _s;
+            while _j < _tl {
+                let _c = char_at(_t, _j);
+                if _c == "\\" { _j = _j + 2; } else {
+                    if _c == "\"" { return __substr(_t, _s, _j); };
+                    _j = _j + 1;
                 };
             };
-            return __substr(_es_text, _es_start, _es_j);
+            return __substr(_t, _s, _j);
         };
-        _es_i = _es_i + 1;
+        _i = _i + 1;
     };
     return "";
 }
 
-fn _mcp_extract_num(_en_text, _en_key) {
-    let _en_pat = "\"" + _en_key + "\":";
-    let _en_patlen = len(_en_pat);
-    let _en_tlen = len(_en_text);
-    let _en_i = 0;
-    while _en_i < _en_tlen {
-        if __substr(_en_text, _en_i, _en_i + _en_patlen) == _en_pat {
-            let _en_start = _en_i + _en_patlen;
-            let _en_j = _en_start;
-            while _en_j < _en_tlen {
-                let _en_c = __char_code(char_at(_en_text, _en_j));
-                if _en_c < 48 { if _en_c != 45 { return __to_number(__substr(_en_text, _en_start, _en_j)); }; };
-                if _en_c > 57 { if _en_c != 46 { return __to_number(__substr(_en_text, _en_start, _en_j)); }; };
-                _en_j = _en_j + 1;
+fn _ext_n(_t, _k) {
+    let _p = "\"" + _k + "\":";
+    let _pl = len(_p);
+    let _tl = len(_t);
+    let _i = 0;
+    while _i < _tl {
+        if __substr(_t, _i, _i + _pl) == _p {
+            let _s = _i + _pl;
+            let _j = _s;
+            while _j < _tl {
+                let _c = __char_code(char_at(_t, _j));
+                if _c < 48 { if _c != 45 { return __to_number(__substr(_t, _s, _j)); }; };
+                if _c > 57 { if _c != 46 { return __to_number(__substr(_t, _s, _j)); }; };
+                _j = _j + 1;
             };
-            return __to_number(__substr(_en_text, _en_start, _en_j));
+            return __to_number(__substr(_t, _s, _j));
         };
-        _en_i = _en_i + 1;
+        _i = _i + 1;
     };
     return 0;
 }

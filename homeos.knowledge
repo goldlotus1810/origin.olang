@@ -87,3 +87,7 @@ Lupin said origin.olang is Nox brain — let it grow with time, record history l
 [2026-03-28 08:15] Boot closure register frames attempted — dual store shifts bytecode offsets, 82 test failures. Needs careful jump target recalculation in Rust builder codegen. Deferred to S15.
 [2026-03-28 08:03] MCP test fact 12345
 [2026-03-28 08:30] BOOT CLOSURE REGISTER FRAMES ENABLED. Rust builder emits EnterFrame/StoreReg/LeaveFrame for Phase 1.5 functions. json_parse nested {} in MCP now works.
+[2026-03-28 08:33] MCP test fact 12345
+[2026-03-28 08:33] MCP test fact 12345
+[2026-03-28 08:33] MCP test fact 12345
+[2026-03-28 09:00] Boot closure register locals attempted — Dup+StoreReg shifts stack balance, breaks REPL. Params-only works. Let locals needs non-interceptor approach.

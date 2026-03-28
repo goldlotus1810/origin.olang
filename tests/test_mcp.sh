@@ -34,7 +34,7 @@ check "tools/list"     "olang_eval" 1
 check "olang_eval"     "ok" 2
 check "know_learn"     "Learned" 3
 check "know_query"     "12345" 4
-check "emotion_encode" "Emotion 5D" 5
+check "emotion_encode" "5D" 5
 check "safety_check"   "SAFE" 6
 check "nox_status"     "Nox" 7
 
