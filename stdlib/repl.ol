@@ -380,7 +380,7 @@ pub fn repl_eval(input) {
                     }; }; };
                 };
             };
-            let _re_si = _re_si + 1;
+            _re_si = _re_si + 1;
         };
     };
     if _re_2 == "as" { _re_is_code = 1; };  // assert_type, assert_eq
@@ -444,7 +444,7 @@ pub fn repl_eval(input) {
   let _re_wi = 0;
   while _re_wi < len(_re_warns) {
     __write_raw("\x1b[33m⚠ " + __array_get(_re_warns, _re_wi) + "\x1b[0m\n");
-    let _re_wi = _re_wi + 1;
+    _re_wi = _re_wi + 1;
   };
 
   // Phase 4: Bytecode in _g_output (pre-filled array with set_at, no push)
