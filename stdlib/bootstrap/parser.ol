@@ -1230,9 +1230,13 @@ pub fn parse_stmt(p) {
                     // Determine assign type from LHS
                     match _ps_lhs {
                         Expr::FieldAccess { object, field } => {
-                            // Could be name.field or complex.chain.field
-                            // For now: emit as FieldAssign with object as string
-                            return Stmt::FieldAssign { object: object, field: field, value: _ps_rhs };
+                            // Extract object name from Ident expression
+                            let _ps_obj_name = object;
+                            match object {
+                                Expr::Ident { name } => { _ps_obj_name = name; },
+                                _ => {},
+                            };
+                            return Stmt::FieldAssign { object: _ps_obj_name, field: field, value: _ps_rhs };
                         },
                         _ => {
                             // General assignment — wrap as ExprStmt (runtime handles)

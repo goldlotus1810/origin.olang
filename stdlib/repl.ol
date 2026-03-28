@@ -147,16 +147,21 @@ pub fn repl_eval(input) {
     if _ld_n > 0 { return "Loaded " + __to_string(_ld_n) + " facts. " + kt_stats(); };
     return "No homeos.knowledge file found.";
   }
-  // Debug command: test parsing
+  // Debug: test parsing step by step
   if src == "dbg_parse" {
     let _dbg_t = tokenize("emit 42;");
     emit "tokens=" + __to_string(len(_dbg_t));
     let _dbg_pp = { tokens: _dbg_t, pos: 0 };
-    emit "parser created, pos=" + __to_string(_dbg_pp.pos);
-    let _dbg_pk = peek(_dbg_pp);
-    emit "peek text=" + _dbg_pk.text;
-    let _dbg_s = parse_stmt(_dbg_pp);
-    emit "parse_stmt done";
+    let _dbg_tok = peek(_dbg_pp);
+    emit "peek text=" + _dbg_tok.text;
+    // Test is_keyword_tok
+    emit "is_kw_tok(emit)=" + __to_string(is_keyword_tok(_dbg_tok, "emit"));
+    emit "tok.text==emit? " + __to_string(_dbg_tok.text == "emit");
+    // Test simple tok.text comparison (what parse_stmt uses for some checks)
+    emit "calling parse_expr with pos=1...";
+    let _dbg_pp2 = { tokens: _dbg_t, pos: 1 };
+    let _dbg_expr = parse_expr(_dbg_pp2);
+    emit "parse_expr DONE pos=" + __to_string(_dbg_pp2.pos);
     return "OK";
   };
   if src == "help" {

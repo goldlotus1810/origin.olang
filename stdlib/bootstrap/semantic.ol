@@ -165,15 +165,14 @@ fn _emit_str(state, _es_str) {
 }
 
 fn _emit_str_u16(state, _esu_str) {
-    let _esu_bytes = __str_bytes(_esu_str);
-    let _esu_len = len(_esu_bytes);
+    let _esu_len = len(_esu_str);
     _emit_byte(state, _esu_len % 256);
     _emit_byte(state, __floor(_esu_len / 256) % 256);
     let _esu_i = 0;
     while _esu_i < _esu_len {
-        _emit_byte(state, _esu_bytes[_esu_i]);
+        _emit_byte(state, __char_code(char_at(_esu_str, _esu_i)));
         _emit_byte(state, 33);
-        let _esu_i = _esu_i + 1;
+        _esu_i = _esu_i + 1;
     };
 }
 
