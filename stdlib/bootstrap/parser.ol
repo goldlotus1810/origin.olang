@@ -704,6 +704,12 @@ fn is_binop(tok) {
 // Explicit save stack for recursive parse_expr_prec (ASM VM has no scoping)
 let _pep_stack = __array_with_cap(512);
 
+// Match arm storage (array-based, supports up to 32 arms)
+let __g_ma_pats = __array_range(32);
+let __g_ma_bss = __array_range(32);
+let __g_ma_bes = __array_range(32);
+let __g_ma_tokens = [];
+
 fn parse_expr_prec(p, min_prec) {
     let _pep_lhs = parse_primary(p);
 
@@ -810,15 +816,10 @@ fn parse_match_expr(p) {
         let _ma_body_end = p.pos;
         // Save to depth-indexed globals (max 8 arms)
         let _ma_idx = len(arms);
-        if _ma_idx == 0 { let __g_ma0_pat = pattern; let __g_ma0_bs = _ma_body_start; let __g_ma0_be = _ma_body_end; };
-        if _ma_idx == 1 { let __g_ma1_pat = pattern; let __g_ma1_bs = _ma_body_start; let __g_ma1_be = _ma_body_end; };
-        if _ma_idx == 2 { let __g_ma2_pat = pattern; let __g_ma2_bs = _ma_body_start; let __g_ma2_be = _ma_body_end; };
-        if _ma_idx == 3 { let __g_ma3_pat = pattern; let __g_ma3_bs = _ma_body_start; let __g_ma3_be = _ma_body_end; };
-        if _ma_idx == 4 { let __g_ma4_pat = pattern; let __g_ma4_bs = _ma_body_start; let __g_ma4_be = _ma_body_end; };
-        if _ma_idx == 5 { let __g_ma5_pat = pattern; let __g_ma5_bs = _ma_body_start; let __g_ma5_be = _ma_body_end; };
-        if _ma_idx == 6 { let __g_ma6_pat = pattern; let __g_ma6_bs = _ma_body_start; let __g_ma6_be = _ma_body_end; };
-        if _ma_idx == 7 { let __g_ma7_pat = pattern; let __g_ma7_bs = _ma_body_start; let __g_ma7_be = _ma_body_end; };
-        let __g_ma_tokens = p.tokens;
+        set_at(__g_ma_pats, _ma_idx, pattern);
+        set_at(__g_ma_bss, _ma_idx, _ma_body_start);
+        set_at(__g_ma_bes, _ma_idx, _ma_body_end);
+        __g_ma_tokens = p.tokens;
         push(arms, MatchArm { pattern: pattern, bindings: bindings, body: body });
         if is_symbol_tok(peek(p), ",") { advance(p); };
     };

@@ -21,6 +21,7 @@ let _ce_lc = [0];
 let __const_names = [];
 let __g_fn_slot_map = [];
 let __g_fn_in_function = 0;
+let __g_mej = __array_range(32);   // match end-jump positions
 
 fn _find_reg_slot(_frs_map, _frs_name) {
     let _frs_i = len(_frs_map) - 1;
@@ -1377,24 +1378,19 @@ fn compile_expr(state, expr) {
             let subj_name = "__match_subj";
             emit_op(state, make_op_name("Store", subj_name));
             push_local(state, subj_name);
-            let __g_mej0 = -1; let __g_mej1 = -1; let __g_mej2 = -1; let __g_mej3 = -1;
-            let __g_mej4 = -1; let __g_mej5 = -1; let __g_mej6 = -1; let __g_mej7 = -1;
+            let _m_mi = 0;
+            while _m_mi < 32 { set_at(__g_mej, _m_mi, -1); _m_mi = _m_mi + 1; };
             let ai = 0;
             let _m_num_arms = len(arms);
-            if _m_num_arms > 8 { emit "Error: match too many arms (max 8)"; };
+            if _m_num_arms > 32 { emit "Error: match too many arms (max 32)"; };
             while ai < _m_num_arms {
                 // Read pattern + body token range from GLOBALS (dict fields corrupt)
                 let _m_pattern = "";
                 let _m_body_s = 0;
                 let _m_body_e = 0;
-                if ai == 0 { let _m_pattern = __g_ma0_pat; let _m_body_s = __g_ma0_bs; let _m_body_e = __g_ma0_be; };
-                if ai == 1 { let _m_pattern = __g_ma1_pat; let _m_body_s = __g_ma1_bs; let _m_body_e = __g_ma1_be; };
-                if ai == 2 { let _m_pattern = __g_ma2_pat; let _m_body_s = __g_ma2_bs; let _m_body_e = __g_ma2_be; };
-                if ai == 3 { let _m_pattern = __g_ma3_pat; let _m_body_s = __g_ma3_bs; let _m_body_e = __g_ma3_be; };
-                if ai == 4 { let _m_pattern = __g_ma4_pat; let _m_body_s = __g_ma4_bs; let _m_body_e = __g_ma4_be; };
-                if ai == 5 { let _m_pattern = __g_ma5_pat; let _m_body_s = __g_ma5_bs; let _m_body_e = __g_ma5_be; };
-                if ai == 6 { let _m_pattern = __g_ma6_pat; let _m_body_s = __g_ma6_bs; let _m_body_e = __g_ma6_be; };
-                if ai == 7 { let _m_pattern = __g_ma7_pat; let _m_body_s = __g_ma7_bs; let _m_body_e = __g_ma7_be; };
+                _m_pattern = __array_get(__g_ma_pats, ai);
+                _m_body_s = __array_get(__g_ma_bss, ai);
+                _m_body_e = __array_get(__g_ma_bes, ai);
                 let _m_bindings = _m_bindings;
                 let _m_body = _m_body;
                 if _m_pattern != "_" {
@@ -1436,14 +1432,15 @@ fn compile_expr(state, expr) {
                     let _m_skip_jmp = current_pos(state);
                     emit_jmp(state, 0);              // skip → body_start
                     let _mej_pos = current_pos(state);
-                    if ai == 0 { let __g_mej0 = _mej_pos; };
-                    if ai == 1 { let __g_mej1 = _mej_pos; };
-                    if ai == 2 { let __g_mej2 = _mej_pos; };
-                    if ai == 3 { let __g_mej3 = _mej_pos; };
-                    if ai == 4 { let __g_mej4 = _mej_pos; };
-                    if ai == 5 { let __g_mej5 = _mej_pos; };
-                    if ai == 6 { let __g_mej6 = _mej_pos; };
-                    if ai == 7 { let __g_mej7 = _mej_pos; };
+                    set_at(__g_mej, ai, _mej_pos);
+
+
+
+
+
+
+
+
                     emit_jmp(state, 0);              // end-Jmp (patched later)
                     let _m_body_begin = current_pos(state);
                     patch_jump(state, _m_skip_jmp, _m_body_begin);
@@ -1466,14 +1463,15 @@ fn compile_expr(state, expr) {
                     let _m_wskip = current_pos(state);
                     emit_jmp(state, 0);
                     let _mej_pos = current_pos(state);
-                    if ai == 0 { let __g_mej0 = _mej_pos; };
-                    if ai == 1 { let __g_mej1 = _mej_pos; };
-                    if ai == 2 { let __g_mej2 = _mej_pos; };
-                    if ai == 3 { let __g_mej3 = _mej_pos; };
-                    if ai == 4 { let __g_mej4 = _mej_pos; };
-                    if ai == 5 { let __g_mej5 = _mej_pos; };
-                    if ai == 6 { let __g_mej6 = _mej_pos; };
-                    if ai == 7 { let __g_mej7 = _mej_pos; };
+                    set_at(__g_mej, ai, _mej_pos);
+
+
+
+
+
+
+
+
                     emit_jmp(state, 0);
                     let _m_wbody_begin = current_pos(state);
                     patch_jump(state, _m_wskip, _m_wbody_begin);
@@ -1495,14 +1493,20 @@ fn compile_expr(state, expr) {
             let _m_end = current_pos(state);
             // Push dummy result (match is expression, needs value on stack)
             emit_op(state, make_op_num("PushNum", 0));
-            if __g_mej0 >= 0 { patch_jump(state, __g_mej0, _m_end); };
-            if __g_mej1 >= 0 { patch_jump(state, __g_mej1, _m_end); };
-            if __g_mej2 >= 0 { patch_jump(state, __g_mej2, _m_end); };
-            if __g_mej3 >= 0 { patch_jump(state, __g_mej3, _m_end); };
-            if __g_mej4 >= 0 { patch_jump(state, __g_mej4, _m_end); };
-            if __g_mej5 >= 0 { patch_jump(state, __g_mej5, _m_end); };
-            if __g_mej6 >= 0 { patch_jump(state, __g_mej6, _m_end); };
-            if __g_mej7 >= 0 { patch_jump(state, __g_mej7, _m_end); };
+            let _m_pi = 0;
+            while _m_pi < _m_num_arms {
+                let _m_pj = __array_get(__g_mej, _m_pi);
+                if _m_pj >= 0 { patch_jump(state, _m_pj, _m_end); };
+                _m_pi = _m_pi + 1;
+            };
+
+
+
+
+
+
+
+
         },
         Expr::Lambda { params, body } => {
             // Lambda expression: fn(params) { body } → emit Closure like FnDef but no Store
