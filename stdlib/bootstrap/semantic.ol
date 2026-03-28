@@ -103,8 +103,8 @@ fn _prefill_output() {
     if _g_output_ready == 0 {
         // Use __array_range to allocate exact size in ONE shot (no relocation!)
         // Values [0..16383] will be overwritten by set_at during codegen
-        let _g_output = __array_range(65536);
-        let _g_output_ready = 1;
+        _g_output = __array_range(65536);
+        _g_output_ready = 1;
     };
     // NOTE: _g_pos NOT reset here — streaming compiler accumulates.
     // Caller must reset _g_pos explicitly when starting a new compilation.
@@ -1341,7 +1341,7 @@ fn compile_expr(state, expr) {
             // Exit
             patch_jump(state, _cc_exit_jz_r, current_pos(state));
             emit_op(state, make_op_name("Load", _cc_result));
-            let _g_semantic_comp_depth = _g_semantic_comp_depth - 1;
+            _g_semantic_comp_depth = _g_semantic_comp_depth - 1;
         },
         Expr::IfExpr { cond, then_expr, else_expr } => {
             compile_expr(state, cond);
@@ -1563,8 +1563,8 @@ fn compile_expr(state, expr) {
                 push_local(state, _lm_params[_lm_pi]);
                 let _lm_pi = _lm_pi - 1;
             };
-            let __g_fn_slot_map = _lm_slot_map;
-            let __g_fn_in_function = 1;
+            __g_fn_slot_map = _lm_slot_map;
+            __g_fn_in_function = 1;
             // Compile body
             let _lm_bi = 0;
             while _lm_bi < len(_lm_body) {
@@ -1581,8 +1581,8 @@ fn compile_expr(state, expr) {
                 set_at(_g_output, _lm_enter_pos, _lm_total);
             };
             // Restore outer register state
-            let __g_fn_in_function = pop(_ce_stack);
-            let __g_fn_slot_map = pop(_ce_stack);
+            __g_fn_in_function = pop(_ce_stack);
+            __g_fn_slot_map = pop(_ce_stack);
             restore_locals(state, _lm_saved);
             // Patch body_len: body starts right after the 4-byte body_len field
             let _lm_body_len = current_pos(state) - _lm_blen_pos - 4;
@@ -1688,15 +1688,15 @@ fn compile_stmt(state, stmt) {
             push(_ce_stack, _fn_slot_map);
             push(_ce_stack, __g_fn_in_function);
             push(_ce_stack, __g_fn_slot_map);
-            let __g_fn_slot_map = _fn_slot_map;
-            let __g_fn_in_function = 1;
+            __g_fn_slot_map = _fn_slot_map;
+            __g_fn_in_function = 1;
             // Set TRO context (save previous)
             let _fn_prev_tro_fn = _g_tro_fn;
             let _fn_prev_tro_params = _g_tro_params;
             let _fn_prev_tro_start = _g_tro_start;
-            let _g_tro_fn = _fn_name;
-            let _g_tro_params = _fn_params;
-            let _g_tro_start = current_pos(state);
+            _g_tro_fn = _fn_name;
+            _g_tro_params = _fn_params;
+            _g_tro_start = current_pos(state);
             // Compile body
             let _fn_bi = 0;
             while _fn_bi < len(_fn_body) {
@@ -1709,17 +1709,17 @@ fn compile_stmt(state, stmt) {
             emit_op(state, make_op_simple("Ret"));
             // Restore outer function's register state
             let _fn_total_slots = len(__g_fn_slot_map);
-            let __g_fn_slot_map = pop(_ce_stack);
-            let __g_fn_in_function = pop(_ce_stack);
+            __g_fn_slot_map = pop(_ce_stack);
+            __g_fn_in_function = pop(_ce_stack);
             _fn_slot_map = pop(_ce_stack);
             if _fn_total_slots > _fn_pcnt {
                 set_at(_g_output, _fn_enter_pos, _fn_total_slots);
             };
             restore_locals(state, _fn_saved);
             // Restore TRO context
-            let _g_tro_fn = _fn_prev_tro_fn;
-            let _g_tro_params = _fn_prev_tro_params;
-            let _g_tro_start = _fn_prev_tro_start;
+            _g_tro_fn = _fn_prev_tro_fn;
+            _g_tro_params = _fn_prev_tro_params;
+            _g_tro_start = _fn_prev_tro_start;
             // Patch Closure body_len (in bytes)
             // Closure instruction = [0x25][param_count:1][body_len:4] = 6 bytes
             let _fn_body_len = current_pos(state) - _fn_closure_pos - 6;
@@ -1947,7 +1947,7 @@ fn compile_stmt(state, stmt) {
             let _fl_arr = "__for_" + _fl_d + "_arr";
             let _fl_len = "__for_" + _fl_d + "_len";
             let _fl_idx = "__for_" + _fl_d + "_idx";
-            let _g_for_depth = _g_for_depth + 1;
+            _g_for_depth = _g_for_depth + 1;
 
             // Save outer break/continue context
             let _fl_old_breaks = _break_patches;
@@ -2059,7 +2059,7 @@ fn compile_stmt(state, stmt) {
             // Restore
             let _break_patches = _fl_old_breaks;
             let _continue_patches = _fl_old_conts;
-            let _g_for_depth = _g_for_depth - 1;
+            _g_for_depth = _g_for_depth - 1;
         },
         Stmt::BreakStmt => {
             let _brk_pos = current_pos(state);
@@ -2256,14 +2256,14 @@ pub fn reset_compiler() {
     let _continue_patches = [];
     let _ce_locals = __array_with_cap(256);
     let _ce_lc = [0];
-    let __const_names = [];
-    let __g_fn_slot_map = [];
-    let __g_fn_in_function = 0;
-    let _g_tro_fn = "";
-    let _g_tro_params = [];
-    let _g_tro_start = 0;
-    let _g_warnings = [];
-    let _g_warn_count = [0];
+    __const_names = [];
+    __g_fn_slot_map = [];
+    __g_fn_in_function = 0;
+    _g_tro_fn = "";
+    _g_tro_params = [];
+    _g_tro_start = 0;
+    _g_warnings = [];
+    _g_warn_count = [0];
 }
 
 // Mutable box defined at top of file (line 38)
@@ -2274,9 +2274,9 @@ pub fn compile_isolated(_ci_ast) {
     let _ci_saved_output = _g_output;
     let _ci_saved_pos = _g_pos;
     // Fresh buffer each time
-    let _g_output = __array_range(65536);
-    let _g_output_ready = 1;
-    let _g_pos = 0;
+    _g_output = __array_range(65536);
+    _g_output_ready = 1;
+    _g_pos = 0;
     // Compile — analyze writes to _g_output, _g_pos advances
     // After analyze returns, scope restore may truncate _g_pos.
     // So we save _g_pos into the output array header (position 0 = size marker)
@@ -2293,8 +2293,8 @@ pub fn compile_isolated(_ci_ast) {
         _ci_i = _ci_i + 1;
     };
     // Restore outer state
-    let _g_output = _ci_saved_output;
-    let _g_pos = _ci_saved_pos;
+    _g_output = _ci_saved_output;
+    _g_pos = _ci_saved_pos;
     return _ci_result;
 }
 

@@ -226,9 +226,9 @@ pub fn repl_eval(input) {
       let _rc_ntok = len(_rc_tokens);
       // Stream compile: parse+analyze one statement at a time
       _prefill_output();
-      let _g_pos = 0;
+      _g_pos = 0;
       let _rc_parser = { tokens: _rc_tokens, pos: 0 };
-      let _g_parse_error = 0;
+      _g_parse_error = 0;
       let _rc_stmts = 0;
       while _rc_parser.pos < _rc_ntok {
         let _rc_peek = _rc_tokens[_rc_parser.pos];
@@ -430,13 +430,13 @@ pub fn repl_eval(input) {
 
   // Parse error → try agent, or show helpful message
   if _g_parse_error == 1 {
-    let _g_parse_error = 0;
+    _g_parse_error = 0;
     _boot_learn();
     return agent_respond(src);
   }
 
   // Phase 3: Semantic analysis
-  let _g_pos = 0;
+  _g_pos = 0;
   let state = analyze(ast);
 
   // Phase 3.5: Show compiler warnings
