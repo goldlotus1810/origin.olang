@@ -453,17 +453,23 @@ fn compile_expr(state, expr) {
             // Short-circuit for && and ||
             if op == "&&" {
                 // Short-circuit: Dup → Jz(end) → Pop → rhs → end
+                // Save rhs before compile_expr(lhs) — overwrites global rhs
+                push(_ce_stack, rhs);
                 compile_expr(state, lhs);
+                let _and_rhs = pop(_ce_stack);
                 emit_op(state, make_op_simple("Dup"));
                 let jz_pos = current_pos(state);
                 emit_op(state, make_op_num("Jz", 0));
                 emit_op(state, make_op_simple("Pop"));
-                compile_expr(state, rhs);
+                compile_expr(state, _and_rhs);
                 patch_jump(state, jz_pos, current_pos(state));
             } else {
                 if op == "||" {
                     // Short-circuit: Dup → Jz(false) → Jmp(end) → false: Pop → rhs → end
+                    // Save rhs before compile_expr(lhs) — lhs compilation overwrites global rhs
+                    push(_ce_stack, rhs);
                     compile_expr(state, lhs);
+                    let _or_rhs = pop(_ce_stack);
                     emit_op(state, make_op_simple("Dup"));
                     let jz_pos = current_pos(state);
                     emit_op(state, make_op_num("Jz", 0));
@@ -471,7 +477,7 @@ fn compile_expr(state, expr) {
                     emit_op(state, make_op_num("Jmp", 0));
                     patch_jump(state, jz_pos, current_pos(state));
                     emit_op(state, make_op_simple("Pop"));
-                    compile_expr(state, rhs);
+                    compile_expr(state, _or_rhs);
                     patch_jump(state, jmp_pos, current_pos(state));
                 } else {
                     push(_ce_stack, op);
