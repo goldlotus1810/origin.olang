@@ -1,6 +1,9 @@
 // editor/main.ol — O Editor entry point
 
 pub fn editor_start(_path) {
+    // Enter raw mode (same as REPL but for editor)
+    __term_raw();
+
     let _cols = term_cols();
     let _rows = term_rows();
     if _cols < 10 { _cols = 80; };
@@ -15,6 +18,7 @@ pub fn editor_start(_path) {
     let _scroll = 0;
     let _running = 1;
 
+    term_hide_cursor();
     term_clear();
 
     while _running == 1 {
@@ -88,5 +92,6 @@ pub fn editor_start(_path) {
     term_clear();
     term_show_cursor();
     term_reset();
+    __term_cooked();
     return "O Editor closed";
 }

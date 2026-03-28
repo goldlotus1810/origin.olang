@@ -1564,6 +1564,9 @@ op_call:
     movabs  $0x9FC459281D29BE97, %rdx
     cmp     %rdx, %rax
     je      .call_array_push
+    movabs  $0x0CBCF741B3385697, %rdx
+    cmp     %rdx, %rax
+    je      .call_term_cooked
     jmp     .call_not_builtin
 
 .builtin_slot_153:
@@ -1771,6 +1774,12 @@ op_call:
     movabs  $0xF2DF815C9D57AEF3, %rdx
     cmp     %rdx, %rax
     je      .call_term_size
+    jmp     .call_not_builtin
+
+.builtin_slot_244:
+    movabs  $0x47027282D580C0F4, %rdx
+    cmp     %rdx, %rax
+    je      .call_term_raw
     jmp     .call_not_builtin
 
 .builtin_slot_245:
@@ -7266,6 +7275,56 @@ op_ret:
     movq    $F64_MARKER, 8(%r14)
     jmp     vm_loop
 
+# __term_raw() → set terminal to raw mode (no echo, no canonical)
+.call_term_raw:
+    add     %rcx, %r13
+    # Save current termios
+    lea     repl_termios_old(%rip), %rdx
+    mov     $0x5401, %esi               # TCGETS
+    xor     %edi, %edi
+    mov     $16, %eax
+    syscall
+    # Copy old → raw
+    lea     repl_termios_old(%rip), %rsi
+    lea     repl_termios_raw(%rip), %rdi
+    mov     $60, %ecx
+    rep     movsb
+    # Clear ICANON|ECHO in c_lflag
+    lea     repl_termios_raw(%rip), %rdi
+    movl    12(%rdi), %eax
+    and     $~0x0A, %eax
+    movl    %eax, 12(%rdi)
+    movb    $1, 23(%rdi)                # VMIN=1
+    movb    $0, 22(%rdi)                # VTIME=0
+    # Apply
+    lea     repl_termios_raw(%rip), %rdx
+    mov     $0x5402, %esi               # TCSETS
+    xor     %edi, %edi
+    mov     $16, %eax
+    syscall
+    movb    $1, repl_raw_mode(%rip)
+    # Return 0
+    sub     $16, %r14
+    xor     %eax, %eax
+    mov     %rax, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+# __term_cooked() → restore terminal to normal mode
+.call_term_cooked:
+    add     %rcx, %r13
+    lea     repl_termios_old(%rip), %rdx
+    mov     $0x5402, %esi               # TCSETS
+    xor     %edi, %edi
+    mov     $16, %eax
+    syscall
+    movb    $0, repl_raw_mode(%rip)
+    sub     $16, %r14
+    xor     %eax, %eax
+    mov     %rax, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
 .call_heap_used:
     add     %rcx, %r13
     mov     %r15, %rax
@@ -11261,7 +11320,7 @@ builtin_jump_table:
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .builtin_slot_243
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_244
     .quad   .builtin_slot_245
     .quad   .builtin_slot_246
     .quad   .call_not_builtin
