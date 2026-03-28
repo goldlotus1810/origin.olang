@@ -9677,15 +9677,14 @@ var_store_global:
     mov     (%rbx), %rcx               # total count
     test    %rcx, %rcx
     jle     .vsg_new
-    # Reverse search from LAST entry to 0 (full table, no frame limit)
+    # Reverse search — update most recent entry (consistent with var_load_hash)
     lea     -1(%rcx), %rdx
     imul    $24, %rdx
     lea     8(%rbx, %rdx), %rdi
-    mov     %rcx, %rdx                  # loop count = all entries
+    mov     %rcx, %rdx
 .vsg_search:
     cmp     (%rdi), %rax
     jne     .vsg_next
-    # Found — update in place
     mov     %r8, 8(%rdi)
     mov     %r9, 16(%rdi)
     pop     %rbx

@@ -34,6 +34,9 @@ let _g_warnings = [];
 let _g_warn_count = [0];
 let _g_output = [];
 let _g_pos = 0;
+// Heap boxes for compiler state (survive scope save/restore)
+let _g_pos_box = [0];           // _g_pos_box[0] = current bytecode position
+let _g_output_box = [0];       // _g_output_box[0] = output array reference
 let _g_for_depth = 0;
 let _g_ci_box = [0, 0];
 let _g_ci_buf = 0;
@@ -101,9 +104,8 @@ let _g_output_ready = 0;
 fn _prefill_output() {
     // Only allocate ONCE — reuse on subsequent calls
     if _g_output_ready == 0 {
-        // Use __array_range to allocate exact size in ONE shot (no relocation!)
-        // Values [0..16383] will be overwritten by set_at during codegen
         _g_output = __array_range(65536);
+        set_at(_g_output_box, 0, _g_output);
         _g_output_ready = 1;
     };
     // NOTE: _g_pos NOT reset here — streaming compiler accumulates.
@@ -129,8 +131,9 @@ fn new_state() {
 
 // Direct bytecode emission — no IR buffer, no heap corruption
 fn _emit_byte(state, _eb_val) {
-    set_at(_g_output, _g_pos, _eb_val);
-    _g_pos = _g_pos + 1;
+    let _eb_pos = _g_pos_box[0];
+    set_at(_g_output_box[0], _eb_pos, _eb_val);
+    set_at(_g_pos_box, 0, _eb_pos + 1);
 }
 
 fn _emit_u32_le(state, _eu_val) {
@@ -272,16 +275,17 @@ fn emit_op(state, _op) {
 }
 
 fn current_pos(state) {
-    return _g_pos;
+    return _g_pos_box[0];
 }
 
 fn patch_jump(state, pos, target) {
     // Patch 4-byte LE u32 at pos+1 (after opcode byte)
     let _pj_pos = pos + 1;
-    set_at(_g_output, _pj_pos, target % 256);
-    set_at(_g_output, _pj_pos + 1, (target / 256) % 256);
-    set_at(_g_output, _pj_pos + 2, (target / 65536) % 256);
-    set_at(_g_output, _pj_pos + 3, (target / 16777216) % 256);
+    let _pj_out = _g_output_box[0];
+    set_at(_pj_out, _pj_pos, target % 256);
+    set_at(_pj_out, _pj_pos + 1, (target / 256) % 256);
+    set_at(_pj_out, _pj_pos + 2, (target / 65536) % 256);
+    set_at(_pj_out, _pj_pos + 3, (target / 16777216) % 256);
 }
 
 fn is_local(state, name) {
@@ -1584,7 +1588,7 @@ fn compile_expr(state, expr) {
             // Patch EnterFrame slot count
             let _lm_total = len(__g_fn_slot_map);
             if _lm_total > _lm_pcnt {
-                set_at(_g_output, _lm_enter_pos, _lm_total);
+                set_at(_g_output_box[0], _lm_enter_pos, _lm_total);
             };
             // Restore outer register state
             __g_fn_in_function = pop(_ce_stack);
@@ -1593,10 +1597,10 @@ fn compile_expr(state, expr) {
             // Patch body_len: body starts right after the 4-byte body_len field
             let _lm_body_len = current_pos(state) - _lm_blen_pos - 4;
             if _lm_body_len < 0 { _lm_body_len = 0; };
-            set_at(_g_output, _lm_blen_pos, _lm_body_len % 256);
-            set_at(_g_output, _lm_blen_pos + 1, __floor((_lm_body_len / 256)) % 256);
-            set_at(_g_output, _lm_blen_pos + 2, __floor((_lm_body_len / 65536)) % 256);
-            set_at(_g_output, _lm_blen_pos + 3, __floor((_lm_body_len / 16777216)) % 256);
+            set_at(_g_output_box[0], _lm_blen_pos, _lm_body_len % 256);
+            set_at(_g_output_box[0], _lm_blen_pos + 1, __floor((_lm_body_len / 256)) % 256);
+            set_at(_g_output_box[0], _lm_blen_pos + 2, __floor((_lm_body_len / 65536)) % 256);
+            set_at(_g_output_box[0], _lm_blen_pos + 3, __floor((_lm_body_len / 16777216)) % 256);
             // Closure value is now on stack (pushed by cg_closure opcode)
         },
         _ => {
@@ -1719,7 +1723,7 @@ fn compile_stmt(state, stmt) {
             __g_fn_in_function = pop(_ce_stack);
             _fn_slot_map = pop(_ce_stack);
             if _fn_total_slots > _fn_pcnt {
-                set_at(_g_output, _fn_enter_pos, _fn_total_slots);
+                set_at(_g_output_box[0], _fn_enter_pos, _fn_total_slots);
             };
             restore_locals(state, _fn_saved);
             // Restore TRO context
@@ -1730,10 +1734,10 @@ fn compile_stmt(state, stmt) {
             // Closure instruction = [0x25][param_count:1][body_len:4] = 6 bytes
             let _fn_body_len = current_pos(state) - _fn_closure_pos - 6;
             let _fn_bpos = _fn_closure_pos + 2;
-            set_at(_g_output, _fn_bpos, _fn_body_len % 256);
-            set_at(_g_output, _fn_bpos + 1, (_fn_body_len / 256) % 256);
-            set_at(_g_output, _fn_bpos + 2, (_fn_body_len / 65536) % 256);
-            set_at(_g_output, _fn_bpos + 3, (_fn_body_len / 16777216) % 256);
+            set_at(_g_output_box[0], _fn_bpos, _fn_body_len % 256);
+            set_at(_g_output_box[0], _fn_bpos + 1, (_fn_body_len / 256) % 256);
+            set_at(_g_output_box[0], _fn_bpos + 2, (_fn_body_len / 65536) % 256);
+            set_at(_g_output_box[0], _fn_bpos + 3, (_fn_body_len / 16777216) % 256);
             // Store closure in var_table
             emit_op(state, make_op_name("Store", _fn_name));
         },
@@ -2224,8 +2228,7 @@ pub fn analyze(ast) {
     // Validate
     validate(state);
 
-    // Save results to box BEFORE this function returns (scope restore loses them)
-    set_at(_g_ci_box, 0, _g_pos);
+    // (box-based _g_pos_box is used by _emit_byte — no need to save here)
 
     return state;
 }
@@ -2235,19 +2238,21 @@ pub fn analyze(ast) {
 pub fn get_compiled_bytes() {
     let _gcb_result = [];
     let _gcb_i = 0;
-    while _gcb_i < _g_pos {
-        push(_gcb_result, __array_get(_g_output, _gcb_i));
+    let _gcb_pos = _g_pos_box[0];
+    let _gcb_out = _g_output_box[0];
+    while _gcb_i < _gcb_pos {
+        push(_gcb_result, __array_get(_gcb_out, _gcb_i));
         _gcb_i = _gcb_i + 1;
     };
     return _gcb_result;
 }
 
 pub fn get_compiled_pos() {
-    return _g_pos;
+    return _g_pos_box[0];
 }
 
 pub fn reset_compiler() {
-    _g_pos = 0;
+    set_at(_g_pos_box, 0, 0);
     // Reset compiler stacks to prevent accumulation across files
     let _ce_stack = __array_with_cap(512);
     let _if_stack = __array_with_cap(512);
@@ -2269,19 +2274,8 @@ pub fn reset_compiler() {
 
 // Isolated compilation: fresh buffer, compile, extract via box, restore
 pub fn compile_isolated(_ci_ast) {
-    // Save _g_output ref to box[1] so _emit_byte can find it via box
-    set_at(_g_ci_box, 1, _g_output);
-    _g_pos = 0;
+    set_at(_g_pos_box, 0, 0);
+    _prefill_output();
     analyze(_ci_ast);
-    // analyze saved _g_pos to _g_ci_box[0]
-    let _ci_size = _g_ci_box[0];
-    // Read from box[1] (the array _emit_byte wrote to, persists via box)
-    let _ci_ref = _g_ci_box[1];
-    let _ci_result = [];
-    let _ci_i = 0;
-    while _ci_i < _ci_size {
-        push(_ci_result, __array_get(_ci_ref, _ci_i));
-        _ci_i = _ci_i + 1;
-    };
-    return _ci_result;
+    return get_compiled_bytes();
 }

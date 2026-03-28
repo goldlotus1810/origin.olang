@@ -227,7 +227,7 @@ pub fn repl_eval(input) {
       let _rc_ntok = len(_rc_tokens);
       // Stream compile: parse+analyze one statement at a time
       _prefill_output();
-      _g_pos = 0;
+      set_at(_g_pos_box, 0, 0);
       let _rc_parser = { tokens: _rc_tokens, pos: 0 };
       _g_parse_error = 0;
       let _rc_stmts = 0;
@@ -245,7 +245,7 @@ pub fn repl_eval(input) {
         analyze(_rc_ast1);
         _rc_stmts = _rc_stmts + 1;
       };
-      return "Compiled " + _rc_path + ": " + __to_string(len(_rc_src)) + " chars → " + __to_string(_rc_ntok) + " tokens → " + __to_string(_g_pos) + " bytes (" + __to_string(_rc_stmts) + " stmts)";
+      return "Compiled " + _rc_path + ": " + __to_string(len(_rc_src)) + " chars → " + __to_string(_rc_ntok) + " tokens → " + __to_string(_g_pos_box[0]) + " bytes (" + __to_string(_rc_stmts) + " stmts)";
     };
   }
 
@@ -437,7 +437,7 @@ pub fn repl_eval(input) {
   }
 
   // Phase 3: Semantic analysis
-  _g_pos = 0;
+  set_at(_g_pos_box, 0, 0);
   let state = analyze(ast);
 
   // Phase 3.5: Show compiler warnings
@@ -450,7 +450,7 @@ pub fn repl_eval(input) {
 
   // Phase 4: Bytecode in _g_output (pre-filled array with set_at, no push)
   let bc = _g_output;
-  if _g_pos == 0 { return ""; }
+  if _g_pos_box[0] == 0 { return ""; }
 
   // Phase 5: Execute compiled bytecode
   return __eval_bytecode(bc);

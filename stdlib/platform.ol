@@ -8,7 +8,6 @@
 //   let m = platform.memory();   // total memory in bytes (0 if unavailable)
 // ────────────────────────────────────────────────────────────────────────────
 
-mod platform;
 
 // CPU architecture string.
 // Returns: "x86_64", "x86", "aarch64", "arm", "riscv64", "riscv32",
