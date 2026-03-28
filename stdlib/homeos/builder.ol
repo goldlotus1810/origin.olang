@@ -126,43 +126,23 @@ fn compile_all(_ca_stdlib_path) {
 let _cd_global_count = [0];
 let _cd_max_files = [999];   // Set to N for testing, 999 for unlimited
 
-fn compile_dir(_cd_dir, _cd_output) {
-  let _cd_files = list_ol_files(_cd_dir);
-  let _cd_i = 0;
-  while _cd_i < len(_cd_files) {
-    if _cd_global_count[0] >= _cd_max_files[0] { _cd_i = len(_cd_files); }
-    else {
-    let _cd_fname = _cd_files[_cd_i];
-    // Skip known-crashing files in --build mode (compiler limitation)
-    let _cd_skip = 0;
-    if len(__str_find(_cd_fname, "sort.ol")) > 0 { _cd_skip = 1; };
-    if len(__str_find(_cd_fname, "_compile_one")) > 0 { _cd_skip = 1; };
-    if len(__str_find(_cd_fname, "_run_compile")) > 0 { _cd_skip = 1; };
-    if _cd_skip == 1 { emit "  " + _cd_fname + " → SKIP (known)"; _cd_i = _cd_i + 1; } else {
-    emit "  [#" + __to_string(_cd_i) + " heap=" + __to_string(__heap_used()) + "]";
-    let _cd_src = file_read_string(_cd_fname);
-    try {
-      let _cd_bc = compile_source(_cd_src);
-      let _cd_bclen = len(_cd_bc);
-      emit "  " + _cd_fname + " → " + __to_string(_cd_bclen) + " bytes";
-      // Replace trailing Halt (0x0F) with Nop — files concatenated, keep Jmp targets valid
-      if _cd_bclen > 0 {
-        if _cd_bc[_cd_bclen - 1] == 15 { set_at(_cd_bc, _cd_bclen - 1, 18); };
-        // Relocate Jmp/Jz/TryBegin targets by base offset
-        let _cd_base = len(_cd_output);
-        if _cd_base > 0 { relocate_jumps(_cd_bc, _cd_bclen, _cd_base); };
-        let _cd_bi = 0;
-        while _cd_bi < _cd_bclen { push(_cd_output, _cd_bc[_cd_bi]); _cd_bi = _cd_bi + 1; };
-      };
-    } catch {
-      emit "  " + _cd_fname + " → SKIP";
-      // Reset compiler state after failed compile to prevent partial bytecode
-      set_at(_g_pos_box, 0, 0);
+fn compile_dir(_xcd_dir, _xcd_output) {
+  let _xcd_flist = list_ol_files(_xcd_dir);
+  let _xcd_idx = 0;
+  while _xcd_idx < len(_xcd_flist) {
+    let _xcd_fname = _xcd_flist[_xcd_idx];
+    let _xcd_src = file_read_string(_xcd_fname);
+    let _xcd_bc = compile_source(_xcd_src);
+    let _xcd_bclen = len(_xcd_bc);
+    emit "  " + _xcd_fname + " → " + __to_string(_xcd_bclen) + " bytes";
+    if _xcd_bclen > 0 {
+      if __floor(_xcd_bc[_xcd_bclen - 1]) == 15 { set_at(_xcd_bc, _xcd_bclen - 1, 18); };
+      let _xcd_base = len(_xcd_output);
+      if _xcd_base > 0 { relocate_jumps(_xcd_bc, _xcd_bclen, _xcd_base); };
+      let _xcd_bi = 0;
+      while _xcd_bi < _xcd_bclen { push(_xcd_output, _xcd_bc[_xcd_bi]); _xcd_bi = _xcd_bi + 1; };
     };
-    set_at(_cd_global_count, 0, _cd_global_count[0] + 1);
-    _cd_i = _cd_i + 1;
-    };
-    };
+    _xcd_idx = _xcd_idx + 1;
   };
 };
 
