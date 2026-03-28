@@ -226,3 +226,9 @@
 {"ts":"2026-03-28 08:33","type":"emotion_encode","msg":"toi vui"}
 {"ts":"2026-03-28 08:33","type":"safety_check","msg":"hello"}
 {"ts":"2026-03-28 08:33","type":"nox_status","msg":""}
+{"ts":"2026-03-28 08:47","type":"olang_eval","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 08:47","type":"know_learn","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 08:47","type":"know_query","msg":"12345"}
+{"ts":"2026-03-28 08:47","type":"emotion_encode","msg":"toi vui"}
+{"ts":"2026-03-28 08:47","type":"safety_check","msg":"hello"}
+{"ts":"2026-03-28 08:47","type":"nox_status","msg":""}
