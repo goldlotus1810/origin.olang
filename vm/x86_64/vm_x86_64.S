@@ -8347,14 +8347,20 @@ op_ret:
     je      .throw_no_handler
 
     # Pop try frame
-    decq    (%rsi)                      # depth--
+    decq    (%rsi)                      # try_depth--
     mov     (%rsi), %rdx               # new depth
     lea     try_stack(%rip), %rdi
-    shl     $4, %rdx                    # depth * 16
-    mov     (%rdi, %rdx), %rax         # catch_PC
-    mov     8(%rdi, %rdx), %r14        # restore stack pointer
+    imul    $32, %rdx                   # depth * 32 (expanded entry)
+    mov     (%rdi, %rdx), %rcx         # catch_PC → rcx (temp)
+    mov     8(%rdi, %rdx), %r14        # restore VM stack pointer
+    # Restore closure_depth and CPU stack (exception unwind)
+    mov     16(%rdi, %rdx), %rax       # saved closure_depth
+    lea     closure_depth(%rip), %rsi
+    mov     %rax, (%rsi)               # restore closure_depth
+    mov     24(%rdi, %rdx), %rsp       # restore CPU stack pointer
+    mov     %rcx, %rax                 # catch_PC → rax
 
-    # Push error message onto restored stack (catch block can access it)
+    # Push error message onto restored VM stack
     sub     $16, %r14
     mov     %r8, (%r14)
     mov     %r9, 8(%r14)
@@ -8454,12 +8460,15 @@ op_try_begin:
     lea     try_depth(%rip), %rsi
     mov     (%rsi), %rdx               # depth
     lea     try_stack(%rip), %rdi
-    shl     $4, %rdx                    # depth * 16
+    imul    $32, %rdx                   # depth * 32 (expanded entry)
     lea     (%rdi, %rdx), %rdi         # try_stack[depth]
     mov     %rax, (%rdi)               # catch_PC
-    mov     %r14, 8(%rdi)              # saved stack pointer
-    lea     try_depth(%rip), %rsi
-    incq    (%rsi)                      # depth++
+    mov     %r14, 8(%rdi)              # saved VM stack pointer
+    lea     closure_depth(%rip), %rsi
+    mov     (%rsi), %rax
+    mov     %rax, 16(%rdi)             # saved closure_depth
+    mov     %rsp, 24(%rdi)             # saved CPU stack pointer
+    incq    (%rsi)                      # try_depth++
     jmp     vm_loop
 
 op_catch_end:
@@ -11933,7 +11942,7 @@ rx_alt_patch:
 fn_registry_count:
     .space 8                            # number of registered functions
 try_stack:
-    .space 256                          # 16 try frames × 16 bytes (catch_PC:8 + saved_r14:8)
+    .space 512                          # 16 try frames × 32 bytes (catch_PC:8 + r14:8 + closure_depth:8 + rsp:8)
 try_depth:
     .space 8                            # current try nesting depth (0 = no try)
 throw_buf:
