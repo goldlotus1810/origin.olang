@@ -542,6 +542,44 @@ fi
 
 echo ""
 
+# ─── SECTION: Closure capture tests ─────────────────────────
+echo -e "${CYAN}── Closure capture ──${NC}"
+
+run_olang_test "closure/capture" \
+    'fn mk(x){return fn(y){return x+y;};};let a=mk(5);emit __to_string(a(10));' "15"
+
+run_olang_test "closure/multi" \
+    'fn mk(x){return fn(y){return x*y;};};let d=mk(2);let t=mk(3);emit __to_string(d(7)+t(7));' "35"
+
+run_olang_test "closure/compose" \
+    'fn comp(f,g){return fn(x){return f(g(x));};};let c=comp(fn(x){return x+1;},fn(x){return x*2;});emit __to_string(c(5));' "11"
+
+run_olang_test "closure/apply" \
+    'fn mk(x){return fn(y){return x+y;};};let a=mk(5);fn go(f){return f(10);};emit __to_string(go(a));' "15"
+
+run_olang_test "closure/string" \
+    'fn greet(p){return fn(n){return p+" "+n;};};let h=greet("Hi");emit h("Nox");' "Hi Nox"
+
+# ─── SECTION: Ghost entries regression ─────────────────────
+echo -e "${CYAN}── Ghost entries ──${NC}"
+
+run_olang_test "ghost/param_reuse" \
+    'fn comp(f,g){return fn(x){return f(g(x));};};let c=comp(fn(x){return x+1;},fn(x){return x*2;});fn go(f){return f(10);};fn mk(x){return fn(y){return x+y;};};let a=mk(5);emit __to_string(go(a));' "15"
+
+run_olang_test "ghost/nested_if" \
+    'fn check(n){let r=0;if n>=10{if n<=20{r=1;};};return r;};emit __to_string(check(5))+__to_string(check(15))+__to_string(check(25));' "010"
+
+# ─── SECTION: System builtin ────────────────────────────────
+echo -e "${CYAN}── System ──${NC}"
+
+run_olang_test "system/echo" \
+    'let r=__system("echo hello");emit r;' "hello"
+
+run_olang_test "system/readdir" \
+    'let f=__readdir("stdlib/editor");emit __to_string(len(f)>0);' "1"
+
+echo ""
+
 # ═══════════════════════════════════════════════════════════════
 # REPORT
 # ═══════════════════════════════════════════════════════════════
