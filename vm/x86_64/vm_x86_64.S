@@ -23,7 +23,7 @@
 .globl _start
 
 # ── Constants ────────────────────────────────────────────────────────────
-.equ STACK_SIZE,    0x100000        # 1 MB VM stack
+.equ STACK_SIZE,    0x1000000       # 16 MB VM stack
 .equ HEAP_SIZE,     0x40000000      # 1 GB heap arena
 .equ HEADER_SIZE,   32
 .equ ELF_HEADER_SIZE, 120           # ELF64 header + 1 program header
@@ -254,7 +254,7 @@ _start:
     test    %rax, %rax
     js      err_mmap
     mov     %rax, %r14                  # r14 = VM stack base
-    add     $(STACK_SIZE - 256), %r14   # stack grows downward (256B guard for underflow)
+    add     $(STACK_SIZE / 2), %r14      # stack grows downward (use half of stack as guard)
     # Save stack top for debug
     mov     %r14, (%rax)
 
