@@ -42,7 +42,7 @@
 .equ REG_MAX_SLOTS,  64             # max locals per function
 .equ REG_SLOT_SIZE,  16             # [ptr:8][len:8] per slot
 .equ REG_FRAME_SIZE, 1024           # REG_MAX_SLOTS * REG_SLOT_SIZE
-.equ REG_STACK_SIZE, 0x400000       # 4MB register stack (4096 frames)
+.equ REG_STACK_SIZE, 0x1000000      # 16MB register stack
 
 # ── Syscall numbers ─────────────────────────────────────────────────────
 .equ SYS_READ,      0
@@ -9560,8 +9560,8 @@ var_table_init:
     lea     var_table_base(%rip), %rcx
     mov     %rax, (%rcx)               # save table base address
     movq    $0, (%r15)                  # count = 0
-    # Reserve 4096 entries × 24 bytes + 8 header = 98312 bytes
-    add     $98312, %r15
+    # Reserve 16384 entries × 24 bytes + 8 header = 393224 bytes
+    add     $393224, %r15
     # Initialize var shadow stack (for closure scoping)
     mov     %r15, %rax
     lea     var_shadow_base(%rip), %rcx
@@ -11902,7 +11902,7 @@ _save_rbx:
 scope_gen:
     .space 8                            # scope generation counter (for cache invalidation)
 scope_frame_ptrs:
-    .space 32768                        # 4096 frame pointers × 8 bytes (max recursion depth)
+    .space 131072                       # 16384 frame pointers × 8 bytes (max recursion depth)
     .align 8
 # ── Register frame stack ──
 reg_frame_base:

@@ -36,6 +36,7 @@ let _g_output = [];
 let _g_pos = 0;
 let _g_for_depth = 0;
 let _g_ci_box = [0, 0];
+let _g_ci_buf = 0;
 let __g_for_vars = ["", "", "", "", "", "", "", ""];  // max 8 nesting levels
 let _g_semantic_comp_depth = 0;
 
@@ -2247,7 +2248,22 @@ pub fn get_compiled_pos() {
 }
 
 pub fn reset_compiler() {
-    let _g_pos = 0;
+    _g_pos = 0;
+    // Reset compiler stacks to prevent accumulation across files
+    let _ce_stack = __array_with_cap(512);
+    let _if_stack = __array_with_cap(512);
+    let _break_patches = [];
+    let _continue_patches = [];
+    let _ce_locals = __array_with_cap(256);
+    let _ce_lc = [0];
+    let __const_names = [];
+    let __g_fn_slot_map = [];
+    let __g_fn_in_function = 0;
+    let _g_tro_fn = "";
+    let _g_tro_params = [];
+    let _g_tro_start = 0;
+    let _g_warnings = [];
+    let _g_warn_count = [0];
 }
 
 // Mutable box defined at top of file (line 38)
@@ -2257,7 +2273,7 @@ pub fn compile_isolated(_ci_ast) {
     // Save outer state
     let _ci_saved_output = _g_output;
     let _ci_saved_pos = _g_pos;
-    // Allocate fresh output buffer
+    // Fresh buffer each time
     let _g_output = __array_range(65536);
     let _g_output_ready = 1;
     let _g_pos = 0;
