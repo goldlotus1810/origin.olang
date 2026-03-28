@@ -123,16 +123,24 @@ fn compile_all(_ca_stdlib_path) {
   return _ca_all_bc;
 };
 
+let _cd_global_count = [0];
+let _cd_max_files = [999];   // Set to N for testing, 999 for unlimited
+
 fn compile_dir(_cd_dir, _cd_output) {
   let _cd_files = list_ol_files(_cd_dir);
   let _cd_i = 0;
   while _cd_i < len(_cd_files) {
+    if _cd_global_count[0] >= _cd_max_files[0] { _cd_i = len(_cd_files); }
+    else {
     let _cd_fname = _cd_files[_cd_i];
     // Skip known-crashing files in --build mode (compiler limitation)
     let _cd_skip = 0;
     if len(__str_find(_cd_fname, "sort.ol")) > 0 { _cd_skip = 1; };
     if len(__str_find(_cd_fname, "_compile_one")) > 0 { _cd_skip = 1; };
     if len(__str_find(_cd_fname, "_run_compile")) > 0 { _cd_skip = 1; };
+    if len(__str_find(_cd_fname, "lexer.ol")) > 0 { _cd_skip = 1; };
+    if len(__str_find(_cd_fname, "parser.ol")) > 0 { _cd_skip = 1; };
+    if len(__str_find(_cd_fname, "semantic.ol")) > 0 { _cd_skip = 1; };
     if _cd_skip == 1 { emit "  " + _cd_fname + " → SKIP (known)"; _cd_i = _cd_i + 1; } else {
     emit "  [#" + __to_string(_cd_i) + " heap=" + __to_string(__heap_used()) + "]";
     let _cd_src = file_read_string(_cd_fname);
@@ -151,8 +159,12 @@ fn compile_dir(_cd_dir, _cd_output) {
       };
     } catch {
       emit "  " + _cd_fname + " → SKIP";
+      // Reset compiler state after failed compile to prevent partial bytecode
+      set_at(_g_pos_box, 0, 0);
     };
+    set_at(_cd_global_count, 0, _cd_global_count[0] + 1);
     _cd_i = _cd_i + 1;
+    };
     };
   };
 };
