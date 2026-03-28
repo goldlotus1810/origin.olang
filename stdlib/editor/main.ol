@@ -1,10 +1,7 @@
 // editor/main.ol — O Editor entry point
 
 pub fn editor_start(_path) {
-    __write_raw("O Editor starting...\n");
-    // Enter raw mode (same as REPL but for editor)
     let _tr = __term_raw();
-    __write_raw("Raw mode set. Reading keys...\n");
 
     let _cols = term_cols();
     let _rows = term_rows();
@@ -20,6 +17,8 @@ pub fn editor_start(_path) {
     let _scroll = 0;
     let _running = 1;
 
+    // Enter alternate screen buffer (like vim/htop)
+    __write_raw(__esc()); __write_raw("[?1049h");
     term_hide_cursor();
     term_clear();
     let _need_render = 1;
@@ -97,7 +96,8 @@ pub fn editor_start(_path) {
         };
     };
 
-    term_clear();
+    // Leave alternate screen buffer
+    __write_raw(__esc()); __write_raw("[?1049l");
     term_show_cursor();
     term_reset();
     __term_cooked();
