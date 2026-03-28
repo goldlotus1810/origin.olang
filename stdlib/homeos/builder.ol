@@ -95,7 +95,6 @@ fn build_wasm(config, bytecode) {
 fn compile_all(_ca_stdlib_path) {
   let _ca_all_bc = [];
 
-  // Compile bootstrap + stdlib root only (binary search for boot crash)
   // Full build
   emit "  Compiling: bootstrap";
   compile_dir(_ca_stdlib_path + "/bootstrap", _ca_all_bc);

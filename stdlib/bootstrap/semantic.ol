@@ -137,10 +137,10 @@ fn _emit_byte(state, _eb_val) {
 }
 
 fn _emit_u32_le(state, _eu_val) {
-    _emit_byte(state, _eu_val % 256);
-    _emit_byte(state, (_eu_val / 256) % 256);
-    _emit_byte(state, (_eu_val / 65536) % 256);
-    _emit_byte(state, (_eu_val / 16777216) % 256);
+    _emit_byte(state, __floor(_eu_val) % 256);
+    _emit_byte(state, __floor(_eu_val / 256) % 256);
+    _emit_byte(state, __floor(_eu_val / 65536) % 256);
+    _emit_byte(state, __floor(_eu_val / 16777216) % 256);
 }
 
 fn _emit_f64_le(state, _ef_val) {
@@ -167,7 +167,7 @@ fn _emit_str_u16(state, _esu_str) {
     let _esu_bytes = __str_bytes(_esu_str);
     let _esu_len = len(_esu_bytes);
     _emit_byte(state, _esu_len % 256);
-    _emit_byte(state, (_esu_len / 256) % 256);
+    _emit_byte(state, __floor(_esu_len / 256) % 256);
     let _esu_i = 0;
     while _esu_i < _esu_len {
         _emit_byte(state, _esu_bytes[_esu_i]);
@@ -282,10 +282,10 @@ fn patch_jump(state, pos, target) {
     // Patch 4-byte LE u32 at pos+1 (after opcode byte)
     let _pj_pos = pos + 1;
     let _pj_out = _g_output_box[0];
-    set_at(_pj_out, _pj_pos, target % 256);
-    set_at(_pj_out, _pj_pos + 1, (target / 256) % 256);
-    set_at(_pj_out, _pj_pos + 2, (target / 65536) % 256);
-    set_at(_pj_out, _pj_pos + 3, (target / 16777216) % 256);
+    set_at(_pj_out, _pj_pos, __floor(target) % 256);
+    set_at(_pj_out, _pj_pos + 1, __floor(target / 256) % 256);
+    set_at(_pj_out, _pj_pos + 2, __floor(target / 65536) % 256);
+    set_at(_pj_out, _pj_pos + 3, __floor(target / 16777216) % 256);
 }
 
 fn is_local(state, name) {
@@ -1735,9 +1735,9 @@ fn compile_stmt(state, stmt) {
             let _fn_body_len = current_pos(state) - _fn_closure_pos - 6;
             let _fn_bpos = _fn_closure_pos + 2;
             set_at(_g_output_box[0], _fn_bpos, _fn_body_len % 256);
-            set_at(_g_output_box[0], _fn_bpos + 1, (_fn_body_len / 256) % 256);
-            set_at(_g_output_box[0], _fn_bpos + 2, (_fn_body_len / 65536) % 256);
-            set_at(_g_output_box[0], _fn_bpos + 3, (_fn_body_len / 16777216) % 256);
+            set_at(_g_output_box[0], _fn_bpos + 1, __floor(_fn_body_len / 256) % 256);
+            set_at(_g_output_box[0], _fn_bpos + 2, __floor(_fn_body_len / 65536) % 256);
+            set_at(_g_output_box[0], _fn_bpos + 3, __floor(_fn_body_len / 16777216) % 256);
             // Store closure in var_table
             emit_op(state, make_op_name("Store", _fn_name));
         },
