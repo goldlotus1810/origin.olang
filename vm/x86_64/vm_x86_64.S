@@ -121,6 +121,11 @@ _start:
     jne     .not_editor
     movb    $1, eval_mode(%rip)         # use eval mode (stdin)
     movb    $1, editor_flag(%rip)       # flag: launch editor after boot
+    # Check if argv[2] exists (filename to open)
+    cmpq    $3, (%rsp)                  # argc >= 3?
+    jb      .open_self
+    mov     24(%rsp), %rax              # argv[2] = filename
+    mov     %rax, editor_path(%rip)
     jmp     .open_self
 .not_editor:
     mov     16(%rsp), %rdi              # argv[1] = filename
@@ -4889,7 +4894,7 @@ op_call:
     push    %rax
     mov     %r15, %rbp
     movq    $0, (%r15)
-    add     $8, %r15
+    add     $8008, %r15                 # reserve 500 element slots (500*16+8)
 .rd_gd:
     mov     $SYS_GETDENTS64, %eax
     mov     (%rsp), %edi
@@ -10378,15 +10383,34 @@ op_halt:
     mov     %rax, eval_buf(%rip)
     add     $0x10000, %r15
 
-    # Check editor flag — inject editor_start("") instead of reading stdin
+    # Check editor flag — inject editor_start("path") instead of reading stdin
     cmpb    $1, editor_flag(%rip)
     jne     .eval_read_stdin
-    # Copy "editor_start(\"\")" into buffer
-    lea     editor_cmd(%rip), %rsi
+    # Build: emit editor_start("path");\n
     mov     eval_buf(%rip), %rdi
-    mov     $23, %ecx                   # len("emit editor_start(\"\");\n")
+    # Copy prefix: emit editor_start("
+    lea     editor_prefix(%rip), %rsi
+    mov     $19, %ecx                   # len('emit editor_start("')
     rep     movsb
-    mov     $23, %rax                   # total = 23 bytes
+    # Copy filename if present
+    mov     editor_path(%rip), %rsi
+    test    %rsi, %rsi
+    jz      .editor_no_path
+.editor_copy_path:
+    lodsb
+    test    %al, %al
+    jz      .editor_no_path
+    stosb
+    jmp     .editor_copy_path
+.editor_no_path:
+    # Copy suffix: ");\n
+    lea     editor_suffix(%rip), %rsi
+    mov     $4, %ecx                    # len('");\n')
+    rep     movsb
+    # Calculate total length
+    mov     eval_buf(%rip), %rsi
+    mov     %rdi, %rax
+    sub     %rsi, %rax                  # rax = total bytes written
     jmp     .eval_have_input
 .eval_read_stdin:
     # Read all stdin into buffer
@@ -10732,7 +10756,8 @@ print_hex_u64:
 
 dev_null_path: .asciz "/dev/null"
 dev_tty_path: .asciz "/dev/tty"
-editor_cmd: .ascii "emit editor_start(\"\");\n"
+editor_prefix: .ascii "emit editor_start(\""
+editor_suffix: .ascii "\");\n"
 repl_bs_seq: .byte 0x08, 0x20, 0x08       # backspace + space + backspace
 proc_self_exe:
     .asciz "/proc/self/exe"
@@ -11514,6 +11539,8 @@ heap_base:
     .space 8                            # saved heap start for __heap_used
 editor_flag:
     .space 1                            # 1 = launch editor after boot
+editor_path:
+    .space 8                            # pointer to argv[2] filename (or 0)
 tty_fd:
     .space 4                            # fd for /dev/tty (0 = not opened)
 repl_termios_old:
