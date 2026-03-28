@@ -1497,8 +1497,51 @@ fn compile_expr(state, expr) {
             let _lm_params = params;
             let _lm_body = body;
             let _lm_pcnt = len(_lm_params);
+
+            // Collect captures: outer locals that aren't lambda params
+            let _lm_captures = [];
+            let _lm_outer_count = len(state.locals);
+            let _lm_ci = 0;
+            while _lm_ci < _lm_outer_count {
+                let _lm_cname = __array_get(state.locals, _lm_ci);
+                // Check if it's a lambda param
+                let _lm_is_param = 0;
+                let _lm_pi2 = 0;
+                while _lm_pi2 < _lm_pcnt {
+                    if __array_get(_lm_params, _lm_pi2) == _lm_cname { _lm_is_param = 1; };
+                    _lm_pi2 = _lm_pi2 + 1;
+                };
+                if _lm_is_param == 0 { push(_lm_captures, _lm_cname); };
+                _lm_ci = _lm_ci + 1;
+            };
+
             let _lm_closure_pos = current_pos(state);
-            emit_op(state, make_op_num("Closure", _lm_pcnt));
+            let _lm_blen_pos = 0;
+            if len(_lm_captures) > 0 {
+                // Emit ClosureCapture (0x30)
+                _emit_byte(state, 0x30);
+                _emit_byte(state, _lm_pcnt);
+                _emit_byte(state, len(_lm_captures));
+                // Emit capture names
+                let _lm_cci = 0;
+                while _lm_cci < len(_lm_captures) {
+                    let _lm_cn = __array_get(_lm_captures, _lm_cci);
+                    let _lm_cnlen = len(_lm_cn);
+                    _emit_byte(state, _lm_cnlen);
+                    let _lm_cni = 0;
+                    while _lm_cni < _lm_cnlen {
+                        _emit_byte(state, __char_code(char_at(_lm_cn, _lm_cni)));
+                        _lm_cni = _lm_cni + 1;
+                    };
+                    _lm_cci = _lm_cci + 1;
+                };
+                // body_len placeholder (4 bytes) — record position for patching
+                _lm_blen_pos = current_pos(state);
+                _emit_u32_le(state, 0);
+            } else {
+                emit_op(state, make_op_num("Closure", _lm_pcnt));
+                _lm_blen_pos = _lm_closure_pos + 2;
+            };
             // Register frame for lambda
             let _lm_slot_map = [];
             _emit_byte(state, 0x28);               // EnterFrame
@@ -1540,14 +1583,13 @@ fn compile_expr(state, expr) {
             let __g_fn_in_function = pop(_ce_stack);
             let __g_fn_slot_map = pop(_ce_stack);
             restore_locals(state, _lm_saved);
-            // Patch body_len
-            let _lm_body_len = current_pos(state) - _lm_closure_pos - 6;
+            // Patch body_len: body starts right after the 4-byte body_len field
+            let _lm_body_len = current_pos(state) - _lm_blen_pos - 4;
             if _lm_body_len < 0 { _lm_body_len = 0; };
-            let _lm_bpos = _lm_closure_pos + 2;
-            set_at(_g_output, _lm_bpos, _lm_body_len % 256);
-            set_at(_g_output, _lm_bpos + 1, (_lm_body_len / 256) % 256);
-            set_at(_g_output, _lm_bpos + 2, (_lm_body_len / 65536) % 256);
-            set_at(_g_output, _lm_bpos + 3, (_lm_body_len / 16777216) % 256);
+            set_at(_g_output, _lm_blen_pos, _lm_body_len % 256);
+            set_at(_g_output, _lm_blen_pos + 1, __floor((_lm_body_len / 256)) % 256);
+            set_at(_g_output, _lm_blen_pos + 2, __floor((_lm_body_len / 65536)) % 256);
+            set_at(_g_output, _lm_blen_pos + 3, __floor((_lm_body_len / 16777216)) % 256);
             // Closure value is now on stack (pushed by cg_closure opcode)
         },
         _ => {

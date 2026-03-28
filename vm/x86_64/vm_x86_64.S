@@ -452,7 +452,7 @@ dispatch_codegen:
 .cg_not_builtin:
     lea     codegen_table(%rip), %rcx
     movzbl  %al, %eax
-    cmp     $0x2A, %al
+    cmp     $0x31, %al
     jae     op_unknown
     movslq  (%rcx, %rax, 4), %rdx
     add     %rcx, %rdx
@@ -503,6 +503,13 @@ codegen_table:
     .long op_store_reg    - codegen_table # 0x27 StoreReg(u8 slot)
     .long op_enter_frame  - codegen_table # 0x28 EnterFrame(u8 num_slots)
     .long op_leave_frame  - codegen_table # 0x29 LeaveFrame
+    .long op_nop          - codegen_table # 0x2A (unused)
+    .long op_nop          - codegen_table # 0x2B (unused)
+    .long op_nop          - codegen_table # 0x2C (unused)
+    .long op_nop          - codegen_table # 0x2D (unused)
+    .long op_nop          - codegen_table # 0x2E (unused)
+    .long op_nop          - codegen_table # 0x2F (unused)
+    .long cg_closure_cap  - codegen_table # 0x30 ClosureCapture
 .section .text
 
 # codegen Push: [chain_len:2 u16 LE][chain_bytes:N] → push raw bytes as chain
@@ -577,6 +584,86 @@ cg_closure:
     shl     $48, %rcx                   # param_count << 48
     orq     $CLOSURE_MARKER, %rcx       # combine with marker
     mov     %rcx, 8(%r14)              # store combined
+
+    # Jump over body
+    add     %eax, %r13d                 # PC += body_len
+    jmp     vm_loop
+
+# ── ClosureCapture: [0x30][param_count:1][capture_count:1][names...][body_len:4][body...]
+# Creates closure with captured variables from var_table.
+# Heap object: [body_pc:8][capture_count:8][(hash:8,ptr:8,len:8)×N]
+.equ CAPTURED_CLOSURE_MARKER, -6    # 0xFFFFFFFFFFFFFFFA
+
+cg_closure_cap:
+    movzbl  (%r12, %r13), %ecx         # param_count
+    inc     %r13
+    movzbl  (%r12, %r13), %edx         # capture_count
+    inc     %r13
+    push    %rcx                        # save param_count
+    push    %rdx                        # save capture_count
+
+    # Allocate heap object: [body_pc:8][capture_count:8][(hash:8,ptr:8,len:8)×N]
+    mov     %r15, %rbp                  # heap object start
+    add     $16, %r15                   # skip body_pc + capture_count fields
+    # For each capture: read name, hash it, look up in var_table, store on heap
+    mov     %edx, %ecx                  # loop counter = capture_count
+    test    %ecx, %ecx
+    jz      .cc_cap_done
+.cc_cap_loop:
+    push    %rcx                        # save remaining count
+    # Read name: [name_len:1][name_bytes:N]
+    movzbl  (%r12, %r13), %ecx         # name_len
+    inc     %r13
+    lea     (%r12, %r13), %rdi         # name ptr
+    mov     %ecx, %edx                  # name len for hash_name
+    push    %rcx
+    call    hash_name                   # → rax = hash
+    pop     %rcx
+    add     %rcx, %r13                  # skip name bytes
+    # Look up hash in var_table
+    push    %rax                        # save hash
+    call    var_load_hash               # → rax=ptr, rdx=len
+    mov     %rax, %r8                   # val_ptr
+    mov     %rdx, %r9                   # val_len
+    pop     %rax                        # restore hash
+    # Store capture on heap: [hash:8][ptr:8][len:8]
+    mov     %rax, (%r15)               # hash
+    mov     %r8, 8(%r15)               # val_ptr
+    mov     %r9, 16(%r15)              # val_len
+    add     $24, %r15                   # advance heap
+    pop     %rcx                        # restore remaining count
+    dec     %ecx
+    jnz     .cc_cap_loop
+.cc_cap_done:
+    pop     %rdx                        # restore capture_count
+    pop     %rcx                        # restore param_count
+
+    # Read body_len (after capture names)
+    movl    (%r12, %r13), %eax          # body_len (u32 LE)
+    add     $4, %r13
+
+    # Fill heap object header
+    # body_pc = current r13 (start of body), with eval flag if needed
+    lea     boot_bc_base(%rip), %rsi
+    cmp     (%rsi), %r12
+    je      .cc_cap_boot
+    # Eval context: absolute address with bit 63
+    lea     (%r12, %r13), %rdi
+    bts     $63, %rdi
+    mov     %rdi, (%rbp)               # body_pc (eval, bit 63 set)
+    jmp     .cc_cap_store
+.cc_cap_boot:
+    mov     %r13, (%rbp)               # body_pc (boot, relative)
+.cc_cap_store:
+    mov     %rdx, 8(%rbp)              # capture_count
+
+    # Push captured closure marker on VM stack
+    sub     $16, %r14
+    mov     %rbp, (%r14)               # heap ptr
+    shl     $48, %rcx                   # param_count << 48
+    movabs  $CAPTURED_CLOSURE_MARKER, %rdi
+    or      %rcx, %rdi
+    mov     %rdi, 8(%r14)              # marker
 
     # Jump over body
     add     %eax, %r13d                 # PC += body_len
@@ -680,10 +767,12 @@ cg_call_closure:
     # Check if it's a closure marker (len has CLOSURE_MARKER bits)
     mov     %rdx, %rsi
     and     $0xFFFF, %esi               # low 16 bits
+    cmp     $CAPTURED_CLOSURE_MARKER, %si  # captured closure?
+    je      .cc_is_captured
     cmp     $CLOSURE_MARKER, %si        # == 0xFFFE?
     jne     .cc_not_closure
 
-    # It's a closure — rax = body_pc, rdx has param_count in high bits
+    # It's a plain closure — rax = body_pc, rdx has param_count in high bits
     # Extract body_pc
     mov     %rax, %rdi                  # body_pc
 
@@ -709,6 +798,37 @@ cg_call_closure:
     mov     (%rax), %r12               # r12 = eval buffer base
     sub     %r12, %rdi                 # offset = absolute - base
     mov     %edi, %r13d               # PC = body offset within eval buffer
+    jmp     vm_loop
+
+.cc_is_captured:
+    # Captured closure via cg_call_closure path
+    # rax = heap_ptr, restore captures then call
+    mov     %rax, %rbp
+    push    %r12
+    push    %r13
+    mov     8(%rbp), %rcx              # capture_count
+    test    %rcx, %rcx
+    jz      .cc_cap2_done
+    lea     16(%rbp), %rsi
+.cc_cap2_loop:
+    push    %rcx
+    push    %rsi
+    mov     (%rsi), %rax
+    mov     8(%rsi), %r8
+    mov     16(%rsi), %r9
+    call    var_store_hash
+    pop     %rsi
+    pop     %rcx
+    add     $24, %rsi
+    dec     %rcx
+    jnz     .cc_cap2_loop
+.cc_cap2_done:
+    mov     (%rbp), %rdi               # body_pc
+    bt      $63, %rdi
+    jc      .cc_eval_closure
+    lea     boot_bc_base(%rip), %rax
+    mov     (%rax), %r12
+    mov     %edi, %r13d
     jmp     vm_loop
 
 .cc_not_closure:
@@ -1855,8 +1975,34 @@ op_call:
     mov     %r9, %rsi
     and     $0xFFFF, %esi
     cmp     $CLOSURE_MARKER, %si
+    je      .fnr_is_closure
+    cmp     $CAPTURED_CLOSURE_MARKER, %si
     jne     .call_skip                  # not a closure → skip
-    # It's a closure — call it (same as existing closure dispatch)
+    # Captured closure from fn_registry — restore captures
+    mov     %r8, %rbp                  # heap ptr
+    push    %r12
+    push    %r13
+    mov     8(%rbp), %rcx
+    test    %rcx, %rcx
+    jz      .fnr_cap_done
+    lea     16(%rbp), %rsi
+.fnr_cap_loop:
+    push    %rcx
+    push    %rsi
+    mov     (%rsi), %rax
+    mov     8(%rsi), %r8
+    mov     16(%rsi), %r9
+    call    var_store_hash
+    pop     %rsi
+    pop     %rcx
+    add     $24, %rsi
+    dec     %rcx
+    jnz     .fnr_cap_loop
+.fnr_cap_done:
+    mov     (%rbp), %rdi
+    jmp     .fnr_do_scope
+.fnr_is_closure:
+    # It's a plain closure — call it (same as existing closure dispatch)
     mov     %r8, %rax                   # body_pc
     push    %r12
     push    %r13
@@ -2033,8 +2179,39 @@ op_call:
     mov     %rdx, %rsi
     and     $0xFFFF, %esi
     cmp     $CLOSURE_MARKER, %si
+    je      .call_is_closure
+    cmp     $CAPTURED_CLOSURE_MARKER, %si
     jne     .call_skip
 
+    # Captured closure: restore captures first, then call
+    add     %rcx, %r13                  # PC past name bytes
+    push    %r12
+    push    %r13
+    # rax = heap_ptr to closure object
+    mov     %rax, %rbp                  # heap object base
+    mov     8(%rbp), %rcx              # capture_count
+    test    %rcx, %rcx
+    jz      .cc_restore_done
+    lea     16(%rbp), %rsi             # first capture entry
+.cc_restore_loop:
+    push    %rcx
+    push    %rsi
+    # Load capture: [hash:8][ptr:8][len:8]
+    mov     (%rsi), %rax               # hash
+    mov     8(%rsi), %r8               # val_ptr
+    mov     16(%rsi), %r9              # val_len
+    call    var_store_hash              # store into var_table
+    pop     %rsi
+    pop     %rcx
+    add     $24, %rsi                  # next capture
+    dec     %rcx
+    jnz     .cc_restore_loop
+.cc_restore_done:
+    # Now call the closure body
+    mov     (%rbp), %rdi               # body_pc from heap object
+    jmp     .closure_do_scope           # continue with scope save + dispatch
+
+.call_is_closure:
     # Found closure in var_table — call it
     add     %rcx, %r13                  # PC past name bytes
     push    %r12                        # save bytecode base (CPU stack)
