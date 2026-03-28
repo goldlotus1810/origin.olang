@@ -95,16 +95,14 @@ fn build_wasm(config, bytecode) {
 fn compile_all(_ca_stdlib_path) {
   let _ca_all_bc = [];
 
-  // Bootstrap first (compiler must be loaded before anything else)
+  // Compile bootstrap + stdlib root only (binary search for boot crash)
+  // Full build
   emit "  Compiling: bootstrap";
   compile_dir(_ca_stdlib_path + "/bootstrap", _ca_all_bc);
-  // Then stdlib root
   emit "  Compiling: stdlib root";
   compile_dir(_ca_stdlib_path, _ca_all_bc);
-  // Then homeos
   emit "  Compiling: homeos";
   compile_dir(_ca_stdlib_path + "/homeos", _ca_all_bc);
-  // Then editor
   emit "  Compiling: editor";
   compile_dir(_ca_stdlib_path + "/editor", _ca_all_bc);
 
