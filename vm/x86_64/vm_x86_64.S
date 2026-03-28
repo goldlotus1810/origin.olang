@@ -1094,10 +1094,14 @@ op_store:
     pop     %r8
     pop     %rcx
     add     %rcx, %r13
-    # Also register in fn_registry if value is a closure
+    # Register in fn_registry ONLY at top-level (depth==0)
+    # Inside functions (depth>0), closures are parameters, not definitions
     push    %rax
     push    %r8
     push    %r9
+    lea     closure_depth(%rip), %rcx
+    cmpq    $0, (%rcx)
+    jne     .op_store_not_closure       # depth>0 → skip fn_registry
     mov     %r9, %rcx
     and     $0xFFFF, %ecx
     cmp     $CLOSURE_MARKER, %cx
@@ -9832,18 +9836,27 @@ var_load_hash:
     test    %rcx, %rcx
     jz      .vlh_not_found
 
-    # Start from last entry, search down to 0
+    # FRAME-AWARE search: search current frame first, then fall back to full table
+    # This prevents finding ghost entries from sibling scopes
+    push    %rax                        # save hash
+    lea     closure_depth(%rip), %rdi
+    mov     (%rdi), %rdi               # depth
+    xor     %r10d, %r10d               # frame_start = 0
+    test    %rdi, %rdi
+    jz      .vlh_have_start
+    dec     %rdi
+    lea     scope_frame_ptrs(%rip), %r10
+    mov     (%r10, %rdi, 8), %r10d     # frame_start = depth_stack[depth-1]
+.vlh_have_start:
+    pop     %rax                        # restore hash
+    # Search from count-1 down to frame_start first
     lea     -1(%rcx), %rdx
     imul    $24, %rdx
     lea     8(%rbx, %rdx), %rdi
-    # rcx = entries to search (full table)
-    # BUT: also try frame-limited search first (current frame entries)
-    # to avoid finding ghost entries from sibling scopes
+    mov     %rcx, %rdx
+    sub     %r10, %rdx                  # entries in current frame
 
 .vlh_search:
-    # Skip entries with zeroed hash (dead entries from scope restore)
-    cmpq    $0, (%rdi)
-    je      .vlh_next
     cmp     (%rdi), %rax
     jne     .vlh_next
     # Found — update cache (256 slots)
@@ -9870,8 +9883,16 @@ var_load_hash:
     ret
 .vlh_next:
     sub     $24, %rdi
-    dec     %rcx
+    dec     %rdx
     jnz     .vlh_search
+    # Not found in current frame — fall back to searching below frame_start
+    test    %r10d, %r10d
+    jz      .vlh_not_found              # frame_start==0 → already searched all
+    mov     %r10, %rdx                  # entries below frame_start
+    test    %rdx, %rdx
+    jz      .vlh_not_found
+    xor     %r10d, %r10d               # prevent second fallback
+    jmp     .vlh_search
 
 .vlh_not_found:
     xor     %eax, %eax
