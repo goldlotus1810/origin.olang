@@ -6270,6 +6270,23 @@ op_ret:
     mov     (%rax, %rcx, 8), %rdx      # saved_count
     lea     var_table_base(%rip), %rdi
     mov     (%rdi), %rdi
+    # Zero-fill dead entries (saved_count..old_count) to prevent ghost lookups
+    push    %rdx
+    push    %rdi
+    mov     (%rdi), %rcx               # old_count
+    sub     %rdx, %rcx                 # entries to clear = old - saved
+    jle     .scope_zero_done
+    imul    $24, %rdx, %rax            # byte offset of saved_count entry
+    lea     8(%rdi, %rax), %rdi        # ptr to first dead entry
+    xor     %eax, %eax
+.scope_zero_loop:
+    mov     %rax, (%rdi)               # zero hash (prevents matching)
+    add     $24, %rdi
+    dec     %rcx
+    jnz     .scope_zero_loop
+.scope_zero_done:
+    pop     %rdi
+    pop     %rdx
     mov     %rdx, (%rdi)               # truncate: var_table.count = saved_count
     # Invalidate var_cache after scope restore (entry pointers may be stale)
     push    %rdi
@@ -9805,12 +9822,18 @@ var_load_hash:
     test    %rcx, %rcx
     jz      .vlh_not_found
 
-    # Start from last entry
+    # Start from last entry, search down to 0
     lea     -1(%rcx), %rdx
     imul    $24, %rdx
     lea     8(%rbx, %rdx), %rdi
+    # rcx = entries to search (full table)
+    # BUT: also try frame-limited search first (current frame entries)
+    # to avoid finding ghost entries from sibling scopes
 
 .vlh_search:
+    # Skip entries with zeroed hash (dead entries from scope restore)
+    cmpq    $0, (%rdi)
+    je      .vlh_next
     cmp     (%rdi), %rax
     jne     .vlh_next
     # Found — update cache (256 slots)
