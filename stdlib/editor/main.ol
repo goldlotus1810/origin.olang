@@ -352,6 +352,26 @@ pub fn editor_start(_path) {
                 }; }; }; };
             } else { if _mode == "SAVED" { _mode = "NORMAL"; }
             else { if _mode == "NORMAL" {
+                // Extended keys (sequential ifs to stay under else-if depth limit)
+                let _nx = 0;
+                if _key == 103 { _cur_row = 0; _cur_col = 0; _nx = 1; };
+                if _key == 48 { _cur_col = 0; _nx = 1; };
+                if _key == 36 { _cur_col = len(_lines[_cur_row]); _nx = 1; };
+                if _key == 68 {
+                    if len(_lines) > 1 {
+                        let _dd_new = [];
+                        let _dd_i = 0;
+                        while _dd_i < len(_lines) {
+                            if _dd_i != _cur_row { push(_dd_new, _lines[_dd_i]); };
+                            _dd_i = _dd_i + 1;
+                        };
+                        _lines = _dd_new;
+                        if _cur_row >= len(_lines) { _cur_row = len(_lines) - 1; };
+                    } else { set_at(_lines, 0, ""); _cur_col = 0; };
+                    _nx = 1;
+                };
+                // Main key chain (only if not handled above)
+                if _nx == 0 {
                 if _key == 105 { _mode = "INSERT"; }          // i
                 else { if _key == 106 { if _cur_row < len(_lines) - 1 { _cur_row = _cur_row + 1; }; }  // j
                 else { if _key == 107 { if _cur_row > 0 { _cur_row = _cur_row - 1; }; }                // k
@@ -447,6 +467,7 @@ pub fn editor_start(_path) {
                         };
                     };
                 }; }; }; }; }; }; }; }; }; }; }; };
+                };
             } else {
                 // INSERT mode
                 if _key == 127 {
@@ -468,11 +489,15 @@ pub fn editor_start(_path) {
                     _lines = _new;
                     _cur_row = _cur_row + 1;
                     _cur_col = 0;
+                } else { if _key == 9 {
+                    let _line = _lines[_cur_row];
+                    set_at(_lines, _cur_row, __substr(_line, 0, _cur_col) + "    " + __substr(_line, _cur_col, len(_line)));
+                    _cur_col = _cur_col + 4;
                 } else { if _key >= 32 {
                     let _line = _lines[_cur_row];
                     set_at(_lines, _cur_row, __substr(_line, 0, _cur_col) + __chr(_key) + __substr(_line, _cur_col, len(_line)));
                     _cur_col = _cur_col + 1;
-                }; }; };
+                }; }; }; };
             }; }; }; }; }; }; };
             // Clamp cursor col to line length
             let _line_len = len(_lines[_cur_row]);
