@@ -28,8 +28,8 @@ pub fn editor_start(_path) {
     while _running == 1 {
         if _need_render == 1 {
         _need_render = 0;
-        // Render
-        term_clear();
+        // Render (overwrite in place, no clear — reduces flicker)
+        term_hide_cursor();
         term_goto(1, 1);
         term_bg(235); term_color(69); term_bold();
         term_fill_line(" O ─ " + _path, _cols);
@@ -80,17 +80,18 @@ pub fn editor_start(_path) {
             _need_render = 1;
             _last_key = _key;
             if _key == 17 { _running = 0; }   // Ctrl-Q = quit
-            else { if _key == 27 {               // ESC
-                if _mode == "INSERT" { _mode = "NORMAL"; }
-                else {
-                    let _k2 = __read_byte();
-                    if _k2 == 91 {
-                        let _k3 = __read_byte();
-                        if _k3 == 65 { if _cur_row > 0 { _cur_row = _cur_row - 1; }; };
-                        if _k3 == 66 { if _cur_row < len(_lines) - 1 { _cur_row = _cur_row + 1; }; };
-                        if _k3 == 67 { _cur_col = _cur_col + 1; };
-                        if _k3 == 68 { if _cur_col > 0 { _cur_col = _cur_col - 1; }; };
-                    };
+            else { if _key == 27 {               // ESC or arrow key
+                let _k2 = __read_byte();
+                if _k2 == 91 {
+                    // Arrow key sequence — works in BOTH modes
+                    let _k3 = __read_byte();
+                    if _k3 == 65 { if _cur_row > 0 { _cur_row = _cur_row - 1; }; };     // Up
+                    if _k3 == 66 { if _cur_row < len(_lines) - 1 { _cur_row = _cur_row + 1; }; }; // Down
+                    if _k3 == 67 { _cur_col = _cur_col + 1; };                           // Right
+                    if _k3 == 68 { if _cur_col > 0 { _cur_col = _cur_col - 1; }; };     // Left
+                } else {
+                    // Bare ESC — switch to NORMAL
+                    if _mode == "INSERT" { _mode = "NORMAL"; };
                 };
             } else { if _mode == "NORMAL" {
                 if _key == 105 { _mode = "INSERT"; }          // i — mode switch only
@@ -126,6 +127,9 @@ pub fn editor_start(_path) {
                     _cur_col = _cur_col + 1;
                 }; }; };
             }; }; };
+            // Clamp cursor col to line length
+            let _line_len = len(_lines[_cur_row]);
+            if _cur_col > _line_len { _cur_col = _line_len; };
             // Vertical scroll
             if _cur_row < _scroll { _scroll = _cur_row; };
             if _cur_row >= _scroll + _rows - 2 { _scroll = _cur_row - _rows + 3; };
