@@ -19,6 +19,17 @@ let _continue_patches = [];
 let _ce_locals = __array_with_cap(256);
 let _ce_lc = [0];
 let __const_names = [];
+let __g_fn_slot_map = [];
+let __g_fn_in_function = 0;
+
+fn _find_reg_slot(_frs_map, _frs_name) {
+    let _frs_i = len(_frs_map) - 1;
+    while _frs_i >= 0 {
+        if __array_get(_frs_map, _frs_i) == _frs_name { return _frs_i; };
+        _frs_i = _frs_i - 1;
+    };
+    return 0 - 1;
+}
 let _g_warnings = [];
 let _g_warn_count = [0];
 let _g_output = [];
@@ -422,7 +433,17 @@ fn compile_expr(state, expr) {
                 if name == "false" {
                     emit_push_str(state, "");
                 } else {
-                    emit_load(state, name);
+                    // Check register slot first (function locals)
+                    let _id_slot = -1;
+                    if __g_fn_in_function == 1 {
+                        _id_slot = _find_reg_slot(__g_fn_slot_map, name);
+                    };
+                    if _id_slot >= 0 {
+                        _emit_byte(state, 0x26);    // LoadReg
+                        _emit_byte(state, _id_slot);
+                    } else {
+                        emit_load(state, name);     // var_table fallback
+                    };
                 };
             };
         },
@@ -1555,14 +1576,28 @@ fn compile_stmt(state, stmt) {
             // Emit Closure(param_count, body_len) + body + Store(name).
             let _fn_closure_pos = current_pos(state);
             emit_op(state, make_op("Closure", 0, _fn_pcnt));
-            // Store params (reversed for stack order)
+            // === Register locals: EnterFrame + StoreReg for params ===
+            let _fn_slot_map = [];
+            _emit_byte(state, 0x28);               // EnterFrame
+            let _fn_enter_pos = current_pos(state); // save pos for patching slot count
+            _emit_byte(state, _fn_pcnt);            // initial: param count (patch later for locals)
+            // Store params: register slots (for local access) + var_table (for Call by name)
             let _fn_saved = save_locals(state);
             let _fn_pi = _fn_pcnt - 1;
             while _fn_pi >= 0 {
+                push(_fn_slot_map, _fn_params[_fn_pi]);
+                // Dup the value: one copy to register, one to var_table
+                emit_op(state, make_op_simple("Dup"));
+                _emit_byte(state, 0x27);            // StoreReg(slot)
+                _emit_byte(state, len(_fn_slot_map) - 1);
                 emit_op(state, make_op_name("Store", _fn_params[_fn_pi]));
                 push_local(state, _fn_params[_fn_pi]);
                 let _fn_pi = _fn_pi - 1;
             };
+            // Save register state for nested fn compilation
+            push(_ce_stack, _fn_slot_map);
+            let __g_fn_slot_map = _fn_slot_map;
+            let __g_fn_in_function = 1;
             // Set TRO context (save previous)
             let _fn_prev_tro_fn = _g_tro_fn;
             let _fn_prev_tro_params = _g_tro_params;
@@ -1576,9 +1611,12 @@ fn compile_stmt(state, stmt) {
                 compile_stmt(state, _fn_body[_fn_bi]);
                 let _fn_bi = _fn_bi + 1;
             };
-            // Default return
+            // Default return with LeaveFrame
             emit_op(state, make_op_name("Push", ""));
+            _emit_byte(state, 0x29);               // LeaveFrame
             emit_op(state, make_op_simple("Ret"));
+            let __g_fn_in_function = 0;
+            _fn_slot_map = pop(_ce_stack);
             restore_locals(state, _fn_saved);
             // Restore TRO context
             let _g_tro_fn = _fn_prev_tro_fn;
@@ -1644,6 +1682,7 @@ fn compile_stmt(state, stmt) {
             };
             if _rt_is_tro == 0 {
                 compile_expr(state, value);
+                if __g_fn_in_function == 1 { _emit_byte(state, 0x29); };  // LeaveFrame
                 emit_op(state, make_op_simple("Ret"));
             };
         },
