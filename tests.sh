@@ -605,6 +605,37 @@ echo ""
 # Cleanup
 rm -rf "$TMP_DIR"
 
+# ── Self-build tests (gen1) ──────────────────────────────────────
+SB_PASS=0
+SB_FAIL=0
+sb_test() {
+    local name="$1"
+    local code="$2"
+    local expect="$3"
+    local actual
+    actual=$(echo "$code" | timeout 10 ./origin_gen1.olang 2>&1 | grep -v "BOOT_OK\|HomeOS\|Type code\|bye" | head -1 | sed 's/^⦿ //')
+    if echo "$actual" | grep -q "$expect"; then
+        echo -e "  ${GREEN}  OK${NC} $name"
+        SB_PASS=$((SB_PASS + 1))
+    else
+        echo -e "  ${RED}FAIL${NC} $name (expected: $expect, got: $actual)"
+        SB_FAIL=$((SB_FAIL + 1))
+        FAIL=$((FAIL + 1))
+    fi
+}
+if [ -f origin_gen1.olang ]; then
+echo -e "\n${CYAN}── Self-build (gen1) ──${NC}"
+sb_test "selfbuild/emit"   'emit 42;'                          "42"
+sb_test "selfbuild/arith"  'emit 1+2+3;'                       "6"
+sb_test "selfbuild/fn"     'fn f(x){return x*x;}; emit f(7);'  "49"
+sb_test "selfbuild/fib"    'fn fib(n){if n<2{return n;};return fib(n-1)+fib(n-2);}; emit fib(10);' "55"
+sb_test "selfbuild/array"  'let a=[1,2,3]; push(a,4); emit len(a);' "4"
+sb_test "selfbuild/sort"   'emit sort([5,3,1,4,2]);'           "1, 2, 3, 4, 5"
+sb_test "selfbuild/map"    'emit map([1,2,3], fn(x){return x*10;});' "10, 20, 30"
+sb_test "selfbuild/sha256" 'emit __sha256("abc");'             "ba7816bf"
+echo -e "\n${CYAN}  Self-build: ${SB_PASS}/$((SB_PASS + SB_FAIL)) passed${NC}"
+fi
+
 # Exit code
 if [ "$FAIL" -gt 0 ]; then
     exit 1
