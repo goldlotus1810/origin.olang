@@ -2243,3 +2243,41 @@ pub fn get_compiled_pos() {
 pub fn reset_compiler() {
     let _g_pos = 0;
 }
+
+// Mutable box for passing compile result size through scope boundaries
+let _g_ci_box = [0];
+
+// Isolated compilation: fresh buffer, compile, extract via box, restore
+pub fn compile_isolated(_ci_ast) {
+    // Save outer state
+    let _ci_saved_output = _g_output;
+    let _ci_saved_pos = _g_pos;
+    // Allocate fresh output buffer
+    let _g_output = __array_range(65536);
+    let _g_output_ready = 1;
+    let _g_pos = 0;
+    // Compile — analyze writes to _g_output, _g_pos advances
+    // After analyze returns, scope restore may truncate _g_pos.
+    // So we save _g_pos into the output array header (position 0 = size marker)
+    // HACK: wrap analyze in a helper that saves _g_pos to _g_ci_box
+    _ci_analyze_and_save(_ci_ast);
+    // Read result size from box (survives scope restore because array is on heap)
+    let _ci_size = _g_ci_box[0];
+    // Extract bytecode from fresh buffer
+    let _ci_result = [];
+    let _ci_i = 0;
+    while _ci_i < _ci_size {
+        push(_ci_result, __array_get(_g_output, _ci_i));
+        _ci_i = _ci_i + 1;
+    };
+    // Restore outer state
+    let _g_output = _ci_saved_output;
+    let _g_pos = _ci_saved_pos;
+    return _ci_result;
+}
+
+fn _ci_analyze_and_save(_cias_ast) {
+    analyze(_cias_ast);
+    // Save _g_pos to mutable box BEFORE this function returns (and scope restores)
+    set_at(_g_ci_box, 0, _g_pos);
+}

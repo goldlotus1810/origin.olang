@@ -124,7 +124,8 @@ fn compile_dir(_cd_dir, _cd_output) {
 };
 
 fn compile_source(_cs_src) {
-  // Real compiler pipeline: tokenize → parse → analyze → extract bytecode
+  // Compile source using self-hosted compiler pipeline
+  // Uses _g_ci_box to pass result size through scope boundaries
   reset_compiler();
   let _cs_tokens = tokenize(_cs_src);
   let _cs_ntok = len(_cs_tokens);
@@ -135,11 +136,8 @@ fn compile_source(_cs_src) {
     if _cs_peek.text == "" { _cs_parser.pos = _cs_ntok; }
     else { push(_cs_ast, parse_stmt(_cs_parser)); };
   };
-  // Use __system to compile via Rust builder (interim: self-hosted compile
-  // can't nest because analyze() shares global _g_output with outer eval)
-  // TODO: isolate _g_output per compilation context
-  analyze(_cs_ast);
-  return get_compiled_bytes();
+  return compile_isolated(_cs_ast);
+}
 };
 
 fn list_ol_files(_lof_dir) {
@@ -182,13 +180,8 @@ fn concat_bytes(dst, src) {
 // ── Default config ──
 
 pub fn default_config() {
-  return {
-    vm_path: "vm/x86_64/vm_x86_64",
-    stdlib_path: "stdlib",
-    kn_path: "",
-    output: "origin_new.olang",
-    arch: "x86_64"
-  };
+  let _dc_cfg = { vm_path: "vm/x86_64/vm_x86_64", stdlib_path: "stdlib", kn_path: "", output: "origin_new.olang", arch: "x86_64" };
+  return _dc_cfg;
 };
 
 pub fn arm64_config() {
