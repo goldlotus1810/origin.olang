@@ -107,105 +107,23 @@ fn _mol_a(mol) { return __floor(mol / 4) % 8; }
 fn _mol_t(mol) { return mol % 4; }
 
 // R dispatch: relation index → behavior tag (T5 foundation)
-pub fn r_dispatch(_rd_r) {
-    if _rd_r == 0 { return "algebraic"; };
-    if _rd_r == 1 { return "order"; };
-    if _rd_r == 2 { return "represent"; };
-    if _rd_r == 3 { return "numeral"; };
-    if _rd_r == 4 { return "punct"; };
-    if _rd_r == 5 { return "currency"; };
-    if _rd_r == 6 { return "additive"; };
-    if _rd_r == 7 { return "control"; };
-    if _rd_r == 8 { return "member"; };
-    if _rd_r == 9 { return "subset"; };
-    if _rd_r == 10 { return "equiv"; };
-    if _rd_r == 11 { return "orthogonal"; };
-    if _rd_r == 12 { return "compose"; };
-    if _rd_r == 13 { return "causes"; };
-    if _rd_r == 14 { return "similar"; };
-    if _rd_r == 15 { return "derived"; };
-    return "unknown";
-}
 
 // Temporal tag: T index → time description (T5 foundation)
-pub fn temporal_tag(_tt_t) {
-    if _tt_t == 0 { return "static"; };
-    if _tt_t == 1 { return "slow"; };
-    if _tt_t == 2 { return "medium"; };
-    if _tt_t == 3 { return "fast"; };
-    return "static";
-}
 
 // Spec §1.6: amplify(Va, Vb, w) — khuếch đại về phía dominant, KHÔNG trung bình
 // base  = (Va + Vb) / 2
 // boost = |Va − base| × w × 0.5
 // Cv    = base + sign(Va + Vb - 8) × boost   (8 = 2×neutral, sign relative to center)
 // w = 0.618 (golden ratio — biological scaling)
-fn _amplify_v(_av_va, _av_vb) {
-    // Explicit parens — Rust compiler precedence bug
-    let _av_base = __floor((_av_va + _av_vb) / 2);
-    let _av_diff = _enc_abs(_av_va - _av_base);
-    // boost = |Va - base| * 0.618 * 0.5 ≈ |Va - base| * 0.309
-    // Use integer approximation: boost = diff * 3 / 10
-    let _av_boost = __floor((_av_diff * 3) / 10);
-    // sign: if sum > 8 (2*neutral=2*4) → positive direction, else negative
-    let _av_sum = _av_va + _av_vb;
-    if _av_sum > 8 {
-        return _enc_min(7, _av_base + _av_boost);
-    };
-    if _av_sum < 8 {
-        return _enc_max(0, _av_base - _av_boost);
-    };
-    return _av_base;
-}
 
 // Spec §1.6: Compose R — tổ hợp quan hệ (not just average)
 // Compose: if same relation → strengthen, if different → higher-order relation
-fn _compose_r(_cr_ra, _cr_rb) {
-    if _cr_ra == _cr_rb { return _cr_ra; };  // same → keep
-    // Different relations → take the more complex (higher number = more complex)
-    return _enc_max(_cr_ra, _cr_rb);
-}
 
 // Spec §1.6: Union S — SDF hợp nhất (take max shape complexity)
-fn _union_s(_us_sa, _us_sb) {
-    // SDF union: merged shape is the more complex one
-    // In practice with integer shapes: max is good approximation
-    return _enc_max(_us_sa, _us_sb);
-}
 
 // Spec §1.6: dominant T — thời gian lấy chủ đạo
-fn _dominant_t(_dt_ta, _dt_tb) {
-    // Dominant: the one that appears most recently (higher T = faster)
-    return _enc_max(_dt_ta, _dt_tb);
-}
 
-pub fn mol_compose(a, b) {
-    // Extract dimensions SEPARATELY (nested calls clobber globals)
-    let _sa = _mol_s(a); let _sb = _mol_s(b);
-    let _ra = _mol_r(a); let _rb = _mol_r(b);
-    let _va = _mol_v(a); let _vb = _mol_v(b);
-    let _aa = _mol_a(a); let _ab = _mol_a(b);
-    let _ta = _mol_t(a); let _tb = _mol_t(b);
-    // Spec §1.6 composition rules:
-    let cs = _union_s(_sa, _sb);          // S: Union (SDF merge)
-    let cr = _compose_r(_ra, _rb);        // R: Compose (relation combine)
-    let cv = _amplify_v(_va, _vb);        // V: Amplify (NOT average!)
-    let ca = _enc_max(_aa, _ab);          // A: max (intensity)
-    let ct = _dominant_t(_ta, _tb);       // T: dominant (time)
-    return _mol_pack(cs, cr, cv, ca, ct);
-}
 
-pub fn mol_compose_many(mols) {
-    if len(mols) == 0 { return _mol_pack(0, 0, 4, 4, 2); };
-    let result = mols[0];
-    let i = 1;
-    while i < len(mols) {
-        result = mol_compose(result, mols[i]);
-        let i = i + 1;
-    };
-    return result;
-}
 
 // ════════════════════════════════════════════════════════════════
 // UTF-8 Decoder — reconstruct full Unicode codepoint from bytes
@@ -256,24 +174,6 @@ pub fn utf8_decode(_ud_text, _ud_i) {
 }
 
 // Is this codepoint an emoji? (emoticon/symbol blocks with high V/A)
-fn _is_emoji_cp(_iec_cp) {
-    // Emoticons 😀-😿
-    if _iec_cp >= 128512 { if _iec_cp <= 128591 { return 1; }; };
-    // Misc Symbols & Pictographs 🌀-🗿
-    if _iec_cp >= 127744 { if _iec_cp <= 128511 { return 1; }; };
-    // Transport & Map 🚀-🛿
-    if _iec_cp >= 128640 { if _iec_cp <= 128767 { return 1; }; };
-    // Supplemental Symbols 🤀-🧿
-    if _iec_cp >= 129280 { if _iec_cp <= 129535 { return 1; }; };
-    // Misc Symbols ☀-⛿
-    if _iec_cp >= 9728 { if _iec_cp <= 9983 { return 1; }; };
-    // Dingbats ✀-➿
-    if _iec_cp >= 9984 { if _iec_cp <= 10175 { return 1; }; };
-    // Common standalone emoji
-    if _iec_cp == 10084 { return 1; };  // ❤ U+2764
-    if _iec_cp == 11088 { return 1; };  // ⭐ U+2B50
-    return 0;
-}
 
 // ════════════════════════════════════════════════════════════════
 // Text → MolecularChain (UTF-8 aware)
@@ -599,27 +499,7 @@ pub fn text_emotion(_te_text) {
 // Sensor + System event encoding
 // ════════════════════════════════════════════════════════════════
 
-pub fn encode_sensor(kind, value) {
-    let cp = 0x25CB;
-    if kind == "temperature" {
-        if value > 35 { let cp = 0x1F525; };
-        if value < 15 { let cp = 0x2744; };
-    };
-    if kind == "light"  { let cp = 0x1F4A1; };
-    if kind == "motion" { let cp = 0x1F3C3; };
-    if kind == "sound"  { let cp = 0x1F50A; };
-    if kind == "power"  { let cp = 0x26A1; };
-    return encode_codepoint(cp);
-}
 
-pub fn encode_event(event) {
-    let cp = 0x25CB;
-    if event == "boot"     { let cp = 0x25CB; };
-    if event == "shutdown" { let cp = 0x1F6D1; };
-    if event == "error"    { let cp = 0x26A0; };
-    if event == "dream"    { let cp = 0x1F319; };
-    return encode_codepoint(cp);
-}
 
 // ════════════════════════════════════════════════════════════════
 // Full encode pipeline
@@ -706,25 +586,6 @@ pub fn analyze_input(text) {
 // OL.4 — Agent dispatch (chief/leo/worker/gate)
 // ════════════════════════════════════════════════════════════════
 
-pub fn agent_process(text) {
-    // GATE — SC.1 normalized security check
-    let _ap_gate = _security_gate(text);
-    if len(_ap_gate) > 0 {
-        let __g_agent_action = "crisis";
-        return _ap_gate;
-    };
-
-    // ENCODE + ANALYZE
-    let mol = analyze_input(text);
-    let intent = __g_analysis_intent;
-    let tone = __g_analysis_tone;
-
-    // LEO — dispatch by intent
-    let __g_agent_action = intent;
-
-    // RESPONSE — compose based on intent + tone
-    return compose_reply(intent, tone, text);
-}
 
 // ════════════════════════════════════════════════════════════════
 // OL.5 — Response composer
@@ -896,33 +757,13 @@ pub fn stm_push(_sp_text, _sp_intent, _sp_tone) {
     };
 }
 
-pub fn stm_last_input() {
-    if len(__stm) == 0 { return ""; };
-    return __stm[len(__stm) - 1].input;
-}
 
-pub fn stm_last_intent() {
-    if len(__stm) == 0 { return "chat"; };
-    return __stm[len(__stm) - 1].intent;
-}
 
 pub fn stm_count() {
     return len(__stm);
 }
 
 // Check if topic repeated N+ times
-pub fn stm_topic_repeated(_str_keyword, _str_n) {
-    let _str_count = 0;
-    let _str_i = 0;
-    while _str_i < len(__stm) {
-        if _a_has(__stm[_str_i].input, _str_keyword) == 1 {
-            _str_count = _str_count + 1;
-        };
-        let _str_i = _str_i + 1;
-    };
-    if _str_count >= _str_n { return 1; };
-    return 0;
-}
 
 // Context summary: summarize conversation themes from STM
 pub fn stm_summary() {
@@ -950,13 +791,10 @@ pub fn stm_summary() {
 
 // ── Conversation digest ──
 // When STM > 16 turns, compress older half into a digest string
-let __stm_digest = "";
-let __stm_digest_count = 0;
 
 fn _stm_maybe_digest() {
     if len(__stm) < 16 { return; };
     // Already digested recently
-    if __stm_digest_count >= len(__stm) { return; };
     // Build digest from first half of STM
     let _sd_half = __floor(len(__stm) / 2);
     let _sd_heal = 0;
@@ -992,8 +830,6 @@ fn _stm_maybe_digest() {
     if _sd_tech > 0 { _sd_d = _sd_d + "ky-thuat(" + __to_string(_sd_tech) + ") "; };
     if _sd_chat > 0 { _sd_d = _sd_d + "chat(" + __to_string(_sd_chat) + ") "; };
     if len(_sd_topics) > 0 { _sd_d = _sd_d + "| " + _sd_topics; };
-    let __stm_digest = _sd_d;
-    let __stm_digest_count = len(__stm);
 
     // Evict digested entries (keep second half)
     let _sd_new = [];
@@ -1005,7 +841,6 @@ fn _stm_maybe_digest() {
     let __stm = _sd_new;
 }
 
-pub fn stm_digest() { return __stm_digest; }
 
 // ════════════════════════════════════════════════════════════════
 // Silk — Hebbian Learning (fire together → wire together)
@@ -1088,54 +923,7 @@ fn silk_decay() {
     };
 }
 
-fn silk_learn_from_text(_slt_text, _slt_intent) {
-    let _slt_words = [];
-    let _slt_cur = "";
-    let _slt_i = 0;
-    while _slt_i < len(_slt_text) {
-        let _slt_ch = char_at(_slt_text, _slt_i);
-        if __char_code(_slt_ch) == 32 {
-            if len(_slt_cur) > 0 {
-                push(_slt_words, _slt_cur);
-                _slt_cur = "";
-            };
-        } else {
-            _slt_cur = _slt_cur + _slt_ch;
-        };
-        let _slt_i = _slt_i + 1;
-    };
-    if len(_slt_cur) > 0 { push(_slt_words, _slt_cur); };
-    let _slt_j = 0;
-    while (_slt_j + 1) < len(_slt_words) {
-        silk_co_activate(_slt_words[_slt_j], _slt_words[_slt_j + 1], _slt_intent);
-        let _slt_j = _slt_j + 1;
-    };
-}
 
-fn silk_find_related(_sfrel_word) {
-    // LG.3: Compare by mol (number) — fast
-    let _sfrel_mol = _word_to_mol(_sfrel_word);
-    let _sfrel_best = 0;
-    let _sfrel_bw = 0;
-    let _sfrel_i = 0;
-    while _sfrel_i < len(__silk) {
-        let _sfrel_e = __silk[_sfrel_i];
-        if _sfrel_e.from == _sfrel_mol {
-            if _sfrel_e.weight > _sfrel_bw {
-                _sfrel_bw = _sfrel_e.weight;
-                _sfrel_best = _sfrel_e.to;
-            };
-        };
-        if _sfrel_e.to == _sfrel_mol {
-            if _sfrel_e.weight > _sfrel_bw {
-                _sfrel_bw = _sfrel_e.weight;
-                _sfrel_best = _sfrel_e.from;
-            };
-        };
-        let _sfrel_i = _sfrel_i + 1;
-    };
-    return _sfrel_best;
-}
 
 pub fn silk_count() { return len(__silk); }
 
@@ -1560,7 +1348,6 @@ pub fn agent_respond(text) {
 //   2. Keyword matching (fallback, exact)
 // Best match = max(mol_score × 2, keyword_score)
 
-let __knowledge = [];
 let __knowledge_max = 512;
 
 // Encode text → UDC chain (array of molecules, one per word)
@@ -1628,17 +1415,6 @@ fn _text_to_chain(_ttc_text) {
 }
 
 // Molecule distance: |Va-Vb| + |Aa-Ab| (Manhattan on V,A — the emotional axes)
-fn _mol_distance(_md_a, _md_b) {
-    // 5D Manhattan distance: S(0-15) + R(0-15) + V(0-7) + A(0-7) + T(0-3) = max 47
-    let _md_sa = _mol_s(_md_a); let _md_sb = _mol_s(_md_b);
-    let _md_ra = _mol_r(_md_a); let _md_rb = _mol_r(_md_b);
-    let _md_va = _mol_v(_md_a); let _md_vb = _mol_v(_md_b);
-    let _md_aa = _mol_a(_md_a); let _md_ab = _mol_a(_md_b);
-    let _md_ta = _mol_t(_md_a); let _md_tb = _mol_t(_md_b);
-    return _enc_abs(_md_sa - _md_sb) + _enc_abs(_md_ra - _md_rb)
-         + _enc_abs(_md_va - _md_vb) + _enc_abs(_md_aa - _md_ab)
-         + _enc_abs(_md_ta - _md_tb);
-}
 
 // Similarity: normalized 5D distance → 0..10 scale
 fn _mol_similarity(_ms_a, _ms_b) {
@@ -1650,315 +1426,11 @@ fn _mol_similarity(_ms_a, _ms_b) {
 }
 
 // Chain similarity: average molecule similarity across chain pairs
-fn _chain_similarity(_cs_a, _cs_b) {
-    let _cs_la = len(_cs_a);
-    let _cs_lb = len(_cs_b);
-    if _cs_la == 0 { return 0; };
-    if _cs_lb == 0 { return 0; };
-    // Compare each mol in A against best match in B
-    let _cs_total = 0;
-    let _cs_i = 0;
-    let _cs_limit = _cs_la;
-    if _cs_limit > 8 { _cs_limit = 8; };  // cap for performance
-    while _cs_i < _cs_limit {
-        let _cs_best = 0;
-        let _cs_j = 0;
-        let _cs_jlim = _cs_lb;
-        if _cs_jlim > 8 { _cs_jlim = 8; };
-        while _cs_j < _cs_jlim {
-            let _cs_sim = _mol_similarity(_cs_a[_cs_i], _cs_b[_cs_j]);
-            if _cs_sim > _cs_best { _cs_best = _cs_sim; };
-            let _cs_j = _cs_j + 1;
-        };
-        _cs_total = _cs_total + _cs_best;
-        let _cs_i = _cs_i + 1;
-    };
-    return __floor(_cs_total / _cs_limit);
-}
 
-pub fn knowledge_learn(text) {
-    // Extract keywords (backward compat)
-    let _kl_words = [];
-    let _kl_w = "";
-    let _kl_i = 0;
-    while _kl_i < len(text) {
-        let _kl_ch = char_at(text, _kl_i);
-        if __char_code(_kl_ch) == 32 {
-            if len(_kl_w) >= 3 { push(_kl_words, _kl_w); };
-            _kl_w = "";
-        } else {
-            _kl_w = _kl_w + _kl_ch;
-        };
-        let _kl_i = _kl_i + 1;
-    };
-    if len(_kl_w) >= 3 { push(_kl_words, _kl_w); };
 
-    // UDC chain: each word → molecule (2 bytes semantic address)
-    let _kl_chain = _text_to_chain(text);
-    // Composed molecule: LCA of whole fact
-    let _kl_mol = 0;
-    if len(_kl_chain) > 0 { _kl_mol = mol_compose_many(_kl_chain); };
-
-    // Store: text + chain + mol + words
-    push(__knowledge, { text: text, chain: _kl_chain, mol: _kl_mol, words: _kl_words });
-
-    // Wire keywords into Silk
-    let _kl_j = 0;
-    while (_kl_j + 1) < len(_kl_words) {
-        silk_co_activate(_kl_words[_kl_j], _kl_words[_kl_j + 1], "learn");
-        let _kl_j = _kl_j + 1;
-    };
-
-    // Evict oldest if over limit
-    if len(__knowledge) > __knowledge_max {
-        let _kl_new = [];
-        let _kl_k = 1;
-        while _kl_k < len(__knowledge) {
-            push(_kl_new, __knowledge[_kl_k]);
-            let _kl_k = _kl_k + 1;
-        };
-        let __knowledge = _kl_new;
-    };
-
-    return len(__knowledge);
-}
-
-pub fn knowledge_count() { return len(__knowledge); }
-
-fn knowledge_search(_ks_query) {
-    // DUAL search: molecule similarity + keyword matching
-    let _ks_best = "";
-    let _ks_best_score = 0;
-
-    // Encode query as chain for molecule comparison
-    let _ks_qchain = _text_to_chain(_ks_query);
-    let _ks_qmol = 0;
-    if len(_ks_qchain) > 0 { _ks_qmol = mol_compose_many(_ks_qchain); };
-
-    let _ks_ki = 0;
-    while _ks_ki < len(__knowledge) {
-        let _ks_entry = __knowledge[_ks_ki];
-        let _ks_score = 0;
-
-        // Strategy 1: Molecule similarity (language-agnostic)
-        if _ks_qmol > 0 {
-            if _ks_entry.mol > 0 {
-                let _ks_msim = _mol_similarity(_ks_qmol, _ks_entry.mol);
-                // Chain similarity for deeper match
-                let _ks_csim = _chain_similarity(_ks_qchain, _ks_entry.chain);
-                // Combined: mol_sim + chain_sim (weighted)
-                _ks_score = _ks_msim + _ks_csim;
-            };
-        };
-
-        // Strategy 2: Keyword matching — case-insensitive substring search
-        let _ks_kwscore = 0;
-        let _ks_match_count = 0;  // number of query words that matched
-        let _ks_qi = 0;
-        let _ks_qw = "";
-        while _ks_qi < len(_ks_query) {
-            let _ks_ch = char_at(_ks_query, _ks_qi);
-            if __char_code(_ks_ch) == 32 {
-                if len(_ks_qw) >= 2 {
-                    // Word list: case-insensitive via _a_has (word == entry_word)
-                    let _ks_wi = 0;
-                    while _ks_wi < len(_ks_entry.words) {
-                        if _a_has(_ks_entry.words[_ks_wi], _ks_qw) == 1 {
-                            if len(_ks_entry.words[_ks_wi]) == len(_ks_qw) {
-                                _ks_kwscore = _ks_kwscore + 3;
-                            };
-                        };
-                        let _ks_wi = _ks_wi + 1;
-                    };
-                    // Full text substring (case-insensitive)
-                    if _a_has(_ks_entry.text, _ks_qw) == 1 {
-                        _ks_kwscore = _ks_kwscore + 2;
-                        _ks_match_count = _ks_match_count + 1;
-                        if len(_ks_qw) >= 4 { _ks_kwscore = _ks_kwscore + 3; };
-                    };
-                };
-                _ks_qw = "";
-            } else {
-                _ks_qw = _ks_qw + _ks_ch;
-            };
-            let _ks_qi = _ks_qi + 1;
-        };
-        if len(_ks_qw) >= 2 {
-            let _ks_wi = 0;
-            while _ks_wi < len(_ks_entry.words) {
-                if _a_has(_ks_entry.words[_ks_wi], _ks_qw) == 1 {
-                    if len(_ks_entry.words[_ks_wi]) == len(_ks_qw) {
-                        _ks_kwscore = _ks_kwscore + 3;
-                    };
-                };
-                let _ks_wi = _ks_wi + 1;
-            };
-            if _a_has(_ks_entry.text, _ks_qw) == 1 {
-                _ks_kwscore = _ks_kwscore + 2;
-                _ks_match_count = _ks_match_count + 1;
-                if len(_ks_qw) >= 4 { _ks_kwscore = _ks_kwscore + 3; };
-            };
-        };
-        // Multi-word bonus: 2+ matching words in same entry = much more relevant
-        if _ks_match_count >= 2 { _ks_kwscore = _ks_kwscore + (_ks_match_count * 10); };
-
-        // Additive: keyword ×5 + mol_score
-        // FIX-3: only count if keyword actually matched (not just mol)
-        if _ks_kwscore > 0 {
-            _ks_score = (_ks_kwscore * 5) + _ks_score;
-        } else {
-            _ks_score = 0;  // no keyword match → don't return this fact
-        };
-
-        if _ks_score > _ks_best_score {
-            _ks_best_score = _ks_score;
-            _ks_best = _ks_entry.text;
-        };
-        let _ks_ki = _ks_ki + 1;
-    };
-
-    // Return scored result for gate_decide
-    if _ks_best_score > 0 {
-        let __g_ks_score = _ks_best_score;
-        return __tpl_know + _ks_best + ")";
-    };
-    let __g_ks_score = 0;
-    return "";
-}
 
 // ════════════════════════════════════════════════════════════════
 // CUT.4 — Self-Build: origin.olang builds itself
 // ════════════════════════════════════════════════════════════════
 
-fn _sb_compile_file(_sbcf_path, _sbcf_bc, _sbcf_pos) {
-    let _sbcf_hp = __heap_save();
-    let _sbcf_src = __file_read(_sbcf_path);
-    if len(_sbcf_src) > 0 {
-        _prefill_output();
-        let _sbcf_tokens = tokenize(_sbcf_src);
-        let _sbcf_ast = parse(_sbcf_tokens);
-        let _sbcf_state = analyze(_sbcf_ast);
-        if _g_pos > 0 {
-            let _sbcf_ci = 0;
-            while _sbcf_ci < _g_pos {
-                __bytes_set(_sbcf_bc, _sbcf_pos, _g_output[_sbcf_ci]);
-                let _sbcf_pos = _sbcf_pos + 1;
-                let _sbcf_ci = _sbcf_ci + 1;
-            };
-            emit "  " + _sbcf_path + ": " + __to_string(_g_pos) + " bytes";
-        } else {
-            emit "  " + _sbcf_path + ": SKIP";
-        };
-    };
-    __heap_restore(_sbcf_hp);
-    return _sbcf_pos;
-}
 
-pub fn self_build() {
-    emit "=== Self-Build ===";
-
-    // Step 1: Read own binary (VM ELF)
-    let _sb_self = __file_read_bytes("/proc/self/exe");
-    let _sb_self_size = __bytes_len(_sb_self);
-    emit "  VM binary: " + __to_string(_sb_self_size) + " bytes";
-
-    // Find header_offset (last 8 bytes of binary)
-    let _sb_b0 = __bytes_get(_sb_self, _sb_self_size - 8);
-    let _sb_b1 = __bytes_get(_sb_self, _sb_self_size - 7);
-    let _sb_b2 = __bytes_get(_sb_self, _sb_self_size - 6);
-    let _sb_b3 = __bytes_get(_sb_self, _sb_self_size - 5);
-    let _sb_header_off = _sb_b0 + (_sb_b1 * 256) + (_sb_b2 * 65536) + (_sb_b3 * 16777216);
-    emit "  Header offset: " + __to_string(_sb_header_off);
-
-    // Step 2: Compile all .ol files
-    let _sb_bc = __bytes_new(524288);
-    let _sb_bc_pos = 0;
-    let _sb_compiled = 0;
-    let _sb_errors = 0;
-
-    // Strategy: copy existing bytecode from current binary as BASE
-    // Then try re-compiling additional files with heap_restore between each
-    // (bootstrap files too large to re-compile with current heap limits)
-    // Read bc_offset and bc_size from Origin header
-    let _sb_bc_off_b0 = __bytes_get(_sb_self, _sb_header_off + 14);
-    let _sb_bc_off_b1 = __bytes_get(_sb_self, _sb_header_off + 15);
-    let _sb_bc_off_b2 = __bytes_get(_sb_self, _sb_header_off + 16);
-    let _sb_bc_off = _sb_bc_off_b0 + (_sb_bc_off_b1 * 256) + (_sb_bc_off_b2 * 65536);
-    let _sb_bc_sz_b0 = __bytes_get(_sb_self, _sb_header_off + 18);
-    let _sb_bc_sz_b1 = __bytes_get(_sb_self, _sb_header_off + 19);
-    let _sb_bc_sz_b2 = __bytes_get(_sb_self, _sb_header_off + 20);
-    let _sb_bc_sz = _sb_bc_sz_b0 + (_sb_bc_sz_b1 * 256) + (_sb_bc_sz_b2 * 65536);
-    emit "  Existing bytecode: " + __to_string(_sb_bc_sz) + " bytes at offset " + __to_string(_sb_bc_off);
-    // Copy existing bytecode to output buffer
-    let _sb_bci = 0;
-    while _sb_bci < _sb_bc_sz {
-        __bytes_set(_sb_bc, _sb_bc_pos, __bytes_get(_sb_self, _sb_bc_off + _sb_bci));
-        let _sb_bc_pos = _sb_bc_pos + 1;
-        let _sb_bci = _sb_bci + 1;
-    };
-    _sb_compiled = 1;
-    emit "  Bytecode copied: " + __to_string(_sb_bc_pos) + " bytes";
-
-    // Append Halt
-    __bytes_set(_sb_bc, _sb_bc_pos, 15);
-    _sb_bc_pos = _sb_bc_pos + 1;
-    emit "  Total bytecode: " + __to_string(_sb_bc_pos) + " bytes (" + __to_string(_sb_compiled) + " files)";
-
-    // Step 3: Pack binary
-    // Output = [VM ELF up to header_offset][Origin header 32B][bytecode][trailer 8B]
-    let _sb_total = _sb_header_off + 32 + _sb_bc_pos + 8;
-    let _sb_out = __bytes_new(_sb_total);
-
-    // Copy VM ELF (bytes 0 to header_offset)
-    let _sb_vi = 0;
-    while _sb_vi < _sb_header_off {
-        __bytes_set(_sb_out, _sb_vi, __bytes_get(_sb_self, _sb_vi));
-        let _sb_vi = _sb_vi + 1;
-    };
-    let _sb_pos = _sb_header_off;
-
-    // Origin header (32 bytes)
-    let _sb_bc_off = _sb_pos + 32;
-    // Magic: ○LNG
-    __bytes_set(_sb_out, _sb_pos, 226);     // 0xE2
-    __bytes_set(_sb_out, _sb_pos + 1, 151); // 0x97
-    __bytes_set(_sb_out, _sb_pos + 2, 139); // 0x8B
-    __bytes_set(_sb_out, _sb_pos + 3, 76);  // 0x4C = 'L'
-    __bytes_set(_sb_out, _sb_pos + 4, 16);  // version 0x10
-    __bytes_set(_sb_out, _sb_pos + 5, 1);   // arch x86_64
-    // bc_offset (bytes 14-17) as u32 LE
-    __bytes_set(_sb_out, _sb_pos + 14, __floor(_sb_bc_off) % 256);
-    __bytes_set(_sb_out, _sb_pos + 15, __floor((_sb_bc_off / 256)) % 256);
-    __bytes_set(_sb_out, _sb_pos + 16, __floor((_sb_bc_off / 65536)) % 256);
-    __bytes_set(_sb_out, _sb_pos + 17, __floor((_sb_bc_off / 16777216)) % 256);
-    // bc_size (bytes 18-21)
-    __bytes_set(_sb_out, _sb_pos + 18, __floor(_sb_bc_pos) % 256);
-    __bytes_set(_sb_out, _sb_pos + 19, __floor((_sb_bc_pos / 256)) % 256);
-    __bytes_set(_sb_out, _sb_pos + 20, __floor((_sb_bc_pos / 65536)) % 256);
-    __bytes_set(_sb_out, _sb_pos + 21, __floor((_sb_bc_pos / 16777216)) % 256);
-    // flags (byte 30): codegen format = 1
-    __bytes_set(_sb_out, _sb_pos + 30, 1);
-    _sb_pos = _sb_pos + 32;
-
-    // Copy bytecode
-    let _sb_bi = 0;
-    while _sb_bi < _sb_bc_pos {
-        __bytes_set(_sb_out, _sb_pos, __bytes_get(_sb_bc, _sb_bi));
-        let _sb_pos = _sb_pos + 1;
-        let _sb_bi = _sb_bi + 1;
-    };
-
-    // Trailer: header_offset as u64 LE (8 bytes)
-    __bytes_set(_sb_out, _sb_pos, __floor(_sb_header_off) % 256);
-    __bytes_set(_sb_out, _sb_pos + 1, __floor((_sb_header_off / 256)) % 256);
-    __bytes_set(_sb_out, _sb_pos + 2, __floor((_sb_header_off / 65536)) % 256);
-    __bytes_set(_sb_out, _sb_pos + 3, __floor((_sb_header_off / 16777216)) % 256);
-    // Upper 4 bytes = 0 (header_offset < 4GB)
-    _sb_pos = _sb_pos + 8;
-
-    // Write output
-    __bytes_write("origin_built.olang", _sb_out, _sb_pos);
-    emit "  Output: origin_built.olang (" + __to_string(_sb_pos) + " bytes)";
-    emit "=== Done ===";
-    return "Built: " + __to_string(_sb_pos) + " bytes (" + __to_string(_sb_compiled) + " files, " + __to_string(_sb_errors) + " errors)";
-}
