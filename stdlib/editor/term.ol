@@ -15,7 +15,7 @@ pub fn term_clear() {
 }
 
 pub fn term_goto(_row, _col) {
-    __write_raw("\x1b[" + to_string(_row) + ";" + to_string(_col) + "H");
+    __write_raw("\x1b[" + __to_string(_row) + ";" + __to_string(_col) + "H");
 }
 
 pub fn term_hide_cursor() {
@@ -27,11 +27,11 @@ pub fn term_show_cursor() {
 }
 
 pub fn term_color(_fg) {
-    __write_raw("\x1b[38;5;" + to_string(_fg) + "m");
+    __write_raw("\x1b[38;5;" + __to_string(_fg) + "m");
 }
 
 pub fn term_bg(_bg) {
-    __write_raw("\x1b[48;5;" + to_string(_bg) + "m");
+    __write_raw("\x1b[48;5;" + __to_string(_bg) + "m");
 }
 
 pub fn term_reset() {

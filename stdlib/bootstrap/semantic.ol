@@ -1053,6 +1053,8 @@ fn compile_expr(state, expr) {
                             } else {
                                 if _ce_fname == "to_num" {
                                     emit_op(state, make_op_name("Call", "__to_number"));
+                                } else { if _ce_fname == "to_string" {
+                                    emit_op(state, make_op_name("Call", "__to_string"));
                                 } else {
                                     if _ce_fname == "set_at" {
                                         emit_op(state, make_op_name("Call", "__array_set"));
@@ -1065,7 +1067,7 @@ fn compile_expr(state, expr) {
                                         };
                                     };
                                 };
-                            };
+                            }; };
                         };
                     };
                 };

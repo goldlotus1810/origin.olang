@@ -1,8 +1,10 @@
 // editor/main.ol — O Editor entry point
 
 pub fn editor_start(_path) {
+    __write_raw("O Editor starting...\n");
     // Enter raw mode (same as REPL but for editor)
-    __term_raw();
+    let _tr = __term_raw();
+    __write_raw("Raw mode set. Reading keys...\n");
 
     let _cols = term_cols();
     let _rows = term_rows();
@@ -35,7 +37,7 @@ pub fn editor_start(_path) {
             let _li = _scroll + _i;
             if _li < len(_lines) {
                 term_bg(234); term_color(238);
-                let _num = to_string(_li + 1);
+                let _num = __to_string(_li + 1);
                 if _li + 1 < 10 { term_write("  " + _num + " "); }
                 else { if _li + 1 < 100 { term_write(" " + _num + " "); }
                 else { term_write(_num + " "); }; };
@@ -52,7 +54,7 @@ pub fn editor_start(_path) {
         // Status bar
         term_goto(_rows, 1);
         term_bg(235); term_color(252);
-        term_fill_line(" " + _mode + " │ Ln " + to_string(_cur_row + 1) + ", Col " + to_string(_cur_col + 1) + " │ " + to_string(len(_lines)) + " lines │ Olang", _cols);
+        term_fill_line(" " + _mode + " │ Ln " + __to_string(_cur_row + 1) + ", Col " + __to_string(_cur_col + 1) + " │ " + __to_string(len(_lines)) + " lines │ Olang", _cols);
         term_reset();
 
         // Cursor
