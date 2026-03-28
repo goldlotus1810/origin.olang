@@ -150,6 +150,7 @@ pub fn repl_eval(input) {
   if src == "help" {
     return "Code: let fn emit if while for match lambda | HOF: map filter reduce pipe any all | AI: learn respond memory | Self: diagnose benchmark selftest | test build exit";
   }
+  // (dump command removed)
   if src == "diagnose" || src == "diag" { return self_diagnostic(); }
   if src == "benchmark" || src == "bench" { return self_benchmark(); }
   if src == "selftest" { return self_test(); }

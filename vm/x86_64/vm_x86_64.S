@@ -10704,7 +10704,11 @@ op_halt:
     pop     %rdi                        # restore input ptr
     pop     %rcx                        # restore input len
     cmp     $CLOSURE_MARKER, %si
-    jne     .repl_fallback_echo
+    je      .repl_have_eval
+    cmp     $CAPTURED_CLOSURE_MARKER, %si
+    je      .repl_have_eval
+    jmp     .repl_fallback_echo
+.repl_have_eval:
 
     # Build trampoline bytecode
     # Push opcode with binary molecule encoding:

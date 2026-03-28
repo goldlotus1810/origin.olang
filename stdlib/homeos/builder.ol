@@ -111,6 +111,8 @@ fn compile_all(_ca_stdlib_path) {
   emit "  Compiling: editor\n";
   compile_dir(_ca_stdlib_path + "/editor", _ca_all_bc);
 
+  // Final Halt (one at the end of all concatenated bytecode)
+  push(_ca_all_bc, 15);
   return _ca_all_bc;
 };
 
@@ -131,7 +133,15 @@ fn compile_dir(_cd_dir, _cd_output) {
       let _cd_bc = compile_source(_cd_src);
       let _cd_bclen = len(_cd_bc);
       emit "  " + _cd_fname + " → " + __to_string(_cd_bclen) + " bytes";
-      if _cd_bclen > 0 { concat_bytes(_cd_output, _cd_bc); };
+      // Strip trailing Halt (0x0F) — files are concatenated, only ONE halt at end
+      if _cd_bclen > 0 {
+        if _cd_bc[_cd_bclen - 1] == 15 { _cd_bclen = _cd_bclen - 1; };
+        // Relocate Jmp/Jz/TryBegin targets by base offset
+        let _cd_base = len(_cd_output);
+        if _cd_base > 0 { relocate_jumps(_cd_bc, _cd_bclen, _cd_base); };
+        let _cd_bi = 0;
+        while _cd_bi < _cd_bclen { push(_cd_output, _cd_bc[_cd_bi]); _cd_bi = _cd_bi + 1; };
+      };
     } catch {
       emit "  " + _cd_fname + " → SKIP";
     };
@@ -161,6 +171,67 @@ fn compile_source(_cs_src) {
     };
   };
   return compile_isolated(_cs_ast);
+};
+
+fn relocate_jumps(_rj_bc, _rj_len, _rj_base) {
+  // Scan bytecode, add _rj_base to all Jmp/Jz/TryBegin targets
+  let _rj_pc = 0;
+  while _rj_pc < _rj_len {
+    let _rj_tag = _rj_bc[_rj_pc];
+    _rj_pc = _rj_pc + 1;
+    let _rj_skip = _bc_opcode_size(_rj_tag, _rj_bc, _rj_pc, _rj_len);
+    // Relocate Jmp(9), Jz(10), TryBegin(26)
+    let _rj_do_reloc = 0;
+    if _rj_tag == 9 { _rj_do_reloc = 1; };
+    if _rj_tag == 10 { _rj_do_reloc = 1; };
+    if _rj_tag == 26 { _rj_do_reloc = 1; };
+    if _rj_do_reloc == 1 {
+      if _rj_pc + 4 <= _rj_len {
+        let _rj_t = _rj_bc[_rj_pc] + _rj_bc[_rj_pc+1]*256 + _rj_bc[_rj_pc+2]*65536 + _rj_bc[_rj_pc+3]*16777216;
+        _rj_t = _rj_t + _rj_base;
+        set_at(_rj_bc, _rj_pc, _rj_t % 256);
+        set_at(_rj_bc, _rj_pc+1, __floor(_rj_t / 256) % 256);
+        set_at(_rj_bc, _rj_pc+2, __floor(_rj_t / 65536) % 256);
+        set_at(_rj_bc, _rj_pc+3, __floor(_rj_t / 16777216) % 256);
+      };
+    };
+    _rj_pc = _rj_pc + _rj_skip;
+  };
+};
+
+fn _bc_opcode_size(_os_tag, _os_bc, _os_pc, _os_len) {
+  // Return operand byte count for a codegen opcode
+  if _os_tag == 1 { if _os_pc + 2 <= _os_len { return 2 + (_os_bc[_os_pc] + _os_bc[_os_pc+1]*256) * 2; }; return 0; };
+  if _os_tag == 2 { if _os_pc < _os_len { return 1 + _os_bc[_os_pc]; }; return 0; };
+  if _os_tag == 7 { if _os_pc < _os_len { return 1 + _os_bc[_os_pc]; }; return 0; };
+  if _os_tag == 19 { if _os_pc < _os_len { return 1 + _os_bc[_os_pc]; }; return 0; };
+  if _os_tag == 20 { if _os_pc < _os_len { return 1 + _os_bc[_os_pc]; }; return 0; };
+  if _os_tag == 28 { if _os_pc < _os_len { return 1 + _os_bc[_os_pc]; }; return 0; };
+  if _os_tag == 9 { return 4; };
+  if _os_tag == 10 { return 4; };
+  if _os_tag == 14 { return 4; };
+  if _os_tag == 21 { return 8; };
+  if _os_tag == 25 { return 2; };
+  if _os_tag == 26 { return 4; };
+  if _os_tag == 37 { return 5; };
+  if _os_tag == 36 { if _os_pc < _os_len { return 1 + _os_bc[_os_pc] + 1; }; return 0; };
+  if _os_tag == 40 { return 1; };
+  if _os_tag == 41 { return 1; };
+  // ClosureCapture (0x30 = 48): [param:1][capture:1][names...][body_len:4]
+  if _os_tag == 48 {
+    if _os_pc + 2 <= _os_len {
+      let _os_ccnt = _os_bc[_os_pc + 1];
+      let _os_skip = 2;
+      let _os_ci = 0;
+      while _os_ci < _os_ccnt {
+        if _os_pc + _os_skip < _os_len { _os_skip = _os_skip + 1 + _os_bc[_os_pc + _os_skip]; };
+        _os_ci = _os_ci + 1;
+      };
+      return _os_skip + 4;
+    };
+    return 0;
+  };
+  return 0;
 };
 
 fn list_ol_files(_lof_dir) {
