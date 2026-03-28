@@ -31,3 +31,8 @@
 [2026-03-27 11:53:43] round=1 pass=67 fail=0 crash=0 total=67 fixed=67 fuzz=0
 [2026-03-27 12:54:17] round=1 pass=67 fail=0 crash=0 total=67 fixed=67 fuzz=0
 [2026-03-27 13:08:13] round=1 pass=67 fail=0 crash=0 total=67 fixed=67 fuzz=0
+[2026-03-28 07:21:21] round=1 pass=84 fail=3 crash=0 total=87 fixed=67 fuzz=20
+
+[2026-03-28 07:21:21] FAIL tro:count | got '' want '10000' | code: fn c(n,a){if n==0{return a;};return c(n-1,a+1);}; emit c(10000,0);
+[2026-03-28 07:21:21] FAIL tro:sum | got '' want '50005000' | code: fn s(n,a){if n==0{return a;};return s(n-1,a+n);}; emit s(10000,0);
+[2026-03-28 07:21:21] FAIL tro:fact | got '' want '3628800' | code: fn f(n,a){if n<2{return a;};return f(n-1,n*a);}; emit f(10,1);
