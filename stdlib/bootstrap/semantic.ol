@@ -1539,6 +1539,21 @@ fn compile_stmt(state, stmt) {
             push(_ce_stack, _ls_name);
             compile_expr(state, value);
             let _ls_name = pop(_ce_stack);
+            // Register locals: if inside function, use StoreReg
+            if __g_fn_in_function == 1 {
+                let _ls_slot = _find_reg_slot(__g_fn_slot_map, _ls_name);
+                if _ls_slot < 0 {
+                    // New local — add slot
+                    push(__g_fn_slot_map, _ls_name);
+                    _ls_slot = len(__g_fn_slot_map) - 1;
+                };
+                // Dup: register + var_table (for Call by name compat)
+                emit_op(state, make_op_simple("Dup"));
+                _emit_byte(state, 0x27);    // StoreReg
+                _emit_byte(state, _ls_slot);
+                emit_op(state, make_op_name("Store", _ls_name));
+                return;
+            };
             // Check if variable already defined → StoreUpdate (update in place)
             // Use FNV hash lookup to avoid while loop (boot context let shadow)
             let _ls_cnt = __array_get(_ce_lc, 0);
@@ -1617,6 +1632,11 @@ fn compile_stmt(state, stmt) {
             emit_op(state, make_op_simple("Ret"));
             let __g_fn_in_function = 0;
             _fn_slot_map = pop(_ce_stack);
+            // Patch EnterFrame slot count (may have grown with let locals)
+            let _fn_total_slots = len(__g_fn_slot_map);
+            if _fn_total_slots > _fn_pcnt {
+                set_at(_g_output, _fn_enter_pos, _fn_total_slots);
+            };
             restore_locals(state, _fn_saved);
             // Restore TRO context
             let _g_tro_fn = _fn_prev_tro_fn;
@@ -1699,10 +1719,19 @@ fn compile_stmt(state, stmt) {
                 emit "Error: cannot reassign const '" + _as_name + "'";
                 return;
             };
-            // Reassignment: x = val → StoreUpdate (full-table search, Julia-style)
+            // Reassignment: x = val
             push(_ce_stack, _as_name);
             compile_expr(state, value);
             let _as_name = pop(_ce_stack);
+            // If in function and variable is a register local, update register too
+            if __g_fn_in_function == 1 {
+                let _as_slot = _find_reg_slot(__g_fn_slot_map, _as_name);
+                if _as_slot >= 0 {
+                    emit_op(state, make_op_simple("Dup"));
+                    _emit_byte(state, 0x27);    // StoreReg
+                    _emit_byte(state, _as_slot);
+                };
+            };
             emit_op(state, make_op_name("StoreUpdate", _as_name));
         },
         Stmt::EmitStmt { expr } => {
