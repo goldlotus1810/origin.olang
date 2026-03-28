@@ -22,9 +22,13 @@ pub fn editor_start(_path) {
 
     term_hide_cursor();
     term_clear();
+    let _need_render = 1;
 
     while _running == 1 {
-        // Render title bar
+        if _need_render == 1 {
+        _need_render = 0;
+        // Render
+        term_clear();
         term_goto(1, 1);
         term_bg(235); term_color(69); term_bold();
         term_fill_line(" O ─ " + _path, _cols);
@@ -60,10 +64,12 @@ pub fn editor_start(_path) {
         // Cursor
         term_goto(_cur_row - _scroll + 2, _cur_col + 7);
         term_show_cursor();
+        }; // end if _need_render
 
-        // Read key
+        // Read key (blocking — waits for input)
         let _key = __read_byte();
-        if _key < 0 { __sleep(16); } else {
+        if _key < 0 { __sleep(50); } else {
+            _need_render = 1;
             if _key == 17 { _running = 0; };   // Ctrl-Q = quit
             if _key == 27 {                     // ESC
                 if _mode == "INSERT" { _mode = "NORMAL"; }
