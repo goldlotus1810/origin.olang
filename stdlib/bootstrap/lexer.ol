@@ -29,12 +29,23 @@ let KEYWORDS = [
 ];
 
 fn is_keyword(name) {
+    // Fast path: check first 2 chars to skip most identifiers
+    if len(name) < 2 { return false; };
+    let _ik_p = __substr(name, 0, 2);
+    if _ik_p != "le" { if _ik_p != "co" { if _ik_p != "fn" { if _ik_p != "if" {
+    if _ik_p != "el" { if _ik_p != "lo" { if _ik_p != "wh" { if _ik_p != "fo" {
+    if _ik_p != "in" { if _ik_p != "re" { if _ik_p != "br" { if _ik_p != "em" {
+    if _ik_p != "ty" { if _ik_p != "un" { if _ik_p != "im" { if _ik_p != "tr" {
+    if _ik_p != "ma" { if _ik_p != "ca" { if _ik_p != "sp" { if _ik_p != "se" {
+    if _ik_p != "ti" { if _ik_p != "fr" { if _ik_p != "us" { if _ik_p != "mo" {
+    if _ik_p != "pu" { if _ik_p != "fa" {
+        return false;
+    };};};};};};};};};};};};};};};};};};};};};};};};}; };
+    // Full match against keyword list
     let i = 0;
     while i < len(KEYWORDS) {
-        if KEYWORDS[i] == name {
-            return true;
-        };
-        let i = i + 1;
+        if KEYWORDS[i] == name { return true; };
+        i = i + 1;
     };
     return false;
 }

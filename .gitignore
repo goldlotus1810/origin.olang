@@ -21,3 +21,5 @@ data/ml_coban.txt
 data/test_mmap.bin
 json/udc_p_table_old.bin
 json/udc_p_table_full.bin
+Nox_brain.olang
+origin.olang

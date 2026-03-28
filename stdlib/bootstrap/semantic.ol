@@ -1306,6 +1306,13 @@ fn compile_expr(state, expr) {
                     _ => {},
                 };
             };
+            if _cc_expr_ntoks > 4 {
+                // Complex expression — re-parse from tokens
+                let _cc_ep = new_parser(__g_comp_tokens);
+                _cc_ep.pos = _cc_es;
+                let _cc_expr_ast = parse_expr(_cc_ep);
+                compile_expr(state, _cc_expr_ast);
+            };
             emit_op(state, make_op_name("Call", "__array_push"));
             emit_op(state, make_op_name("Store", _cc_result));
 
