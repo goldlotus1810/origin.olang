@@ -1346,6 +1346,12 @@ op_call:
     je      .call_write_raw
     jmp     .call_not_builtin
 
+.builtin_slot_66:
+    movabs  $0xF41F931B6E11C642, %rdx
+    cmp     %rdx, %rax
+    je      .call_read_byte
+    jmp     .call_not_builtin
+
 .builtin_slot_74:
     movabs  $0x53416FC92E4E354A, %rdx
     cmp     %rdx, %rax
@@ -1749,6 +1755,12 @@ op_call:
     movabs  $0x10278AEC167ABEF0, %rdx
     cmp     %rdx, %rax
     je      .call_text_to_pw
+    jmp     .call_not_builtin
+
+.builtin_slot_243:
+    movabs  $0xF2DF815C9D57AEF3, %rdx
+    cmp     %rdx, %rax
+    je      .call_term_size
     jmp     .call_not_builtin
 
 .builtin_slot_245:
@@ -7196,6 +7208,54 @@ op_ret:
     jmp     vm_loop
 
 # __heap_used() → bytes used on heap (r15 - heap_base)
+# __term_size() → cols*10000+rows (decode in Olang: cols=floor(n/10000), rows=n%10000)
+.call_term_size:
+    add     %rcx, %r13
+    sub     $8, %rsp
+    mov     %rsp, %rdx                  # &winsize struct
+    mov     $0x5413, %esi               # TIOCGWINSZ
+    mov     $1, %edi                    # stdout
+    mov     $16, %eax                   # SYS_ioctl
+    syscall
+    movzwl  (%rsp), %eax               # ws_row
+    movzwl  2(%rsp), %edx              # ws_col
+    add     $8, %rsp
+    imul    $10000, %edx
+    add     %eax, %edx
+    cvtsi2sd %edx, %xmm0
+    sub     $16, %r14
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+# __read_byte() → f64 byte value, or -1 if no data (non-blocking)
+.call_read_byte:
+    add     %rcx, %r13
+    # Set stdin non-blocking temporarily
+    sub     $1, %rsp
+    mov     %rsp, %rsi                  # buf for 1 byte
+    mov     $1, %edx
+    xor     %edi, %edi                  # stdin
+    mov     $SYS_READ, %eax
+    syscall
+    test    %rax, %rax
+    jle     .read_byte_none
+    movzbl  (%rsp), %eax
+    add     $1, %rsp
+    cvtsi2sd %eax, %xmm0
+    sub     $16, %r14
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+.read_byte_none:
+    add     $1, %rsp
+    # Push -1
+    sub     $16, %r14
+    mov     $0xBFF0000000000000, %rax   # -1.0
+    mov     %rax, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
 .call_heap_used:
     add     %rcx, %r13
     mov     %r15, %rax
@@ -11000,7 +11060,7 @@ builtin_jump_table:
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .call_not_builtin
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_66
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .call_not_builtin
@@ -11177,7 +11237,7 @@ builtin_jump_table:
     .quad   .builtin_slot_240
     .quad   .call_not_builtin
     .quad   .call_not_builtin
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_243
     .quad   .call_not_builtin
     .quad   .builtin_slot_245
     .quad   .builtin_slot_246
