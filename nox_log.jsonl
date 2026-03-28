@@ -283,3 +283,9 @@
 {"ts":"2026-03-28 09:53","type":"emotion_encode","msg":"toi vui"}
 {"ts":"2026-03-28 09:53","type":"safety_check","msg":"hello"}
 {"ts":"2026-03-28 09:53","type":"nox_status","msg":""}
+{"ts":"2026-03-28 09:57","type":"olang_eval","msg":""}
+{"ts":"2026-03-28 09:57","type":"know_learn","msg":""}
+{"ts":"2026-03-28 09:57","type":"know_query","msg":""}
+{"ts":"2026-03-28 09:57","type":"emotion_encode","msg":""}
+{"ts":"2026-03-28 09:57","type":"safety_check","msg":""}
+{"ts":"2026-03-28 09:57","type":"nox_status","msg":""}

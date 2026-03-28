@@ -93,24 +93,35 @@ fn _jp_parse_array(_ja_t, _ja_pos) {
     return _ja_result;
 }
 
+let __jp_stk = [];
+
 fn _jp_parse_object(_jo_t, _jo_pos) {
     set_at(_jo_pos, 0, _jo_pos[0] + 1);
     _jp_skip_ws(_jo_t, _jo_pos);
     let _jo_result = [];
     if __char_code(char_at(_jo_t, _jo_pos[0])) == 125 { set_at(_jo_pos, 0, _jo_pos[0] + 1); return _jo_result; };
+    // Save result before recursive parse_value (may call parse_object again)
+    push(__jp_stk, _jo_result);
     let _jo_key = _jp_parse_string(_jo_t, _jo_pos);
     _jp_skip_ws(_jo_t, _jo_pos);
     set_at(_jo_pos, 0, _jo_pos[0] + 1);
+    push(__jp_stk, _jo_key);
     let _jo_val = _jp_parse_value(_jo_t, _jo_pos);
+    _jo_key = pop(__jp_stk);
+    _jo_result = pop(__jp_stk);
     push(_jo_result, _jo_key);
     push(_jo_result, _jo_val);
     _jp_skip_ws(_jo_t, _jo_pos);
     while __char_code(char_at(_jo_t, _jo_pos[0])) == 44 {
         set_at(_jo_pos, 0, _jo_pos[0] + 1);
+        push(__jp_stk, _jo_result);
         let _jo_key = _jp_parse_string(_jo_t, _jo_pos);
         _jp_skip_ws(_jo_t, _jo_pos);
         set_at(_jo_pos, 0, _jo_pos[0] + 1);
+        push(__jp_stk, _jo_key);
         let _jo_val = _jp_parse_value(_jo_t, _jo_pos);
+        _jo_key = pop(__jp_stk);
+        _jo_result = pop(__jp_stk);
         push(_jo_result, _jo_key);
         push(_jo_result, _jo_val);
         _jp_skip_ws(_jo_t, _jo_pos);

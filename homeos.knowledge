@@ -105,3 +105,5 @@ Lupin said origin.olang is Nox brain — let it grow with time, record history l
 [2026-03-28 09:46] MCP test fact 12345"}},"id":3}
 [2026-03-28 09:53] MCP test fact 12345
 [2026-03-28 11:00] S15 scope chain investigation complete. var_table truncation in LeaveFrame either loses globals (too aggressive) or hangs (runtime calls add entries). TRUE fix: scope chain with separate globals table. Multi-day task.
+[2026-03-28 09:57] MCP test fact 12345
+[2026-03-28 11:15] json_parse nested {} FIXED in MCP! Used save/restore stack in _jp_parse_object. No more string extraction workaround. MCP server now uses proper json_parse + json_get.

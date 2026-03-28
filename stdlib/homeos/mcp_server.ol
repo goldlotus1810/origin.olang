@@ -11,20 +11,19 @@ pub fn mcp_dispatch(_md_line) {
         let _mb2 = kt_load("homeos.knowledge");
     };
 
-    // String extraction (boot closure let locals not yet in registers)
-    let _md_method = _ext_s(_md_line, "method");
-    let _md_id = _ext_n(_md_line, "id");
+    // json_parse now safe with nested {} (save/restore stack in _jp_parse_object)
+    let _md_req = json_parse(_md_line);
+    let _md_method = json_get(_md_req, "method");
+    let _md_id = json_get(_md_req, "id");
 
     if _md_method == "initialize" { return _mcp_init(_md_id); };
     if _md_method == "notifications/initialized" { return ""; };
     if _md_method == "tools/list" { return _mcp_tools(_md_id); };
     if _md_method == "tools/call" {
-        let _md_tool = _ext_s(_md_line, "name");
-        let _md_code = _ext_s(_md_line, "code");
-        let _md_fact = _ext_s(_md_line, "fact");
-        let _md_question = _ext_s(_md_line, "question");
-        let _md_text = _ext_s(_md_line, "text");
-        return _mcp_call_ex(_md_id, _md_tool, _md_code, _md_fact, _md_question, _md_text);
+        let _md_params = json_get(_md_req, "params");
+        let _md_tool = json_get(_md_params, "name");
+        let _md_args = json_get(_md_params, "arguments");
+        return _mcp_call(_md_id, _md_tool, _md_args);
     };
 
     return _err(_md_id, "Unknown method");
@@ -56,17 +55,17 @@ fn _tool_no_arg(_name, _desc) {
     return "{\"name\":\"" + _name + "\",\"description\":\"" + _desc + "\",\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}";
 }
 
-fn _mcp_call_ex(_id, _tool, _code, _fact, _question, _text) {
-    _log(_tool, _code + _fact + _question + _text);
+fn _mcp_call(_id, _tool, _args) {
+    _log(_tool, to_string(_args));
     if _tool == "olang_eval" {
         let _fd = __stdout_off();
-        let _r = repl_eval(_code);
+        let _r = repl_eval(json_get(_args, "code"));
         __stdout_on(_fd);
         if len(_r) == 0 { return _ok(_id, "ok"); };
         return _ok(_id, _r);
     };
     if _tool == "know_learn" {
-        let _fact = _fact;
+        let _fact = json_get(_args, "fact");
         let _ts = _fmt_ts(__timestamp());
         let _entry = "[" + _ts + "] " + _fact;
         kt_learn(_entry);
@@ -74,7 +73,7 @@ fn _mcp_call_ex(_id, _tool, _code, _fact, _question, _text) {
         return _ok(_id, "Learned: " + _entry + " (" + to_string(kt_fact_count()) + " facts)");
     };
     if _tool == "know_query" {
-        let _q = _question;
+        let _q = json_get(_args, "question");
         let _results = kt_find(_q, 10);
         if len(_results) == 0 { return _ok(_id, "No facts for: " + _q + " (" + to_string(kt_fact_count()) + " total)"); };
         let _out = "";
@@ -87,11 +86,11 @@ fn _mcp_call_ex(_id, _tool, _code, _fact, _question, _text) {
         return _ok(_id, _out);
     };
     if _tool == "emotion_encode" {
-        let _e = text_emotion_v2(_text);
+        let _e = text_emotion_v2(json_get(_args, "text"));
         return _ok(_id, "5D: S=" + to_string(_e.s) + " R=" + to_string(_e.r) + " V=" + to_string(_e.v) + " A=" + to_string(_e.a) + " T=" + to_string(_e.t));
     };
     if _tool == "safety_check" {
-        let _r = _security_gate(_text);
+        let _r = _security_gate(json_get(_args, "text"));
         if len(_r) > 0 { return _ok(_id, "CRISIS: " + _r); };
         return _ok(_id, "SAFE");
     };
@@ -146,47 +145,3 @@ fn _log(_type, _msg) {
     __file_append("nox_log.jsonl", "{\"ts\":\"" + _fmt_ts(__timestamp()) + "\",\"type\":\"" + _type + "\",\"msg\":\"" + _esc(_msg) + "\"}\n");
 }
 
-fn _ext_s(_t, _k) {
-    let _p = "\"" + _k + "\":\"";
-    let _pl = len(_p);
-    let _tl = len(_t);
-    let _i = 0;
-    while _i < _tl {
-        if __substr(_t, _i, _i + _pl) == _p {
-            let _s = _i + _pl;
-            let _j = _s;
-            while _j < _tl {
-                let _c = char_at(_t, _j);
-                if _c == "\\" { _j = _j + 2; } else {
-                    if _c == "\"" { return __substr(_t, _s, _j); };
-                    _j = _j + 1;
-                };
-            };
-            return __substr(_t, _s, _j);
-        };
-        _i = _i + 1;
-    };
-    return "";
-}
-
-fn _ext_n(_t, _k) {
-    let _p = "\"" + _k + "\":";
-    let _pl = len(_p);
-    let _tl = len(_t);
-    let _i = 0;
-    while _i < _tl {
-        if __substr(_t, _i, _i + _pl) == _p {
-            let _s = _i + _pl;
-            let _j = _s;
-            while _j < _tl {
-                let _c = __char_code(char_at(_t, _j));
-                if _c < 48 { if _c != 45 { return __to_number(__substr(_t, _s, _j)); }; };
-                if _c > 57 { if _c != 46 { return __to_number(__substr(_t, _s, _j)); }; };
-                _j = _j + 1;
-            };
-            return __to_number(__substr(_t, _s, _j));
-        };
-        _i = _i + 1;
-    };
-    return 0;
-}
