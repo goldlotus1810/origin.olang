@@ -67,3 +67,71 @@
 {"ts":"2026-03-28 06:34","type":"EMOTION","msg":"toi vui"}
 {"ts":"2026-03-28 06:34","type":"SAFETY","msg":"hello"}
 {"ts":"2026-03-28 06:34","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 06:37","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 06:37","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 06:37","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 06:37","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 06:37","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 06:37","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 06:41","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 06:41","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 06:41","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 06:41","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 06:41","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 06:41","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 06:48","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 06:48","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 06:48","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 06:48","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 06:48","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 06:48","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 06:52","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 06:52","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 06:52","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 06:52","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 06:52","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 06:52","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 06:55","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 06:55","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 06:55","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 06:55","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 06:55","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 06:55","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 06:59","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 06:59","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 06:59","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 06:59","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 06:59","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 06:59","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 07:10","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 07:10","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 07:10","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 07:10","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 07:10","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 07:10","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 07:13","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 07:13","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 07:13","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 07:13","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 07:13","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 07:13","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 07:16","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 07:16","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 07:16","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 07:16","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 07:16","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 07:16","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 07:17","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 07:17","type":"EVAL","msg":"fn sq(x) { return x * x; }; emit sq(9);"}
+{"ts":"2026-03-28 07:17","type":"QUERY","msg":"Nox"}
+{"ts":"2026-03-28 07:17","type":"LEARN","msg":"register locals killed the var_table boss"}
+{"ts":"2026-03-28 07:17","type":"QUERY","msg":"register"}
+{"ts":"2026-03-28 07:17","type":"QUERY","msg":"boss"}
+{"ts":"2026-03-28 07:17","type":"EMOTION","msg":"chien thang"}
+{"ts":"2026-03-28 07:17","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 07:18","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 07:18","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 07:18","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 07:18","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 07:18","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 07:18","type":"STATUS","msg":"brain check"}
