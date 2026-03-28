@@ -100,3 +100,5 @@ Lupin said origin.olang is Nox brain — let it grow with time, record history l
 [2026-03-28 10:00] Pattern confirmed: boot closure let locals AND eval context for-in loop counters both broken without full register locals. S15 is THE critical blocker for Phase 3.
 [2026-03-28 09:17] MCP test fact 12345
 [2026-03-28 09:19] MCP test fact 12345
+[2026-03-28 09:26] MCP test fact 12345
+[2026-03-28 10:30] S15 deep investigation: LeaveFrame var_table truncate → hangs (loses stdlib globals). Root cause confirmed: var_table mixes globals and locals in flat array. Fix needs scope chain separation (globals vs locals). Deferred.

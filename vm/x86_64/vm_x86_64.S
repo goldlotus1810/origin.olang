@@ -575,7 +575,10 @@ cg_closure:
 op_enter_frame:
     movzbl  (%r12, %r13), %eax         # num_slots
     inc     %r13
-    # Save old state on CPU stack
+    # Save on CPU stack: [var_table_count, old_cur_frame, old_frame_ptr]
+    lea     var_table_base(%rip), %rcx
+    mov     (%rcx), %rcx
+    push    (%rcx)                      # save var_table.count for scope restore
     lea     reg_cur_frame(%rip), %rcx
     push    (%rcx)                      # save old cur_frame
     lea     reg_frame_ptr(%rip), %rdx
@@ -605,6 +608,7 @@ op_leave_frame:
     pop     %rax                        # restore old cur_frame
     lea     reg_cur_frame(%rip), %rcx
     mov     %rax, (%rcx)
+    pop     %rax                        # discard saved var_table count (can't truncate — loses globals)
     jmp     vm_loop
 
 # LoadReg(u8 slot): push register value onto VM stack
@@ -5852,7 +5856,7 @@ op_ret:
     # Scope restore: truncate var_table if depth > 0
     lea     closure_depth(%rip), %rsi
     cmpq    $0, (%rsi)
-    je      vm_loop                     # depth==0 (boot top-level) → no scope to restore
+    je      vm_loop                     # depth==0 → no scope (LeaveFrame handles it)
     decq    (%rsi)                      # depth--
     # Check skip_scope_restore flag (module loading)
     lea     skip_scope_restore(%rip), %rax
