@@ -112,11 +112,13 @@ fn compile_dir(_cd_dir, _cd_output) {
   while _cd_i < len(_cd_files) {
     let _cd_fname = _cd_files[_cd_i];
     let _cd_src = file_read_string(_cd_fname);
-    let _cd_bc = compile_source(_cd_src);
-    let _cd_bclen = len(_cd_bc);
-    emit "  " + _cd_fname + " → " + __to_string(_cd_bclen) + " bytes";
-    if _cd_bclen > 0 {
-      concat_bytes(_cd_output, _cd_bc);
+    try {
+      let _cd_bc = compile_source(_cd_src);
+      let _cd_bclen = len(_cd_bc);
+      emit "  " + _cd_fname + " → " + __to_string(_cd_bclen) + " bytes";
+      if _cd_bclen > 0 { concat_bytes(_cd_output, _cd_bc); };
+    } catch {
+      emit "  " + _cd_fname + " → SKIP (error)";
     };
     _cd_i = _cd_i + 1;
   };
