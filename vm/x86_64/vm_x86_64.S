@@ -7301,12 +7301,31 @@ op_ret:
 # __term_raw() → set terminal to raw mode (no echo, no canonical)
 .call_term_raw:
     add     %rcx, %r13
-    # Save current termios
+    # Open /dev/tty if needed
+    mov     tty_fd(%rip), %edi
+    test    %edi, %edi
+    jnz     .term_raw_have_fd
+    lea     dev_tty_path(%rip), %rdi
+    mov     $2, %esi                    # O_RDWR
+    xor     %edx, %edx
+    mov     $2, %eax
+    syscall
+    test    %eax, %eax
+    js      .term_raw_use_stdin
+    mov     %eax, tty_fd(%rip)
+    mov     %eax, %edi
+    jmp     .term_raw_have_fd
+.term_raw_use_stdin:
+    xor     %edi, %edi
+.term_raw_have_fd:
+    # Save current termios from tty fd
+    push    %rdi
     lea     repl_termios_old(%rip), %rdx
     mov     $0x5401, %esi               # TCGETS
-    xor     %edi, %edi
     mov     $16, %eax
     syscall
+    pop     %rdi
+    push    %rdi                        # save fd for TCSETS
     # Copy old → raw
     lea     repl_termios_old(%rip), %rsi
     lea     repl_termios_raw(%rip), %rdi
@@ -7319,10 +7338,10 @@ op_ret:
     movl    %eax, 12(%rdi)
     movb    $1, 23(%rdi)                # VMIN=1
     movb    $0, 22(%rdi)                # VTIME=0
-    # Apply
+    # Apply to tty fd
+    pop     %rdi                        # restore saved fd
     lea     repl_termios_raw(%rip), %rdx
     mov     $0x5402, %esi               # TCSETS
-    xor     %edi, %edi
     mov     $16, %eax
     syscall
     movb    $1, repl_raw_mode(%rip)
@@ -7338,7 +7357,11 @@ op_ret:
     add     %rcx, %r13
     lea     repl_termios_old(%rip), %rdx
     mov     $0x5402, %esi               # TCSETS
-    xor     %edi, %edi
+    mov     tty_fd(%rip), %edi
+    test    %edi, %edi
+    jnz     .term_cooked_go
+    xor     %edi, %edi                  # fallback fd 0
+.term_cooked_go:
     mov     $16, %eax
     syscall
     movb    $0, repl_raw_mode(%rip)
