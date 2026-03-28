@@ -71,8 +71,8 @@ pub fn editor_start(_path) {
         if _key < 0 { __sleep(50); } else {
             _need_render = 1;
             _last_key = _key;
-            if _key == 17 { _running = 0; };   // Ctrl-Q = quit
-            if _key == 27 {                     // ESC
+            if _key == 17 { _running = 0; }   // Ctrl-Q = quit
+            else { if _key == 27 {               // ESC
                 if _mode == "INSERT" { _mode = "NORMAL"; }
                 else {
                     let _k2 = __read_byte();
@@ -84,46 +84,40 @@ pub fn editor_start(_path) {
                         if _k3 == 68 { if _cur_col > 0 { _cur_col = _cur_col - 1; }; };
                     };
                 };
-            };
-            if _mode == "NORMAL" {
-                if _key == 105 { _mode = "INSERT"; };          // i
-                if _key == 106 { if _cur_row < len(_lines) - 1 { _cur_row = _cur_row + 1; }; }; // j
-                if _key == 107 { if _cur_row > 0 { _cur_row = _cur_row - 1; }; };                // k
-                if _key == 104 { if _cur_col > 0 { _cur_col = _cur_col - 1; }; };                // h
-                if _key == 108 { _cur_col = _cur_col + 1; };                                      // l
-            };
-            if _mode == "INSERT" {
-                if _key != 27 { if _key != 105 {
-                    if _key == 127 {
-                        // Backspace
-                        if _cur_col > 0 {
-                            let _line = _lines[_cur_row];
-                            set_at(_lines, _cur_row, __substr(_line, 0, _cur_col - 1) + __substr(_line, _cur_col, len(_line)));
-                            _cur_col = _cur_col - 1;
-                        };
-                    } else { if _key == 13 {
-                        // Enter — split line
+            } else { if _mode == "NORMAL" {
+                if _key == 105 { _mode = "INSERT"; }          // i — mode switch only
+                else { if _key == 106 { if _cur_row < len(_lines) - 1 { _cur_row = _cur_row + 1; }; }  // j
+                else { if _key == 107 { if _cur_row > 0 { _cur_row = _cur_row - 1; }; }                // k
+                else { if _key == 104 { if _cur_col > 0 { _cur_col = _cur_col - 1; }; }                // h
+                else { if _key == 108 { _cur_col = _cur_col + 1; };                                    // l
+                }; }; }; };
+            } else {
+                // INSERT mode — type text
+                if _key == 127 {
+                    if _cur_col > 0 {
                         let _line = _lines[_cur_row];
-                        set_at(_lines, _cur_row, __substr(_line, 0, _cur_col));
-                        // Insert new line after
-                        let _new = [];
-                        let _ni = 0;
-                        while _ni < len(_lines) {
-                            push(_new, _lines[_ni]);
-                            if _ni == _cur_row { push(_new, __substr(_line, _cur_col, len(_line))); };
-                            _ni = _ni + 1;
-                        };
-                        _lines = _new;
-                        _cur_row = _cur_row + 1;
-                        _cur_col = 0;
-                    } else { if _key >= 32 {
-                        // Printable char
-                        let _line = _lines[_cur_row];
-                        set_at(_lines, _cur_row, __substr(_line, 0, _cur_col) + __chr(_key) + __substr(_line, _cur_col, len(_line)));
-                        _cur_col = _cur_col + 1;
-                    }; }; };
-                }; };
-            };
+                        set_at(_lines, _cur_row, __substr(_line, 0, _cur_col - 1) + __substr(_line, _cur_col, len(_line)));
+                        _cur_col = _cur_col - 1;
+                    };
+                } else { if _key == 13 || _key == 10 { // Enter (CR or LF)
+                    let _line = _lines[_cur_row];
+                    set_at(_lines, _cur_row, __substr(_line, 0, _cur_col));
+                    let _new = [];
+                    let _ni = 0;
+                    while _ni < len(_lines) {
+                        push(_new, _lines[_ni]);
+                        if _ni == _cur_row { push(_new, __substr(_line, _cur_col, len(_line))); };
+                        _ni = _ni + 1;
+                    };
+                    _lines = _new;
+                    _cur_row = _cur_row + 1;
+                    _cur_col = 0;
+                } else { if _key >= 32 {
+                    let _line = _lines[_cur_row];
+                    set_at(_lines, _cur_row, __substr(_line, 0, _cur_col) + __chr(_key) + __substr(_line, _cur_col, len(_line)));
+                    _cur_col = _cur_col + 1;
+                }; }; };
+            }; }; };
             // Scroll
             if _cur_row < _scroll { _scroll = _cur_row; };
             if _cur_row >= _scroll + _rows - 2 { _scroll = _cur_row - _rows + 3; };
