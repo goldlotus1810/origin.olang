@@ -364,6 +364,7 @@ pub fn repl_eval(input) {
     if _re_2 == "__" { _re_is_code = 1; };
     if _re_2 == "us" { _re_is_code = 1; };  // use "module.ol"
     if _re_2 == "co" { _re_is_code = 1; };  // const
+    if _re_2 == "ed" { _re_is_code = 1; };  // editor_start
     // Detect assignment: ident = expr (scan for = not preceded by !<>)
     if _re_is_code == 0 {
         let _re_si = 0;
