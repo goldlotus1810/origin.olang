@@ -128,6 +128,16 @@ _start:
     mov     %rax, editor_path(%rip)
     jmp     .open_self
 .not_editor:
+    # Check if argv[1] == "--build"
+    mov     16(%rsp), %rdi
+    cmpl    $0x75622d2d, (%rdi)         # "--bu" (LE: 2d2d6275)
+    jne     .not_build
+    cmpl    $0x00646C69, 4(%rdi)        # "ild\0"
+    jne     .not_build
+    movb    $1, eval_mode(%rip)         # use eval mode
+    movb    $1, build_flag(%rip)        # flag: run builder after boot
+    jmp     .open_self
+.not_build:
     mov     16(%rsp), %rdi              # argv[1] = filename
     jmp     .do_open
 .open_self:
@@ -10772,6 +10782,18 @@ op_halt:
     mov     %rax, eval_buf(%rip)
     add     $0x10000, %r15
 
+    # Check build flag — inject build command
+    cmpb    $1, build_flag(%rip)
+    jne     .not_build_inject
+    mov     eval_buf(%rip), %rdi
+    lea     build_cmd(%rip), %rsi
+    mov     $31, %ecx                   # len of build command
+    rep     movsb
+    mov     eval_buf(%rip), %rsi
+    mov     %rdi, %rax
+    sub     %rsi, %rax
+    jmp     .eval_have_input
+.not_build_inject:
     # Check editor flag — inject editor_start("path") instead of reading stdin
     cmpb    $1, editor_flag(%rip)
     jne     .eval_read_stdin
@@ -11147,6 +11169,7 @@ bin_sh_path: .asciz "/bin/sh"
 sh_c_arg: .asciz "-c"
 dev_null_path: .asciz "/dev/null"
 dev_tty_path: .asciz "/dev/tty"
+build_cmd: .ascii "emit build(default_config());\n"
 editor_prefix: .ascii "emit editor_start(\""
 editor_suffix: .ascii "\");\n"
 repl_bs_seq: .byte 0x08, 0x20, 0x08       # backspace + space + backspace
@@ -11932,6 +11955,8 @@ heap_base:
     .space 8                            # saved heap start for __heap_used
 editor_flag:
     .space 1                            # 1 = launch editor after boot
+build_flag:
+    .space 1                            # 1 = run builder after boot
 editor_path:
     .space 8                            # pointer to argv[2] filename (or 0)
 tty_fd:
