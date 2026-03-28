@@ -7,12 +7,12 @@
 ## TÌNH TRẠNG HIỆN TẠI (cập nhật mỗi session)
 
 ```
-Commits:    181 (18 this session)
-Binary:     484K
-VM ASM:     ~12,000 LOC (+closure capture, +__system, +ghost fix, +scope_gen)
-Compiler:   ~4,500 LOC (4 files) (+compile_isolated, +capture detection)
-Editor:     ~1,200 LOC (5 files) (+save, +search, +F5, +D/g/0/$)
-Stdlib:     ~12,500 LOC (45+ files)
+Commits:    163
+Binary:     471K
+VM ASM:     11,915 LOC
+Compiler:   4,298 LOC (4 files)
+Editor:     819 LOC (5 files)
+Stdlib:     12,271 LOC (45+ files)
 Tests:      90/90 core + 9/9 MCP
 ```
 
@@ -21,8 +21,8 @@ Tests:      90/90 core + 9/9 MCP
 ## THỨ TỰ ƯU TIÊN (KHÔNG ĐỔI)
 
 ```
-S17  Fix ghost entries bug           ✅ DONE — fn_registry depth check + frame-aware var_load_hash
-S18  Self-build (kill Rust)          🔧 70% — pipeline works, blocker: builder.ol parse truncation
+S17  Fix ghost entries bug           ← phải fix trước, ảnh hưởng mọi thứ
+S18  Self-build (kill Rust)          ← T-BUILD đang làm, tiếp tục
 S19  Test coverage                   ← bảo vệ mọi thứ đã build
 S20  O Editor panels                 ← spawn bash + claude
 S21  GC cơ bản                       ← heap không vỡ khi chạy lâu
@@ -248,7 +248,16 @@ T20.8: Update main.ol event loop
         render_if_changed();
     };
 
-Effort: ~10 giờ = 1.5 sessions
+T20.9: File lock — __file_lock / __file_trylock / __file_unlock
+  Nhiều Olang instances chạy cùng lúc → chỉ 1 được ghi file tại 1 thời điểm.
+  .equ SYS_FLOCK, 73
+  __file_lock(path)     → flock(fd, LOCK_EX)       chờ đến khi lock được
+  __file_trylock(path)  → flock(fd, LOCK_EX|LOCK_NB) return 0 (fail) hoặc 1 (ok)
+  __file_unlock(path)   → flock(fd, LOCK_UN)
+  ~30 LOC ASM (1 syscall, 3 builtins)
+  Test: 2 instances ghi cùng file → cái sau chờ hoặc báo lỗi
+
+Effort: ~11 giờ = 1.5 sessions
 ```
 
 ---
@@ -397,13 +406,13 @@ Sprint    Task                    Effort    Deps
 S17       Ghost entries fix       1h        none
 S18       Self-build              6h        S17
 S19       Test coverage           3h        S18
-S20       Editor process panels   10h       S18
+S20       Editor panels + file lock  11h       S18
 S21       GC cơ bản               30min     none
 S22       Boot closure locals     0h        S18 (tự động)
 S23       Unified P_w table       16h       none
 S24       SDF renderer            20h       S23
 ────────────────────────────────────────────────
-TOTAL:    ~57h = ~8 sessions Nox
+TOTAL:    ~58h = ~8 sessions Nox
 
 Session 1: S17 + S18 (ghost fix + self-build finish)
 Session 2: S18 (self-build debug + fixed-point)
