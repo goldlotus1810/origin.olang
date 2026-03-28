@@ -7250,11 +7250,34 @@ op_ret:
 # __read_byte() → f64 byte value, or -1 if no data (non-blocking)
 .call_read_byte:
     add     %rcx, %r13
-    # Set stdin non-blocking temporarily
+    # Read from /dev/tty (not stdin — stdin may be consumed by eval)
+    # Open /dev/tty if not already open
+    mov     tty_fd(%rip), %edi
+    test    %edi, %edi
+    jnz     .read_byte_have_fd
+    lea     dev_tty_path(%rip), %rdi
+    mov     $2, %esi                    # O_RDWR
+    xor     %edx, %edx
+    mov     $2, %eax                    # SYS_open
+    syscall
+    test    %eax, %eax
+    js      .read_byte_use_stdin        # /dev/tty fail → use stdin
+    mov     %eax, tty_fd(%rip)
+    mov     %eax, %edi
+    # Apply raw mode to tty fd too
+    push    %rdi
+    lea     repl_termios_raw(%rip), %rdx
+    mov     $0x5402, %esi
+    mov     $16, %eax
+    syscall
+    pop     %rdi
+    jmp     .read_byte_have_fd
+.read_byte_use_stdin:
+    xor     %edi, %edi
+.read_byte_have_fd:
     sub     $1, %rsp
     mov     %rsp, %rsi                  # buf for 1 byte
     mov     $1, %edx
-    xor     %edi, %edi                  # stdin
     mov     $SYS_READ, %eax
     syscall
     test    %rax, %rax
@@ -10667,6 +10690,7 @@ print_hex_u64:
 .section .rodata
 
 dev_null_path: .asciz "/dev/null"
+dev_tty_path: .asciz "/dev/tty"
 editor_cmd: .ascii "emit editor_start(\"\");\n"
 repl_bs_seq: .byte 0x08, 0x20, 0x08       # backspace + space + backspace
 proc_self_exe:
@@ -11449,6 +11473,8 @@ heap_base:
     .space 8                            # saved heap start for __heap_used
 editor_flag:
     .space 1                            # 1 = launch editor after boot
+tty_fd:
+    .space 4                            # fd for /dev/tty (0 = not opened)
 repl_termios_old:
     .space 60                           # saved terminal settings
 repl_termios_raw:
