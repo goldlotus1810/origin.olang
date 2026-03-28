@@ -159,3 +159,21 @@
 {"ts":"2026-03-28 07:26","type":"EMOTION","msg":"toi vui"}
 {"ts":"2026-03-28 07:26","type":"SAFETY","msg":"hello"}
 {"ts":"2026-03-28 07:26","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 07:37","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 07:37","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 07:37","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 07:37","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 07:37","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 07:37","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 07:41","type":"olang_eval","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 07:41","type":"know_learn","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 07:41","type":"know_query","msg":"12345"}
+{"ts":"2026-03-28 07:41","type":"emotion_encode","msg":"toi vui"}
+{"ts":"2026-03-28 07:41","type":"safety_check","msg":"hello"}
+{"ts":"2026-03-28 07:41","type":"nox_status","msg":""}
+{"ts":"2026-03-28 07:41","type":"olang_eval","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 07:41","type":"know_learn","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 07:41","type":"know_query","msg":"12345"}
+{"ts":"2026-03-28 07:41","type":"emotion_encode","msg":"toi vui"}
+{"ts":"2026-03-28 07:41","type":"safety_check","msg":"hello"}
+{"ts":"2026-03-28 07:41","type":"nox_status","msg":""}

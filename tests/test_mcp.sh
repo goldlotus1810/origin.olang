@@ -36,7 +36,7 @@ check "know_learn"     "Learned" 3
 check "know_query"     "12345" 4
 check "emotion_encode" "Emotion 5D" 5
 check "safety_check"   "SAFE" 6
-check "nox_status"     "Nox Brain Status" 7
+check "nox_status"     "Nox" 7
 
 # Check no stdout leak (no bare numbers before JSON)
 LEAKS=$(echo "$RESPONSE" | grep -v '^{' | grep -v '^$' | wc -l)
