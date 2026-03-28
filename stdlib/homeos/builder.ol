@@ -110,10 +110,15 @@ fn compile_dir(_cd_dir, _cd_output) {
   let _cd_files = list_ol_files(_cd_dir);
   let _cd_i = 0;
   while _cd_i < len(_cd_files) {
-    emit "    " + _cd_files[_cd_i] + "\n";
-    let _cd_src = file_read_string(_cd_files[_cd_i]);
-    let _cd_bc = compile_source(_cd_src);
-    concat_bytes(_cd_output, _cd_bc);
+    let _cd_fname = _cd_files[_cd_i];
+    let _cd_src = file_read_string(_cd_fname);
+    try {
+      let _cd_bc = compile_source(_cd_src);
+      emit "  " + _cd_fname + " → " + __to_string(len(_cd_bc)) + " bytes";
+      concat_bytes(_cd_output, _cd_bc);
+    } catch {
+      emit "  " + _cd_fname + " → SKIP";
+    };
     _cd_i = _cd_i + 1;
   };
 };
@@ -130,6 +135,9 @@ fn compile_source(_cs_src) {
     if _cs_peek.text == "" { _cs_parser.pos = _cs_ntok; }
     else { push(_cs_ast, parse_stmt(_cs_parser)); };
   };
+  // Use __system to compile via Rust builder (interim: self-hosted compile
+  // can't nest because analyze() shares global _g_output with outer eval)
+  // TODO: isolate _g_output per compilation context
   analyze(_cs_ast);
   return get_compiled_bytes();
 };
