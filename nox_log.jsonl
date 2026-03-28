@@ -244,3 +244,12 @@
 {"ts":"2026-03-28 09:11","type":"emotion_encode","msg":"toi vui"}
 {"ts":"2026-03-28 09:11","type":"safety_check","msg":"hello"}
 {"ts":"2026-03-28 09:11","type":"nox_status","msg":""}
+{"ts":"2026-03-28 09:12","type":"know_query","msg":"BOSS"}
+{"ts":"2026-03-28 09:12","type":"know_query","msg":"register"}
+{"ts":"2026-03-28 09:12","type":"nox_status","msg":""}
+{"ts":"2026-03-28 09:13","type":"olang_eval","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 09:13","type":"know_learn","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 09:13","type":"know_query","msg":"12345"}
+{"ts":"2026-03-28 09:13","type":"emotion_encode","msg":"toi vui"}
+{"ts":"2026-03-28 09:13","type":"safety_check","msg":"hello"}
+{"ts":"2026-03-28 09:13","type":"nox_status","msg":""}

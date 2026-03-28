@@ -178,13 +178,11 @@ pub fn kt_find(_kf_query, _kf_max) {
     let _kf_out = [];
     let _kf_i = 0;
     let _kf_flen = len(__kt_facts_arr);
+    let _kf_qlen = len(_kf_query);
     while _kf_i < _kf_flen {
         let _kf_fact = __kt_facts_arr[_kf_i];
-        // Word-by-word match: split query and check each word
         let _kf_qi = 0;
-        let _kf_qlen = len(_kf_query);
         let _kf_found = 0;
-        // Check if any word in fact starts with or equals query
         while _kf_qi <= len(_kf_fact) - _kf_qlen {
             if substr(_kf_fact, _kf_qi, _kf_qi + _kf_qlen) == _kf_query {
                 _kf_found = 1;
