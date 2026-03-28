@@ -99,18 +99,9 @@ fn compile_all(_ca_stdlib_path) {
   emit "  Compiling: bootstrap";
   emit "  codegen.ol...";
   compile_one_file("stdlib/bootstrap/codegen.ol", _ca_all_bc);
-  emit "  lexer.ol...";
   compile_one_file("stdlib/bootstrap/lexer.ol", _ca_all_bc);
-  emit "  parser.ol...";
-  compile_one_file("stdlib/bootstrap/parser.ol", _ca_all_bc);
-  emit "  semantic.ol...";
-  compile_one_file("stdlib/bootstrap/semantic.ol", _ca_all_bc);
-  emit "  Compiling: stdlib root";
-  compile_dir(_ca_stdlib_path, _ca_all_bc);
-  emit "  Compiling: homeos";
-  compile_dir(_ca_stdlib_path + "/homeos", _ca_all_bc);
-  emit "  Compiling: editor";
-  compile_dir(_ca_stdlib_path + "/editor", _ca_all_bc);
+  // TEMP: bootstrap only for boot test
+  emit "  (stdlib/homeos/editor skipped for boot test)";
 
   // Debug: emit "BOOT OK" before final Halt to confirm all files executed
   // Push "BOOT OK" string: [0x01][len:2][molecules]
@@ -138,7 +129,11 @@ fn compile_one_file(_cof_path, _cof_output) {
   if len(_cof_src) == 0 { return; };
   let _cof_bc = compile_source(_cof_src);
   let _cof_bclen = len(_cof_bc);
-  emit "  " + _cof_path + " → " + __to_string(_cof_bclen) + " bytes";
+  // Quick checksum: sum of first 10 bytes
+  let _cof_sum = 0;
+  let _cof_ci = 0;
+  while _cof_ci < 10 { if _cof_ci < _cof_bclen { _cof_sum = _cof_sum + __floor(_cof_bc[_cof_ci]); }; _cof_ci = _cof_ci + 1; };
+  emit "  " + _cof_path + " → " + __to_string(_cof_bclen) + " bytes sum10=" + __to_string(_cof_sum);
   if _cof_bclen > 1 {
     if __floor(_cof_bc[_cof_bclen - 1]) == 15 { set_at(_cof_bc, _cof_bclen - 1, 18); };
     let _cof_base = len(_cof_output);
@@ -200,7 +195,7 @@ fn relocate_jumps(_rj_bc, _rj_len, _rj_base) {
   // Scan bytecode, add _rj_base to all Jmp/Jz/TryBegin targets
   let _rj_pc = 0;
   while _rj_pc < _rj_len {
-    let _rj_tag = _rj_bc[_rj_pc];
+    let _rj_tag = __floor(_rj_bc[_rj_pc]);
     _rj_pc = _rj_pc + 1;
     let _rj_skip = _bc_opcode_size(_rj_tag, _rj_bc, _rj_pc, _rj_len);
     // Relocate Jmp(9), Jz(10), TryBegin(26)
@@ -224,12 +219,12 @@ fn relocate_jumps(_rj_bc, _rj_len, _rj_base) {
 
 fn _bc_opcode_size(_os_tag, _os_bc, _os_pc, _os_len) {
   // Return operand byte count for a codegen opcode
-  if _os_tag == 1 { if _os_pc + 2 <= _os_len { return 2 + (_os_bc[_os_pc] + _os_bc[_os_pc+1]*256) * 2; }; return 0; };
-  if _os_tag == 2 { if _os_pc < _os_len { return 1 + _os_bc[_os_pc]; }; return 0; };
-  if _os_tag == 7 { if _os_pc < _os_len { return 1 + _os_bc[_os_pc]; }; return 0; };
-  if _os_tag == 19 { if _os_pc < _os_len { return 1 + _os_bc[_os_pc]; }; return 0; };
-  if _os_tag == 20 { if _os_pc < _os_len { return 1 + _os_bc[_os_pc]; }; return 0; };
-  if _os_tag == 28 { if _os_pc < _os_len { return 1 + _os_bc[_os_pc]; }; return 0; };
+  if _os_tag == 1 { if _os_pc + 2 <= _os_len { return 2 + __floor(__floor(_os_bc[_os_pc]) + __floor(_os_bc[_os_pc+1])*256) * 2; }; return 0; };
+  if _os_tag == 2 { if _os_pc < _os_len { return 1 + __floor(_os_bc[_os_pc]); }; return 0; };
+  if _os_tag == 7 { if _os_pc < _os_len { return 1 + __floor(_os_bc[_os_pc]); }; return 0; };
+  if _os_tag == 19 { if _os_pc < _os_len { return 1 + __floor(_os_bc[_os_pc]); }; return 0; };
+  if _os_tag == 20 { if _os_pc < _os_len { return 1 + __floor(_os_bc[_os_pc]); }; return 0; };
+  if _os_tag == 28 { if _os_pc < _os_len { return 1 + __floor(_os_bc[_os_pc]); }; return 0; };
   if _os_tag == 9 { return 4; };
   if _os_tag == 10 { return 4; };
   if _os_tag == 14 { return 4; };
@@ -237,7 +232,7 @@ fn _bc_opcode_size(_os_tag, _os_bc, _os_pc, _os_len) {
   if _os_tag == 25 { return 2; };
   if _os_tag == 26 { return 4; };
   if _os_tag == 37 { return 5; };
-  if _os_tag == 36 { if _os_pc < _os_len { return 1 + _os_bc[_os_pc] + 1; }; return 0; };
+  if _os_tag == 36 { if _os_pc < _os_len { return 1 + __floor(_os_bc[_os_pc]) + 1; }; return 0; };
   if _os_tag == 38 { return 1; };   // LoadReg [slot:1]
   if _os_tag == 39 { return 1; };   // StoreReg [slot:1]
   if _os_tag == 40 { return 1; };
@@ -245,11 +240,11 @@ fn _bc_opcode_size(_os_tag, _os_bc, _os_pc, _os_len) {
   // ClosureCapture (0x30 = 48): [param:1][capture:1][names...][body_len:4]
   if _os_tag == 48 {
     if _os_pc + 2 <= _os_len {
-      let _os_ccnt = _os_bc[_os_pc + 1];
+      let _os_ccnt = __floor(_os_bc[_os_pc + 1]);
       let _os_skip = 2;
       let _os_ci = 0;
       while _os_ci < _os_ccnt {
-        if _os_pc + _os_skip < _os_len { _os_skip = _os_skip + 1 + _os_bc[_os_pc + _os_skip]; };
+        if _os_pc + _os_skip < _os_len { _os_skip = _os_skip + 1 + __floor(_os_bc[_os_pc + _os_skip]); };
         _os_ci = _os_ci + 1;
       };
       return _os_skip + 4;
