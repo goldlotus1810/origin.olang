@@ -102,3 +102,6 @@ Lupin said origin.olang is Nox brain — let it grow with time, record history l
 [2026-03-28 09:19] MCP test fact 12345
 [2026-03-28 09:26] MCP test fact 12345
 [2026-03-28 10:30] S15 deep investigation: LeaveFrame var_table truncate → hangs (loses stdlib globals). Root cause confirmed: var_table mixes globals and locals in flat array. Fix needs scope chain separation (globals vs locals). Deferred.
+[2026-03-28 09:46] MCP test fact 12345"}},"id":3}
+[2026-03-28 09:53] MCP test fact 12345
+[2026-03-28 11:00] S15 scope chain investigation complete. var_table truncation in LeaveFrame either loses globals (too aggressive) or hangs (runtime calls add entries). TRUE fix: scope chain with separate globals table. Multi-day task.
