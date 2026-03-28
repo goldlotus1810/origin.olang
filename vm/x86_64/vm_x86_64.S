@@ -7334,11 +7334,16 @@ op_ret:
     lea     repl_termios_raw(%rip), %rdi
     mov     $60, %ecx
     rep     movsb
-    # Clear ICANON|ECHO in c_lflag
+    # Clear ICANON|ECHO in c_lflag (offset 12)
     lea     repl_termios_raw(%rip), %rdi
     movl    12(%rdi), %eax
-    and     $~0x0A, %eax
+    and     $~0x0A, %eax                # clear ICANON(2) | ECHO(8)
+    and     $~0x01, %eax                # clear ISIG (allow Ctrl-C/Q raw)
     movl    %eax, 12(%rdi)
+    # Clear IXON in c_iflag (offset 0) — allows Ctrl-Q/Ctrl-S
+    movl    (%rdi), %eax
+    and     $~0x0400, %eax              # clear IXON
+    movl    %eax, (%rdi)
     movb    $1, 23(%rdi)                # VMIN=1
     movb    $0, 22(%rdi)                # VTIME=0
     # Apply to tty fd

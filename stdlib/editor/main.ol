@@ -22,6 +22,7 @@ pub fn editor_start(_path) {
     term_hide_cursor();
     term_clear();
     let _need_render = 1;
+    let _last_key = 0;
 
     while _running == 1 {
         if _need_render == 1 {
@@ -57,7 +58,7 @@ pub fn editor_start(_path) {
         // Status bar
         term_goto(_rows, 1);
         term_bg(235); term_color(252);
-        term_fill_line(" " + _mode + " │ Ln " + __to_string(_cur_row + 1) + ", Col " + __to_string(_cur_col + 1) + " │ " + __to_string(len(_lines)) + " lines │ Olang", _cols);
+        term_fill_line(" " + _mode + " │ Ln " + __to_string(_cur_row + 1) + ", Col " + __to_string(_cur_col + 1) + " │ " + __to_string(len(_lines)) + " lines │ key=" + __to_string(_last_key), _cols);
         term_reset();
 
         // Cursor
@@ -69,6 +70,7 @@ pub fn editor_start(_path) {
         let _key = __read_byte();
         if _key < 0 { __sleep(50); } else {
             _need_render = 1;
+            _last_key = _key;
             if _key == 17 { _running = 0; };   // Ctrl-Q = quit
             if _key == 27 {                     // ESC
                 if _mode == "INSERT" { _mode = "NORMAL"; }
@@ -89,6 +91,38 @@ pub fn editor_start(_path) {
                 if _key == 107 { if _cur_row > 0 { _cur_row = _cur_row - 1; }; };                // k
                 if _key == 104 { if _cur_col > 0 { _cur_col = _cur_col - 1; }; };                // h
                 if _key == 108 { _cur_col = _cur_col + 1; };                                      // l
+            };
+            if _mode == "INSERT" {
+                if _key != 27 { if _key != 105 {
+                    if _key == 127 {
+                        // Backspace
+                        if _cur_col > 0 {
+                            let _line = _lines[_cur_row];
+                            set_at(_lines, _cur_row, __substr(_line, 0, _cur_col - 1) + __substr(_line, _cur_col, len(_line)));
+                            _cur_col = _cur_col - 1;
+                        };
+                    } else { if _key == 13 {
+                        // Enter — split line
+                        let _line = _lines[_cur_row];
+                        set_at(_lines, _cur_row, __substr(_line, 0, _cur_col));
+                        // Insert new line after
+                        let _new = [];
+                        let _ni = 0;
+                        while _ni < len(_lines) {
+                            push(_new, _lines[_ni]);
+                            if _ni == _cur_row { push(_new, __substr(_line, _cur_col, len(_line))); };
+                            _ni = _ni + 1;
+                        };
+                        _lines = _new;
+                        _cur_row = _cur_row + 1;
+                        _cur_col = 0;
+                    } else { if _key >= 32 {
+                        // Printable char
+                        let _line = _lines[_cur_row];
+                        set_at(_lines, _cur_row, __substr(_line, 0, _cur_col) + __chr(_key) + __substr(_line, _cur_col, len(_line)));
+                        _cur_col = _cur_col + 1;
+                    }; }; };
+                }; };
             };
             // Scroll
             if _cur_row < _scroll { _scroll = _cur_row; };
