@@ -1,61 +1,49 @@
-# OLANG PLAN — Phase 3
+# OLANG PLAN — Phase 3+
 
-> Updated: 2026-03-28 09:00
-> Binary: 428K ELF64, static, zero deps, boot 3ms
-> Tests: 90/90 core + 9/9 MCP
-> Commits: 125 | VM: 11,325 LOC | Stdlib: 10,800 LOC (38 files)
-> KnowTree: 90 facts | Brain: ~/.claude/Nox_brain.olang
+> Updated: 2026-03-28 11:30
+> Binary: 439K | Tests: 90/90 + 9/9 MCP | Commits: 134
+> json_parse nested {} FIXED | Brain: proper JSON parsing
+> KnowTree: 109 facts | Nox Brain deployed
 
 ---
 
 ## Phase 2 — COMPLETE ✅
 
-```
-S9:  Regex NFA Thompson (15/15) + string utils + json_emit ✅
-S10: HTTP client (crawl, GET, POST, crawl_json) ✅
-S11: REPL DX (tab, history, errors, modules) ✅
-S12: HMAC-SHA256 ✅ (Ed25519 deferred)
-S13: const, pipe |>, method syntax, comprehension ✅
-S14: CI local, dead code cleanup (-1859 LOC) ✅
-MCP: 8 tools, auto-journal, timestamps ✅
-Boss: var_table killed — register frames Phase 1-3 ✅
-Audit: Sora bugs all fixed ✅
-```
+S9-S14, MCP brain 8 tools, var_table boss killed,
+Sora audit done, -1859 LOC cleanup, register frames.
 
 ---
 
 ## Phase 3 — IN PROGRESS
 
-### S15: Register Frames — Status
-```
-✅ Eval context: params + let locals + lambda → register frames
-✅ Boot closure params: LoadReg for param reads (Rust builder)
-⬚ Boot closure let locals: Dup+StoreReg breaks REPL stack balance
-   Fix: refactor Rust lower_stmt to emit StoreReg directly (not interceptor)
-   Impact: json_parse nested {} in MCP, closure capture
-```
+### Done
+- ✅ S15 partial: boot closure params in registers
+- ✅ json_parse nested {} fixed (save/restore stack, not scope chain)
+- ✅ MCP uses proper json_parse (string extraction removed)
+- ✅ __heap_used builtin, \r \0 escapes
 
-### S16: Closure Capture
-```
-fn outer() { let x = 10; return fn() { return x; }; }
-Needs: closure environment — copy captured vars before return
-Blocked by: S15 full register locals (capture from register frame)
-```
+### Next
+- ⬚ S16: Closure capture (`make_adder(5)(10)` = 15)
+- ⬚ S17: GC / memory management
+- ⬚ README for GitHub (others can clone + run)
+- ⬚ Example programs (web scraper, todo, calculator)
 
-### S17: GC / Memory Management
-```
-Heap bump-only — never frees
-REPL: checkpoint reset each turn ✅
-MCP: no reset (closures persist across requests)
-Needs: mark-sweep or arena per-request
-```
+---
 
-### S18: Production Polish
+## Phase 4 — O EDITOR
+
+> TUI code editor bằng Olang, tích hợp Claude Code + KnowTree + MCP
+> Spec: docs/For_Nox/TASKBOARD_O_EDITOR.md
+
 ```
-- Ed25519 (needs bigint mod 2^255-19)
-- Real HMAC-SHA256 (raw byte support)
-- Error stack trace
-- Documentation generator
+O Editor = vim/helix-style TUI trong terminal
+  - Modal: Normal + Insert mode
+  - File tree, syntax highlighting, line numbers
+  - AI panel: Claude Code integration
+  - MCP panel: KnowTree query/learn
+  - Terminal panel: embedded bash
+  - 1 binary: ./origin.olang --editor (hoặc "O")
+  - Zero deps, ANSI 256-color, Unicode box drawing
 ```
 
 ---
@@ -63,15 +51,12 @@ Needs: mark-sweep or arena per-request
 ## Architecture
 
 ```
-origin.olang (428K)
-├── VM (x86-64 ASM, 11325 LOC)
-│   ├── Bytecode interpreter (stack + register hybrid)
-│   ├── 256-slot builtin dispatch (FNV hash)
-│   ├── Register frame stack (4MB, ~4096 frames)
-│   ├── Regex NFA (Thompson), SHA-256, TCP, DNS
-│   ├── MCP mode (--mcp, JSON-RPC stdio)
-│   └── REPL (raw mode, tab, history)
+origin.olang (439K)
+├── VM (x86-64 ASM, 11349 LOC)
 ├── Compiler (Olang, 4 files, ~4200 LOC)
-├── Stdlib (38 files, ~6600 LOC)
+├── Stdlib (38 files, ~7200 LOC)
+├── MCP brain (147 LOC, 8 tools, json_parse)
 └── Tests (90 core + 9 MCP + 67 spider)
+
+~/.claude/Nox_brain.olang = brain deployed as MCP server
 ```
