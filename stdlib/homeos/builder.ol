@@ -96,22 +96,32 @@ fn compile_all(_ca_stdlib_path) {
   let _ca_all_bc = [];
 
   // Bootstrap first (compiler must be loaded before anything else)
-  emit "  Compiling: bootstrap\n";
+  emit "  Compiling: bootstrap";
   compile_dir(_ca_stdlib_path + "/bootstrap", _ca_all_bc);
-
   // Then stdlib root
-  emit "  Compiling: stdlib root\n";
+  emit "  Compiling: stdlib root";
   compile_dir(_ca_stdlib_path, _ca_all_bc);
-
   // Then homeos
-  emit "  Compiling: homeos\n";
+  emit "  Compiling: homeos";
   compile_dir(_ca_stdlib_path + "/homeos", _ca_all_bc);
-
   // Then editor
-  emit "  Compiling: editor\n";
+  emit "  Compiling: editor";
   compile_dir(_ca_stdlib_path + "/editor", _ca_all_bc);
 
-  // Final Halt (one at the end of all concatenated bytecode)
+  // Debug: emit "BOOT OK" before final Halt to confirm all files executed
+  // Push "BOOT OK" string: [0x01][len:2][molecules]
+  let _boot_msg = "BOOT_OK";
+  push(_ca_all_bc, 1);  // Push opcode
+  push(_ca_all_bc, len(_boot_msg) % 256);
+  push(_ca_all_bc, 0);
+  let _bm_i = 0;
+  while _bm_i < len(_boot_msg) {
+    push(_ca_all_bc, __char_code(char_at(_boot_msg, _bm_i)));
+    push(_ca_all_bc, 33);  // 0x21 molecule high byte
+    _bm_i = _bm_i + 1;
+  };
+  push(_ca_all_bc, 6);   // Emit opcode
+  // Final Halt
   push(_ca_all_bc, 15);
   return _ca_all_bc;
 };
@@ -133,9 +143,9 @@ fn compile_dir(_cd_dir, _cd_output) {
       let _cd_bc = compile_source(_cd_src);
       let _cd_bclen = len(_cd_bc);
       emit "  " + _cd_fname + " → " + __to_string(_cd_bclen) + " bytes";
-      // Strip trailing Halt (0x0F) — files are concatenated, only ONE halt at end
+      // Replace trailing Halt (0x0F) with Nop — files concatenated, keep Jmp targets valid
       if _cd_bclen > 0 {
-        if _cd_bc[_cd_bclen - 1] == 15 { _cd_bclen = _cd_bclen - 1; };
+        if _cd_bc[_cd_bclen - 1] == 15 { set_at(_cd_bc, _cd_bclen - 1, 18); };
         // Relocate Jmp/Jz/TryBegin targets by base offset
         let _cd_base = len(_cd_output);
         if _cd_base > 0 { relocate_jumps(_cd_bc, _cd_bclen, _cd_base); };
@@ -273,7 +283,7 @@ fn file_write_bytes(_fwb_path, _fwb_data) {
   let _fwb_buf = __bytes_new(_fwb_len);
   let _fwb_i = 0;
   while _fwb_i < _fwb_len {
-    __bytes_set(_fwb_buf, _fwb_i, _fwb_data[_fwb_i]);
+    __bytes_set(_fwb_buf, _fwb_i, __floor(_fwb_data[_fwb_i]));
     _fwb_i = _fwb_i + 1;
   };
   __bytes_write(_fwb_path, _fwb_buf, _fwb_len);
