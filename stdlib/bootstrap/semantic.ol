@@ -1709,9 +1709,17 @@ fn compile_stmt(state, stmt) {
                                             let args = pop(_ce_stack);
                                             let _rt_ai = _rt_ai + 1;
                                         };
-                                        // Store args to params in reverse order
+                                        // Store args to params in reverse order (register + var_table)
                                         let _rt_pi = _rt_nargs - 1;
                                         while _rt_pi >= 0 {
+                                            if __g_fn_in_function == 1 {
+                                                let _rt_slot = _find_reg_slot(__g_fn_slot_map, _g_tro_params[_rt_pi]);
+                                                if _rt_slot >= 0 {
+                                                    emit_op(state, make_op_simple("Dup"));
+                                                    _emit_byte(state, 0x27);    // StoreReg
+                                                    _emit_byte(state, _rt_slot);
+                                                };
+                                            };
                                             emit_op(state, make_op_name("Store", _g_tro_params[_rt_pi]));
                                             let _rt_pi = _rt_pi - 1;
                                         };

@@ -135,3 +135,21 @@
 {"ts":"2026-03-28 07:18","type":"EMOTION","msg":"toi vui"}
 {"ts":"2026-03-28 07:18","type":"SAFETY","msg":"hello"}
 {"ts":"2026-03-28 07:18","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 07:21","type":"EVAL","msg":"fn sq(x) { return x * x; }; emit sq(9);"}
+{"ts":"2026-03-28 07:21","type":"LEARN","msg":"all bugs verified after boss kill"}
+{"ts":"2026-03-28 07:21","type":"QUERY","msg":"boss"}
+{"ts":"2026-03-28 07:21","type":"EMOTION","msg":"chien thang roi"}
+{"ts":"2026-03-28 07:21","type":"SAFETY","msg":"everything is great"}
+{"ts":"2026-03-28 07:21","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 07:21","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 07:21","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 07:21","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 07:21","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 07:21","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 07:21","type":"STATUS","msg":"brain check"}
+{"ts":"2026-03-28 07:24","type":"EVAL","msg":"emit 6 * 7"}
+{"ts":"2026-03-28 07:24","type":"LEARN","msg":"MCP test fact 12345"}
+{"ts":"2026-03-28 07:24","type":"QUERY","msg":"12345"}
+{"ts":"2026-03-28 07:24","type":"EMOTION","msg":"toi vui"}
+{"ts":"2026-03-28 07:24","type":"SAFETY","msg":"hello"}
+{"ts":"2026-03-28 07:24","type":"STATUS","msg":"brain check"}
