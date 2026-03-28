@@ -2223,3 +2223,23 @@ pub fn analyze(ast) {
 
     return state;
 }
+
+// ── Builder support ─────────────────────────────────────────────────────
+
+pub fn get_compiled_bytes() {
+    let _gcb_result = [];
+    let _gcb_i = 0;
+    while _gcb_i < _g_pos {
+        push(_gcb_result, __array_get(_g_output, _gcb_i));
+        _gcb_i = _gcb_i + 1;
+    };
+    return _gcb_result;
+}
+
+pub fn get_compiled_pos() {
+    return _g_pos;
+}
+
+pub fn reset_compiler() {
+    let _g_pos = 0;
+}
