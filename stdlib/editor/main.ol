@@ -272,7 +272,42 @@ pub fn editor_start(_path) {
                                 };
                             };
                         };
-                    }; }; }; }; };
+                    } else { if _k3 == 49 {
+                        // Could be F5: ESC[15~ (bytes: 27 91 49 53 126)
+                        let _fk4 = __read_byte();
+                        if _fk4 == 53 {
+                            let _fk5 = __read_byte();
+                            if _fk5 == 126 {
+                                // F5 — save + compile + run
+                                if len(_path) > 0 {
+                                    // Save first
+                                    let _save_buf = "";
+                                    let _fsi = 0;
+                                    while _fsi < len(_lines) {
+                                        if _fsi > 0 { _save_buf = _save_buf + "\n"; };
+                                        _save_buf = _save_buf + _lines[_fsi];
+                                        _fsi = _fsi + 1;
+                                    };
+                                    _save_buf = _save_buf + "\n";
+                                    __file_write(_path, _save_buf);
+                                    // Exit alternate screen
+                                    __write_raw(__esc()); __write_raw("[?1049l");
+                                    __term_cooked();
+                                    // Run the file
+                                    let _run_out = __system("./origin.olang " + _path + " 2>&1");
+                                    __write_raw("\n─── Output ───\n");
+                                    __write_raw(_run_out);
+                                    __write_raw("\n─── Press any key ───\n");
+                                    __term_raw();
+                                    let _wait = __read_byte();
+                                    while _wait < 0 { __sleep(50); _wait = __read_byte(); };
+                                    // Re-enter alternate screen
+                                    __write_raw(__esc()); __write_raw("[?1049h");
+                                    term_clear();
+                                };
+                            };
+                        };
+                    }; }; }; }; }; };
                 } else {
                     // Bare ESC
                     if _mode == "INSERT" { _mode = "NORMAL"; };

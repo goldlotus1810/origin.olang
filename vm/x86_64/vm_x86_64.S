@@ -1572,6 +1572,9 @@ op_call:
     movabs  $0x9E3D368BE8B3606A, %rdx
     cmp     %rdx, %rax
     je      .call_ceil
+    movabs  $0x325D856BA281A26A, %rdx
+    cmp     %rdx, %rax
+    je      .call_system
     jmp     .call_not_builtin
 
 .builtin_slot_109:
@@ -5041,6 +5044,152 @@ op_call:
     sub     $16, %r14
     mov     %r15, (%r14)
     movq    $0, 8(%r14)
+    jmp     vm_loop
+
+# __system(cmd_string) → output string
+# fork + exec /bin/sh -c "cmd" + pipe stdout + wait
+.call_system:
+    add     %rcx, %r13
+    # Pop command string from VM stack
+    mov     (%r14), %rsi               # cmd ptr (molecules)
+    mov     8(%r14), %rdx              # cmd mol_count
+    add     $16, %r14
+
+    # Decode molecules to C string in sha_input buffer
+    lea     sha_input(%rip), %rdi
+    xor     %ecx, %ecx
+.sys_dec:
+    cmp     %rdx, %rcx
+    jge     .sys_dec_done
+    movzbl  (%rsi, %rcx, 2), %eax
+    mov     %al, (%rdi, %rcx)
+    inc     %rcx
+    jmp     .sys_dec
+.sys_dec_done:
+    movb    $0, (%rdi, %rcx)           # null terminate
+
+    # Create pipe for stdout capture
+    sub     $16, %rsp                   # pipe fds: [read_fd, write_fd]
+    mov     %rsp, %rdi
+    mov     $22, %eax                   # SYS_pipe
+    syscall
+    test    %rax, %rax
+    js      .sys_fail
+
+    # fork
+    mov     $57, %eax                   # SYS_fork
+    syscall
+    test    %rax, %rax
+    js      .sys_fail_close
+    jnz     .sys_parent
+
+    # ── Child process ──
+    # Close read end of pipe
+    mov     (%rsp), %edi
+    mov     $3, %eax                    # SYS_close
+    syscall
+    # Redirect stdout to write end
+    mov     4(%rsp), %edi               # write_fd
+    mov     $1, %esi                    # STDOUT
+    mov     $33, %eax                   # SYS_dup2
+    syscall
+    # Redirect stderr to write end too
+    mov     4(%rsp), %edi
+    mov     $2, %esi                    # STDERR
+    mov     $33, %eax                   # SYS_dup2
+    syscall
+    # Close original write_fd
+    mov     4(%rsp), %edi
+    mov     $3, %eax
+    syscall
+    # execve("/bin/sh", ["/bin/sh", "-c", cmd], NULL)
+    sub     $32, %rsp                   # argv array (4 pointers)
+    lea     bin_sh_path(%rip), %rax
+    mov     %rax, (%rsp)               # argv[0] = "/bin/sh"
+    lea     sh_c_arg(%rip), %rax
+    mov     %rax, 8(%rsp)              # argv[1] = "-c"
+    lea     sha_input(%rip), %rax
+    mov     %rax, 16(%rsp)             # argv[2] = cmd
+    movq    $0, 24(%rsp)               # argv[3] = NULL
+    lea     bin_sh_path(%rip), %rdi    # pathname
+    mov     %rsp, %rsi                 # argv
+    xor     %edx, %edx                 # envp = NULL
+    mov     $59, %eax                  # SYS_execve
+    syscall
+    # If execve fails, exit
+    mov     $60, %eax                   # SYS_exit
+    mov     $127, %edi
+    syscall
+
+.sys_parent:
+    # Parent: close write end
+    mov     %eax, %ebx                  # save child pid
+    mov     4(%rsp), %edi              # write_fd
+    mov     $3, %eax                    # SYS_close
+    syscall
+
+    # Read stdout from pipe into heap
+    mov     %r15, %rbp                  # output buffer start
+    xor     %r8d, %r8d                  # total bytes read
+.sys_read_loop:
+    mov     (%rsp), %edi               # read_fd
+    lea     (%r15, %r8), %rsi          # buf at heap + offset
+    mov     $4096, %edx                # read up to 4KB at a time
+    mov     $0, %eax                   # SYS_read
+    syscall
+    test    %rax, %rax
+    jle     .sys_read_done
+    add     %rax, %r8                  # total += bytes_read
+    jmp     .sys_read_loop
+.sys_read_done:
+    # Close read end
+    mov     (%rsp), %edi
+    mov     $3, %eax
+    syscall
+    # Wait for child
+    mov     %ebx, %edi                  # child pid
+    xor     %esi, %esi                  # status ptr (don't care)
+    xor     %edx, %edx                 # options
+    xor     %r10d, %r10d               # rusage
+    mov     $61, %eax                   # SYS_wait4
+    syscall
+    add     $16, %rsp                   # pop pipe fds
+
+    # Convert raw bytes to molecule string on heap
+    # rbp = raw bytes, r8 = byte count
+    mov     %r15, %r9                   # molecule output start
+    add     %r8, %r15                   # skip past raw bytes (temporary)
+    xor     %ecx, %ecx
+.sys_mol:
+    cmp     %r8, %rcx
+    jge     .sys_mol_done
+    movzbl  (%rbp, %rcx), %eax
+    or      $0x2100, %eax
+    movw    %ax, (%r15)
+    add     $2, %r15
+    inc     %rcx
+    jmp     .sys_mol
+.sys_mol_done:
+    # Push string result: (mol_ptr, mol_count)
+    sub     $16, %r14
+    mov     %r9, (%r14)                # mol ptr
+    mov     %r8, 8(%r14)               # mol count = byte count
+    jmp     vm_loop
+
+.sys_fail_close:
+    mov     (%rsp), %edi
+    mov     $3, %eax
+    syscall
+    mov     4(%rsp), %edi
+    mov     $3, %eax
+    syscall
+    add     $16, %rsp
+.sys_fail:
+    # Push empty string on failure
+    sub     $16, %r14
+    xor     %eax, %eax
+    mov     %rax, (%r14)
+    mov     %rax, 8(%r14)
     jmp     vm_loop
 
 # __readdir(path) → array of filenames
@@ -10931,6 +11080,8 @@ print_hex_u64:
 
 .section .rodata
 
+bin_sh_path: .asciz "/bin/sh"
+sh_c_arg: .asciz "-c"
 dev_null_path: .asciz "/dev/null"
 dev_tty_path: .asciz "/dev/tty"
 editor_prefix: .ascii "emit editor_start(\""
