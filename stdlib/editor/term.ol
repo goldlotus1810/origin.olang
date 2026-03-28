@@ -1,5 +1,7 @@
 // editor/term.ol — Terminal ANSI control + key decode
 
+let ESC = __chr(27);
+
 pub fn term_cols() {
     let _ts = __term_size();
     return __floor(_ts / 10000);
@@ -11,35 +13,35 @@ pub fn term_rows() {
 }
 
 pub fn term_clear() {
-    __write_raw("\x1b[2J\x1b[H");
+    __write_raw(ESC + "[2J" + ESC + "[H");
 }
 
 pub fn term_goto(_row, _col) {
-    __write_raw("\x1b[" + __to_string(_row) + ";" + __to_string(_col) + "H");
+    __write_raw(ESC + "[" + __to_string(_row) + ";" + __to_string(_col) + "H");
 }
 
 pub fn term_hide_cursor() {
-    __write_raw("\x1b[?25l");
+    __write_raw(ESC + "[?25l");
 }
 
 pub fn term_show_cursor() {
-    __write_raw("\x1b[?25h");
+    __write_raw(ESC + "[?25h");
 }
 
 pub fn term_color(_fg) {
-    __write_raw("\x1b[38;5;" + __to_string(_fg) + "m");
+    __write_raw(ESC + "[38;5;" + __to_string(_fg) + "m");
 }
 
 pub fn term_bg(_bg) {
-    __write_raw("\x1b[48;5;" + __to_string(_bg) + "m");
+    __write_raw(ESC + "[48;5;" + __to_string(_bg) + "m");
 }
 
 pub fn term_reset() {
-    __write_raw("\x1b[0m");
+    __write_raw(ESC + "[0m");
 }
 
 pub fn term_bold() {
-    __write_raw("\x1b[1m");
+    __write_raw(ESC + "[1m");
 }
 
 pub fn term_write(_text) {
