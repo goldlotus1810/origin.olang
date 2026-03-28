@@ -924,7 +924,10 @@ pub fn parse_stmt(p) {
     if is_keyword_tok(tok, "if") {
         advance(p);
         let _ps_cond = parse_expr(p);
+        // Save cond before parse_block (inner if-stmt overwrites _ps_cond)
+        push(_pb_stack, _ps_cond);
         let _ps_then = parse_block(p);
+        let _ps_cond = pop(_pb_stack);
         if is_keyword_tok(peek(p), "else") {
             advance(p);
             // Save cond+then before parsing else (inner if-stmt overwrites _ps_*)
