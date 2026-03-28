@@ -94,3 +94,5 @@ Lupin said origin.olang is Nox brain — let it grow with time, record history l
 [2026-03-28 08:47] MCP test fact 12345
 [2026-03-28 09:30] Boot closure let locals via lower_stmt also breaks — Dup in ops list changes instruction count, breaks REPL. Root cause: boot code compilation is tightly coupled with var_table semantics. Needs full Phase 1.5 refactor.
 [2026-03-28 09:30] Session 2 end — 34 commits. S11+S13 done. Boss killed. Sora audit done. -1859 LOC. Boot params in registers. 428K binary. 90/90+9/9.
+[2026-03-28 09:02] MCP test fact 12345
+[2026-03-28 09:11] MCP test fact 12345

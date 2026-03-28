@@ -95,7 +95,10 @@ fn _mcp_call_ex(_id, _tool, _code, _fact, _question, _text) {
         if len(_r) > 0 { return _ok(_id, "CRISIS: " + _r); };
         return _ok(_id, "SAFE");
     };
-    if _tool == "nox_status" { return _ok(_id, "Nox [" + _fmt_ts(__timestamp()) + "] " + to_string(kt_fact_count()) + " facts"); };
+    if _tool == "nox_status" {
+        let _heap_mb = to_string(__floor(__heap_used() / 1048576));
+        return _ok(_id, "Nox [" + _fmt_ts(__timestamp()) + "] " + to_string(kt_fact_count()) + " facts, " + _heap_mb + "MB heap");
+    };
     if _tool == "silk_status" { return _ok(_id, "Silk: " + to_string(silk_count()) + " edges"); };
     if _tool == "dream_cycle" { dream_cycle(); return _ok(_id, "Dream done"); };
     return _err(_id, "Unknown tool: " + _tool);

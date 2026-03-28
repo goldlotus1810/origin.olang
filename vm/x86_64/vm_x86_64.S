@@ -245,6 +245,7 @@ _start:
     test    %rax, %rax
     js      err_mmap
     mov     %rax, %r15                  # r15 = heap base (bump allocator)
+    mov     %rax, heap_base(%rip)       # save for __heap_used
 
     # ── 3. Read bytecode from file into heap ─────────────────────────
     # Recover bc_offset from stack
@@ -1681,6 +1682,12 @@ op_call:
     movabs  $0x6F0C4CBAC89C91C4, %rdx
     cmp     %rdx, %rax
     je      .call_tcp_listen
+    jmp     .call_not_builtin
+
+.builtin_slot_199:
+    movabs  $0xBEE9FAE3C4AD93C7, %rdx
+    cmp     %rdx, %rax
+    je      .call_heap_used
     jmp     .call_not_builtin
 
 .builtin_slot_200:
@@ -7184,6 +7191,17 @@ op_ret:
     movq    $F64_MARKER, 8(%r14)
     jmp     vm_loop
 
+# __heap_used() → bytes used on heap (r15 - heap_base)
+.call_heap_used:
+    add     %rcx, %r13
+    mov     %r15, %rax
+    sub     heap_base(%rip), %rax
+    cvtsi2sd %rax, %xmm0
+    sub     $16, %r14
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
 .call_file_append:
     add     %rcx, %r13
     jmp     op_file_append
@@ -11111,7 +11129,7 @@ builtin_jump_table:
     .quad   .builtin_slot_196
     .quad   .call_not_builtin
     .quad   .call_not_builtin
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_199
     .quad   .builtin_slot_200
     .quad   .call_not_builtin
     .quad   .call_not_builtin
@@ -11281,6 +11299,8 @@ mcp_out_buf:
     .space 8192                         # captured emit output buffer (8KB)
 mcp_fmt_tmp:
     .space 64                           # temp buffer for f64 formatting in capture mode
+heap_base:
+    .space 8                            # saved heap start for __heap_used
 repl_termios_old:
     .space 60                           # saved terminal settings
 repl_termios_raw:

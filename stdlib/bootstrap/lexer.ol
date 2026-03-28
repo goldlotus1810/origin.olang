@@ -196,7 +196,9 @@ pub fn tokenize(source) {
                         let _sl_ec = char_at(source, pos);
                         if _sl_ec == "n" { _sl_val = _sl_val + "\n"; }
                         else { if _sl_ec == "t" { _sl_val = _sl_val + "\t"; }
-                        else { _sl_val = _sl_val + _sl_ec; }; };
+                        else { if _sl_ec == "r" { _sl_val = _sl_val + __chr(13); }
+                        else { if _sl_ec == "0" { _sl_val = _sl_val + __chr(0); }
+                        else { _sl_val = _sl_val + _sl_ec; }; }; }; };
                     };
                 } else {
                     _sl_val = _sl_val + char_at(source, pos);
