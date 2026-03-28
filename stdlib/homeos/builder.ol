@@ -222,8 +222,10 @@ fn _bc_opcode_size(_os_tag, _os_bc, _os_pc, _os_len) {
   if _os_tag == 26 { return 4; };
   if _os_tag == 37 { return 5; };
   if _os_tag == 36 { if _os_pc < _os_len { return 1 + _os_bc[_os_pc] + 1; }; return 0; };
+  if _os_tag == 38 { return 1; };   // LoadReg [slot:1]
+  if _os_tag == 39 { return 1; };   // StoreReg [slot:1]
   if _os_tag == 40 { return 1; };
-  if _os_tag == 41 { return 1; };
+  if _os_tag == 41 { return 0; };   // LeaveFrame (no operands)
   // ClosureCapture (0x30 = 48): [param:1][capture:1][names...][body_len:4]
   if _os_tag == 48 {
     if _os_pc + 2 <= _os_len {
