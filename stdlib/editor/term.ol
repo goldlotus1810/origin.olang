@@ -39,7 +39,11 @@ pub fn term_bold() { __write_raw(__esc()); __write_raw("[1m"); }
 pub fn term_write(_t) { __write_raw(_t); }
 
 pub fn term_fill_line(_t, _w) {
-    __write_raw(_t);
-    let _i = len(_t);
-    while _i < _w { __write_raw(" "); _i = _i + 1; };
+    if len(_t) > _w {
+        __write_raw(__substr(_t, 0, _w));
+    } else {
+        __write_raw(_t);
+        let _i = len(_t);
+        while _i < _w { __write_raw(" "); _i = _i + 1; };
+    };
 }

@@ -23,6 +23,7 @@ pub fn editor_start(_path) {
     term_clear();
     let _need_render = 1;
     let _last_key = 0;
+    let _scroll_col = 0;
 
     while _running == 1 {
         if _need_render == 1 {
@@ -47,7 +48,14 @@ pub fn editor_start(_path) {
                 else { term_write(_num + " "); }; };
                 term_color(237); term_write("│ ");
                 term_color(252);
-                term_fill_line(_lines[_li], _cols - 6);
+                let _text_w = _cols - 6;
+                let _line_text = _lines[_li];
+                if _scroll_col > 0 {
+                    if _scroll_col < len(_line_text) {
+                        _line_text = __substr(_line_text, _scroll_col, len(_line_text));
+                    } else { _line_text = ""; };
+                };
+                term_fill_line(_line_text, _text_w);
             } else {
                 term_bg(234); term_color(238);
                 term_fill_line("~", _cols);
@@ -62,7 +70,7 @@ pub fn editor_start(_path) {
         term_reset();
 
         // Cursor
-        term_goto(_cur_row - _scroll + 2, _cur_col + 7);
+        term_goto(_cur_row - _scroll + 2, _cur_col - _scroll_col + 7);
         term_show_cursor();
         }; // end if _need_render
 
@@ -118,9 +126,13 @@ pub fn editor_start(_path) {
                     _cur_col = _cur_col + 1;
                 }; }; };
             }; }; };
-            // Scroll
+            // Vertical scroll
             if _cur_row < _scroll { _scroll = _cur_row; };
             if _cur_row >= _scroll + _rows - 2 { _scroll = _cur_row - _rows + 3; };
+            // Horizontal scroll
+            let _text_w = _cols - 6;
+            if _cur_col < _scroll_col { _scroll_col = _cur_col; };
+            if _cur_col >= _scroll_col + _text_w { _scroll_col = _cur_col - _text_w + 1; };
         };
     };
 
