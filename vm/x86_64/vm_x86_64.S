@@ -10808,7 +10808,7 @@ op_halt:
     jne     .not_build_inject
     mov     eval_buf(%rip), %rdi
     lea     build_cmd(%rip), %rsi
-    mov     $31, %ecx                   # len of build command
+    mov     $30, %ecx                   # len of build command
     rep     movsb
     mov     eval_buf(%rip), %rsi
     mov     %rdi, %rax
