@@ -113,6 +113,16 @@ _start:
     movb    $2, eval_mode(%rip)         # mode 2 = MCP
     jmp     .open_self
 .not_mcp:
+    # Check if argv[1] == "--editor"
+    mov     16(%rsp), %rdi
+    cmpl    $0x64652d2d, (%rdi)         # "--ed"
+    jne     .not_editor
+    cmpl    $0x726f7469, 4(%rdi)        # "itor"
+    jne     .not_editor
+    movb    $1, eval_mode(%rip)         # use eval mode (stdin)
+    movb    $1, editor_flag(%rip)       # flag: launch editor after boot
+    jmp     .open_self
+.not_editor:
     mov     16(%rsp), %rdi              # argv[1] = filename
     jmp     .do_open
 .open_self:
@@ -10240,17 +10250,29 @@ op_halt:
     cmpq    $0, eval_buf(%rip)
     jne     .eval_next_line             # re-entry → continue from saved offset
 
-    # First entry: allocate 64KB buffer and read all stdin
+    # First entry: allocate 64KB buffer
     mov     %r15, %rax
-    mov     %rax, eval_buf(%rip)        # save buffer base in BSS
-    add     $0x10000, %r15              # reserve 64KB
+    mov     %rax, eval_buf(%rip)
+    add     $0x10000, %r15
 
+    # Check editor flag — inject editor_start("") instead of reading stdin
+    cmpb    $1, editor_flag(%rip)
+    jne     .eval_read_stdin
+    # Copy "editor_start(\"\")" into buffer
+    lea     editor_cmd(%rip), %rsi
+    mov     eval_buf(%rip), %rdi
+    mov     $18, %ecx                   # len("editor_start(\"\")\n")
+    rep     movsb
+    mov     $18, %rax                   # total = 18 bytes
+    jmp     .eval_have_input
+.eval_read_stdin:
     # Read all stdin into buffer
-    mov     %rax, %rsi                  # buf
-    mov     $0x10000, %edx             # max 64KB
-    xor     %edi, %edi                  # fd = stdin (0)
+    mov     eval_buf(%rip), %rsi
+    mov     $0x10000, %edx
+    xor     %edi, %edi
     mov     $SYS_READ, %eax
     syscall
+.eval_have_input:
     test    %rax, %rax
     jle     .eval_exit                  # EOF or error → exit
 
@@ -10586,6 +10608,7 @@ print_hex_u64:
 .section .rodata
 
 dev_null_path: .asciz "/dev/null"
+editor_cmd: .ascii "editor_start(\"\")\n"
 repl_bs_seq: .byte 0x08, 0x20, 0x08       # backspace + space + backspace
 proc_self_exe:
     .asciz "/proc/self/exe"
@@ -11365,6 +11388,8 @@ mcp_fmt_tmp:
     .space 64                           # temp buffer for f64 formatting in capture mode
 heap_base:
     .space 8                            # saved heap start for __heap_used
+editor_flag:
+    .space 1                            # 1 = launch editor after boot
 repl_termios_old:
     .space 60                           # saved terminal settings
 repl_termios_raw:
