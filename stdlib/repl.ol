@@ -147,24 +147,18 @@ pub fn repl_eval(input) {
     if _ld_n > 0 { return "Loaded " + __to_string(_ld_n) + " facts. " + kt_stats(); };
     return "No homeos.knowledge file found.";
   }
-  // Debug: test match manually
+  // Debug: test full pipeline
   if src == "dbg_parse" {
+    emit "[1] tokenize...";
     let _dbg_t = tokenize("emit 42;");
-    let _dbg_tok = _dbg_t[0];
-    let _dbg_k = _dbg_tok.kind;
-    // Manual match: replicate what is_keyword_tok does
-    let _dbg_m = __match_enum(_dbg_k, "TokenKind::Keyword");
-    emit "match=" + __to_string(_dbg_m);
-    if _dbg_m == 1 {
-      // Extract name field
-      let _dbg_name = __enum_field(_dbg_k, 0);
-      emit "name=" + _dbg_name;
-      emit "name==emit? " + __to_string(_dbg_name == "emit");
-    };
-    // Now test the ACTUAL is_keyword_tok
-    emit "is_kw_tok=" + __to_string(is_keyword_tok(_dbg_tok, "emit"));
-    // Bypass: use tok.text instead
-    emit "tok.text==emit? " + __to_string(_dbg_tok.text == "emit");
+    emit "[2] tokens=" + __to_string(len(_dbg_t));
+    emit "[3] parse...";
+    let _dbg_ast = parse(_dbg_t);
+    emit "[4] ast=" + __to_string(len(_dbg_ast));
+    emit "[5] analyze...";
+    set_at(_g_pos_box, 0, 0);
+    analyze(_dbg_ast);
+    emit "[6] bc_len=" + __to_string(_g_pos_box[0]);
     return "OK";
   };
   if src == "help" {

@@ -355,22 +355,25 @@ fn collect_fns(state, stmts) {
     let i = 0;
     while i < len(stmts) {
         let stmt = stmts[i];
-        match stmt {
-            Stmt::FnDef { name, params, body } => {
-                declare_fn(state, name, len(params), params);
-                push(state.fn_bodies, FnEntry {
-                    name: name, param_count: len(params),
-                    body_pc: 0, params: params,
-                });
-            },
-            Stmt::TypeDef { name, fields } => {
-                push(state.types, name);
-            },
-            Stmt::UnionDef { name, variants } => {
-                push(state.unions, name);
-            },
-            _ => {},
-        };
+        if __match_enum(stmt, "Stmt::FnDef") == 1 {
+            let name = __enum_field(stmt, 0);
+            let params = __enum_field(stmt, 1);
+            let body = __enum_field(stmt, 2);
+            declare_fn(state, name, len(params), params);
+            push(state.fn_bodies, FnEntry {
+                name: name, param_count: len(params),
+                body_pc: 0, params: params,
+            });
+        } else { if __match_enum(stmt, "Stmt::TypeDef") == 1 {
+            let name = __enum_field(stmt, 0);
+            let fields = __enum_field(stmt, 1);
+            push(state.types, name);
+        } else { if __match_enum(stmt, "Stmt::UnionDef") == 1 {
+            let name = __enum_field(stmt, 0);
+            let variants = __enum_field(stmt, 1);
+            push(state.unions, name);
+        } else {
+        }; }; };
         let i = i + 1;
     };
 }
@@ -381,34 +384,35 @@ fn precompile_fns(state, stmts) {
     let i = 0;
     while i < len(stmts) {
         let stmt = stmts[i];
-        match stmt {
-            Stmt::FnDef { name, params, body } => {
-                let body_start = current_pos(state);
-                // Store params (they arrive on stack from CallClosure)
-                let pi = len(params) - 1;
-                while pi >= 0 {
-                    emit_op(state, make_op_name("Store", params[pi]));
-                    push_local(state, params[pi]);
-                    let pi = pi - 1;
-                };
-                // Compile function body
-                let saved = save_locals(state);
-                let bi = 0;
-                while bi < len(body) {
-                    compile_stmt(state, body[bi]);
-                    let bi = bi + 1;
-                };
-                // Default return (empty)
-                emit_op(state, make_op_name("Push", ""));
-                emit_op(state, make_op_simple("Ret"));
-                restore_locals(state, saved);
-                // Register compiled function
-                push(state.compiled_fns, FnEntry {
-                    name: name, param_count: len(params),
-                    body_pc: body_start, params: params,
-                });
-            },
-            _ => {},
+        if __match_enum(stmt, "Stmt::FnDef") == 1 {
+            let name = __enum_field(stmt, 0);
+            let params = __enum_field(stmt, 1);
+            let body = __enum_field(stmt, 2);
+            let body_start = current_pos(state);
+            // Store params (they arrive on stack from CallClosure)
+            let pi = len(params) - 1;
+            while pi >= 0 {
+                emit_op(state, make_op_name("Store", params[pi]));
+                push_local(state, params[pi]);
+                let pi = pi - 1;
+            };
+            // Compile function body
+            let saved = save_locals(state);
+            let bi = 0;
+            while bi < len(body) {
+                compile_stmt(state, body[bi]);
+                let bi = bi + 1;
+            };
+            // Default return (empty)
+            emit_op(state, make_op_name("Push", ""));
+            emit_op(state, make_op_simple("Ret"));
+            restore_locals(state, saved);
+            // Register compiled function
+            push(state.compiled_fns, FnEntry {
+                name: name, param_count: len(params),
+                body_pc: body_start, params: params,
+            });
+        } else {
         };
         let i = i + 1;
     };
@@ -417,43 +421,45 @@ fn precompile_fns(state, stmts) {
 // ── Expression compilation ──────────────────────────────────────
 
 fn compile_expr(state, expr) {
-    match expr {
-        Expr::NumLit { value } => {
-            let _ce_numval = value;
-            emit_op(state, make_op_num("PushNum", _ce_numval));
-        },
-        Expr::StrLit { value } => {
-            emit_op(state, make_op_name("Push", value));
-        },
-        Expr::BoolLit { value } => {
-            if value == 1 {
-                emit_op(state, make_op_num("PushNum", 1));
+    if __match_enum(expr, "Expr::NumLit") == 1 {
+        let value = __enum_field(expr, 0);
+        let _ce_numval = value;
+        emit_op(state, make_op_num("PushNum", _ce_numval));
+    } else { if __match_enum(expr, "Expr::StrLit") == 1 {
+        let value = __enum_field(expr, 0);
+        emit_op(state, make_op_name("Push", value));
+    } else { if __match_enum(expr, "Expr::BoolLit") == 1 {
+        let value = __enum_field(expr, 0);
+        if value == 1 {
+            emit_op(state, make_op_num("PushNum", 1));
+        } else {
+            emit_op(state, make_op_name("Push", ""));
+        };
+    } else { if __match_enum(expr, "Expr::Ident") == 1 {
+        let name = __enum_field(expr, 0);
+        if name == "true" {
+            emit_num(state, 1);
+        } else {
+            if name == "false" {
+                emit_push_str(state, "");
             } else {
-                emit_op(state, make_op_name("Push", ""));
-            };
-        },
-        Expr::Ident { name } => {
-            if name == "true" {
-                emit_num(state, 1);
-            } else {
-                if name == "false" {
-                    emit_push_str(state, "");
+                // Check register slot first (function locals)
+                let _id_slot = -1;
+                if __g_fn_in_function == 1 {
+                    _id_slot = _find_reg_slot(__g_fn_slot_map, name);
+                };
+                if _id_slot >= 0 {
+                    _emit_byte(state, 0x26);    // LoadReg
+                    _emit_byte(state, _id_slot);
                 } else {
-                    // Check register slot first (function locals)
-                    let _id_slot = -1;
-                    if __g_fn_in_function == 1 {
-                        _id_slot = _find_reg_slot(__g_fn_slot_map, name);
-                    };
-                    if _id_slot >= 0 {
-                        _emit_byte(state, 0x26);    // LoadReg
-                        _emit_byte(state, _id_slot);
-                    } else {
-                        emit_load(state, name);     // var_table fallback
-                    };
+                    emit_load(state, name);     // var_table fallback
                 };
             };
-        },
-        Expr::BinOp { op, lhs, rhs } => {
+        };
+    } else { if __match_enum(expr, "Expr::BinOp") == 1 {
+        let op = __enum_field(expr, 0);
+        let lhs = __enum_field(expr, 1);
+        let rhs = __enum_field(expr, 2);
             // Short-circuit for && and ||
             if op == "&&" {
                 // Short-circuit: Dup → Jz(end) → Pop → rhs → end
@@ -507,19 +513,21 @@ fn compile_expr(state, expr) {
                     if _binop == ">=" { emit_op(state, make_op_name("Call", "__cmp_ge")); };
                 };
             };
-        },
-        Expr::UnaryNot { expr } => {
-            compile_expr(state, expr);
-            emit_op(state, make_op_name("Call", "__logic_not"));
-        },
-        Expr::Call { callee, args } => {
-            // Check if it's a known builtin
-            let _ce_fname = "";
-            match callee {
-                Expr::Ident { name } => { let _ce_fname = name; },
-                _ => {},
-            };
-            // ── Inline higher-order builtins: map, filter, reduce ──
+    } else { if __match_enum(expr, "Expr::UnaryNot") == 1 {
+        let expr = __enum_field(expr, 0);
+        compile_expr(state, expr);
+        emit_op(state, make_op_name("Call", "__logic_not"));
+    } else { if __match_enum(expr, "Expr::Call") == 1 {
+        let callee = __enum_field(expr, 0);
+        let args = __enum_field(expr, 1);
+        // Check if it's a known builtin
+        let _ce_fname = "";
+        if __match_enum(callee, "Expr::Ident") == 1 {
+            let name = __enum_field(callee, 0);
+            let _ce_fname = name;
+        } else {
+        };
+        // ── Inline higher-order builtins: map, filter, reduce ──
             if _ce_fname == "map" && len(args) == 2 {
                 // map(arr, f) → inline loop: result=[], for i in arr { push(result, f(arr[i])) }
                 compile_expr(state, args[0]);
@@ -1084,33 +1092,37 @@ fn compile_expr(state, expr) {
                     };
                 };
             };
-        },
-        Expr::FieldAccess { object, field } => {
-            compile_expr(state, object);
-            emit_op(state, make_op_name("Push", field));
-            emit_op(state, make_op_name("Call", "__dict_get"));
-        },
-        Expr::Index { object, index } => {
-            compile_expr(state, object);
-            compile_expr(state, index);
-            emit_call(state, "__array_get");
-        },
-        Expr::ArrayLit { items } => {
-            let ai = 0;
-            while ai < len(items) {
-                compile_expr(state, items[ai]);
-                let ai = ai + 1;
-            };
-            emit_op(state, make_op_num("PushNum", len(items)));
-            emit_op(state, make_op_name("Call", "__array_new"));
-        },
-        Expr::PathExpr { base, member } => {
-            // Enum variant without fields (unit variant): Base::Member
-            let tag = base + "::" + member;
-            emit_op(state, make_op_name("Push", tag));
-            emit_op(state, make_op_name("Call", "__enum_unit"));
-        },
-        Expr::StructLit { path, fields } => {
+    } else { if __match_enum(expr, "Expr::FieldAccess") == 1 {
+        let object = __enum_field(expr, 0);
+        let field = __enum_field(expr, 1);
+        compile_expr(state, object);
+        emit_op(state, make_op_name("Push", field));
+        emit_op(state, make_op_name("Call", "__dict_get"));
+    } else { if __match_enum(expr, "Expr::Index") == 1 {
+        let object = __enum_field(expr, 0);
+        let index = __enum_field(expr, 1);
+        compile_expr(state, object);
+        compile_expr(state, index);
+        emit_call(state, "__array_get");
+    } else { if __match_enum(expr, "Expr::ArrayLit") == 1 {
+        let items = __enum_field(expr, 0);
+        let ai = 0;
+        while ai < len(items) {
+            compile_expr(state, items[ai]);
+            let ai = ai + 1;
+        };
+        emit_op(state, make_op_num("PushNum", len(items)));
+        emit_op(state, make_op_name("Call", "__array_new"));
+    } else { if __match_enum(expr, "Expr::PathExpr") == 1 {
+        let base = __enum_field(expr, 0);
+        let member = __enum_field(expr, 1);
+        // Enum variant without fields (unit variant): Base::Member
+        let tag = base + "::" + member;
+        emit_op(state, make_op_name("Push", tag));
+        emit_op(state, make_op_name("Call", "__enum_unit"));
+    } else { if __match_enum(expr, "Expr::StructLit") == 1 {
+        let path = __enum_field(expr, 0);
+        let fields = __enum_field(expr, 1);
             // Struct or enum variant with fields
             // Save fields/fi before compile_expr (recursive may clobber)
             let fi = 0;
@@ -1131,34 +1143,35 @@ fn compile_expr(state, expr) {
                 let fields = pop(_ce_stack);
                 let fi = fi + 1;
             };
-            emit_op(state, make_op_num("PushNum", _sl_count));
-            emit_op(state, make_op_name("Call", "__dict_new"));
-            emit_op(state, make_op_name("Push", path));
-            emit_op(state, make_op_name("Call", "__struct_tag"));
-        },
-        Expr::DictLit { fields } => {
-            // Dict literal: { key: value, ... } — no tag
-            // Save fields before compile_expr (recursive may clobber _dl_i/_dl_f)
-            let _dl_i = 0;
-            let _dl_count = len(fields);
-            while _dl_i < _dl_count {
-                let _dl_f = fields[_dl_i];
-                let _dl_fname = _dl_f.name;
-                let _dl_fval = _dl_f.value;
-                emit_op(state, make_op_name("Push", _dl_fname));
-                push(_ce_stack, fields);
-                push(_ce_stack, _dl_i);
-                push(_ce_stack, _dl_count);
-                compile_expr(state, _dl_fval);
-                let _dl_count = pop(_ce_stack);
-                let _dl_i = pop(_ce_stack);
-                let fields = pop(_ce_stack);
-                let _dl_i = _dl_i + 1;
-            };
-            emit_op(state, make_op_num("PushNum", _dl_count));
-            emit_op(state, make_op_name("Call", "__dict_new"));
-        },
-        Expr::ArrayComp { var, depth } => {
+        emit_op(state, make_op_num("PushNum", _sl_count));
+        emit_op(state, make_op_name("Call", "__dict_new"));
+        emit_op(state, make_op_name("Push", path));
+        emit_op(state, make_op_name("Call", "__struct_tag"));
+    } else { if __match_enum(expr, "Expr::DictLit") == 1 {
+        let fields = __enum_field(expr, 0);
+        // Dict literal: { key: value, ... } — no tag
+        // Save fields before compile_expr (recursive may clobber _dl_i/_dl_f)
+        let _dl_i = 0;
+        let _dl_count = len(fields);
+        while _dl_i < _dl_count {
+            let _dl_f = fields[_dl_i];
+            let _dl_fname = _dl_f.name;
+            let _dl_fval = _dl_f.value;
+            emit_op(state, make_op_name("Push", _dl_fname));
+            push(_ce_stack, fields);
+            push(_ce_stack, _dl_i);
+            push(_ce_stack, _dl_count);
+            compile_expr(state, _dl_fval);
+            let _dl_count = pop(_ce_stack);
+            let _dl_i = pop(_ce_stack);
+            let fields = pop(_ce_stack);
+            let _dl_i = _dl_i + 1;
+        };
+        emit_op(state, make_op_num("PushNum", _dl_count));
+        emit_op(state, make_op_name("Call", "__dict_new"));
+    } else { if __match_enum(expr, "Expr::ArrayComp") == 1 {
+        let var = __enum_field(expr, 0);
+        let depth = __enum_field(expr, 1);
             // ArrayComp: [expr for var in iter if filter]
             // [expr for var in iter if filter]
             // Read depth-indexed globals (set by parser)
@@ -1283,41 +1296,50 @@ fn compile_expr(state, expr) {
                 let _cc_t1 = __g_comp_tokens[_cc_es + 1];
                 let _cc_t2 = __g_comp_tokens[_cc_es + 2];
                 // Emit lhs
-                match _cc_t0.kind {
-                    TokenKind::Ident { name } => { emit_op(state, make_op_name("Load", name)); },
-                    TokenKind::Number { value } => { emit_op(state, make_op_num("PushNum", value)); },
-                    _ => {},
-                };
+                if __match_enum(_cc_t0.kind, "TokenKind::Ident") == 1 {
+                    let name = __enum_field(_cc_t0.kind, 0);
+                    emit_op(state, make_op_name("Load", name));
+                } else { if __match_enum(_cc_t0.kind, "TokenKind::Number") == 1 {
+                    let value = __enum_field(_cc_t0.kind, 0);
+                    emit_op(state, make_op_num("PushNum", value));
+                } else {
+                }; };
                 // Emit rhs
-                match _cc_t2.kind {
-                    TokenKind::Ident { name } => { emit_op(state, make_op_name("Load", name)); },
-                    TokenKind::Number { value } => { emit_op(state, make_op_num("PushNum", value)); },
-                    _ => {},
-                };
+                if __match_enum(_cc_t2.kind, "TokenKind::Ident") == 1 {
+                    let name = __enum_field(_cc_t2.kind, 0);
+                    emit_op(state, make_op_name("Load", name));
+                } else { if __match_enum(_cc_t2.kind, "TokenKind::Number") == 1 {
+                    let value = __enum_field(_cc_t2.kind, 0);
+                    emit_op(state, make_op_num("PushNum", value));
+                } else {
+                }; };
                 // Emit op
-                match _cc_t1.kind {
-                    TokenKind::Symbol { ch } => {
-                        if ch == "+" { emit_op(state, make_op_name("Call", "__hyp_add")); };
-                        if ch == "-" { emit_op(state, make_op_name("Call", "__hyp_sub")); };
-                        if ch == "*" { emit_op(state, make_op_name("Call", "__hyp_mul")); };
-                        if ch == "/" { emit_op(state, make_op_name("Call", "__hyp_div")); };
-                        if ch == "%" { emit_op(state, make_op_name("Call", "__hyp_mod")); };
-                    },
-                    _ => {},
+                if __match_enum(_cc_t1.kind, "TokenKind::Symbol") == 1 {
+                    let ch = __enum_field(_cc_t1.kind, 0);
+                    if ch == "+" { emit_op(state, make_op_name("Call", "__hyp_add")); };
+                    if ch == "-" { emit_op(state, make_op_name("Call", "__hyp_sub")); };
+                    if ch == "*" { emit_op(state, make_op_name("Call", "__hyp_mul")); };
+                    if ch == "/" { emit_op(state, make_op_name("Call", "__hyp_div")); };
+                    if ch == "%" { emit_op(state, make_op_name("Call", "__hyp_mod")); };
+                } else {
                 };
             };
             if _cc_expr_ntoks == 4 {
                 // fn(arg) pattern: id ( arg )
                 let _cc_t0 = __g_comp_tokens[_cc_es];
                 let _cc_t2 = __g_comp_tokens[_cc_es + 2];
-                match _cc_t2.kind {
-                    TokenKind::Ident { name } => { emit_op(state, make_op_name("Load", name)); },
-                    TokenKind::Number { value } => { emit_op(state, make_op_num("PushNum", value)); },
-                    _ => {},
-                };
-                match _cc_t0.kind {
-                    TokenKind::Ident { name } => { emit_op(state, make_op_name("Call", name)); },
-                    _ => {},
+                if __match_enum(_cc_t2.kind, "TokenKind::Ident") == 1 {
+                    let name = __enum_field(_cc_t2.kind, 0);
+                    emit_op(state, make_op_name("Load", name));
+                } else { if __match_enum(_cc_t2.kind, "TokenKind::Number") == 1 {
+                    let value = __enum_field(_cc_t2.kind, 0);
+                    emit_op(state, make_op_num("PushNum", value));
+                } else {
+                }; };
+                if __match_enum(_cc_t0.kind, "TokenKind::Ident") == 1 {
+                    let name = __enum_field(_cc_t0.kind, 0);
+                    emit_op(state, make_op_name("Call", name));
+                } else {
                 };
             };
             if _cc_expr_ntoks > 4 {
@@ -1352,30 +1374,33 @@ fn compile_expr(state, expr) {
             patch_jump(state, _cc_exit_jz_r, current_pos(state));
             emit_op(state, make_op_name("Load", _cc_result));
             _g_semantic_comp_depth = _g_semantic_comp_depth - 1;
-        },
-        Expr::IfExpr { cond, then_expr, else_expr } => {
-            compile_expr(state, cond);
-            let jz_pos = current_pos(state);
-            emit_op(state, make_op_num("Jz", 0));
-            emit_op(state, make_op_simple("Pop"));
-            compile_expr(state, then_expr);
-            let jmp_pos = current_pos(state);
-            emit_op(state, make_op_num("Jmp", 0));
-            patch_jump(state, jz_pos, current_pos(state));
-            emit_op(state, make_op_simple("Pop"));
-            compile_expr(state, else_expr);
-            patch_jump(state, jmp_pos, current_pos(state));
-        },
-        Expr::MolLiteral { packed } => {
-            // packed u16 [S:4][R:4][V:3][A:3][T:2] — already packed by parser
-            let op = Op { tag: "PushMol", name: "", value: packed };
-            emit_op(state, op);
-        },
-        Expr::MatchExpr { subject, arms } => {
-            // Simplified match: store subject, test each arm
-            compile_expr(state, subject);
-            let subj_name = "__match_subj";
-            emit_op(state, make_op_name("Store", subj_name));
+    } else { if __match_enum(expr, "Expr::IfExpr") == 1 {
+        let cond = __enum_field(expr, 0);
+        let then_expr = __enum_field(expr, 1);
+        let else_expr = __enum_field(expr, 2);
+        compile_expr(state, cond);
+        let jz_pos = current_pos(state);
+        emit_op(state, make_op_num("Jz", 0));
+        emit_op(state, make_op_simple("Pop"));
+        compile_expr(state, then_expr);
+        let jmp_pos = current_pos(state);
+        emit_op(state, make_op_num("Jmp", 0));
+        patch_jump(state, jz_pos, current_pos(state));
+        emit_op(state, make_op_simple("Pop"));
+        compile_expr(state, else_expr);
+        patch_jump(state, jmp_pos, current_pos(state));
+    } else { if __match_enum(expr, "Expr::MolLiteral") == 1 {
+        let packed = __enum_field(expr, 0);
+        // packed u16 [S:4][R:4][V:3][A:3][T:2] — already packed by parser
+        let op = Op { tag: "PushMol", name: "", value: packed };
+        emit_op(state, op);
+    } else { if __match_enum(expr, "Expr::MatchExpr") == 1 {
+        let subject = __enum_field(expr, 0);
+        let arms = __enum_field(expr, 1);
+        // Simplified match: store subject, test each arm
+        compile_expr(state, subject);
+        let subj_name = "__match_subj";
+        emit_op(state, make_op_name("Store", subj_name));
             push_local(state, subj_name);
             let _m_mi = 0;
             while _m_mi < 32 { set_at(__g_mej, _m_mi, -1); _m_mi = _m_mi + 1; };
@@ -1506,10 +1531,11 @@ fn compile_expr(state, expr) {
 
 
 
-        },
-        Expr::Lambda { params, body } => {
-            // Lambda expression: fn(params) { body } → emit Closure like FnDef but no Store
-            let _lm_params = params;
+    } else { if __match_enum(expr, "Expr::Lambda") == 1 {
+        let params = __enum_field(expr, 0);
+        let body = __enum_field(expr, 1);
+        // Lambda expression: fn(params) { body } → emit Closure like FnDef but no Store
+        let _lm_params = params;
             let _lm_body = body;
             let _lm_pcnt = len(_lm_params);
 
@@ -1605,25 +1631,25 @@ fn compile_expr(state, expr) {
             set_at(_g_output_box[0], _lm_blen_pos + 2, __floor((_lm_body_len / 65536)) % 256);
             set_at(_g_output_box[0], _lm_blen_pos + 3, __floor((_lm_body_len / 16777216)) % 256);
             // Closure value is now on stack (pushed by cg_closure opcode)
-        },
-        _ => {
-            add_error(state, "Unknown expression type");
-        },
-    };
+    } else {
+        add_error(state, "Unknown expression type");
+    }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; };
 }
 
 // ── Statement compilation ───────────────────────────────────────
 
 fn compile_stmt(state, stmt) {
-    match stmt {
-        Stmt::ConstStmt { name, value } => {
-            // const = immutable let — Store + register as const
-            compile_expr(state, value);
-            emit_op(state, make_op_name("Store", name));
-            push(__const_names, name);
-        },
-        Stmt::LetStmt { name, value } => {
-            let _ls_name = name;
+    if __match_enum(stmt, "Stmt::ConstStmt") == 1 {
+        let name = __enum_field(stmt, 0);
+        let value = __enum_field(stmt, 1);
+        // const = immutable let — Store + register as const
+        compile_expr(state, value);
+        emit_op(state, make_op_name("Store", name));
+        push(__const_names, name);
+    } else { if __match_enum(stmt, "Stmt::LetStmt") == 1 {
+        let name = __enum_field(stmt, 0);
+        let value = __enum_field(stmt, 1);
+        let _ls_name = name;
             push(_ce_stack, _ls_name);
             compile_expr(state, value);
             let _ls_name = pop(_ce_stack);
@@ -1669,12 +1695,14 @@ fn compile_stmt(state, stmt) {
                     let _ = set_at(_ce_lc, 0, _ls_cnt + 1);
                 };
             };
-        },
-        Stmt::FnDef { name, params, body } => {
-            // Save name/params before body compilation (body may overwrite "name")
-            let _fn_name = name;
-            let _fn_params = params;
-            let _fn_body = body;
+    } else { if __match_enum(stmt, "Stmt::FnDef") == 1 {
+        let name = __enum_field(stmt, 0);
+        let params = __enum_field(stmt, 1);
+        let body = __enum_field(stmt, 2);
+        // Save name/params before body compilation (body may overwrite "name")
+        let _fn_name = name;
+        let _fn_params = params;
+        let _fn_body = body;
             let _fn_pcnt = len(_fn_params);
             // Emit Closure(param_count, body_len) + body + Store(name).
             let _fn_closure_pos = current_pos(state);
@@ -1742,67 +1770,67 @@ fn compile_stmt(state, stmt) {
             set_at(_g_output_box[0], _fn_bpos + 2, __floor(_fn_body_len / 65536) % 256);
             set_at(_g_output_box[0], _fn_bpos + 3, __floor(_fn_body_len / 16777216) % 256);
             // Store closure in var_table
-            emit_op(state, make_op_name("Store", _fn_name));
-        },
-        Stmt::ReturnStmt { value } => {
-            // TRO: if return value is a call to the SAME function → loop
-            let _rt_is_tro = 0;
-            if len(_g_tro_fn) > 0 {
-                match value {
-                    Expr::Call { callee, args } => {
-                        match callee {
-                            Expr::Ident { name } => {
-                                if name == _g_tro_fn {
-                                    if len(args) == len(_g_tro_params) {
-                                        let _rt_is_tro = 1;
-                                        // Compile args, store to params, jump to body start
-                                        let _rt_ai = 0;
-                                        let _rt_nargs = len(args);
-                                        // Compile all args first (before overwriting params)
-                                        while _rt_ai < _rt_nargs {
-                                            push(_ce_stack, args);
-                                            push(_ce_stack, _rt_ai);
-                                            push(_ce_stack, _rt_nargs);
-                                            compile_expr(state, args[_rt_ai]);
-                                            let _rt_nargs = pop(_ce_stack);
-                                            let _rt_ai = pop(_ce_stack);
-                                            let args = pop(_ce_stack);
-                                            let _rt_ai = _rt_ai + 1;
-                                        };
-                                        // Store args to params in reverse order (register + var_table)
-                                        let _rt_pi = _rt_nargs - 1;
-                                        while _rt_pi >= 0 {
-                                            if __g_fn_in_function == 1 {
-                                                let _rt_slot = _find_reg_slot(__g_fn_slot_map, _g_tro_params[_rt_pi]);
-                                                if _rt_slot >= 0 {
-                                                    emit_op(state, make_op_simple("Dup"));
-                                                    _emit_byte(state, 0x27);    // StoreReg
-                                                    _emit_byte(state, _rt_slot);
-                                                };
-                                            };
-                                            emit_op(state, make_op_name("Store", _g_tro_params[_rt_pi]));
-                                            let _rt_pi = _rt_pi - 1;
-                                        };
-                                        // Jump to function body start
-                                        emit_jmp(state, _g_tro_start);
+        emit_op(state, make_op_name("Store", _fn_name));
+    } else { if __match_enum(stmt, "Stmt::ReturnStmt") == 1 {
+        let value = __enum_field(stmt, 0);
+        // TRO: if return value is a call to the SAME function → loop
+        let _rt_is_tro = 0;
+        if len(_g_tro_fn) > 0 {
+            if __match_enum(value, "Expr::Call") == 1 {
+                let callee = __enum_field(value, 0);
+                let args = __enum_field(value, 1);
+                if __match_enum(callee, "Expr::Ident") == 1 {
+                    let name = __enum_field(callee, 0);
+                    if name == _g_tro_fn {
+                        if len(args) == len(_g_tro_params) {
+                            let _rt_is_tro = 1;
+                            // Compile args, store to params, jump to body start
+                            let _rt_ai = 0;
+                            let _rt_nargs = len(args);
+                            // Compile all args first (before overwriting params)
+                            while _rt_ai < _rt_nargs {
+                                push(_ce_stack, args);
+                                push(_ce_stack, _rt_ai);
+                                push(_ce_stack, _rt_nargs);
+                                compile_expr(state, args[_rt_ai]);
+                                let _rt_nargs = pop(_ce_stack);
+                                let _rt_ai = pop(_ce_stack);
+                                let args = pop(_ce_stack);
+                                let _rt_ai = _rt_ai + 1;
+                            };
+                            // Store args to params in reverse order (register + var_table)
+                            let _rt_pi = _rt_nargs - 1;
+                            while _rt_pi >= 0 {
+                                if __g_fn_in_function == 1 {
+                                    let _rt_slot = _find_reg_slot(__g_fn_slot_map, _g_tro_params[_rt_pi]);
+                                    if _rt_slot >= 0 {
+                                        emit_op(state, make_op_simple("Dup"));
+                                        _emit_byte(state, 0x27);    // StoreReg
+                                        _emit_byte(state, _rt_slot);
                                     };
                                 };
-                            },
-                            _ => {},
+                                emit_op(state, make_op_name("Store", _g_tro_params[_rt_pi]));
+                                let _rt_pi = _rt_pi - 1;
+                            };
+                            // Jump to function body start
+                            emit_jmp(state, _g_tro_start);
                         };
-                    },
-                    _ => {},
+                    };
+                } else {
                 };
+            } else {
             };
-            if _rt_is_tro == 0 {
-                compile_expr(state, value);
-                if __g_fn_in_function == 1 { _emit_byte(state, 0x29); };  // LeaveFrame
-                emit_op(state, make_op_simple("Ret"));
-            };
-        },
-        Stmt::AssignStmt { name, value } => {
-            // Check const: reject reassignment of const variables
-            let _as_name = name;
+        };
+        if _rt_is_tro == 0 {
+            compile_expr(state, value);
+            if __g_fn_in_function == 1 { _emit_byte(state, 0x29); };  // LeaveFrame
+            emit_op(state, make_op_simple("Ret"));
+        };
+    } else { if __match_enum(stmt, "Stmt::AssignStmt") == 1 {
+        let name = __enum_field(stmt, 0);
+        let value = __enum_field(stmt, 1);
+        // Check const: reject reassignment of const variables
+        let _as_name = name;
             let _as_is_const = 0;
             let _as_ci = 0;
             while _as_ci < len(__const_names) {
@@ -1826,17 +1854,19 @@ fn compile_stmt(state, stmt) {
                     _emit_byte(state, _as_slot);
                 };
             };
-            emit_op(state, make_op_name("StoreUpdate", _as_name));
-        },
-        Stmt::EmitStmt { expr } => {
-            compile_expr(state, expr);
-            emit_op(state, make_op_simple("Emit"));
-        },
-        Stmt::IfStmt { cond, then_block, else_block } => {
-            // Save blocks on _if_stack (separate from _ce_stack to avoid interleave)
-            push(_if_stack, then_block);
-            push(_if_stack, else_block);
-            compile_expr(state, cond);
+        emit_op(state, make_op_name("StoreUpdate", _as_name));
+    } else { if __match_enum(stmt, "Stmt::EmitStmt") == 1 {
+        let expr = __enum_field(stmt, 0);
+        compile_expr(state, expr);
+        emit_op(state, make_op_simple("Emit"));
+    } else { if __match_enum(stmt, "Stmt::IfStmt") == 1 {
+        let cond = __enum_field(stmt, 0);
+        let then_block = __enum_field(stmt, 1);
+        let else_block = __enum_field(stmt, 2);
+        // Save blocks on _if_stack (separate from _ce_stack to avoid interleave)
+        push(_if_stack, then_block);
+        push(_if_stack, else_block);
+        compile_expr(state, cond);
             let _if_jz = current_pos(state);
             emit_op(state, make_op_num("Jz", 0));
             // Restore after compile_expr
@@ -1875,14 +1905,15 @@ fn compile_stmt(state, stmt) {
             } else {
                 patch_jump(state, _if_jz, current_pos(state));
             };
-        },
-        Stmt::WhileStmt { cond, body } => {
-            // Save outer break/continue context
-            let _wl_old_breaks = _break_patches;
-            let _wl_old_conts = _continue_patches;
-            let _break_patches = [];
-            let _continue_patches = [];
-            let _wl_body = body;
+    } else { if __match_enum(stmt, "Stmt::WhileStmt") == 1 {
+        let cond = __enum_field(stmt, 0);
+        let body = __enum_field(stmt, 1);
+        // Save outer break/continue context
+        let _wl_old_breaks = _break_patches;
+        let _wl_old_conts = _continue_patches;
+        let _break_patches = [];
+        let _continue_patches = [];
+        let _wl_body = body;
             let _wl_start = current_pos(state);
             // Re-parse condition from tokens (avoids dict corruption)
             // WhileStmt has cond_start, cond_end, tokens fields
@@ -1933,12 +1964,14 @@ fn compile_stmt(state, stmt) {
                 let _bp_i = _bp_i + 1;
             };
             // Restore outer context
-            let _break_patches = _wl_old_breaks;
-            let _continue_patches = _wl_old_conts;
-        },
-        Stmt::ForStmt { var, iter, body } => {
-            // Read ALL depth-indexed globals BEFORE incrementing _g_for_depth
-            let _fl_var = "";
+        let _break_patches = _wl_old_breaks;
+        let _continue_patches = _wl_old_conts;
+    } else { if __match_enum(stmt, "Stmt::ForStmt") == 1 {
+        let var = __enum_field(stmt, 0);
+        let iter = __enum_field(stmt, 1);
+        let body = __enum_field(stmt, 2);
+        // Read ALL depth-indexed globals BEFORE incrementing _g_for_depth
+        let _fl_var = "";
             let _fl_is = 0;
             let _fl_ie = 0;
             if _g_for_depth == 0 { let _fl_var = __g_fv0; let _fl_is = __g_fi0s; let _fl_ie = __g_fi0e; };
@@ -2067,111 +2100,113 @@ fn compile_stmt(state, stmt) {
             // Restore
             let _break_patches = _fl_old_breaks;
             let _continue_patches = _fl_old_conts;
-            _g_for_depth = _g_for_depth - 1;
-        },
-        Stmt::BreakStmt => {
-            let _brk_pos = current_pos(state);
-            emit_op(state, make_op_num("Jmp", 0));
-            push(_break_patches, _brk_pos);
-        },
-        Stmt::ContinueStmt => {
-            let _cont_pos = current_pos(state);
-            emit_op(state, make_op_num("Jmp", 0));
-            push(_continue_patches, _cont_pos);
-        },
-        Stmt::TypeDef { name, fields } => {
-            // Type metadata — no opcodes needed for bootstrap
-        },
-        Stmt::UnionDef { name, variants } => {
-            // Union metadata — no opcodes needed for bootstrap
-        },
-        Stmt::UseStmt { path } => {
-            // Module import: UseStmt is handled at REPL level by inlining file contents
-            // before compilation. By the time we reach semantic, `use` has been expanded.
-            // If we somehow get here, it means use wasn't expanded → skip silently.
-        },
-        Stmt::FieldAssign { object, field, value } => {
-            // obj.field = value → load obj, set field, store back
-            let _fa_obj = object;
-            if is_local(state, _fa_obj) {
-                emit_op(state, make_op_name("LoadLocal", _fa_obj));
-            } else {
-                emit_op(state, make_op_name("Load", _fa_obj));
-            };
-            emit_op(state, make_op_name("Push", field));
-            push(_ce_stack, _fa_obj);
-            compile_expr(state, value);
-            let _fa_obj = pop(_ce_stack);
-            emit_op(state, make_op_name("Call", "__dict_set"));
-            emit_op(state, make_op_name("Store", _fa_obj));
-        },
-        Stmt::MatchStmt { subject, arms } => {
-            // Match as statement: compile subject match expression, discard result
-            compile_expr(state, subject);
-            emit_op(state, make_op_simple("Pop"));
-        },
-        Stmt::TryCatch { try_block, catch_block } => {
-            // try { body } catch { handler }
-            // → TryBegin(catch_pc) [try body] Jmp(end) [catch body] CatchEnd
-            let _tc_try = try_block;
-            let _tc_catch = catch_block;
+        _g_for_depth = _g_for_depth - 1;
+    } else { if __match_enum(stmt, "Stmt::BreakStmt") == 1 {
+        let _brk_pos = current_pos(state);
+        emit_op(state, make_op_num("Jmp", 0));
+        push(_break_patches, _brk_pos);
+    } else { if __match_enum(stmt, "Stmt::ContinueStmt") == 1 {
+        let _cont_pos = current_pos(state);
+        emit_op(state, make_op_num("Jmp", 0));
+        push(_continue_patches, _cont_pos);
+    } else { if __match_enum(stmt, "Stmt::TypeDef") == 1 {
+        let name = __enum_field(stmt, 0);
+        let fields = __enum_field(stmt, 1);
+        // Type metadata — no opcodes needed for bootstrap
+    } else { if __match_enum(stmt, "Stmt::UnionDef") == 1 {
+        let name = __enum_field(stmt, 0);
+        let variants = __enum_field(stmt, 1);
+        // Union metadata — no opcodes needed for bootstrap
+    } else { if __match_enum(stmt, "Stmt::UseStmt") == 1 {
+        let path = __enum_field(stmt, 0);
+        // Module import: UseStmt is handled at REPL level by inlining file contents
+        // before compilation. By the time we reach semantic, `use` has been expanded.
+        // If we somehow get here, it means use wasn't expanded → skip silently.
+    } else { if __match_enum(stmt, "Stmt::FieldAssign") == 1 {
+        let object = __enum_field(stmt, 0);
+        let field = __enum_field(stmt, 1);
+        let value = __enum_field(stmt, 2);
+        // obj.field = value → load obj, set field, store back
+        let _fa_obj = object;
+        if is_local(state, _fa_obj) {
+            emit_op(state, make_op_name("LoadLocal", _fa_obj));
+        } else {
+            emit_op(state, make_op_name("Load", _fa_obj));
+        };
+        emit_op(state, make_op_name("Push", field));
+        push(_ce_stack, _fa_obj);
+        compile_expr(state, value);
+        let _fa_obj = pop(_ce_stack);
+        emit_op(state, make_op_name("Call", "__dict_set"));
+        emit_op(state, make_op_name("Store", _fa_obj));
+    } else { if __match_enum(stmt, "Stmt::MatchStmt") == 1 {
+        let subject = __enum_field(stmt, 0);
+        let arms = __enum_field(stmt, 1);
+        // Match as statement: compile subject match expression, discard result
+        compile_expr(state, subject);
+        emit_op(state, make_op_simple("Pop"));
+    } else { if __match_enum(stmt, "Stmt::TryCatch") == 1 {
+        let try_block = __enum_field(stmt, 0);
+        let catch_block = __enum_field(stmt, 1);
+        // try { body } catch { handler }
+        // → TryBegin(catch_pc) [try body] Jmp(end) [catch body] CatchEnd
+        let _tc_try = try_block;
+        let _tc_catch = catch_block;
 
-            // TryBegin — patch later with catch_pc
-            let _tc_try_pos = current_pos(state);
-            _emit_byte(state, 26);      // 0x1A = TryBegin
-            _emit_u32_le(state, 0);     // placeholder for catch_offset
+        // TryBegin — patch later with catch_pc
+        let _tc_try_pos = current_pos(state);
+        _emit_byte(state, 26);      // 0x1A = TryBegin
+        _emit_u32_le(state, 0);     // placeholder for catch_offset
 
-            // Compile try block
-            let _tc_ti = 0;
-            while _tc_ti < len(_tc_try) {
-                push(_ce_stack, _tc_try);
-                push(_ce_stack, _tc_catch);
-                push(_ce_stack, _tc_try_pos);
-                push(_ce_stack, _tc_ti);
-                compile_stmt(state, _tc_try[_tc_ti]);
-                let _tc_ti = pop(_ce_stack);
-                let _tc_try_pos = pop(_ce_stack);
-                let _tc_catch = pop(_ce_stack);
-                let _tc_try = pop(_ce_stack);
-                let _tc_ti = _tc_ti + 1;
-            };
+        // Compile try block
+        let _tc_ti = 0;
+        while _tc_ti < len(_tc_try) {
+            push(_ce_stack, _tc_try);
+            push(_ce_stack, _tc_catch);
+            push(_ce_stack, _tc_try_pos);
+            push(_ce_stack, _tc_ti);
+            compile_stmt(state, _tc_try[_tc_ti]);
+            let _tc_ti = pop(_ce_stack);
+            let _tc_try_pos = pop(_ce_stack);
+            let _tc_catch = pop(_ce_stack);
+            let _tc_try = pop(_ce_stack);
+            let _tc_ti = _tc_ti + 1;
+        };
 
-            // Jmp past catch on success
-            let _tc_jmp_pos = current_pos(state);
-            emit_jmp(state, 0);         // placeholder
+        // Jmp past catch on success
+        let _tc_jmp_pos = current_pos(state);
+        emit_jmp(state, 0);         // placeholder
 
-            // Patch TryBegin → catch_pc
-            let _tc_catch_pc = current_pos(state);
-            patch_jump(state, _tc_try_pos, _tc_catch_pc);
+        // Patch TryBegin → catch_pc
+        let _tc_catch_pc = current_pos(state);
+        patch_jump(state, _tc_try_pos, _tc_catch_pc);
 
-            // Compile catch block
-            let _tc_ci = 0;
-            while _tc_ci < len(_tc_catch) {
-                push(_ce_stack, _tc_catch);
-                push(_ce_stack, _tc_jmp_pos);
-                push(_ce_stack, _tc_ci);
-                compile_stmt(state, _tc_catch[_tc_ci]);
-                let _tc_ci = pop(_ce_stack);
-                let _tc_jmp_pos = pop(_ce_stack);
-                let _tc_catch = pop(_ce_stack);
-                let _tc_ci = _tc_ci + 1;
-            };
+        // Compile catch block
+        let _tc_ci = 0;
+        while _tc_ci < len(_tc_catch) {
+            push(_ce_stack, _tc_catch);
+            push(_ce_stack, _tc_jmp_pos);
+            push(_ce_stack, _tc_ci);
+            compile_stmt(state, _tc_catch[_tc_ci]);
+            let _tc_ci = pop(_ce_stack);
+            let _tc_jmp_pos = pop(_ce_stack);
+            let _tc_catch = pop(_ce_stack);
+            let _tc_ci = _tc_ci + 1;
+        };
 
-            // CatchEnd
-            _emit_byte(state, 27);      // 0x1B = CatchEnd
+        // CatchEnd
+        _emit_byte(state, 27);      // 0x1B = CatchEnd
 
-            // Patch Jmp → after catch
-            patch_jump(state, _tc_jmp_pos, current_pos(state));
-        },
-        Stmt::ExprStmt { expr } => {
-            compile_expr(state, expr);
-            // Pop the result (don't auto-emit) — use explicit "emit" for output
-            emit_op(state, make_op_simple("Pop"));
-        },
-        _ => {
-            add_error(state, "Unknown statement type");
-        },
-    };
+        // Patch Jmp → after catch
+        patch_jump(state, _tc_jmp_pos, current_pos(state));
+    } else { if __match_enum(stmt, "Stmt::ExprStmt") == 1 {
+        let expr = __enum_field(stmt, 0);
+        compile_expr(state, expr);
+        // Pop the result (don't auto-emit) — use explicit "emit" for output
+        emit_op(state, make_op_simple("Pop"));
+    } else {
+        add_error(state, "Unknown statement type");
+    }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; }; };
 }
 
 // ── Validation ──────────────────────────────────────────────────
