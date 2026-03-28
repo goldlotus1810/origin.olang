@@ -1666,6 +1666,9 @@ op_call:
     movabs  $0xFE7CDB1931FA9AB0, %rdx
     cmp     %rdx, %rax
     je      .call_regex_match
+    movabs  $0xD6B3A6F66D9F70B0, %rdx
+    cmp     %rdx, %rax
+    je      .call_esc
     jmp     .call_not_builtin
 
 .builtin_slot_178:
@@ -7369,6 +7372,16 @@ op_ret:
     xor     %eax, %eax
     mov     %rax, (%r14)
     movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+# __esc() → ESC byte (0x1B) as 1-char string molecule
+.call_esc:
+    add     %rcx, %r13
+    sub     $16, %r14
+    mov     %r15, (%r14)                # chain ptr
+    movq    $1, 8(%r14)                 # mol_count = 1
+    movw    $0x211B, (%r15)             # molecule: 0x2100 | 0x1B (ESC)
+    add     $2, %r15
     jmp     vm_loop
 
 .call_heap_used:
