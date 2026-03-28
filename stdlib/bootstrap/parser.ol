@@ -551,7 +551,8 @@ fn parse_primary(p) {
                 };
                 // Regular array literal — restore depth (was incremented speculatively)
                 let _g_parser_comp_depth = _g_parser_comp_depth - 1;
-                let items = [_pa_first];
+                let items = [];
+                push(items, _pa_first);
                 while is_symbol_tok(peek(p), ",") {
                     advance(p);
                     if !is_symbol_tok(peek(p), "]") {

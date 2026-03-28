@@ -254,7 +254,7 @@ _start:
     test    %rax, %rax
     js      err_mmap
     mov     %rax, %r14                  # r14 = VM stack base
-    add     $STACK_SIZE, %r14           # stack grows downward
+    add     $(STACK_SIZE - 256), %r14   # stack grows downward (256B guard for underflow)
     # Save stack top for debug
     mov     %r14, (%rax)
 

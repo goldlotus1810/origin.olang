@@ -100,7 +100,12 @@ fn compile_all(_ca_stdlib_path) {
   emit "  codegen.ol...";
   compile_one_file("stdlib/bootstrap/codegen.ol", _ca_all_bc);
   compile_one_file("stdlib/bootstrap/lexer.ol", _ca_all_bc);
-  // TEMP: bootstrap only for boot test
+  compile_one_file("stdlib/bootstrap/parser.ol", _ca_all_bc);
+  compile_one_file("stdlib/bootstrap/semantic.ol", _ca_all_bc);
+  // Compile stdlib root files
+  compile_dir("stdlib", _ca_all_bc);
+  // Compile homeos files
+  compile_dir("stdlib/homeos", _ca_all_bc);
   emit "  (stdlib/homeos/editor skipped for boot test)";
 
   // Debug: emit "BOOT OK" before final Halt to confirm all files executed
@@ -129,18 +134,13 @@ fn compile_one_file(_cof_path, _cof_output) {
   if len(_cof_src) == 0 { return; };
   let _cof_bc = compile_source(_cof_src);
   let _cof_bclen = len(_cof_bc);
-  // Quick checksum: sum of first 10 bytes
-  let _cof_sum = 0;
-  let _cof_ci = 0;
-  while _cof_ci < 10 { if _cof_ci < _cof_bclen { _cof_sum = _cof_sum + __floor(_cof_bc[_cof_ci]); }; _cof_ci = _cof_ci + 1; };
-  emit "  " + _cof_path + " → " + __to_string(_cof_bclen) + " bytes sum10=" + __to_string(_cof_sum);
-  if _cof_bclen > 1 {
-    if __floor(_cof_bc[_cof_bclen - 1]) == 15 { set_at(_cof_bc, _cof_bclen - 1, 18); };
-    let _cof_base = len(_cof_output);
-    if _cof_base > 0 { relocate_jumps(_cof_bc, _cof_bclen, _cof_base); };
-    let _cof_bi = 0;
-    while _cof_bi < _cof_bclen { push(_cof_output, _cof_bc[_cof_bi]); _cof_bi = _cof_bi + 1; };
-  };
+  emit "  " + _cof_path + " → " + __to_string(_cof_bclen) + " bytes";
+  if _cof_bclen < 2 { return; };
+  if __floor(_cof_bc[_cof_bclen - 1]) == 15 { set_at(_cof_bc, _cof_bclen - 1, 18); };
+  let _cof_base = len(_cof_output);
+  if _cof_base > 0 { relocate_jumps(_cof_bc, _cof_bclen, _cof_base); };
+  let _cof_bi = 0;
+  while _cof_bi < _cof_bclen { push(_cof_output, _cof_bc[_cof_bi]); _cof_bi = _cof_bi + 1; };
 };
 
 fn compile_dir(_xcd_dir, _xcd_output) {
@@ -169,9 +169,11 @@ fn compile_dir(_xcd_dir, _xcd_output) {
 };
 
 fn compile_source(_cs_src) {
+  emit "  [cs] src len=" + __to_string(len(_cs_src));
   reset_compiler();
   let _cs_tokens = tokenize(_cs_src);
   let _cs_ntok = len(_cs_tokens);
+  emit "  [cs] tokens=" + __to_string(_cs_ntok);
   let _cs_parser = { tokens: _cs_tokens, pos: 0 };
   let _cs_ast = [];
   let _cs_errors = 0;
@@ -181,77 +183,17 @@ fn compile_source(_cs_src) {
     else {
       let _cs_prev_pos = _cs_parser.pos;
       try { push(_cs_ast, parse_stmt(_cs_parser)); }
-      catch { _cs_errors = _cs_errors + 1; };
+      catch { _cs_errors = _cs_errors + 1; emit "  [cs] parse error #" + __to_string(_cs_errors); };
       // If parser didn't advance, skip token to prevent infinite loop
       if _cs_parser.pos == _cs_prev_pos { _cs_parser.pos = _cs_parser.pos + 1; };
       // Bail after too many errors
       if _cs_errors > 10 { _cs_parser.pos = _cs_ntok; };
     };
   };
-  return compile_isolated(_cs_ast);
-};
-
-fn relocate_jumps(_rj_bc, _rj_len, _rj_base) {
-  // Scan bytecode, add _rj_base to all Jmp/Jz/TryBegin targets
-  let _rj_pc = 0;
-  while _rj_pc < _rj_len {
-    let _rj_tag = __floor(_rj_bc[_rj_pc]);
-    _rj_pc = _rj_pc + 1;
-    let _rj_skip = _bc_opcode_size(_rj_tag, _rj_bc, _rj_pc, _rj_len);
-    // Relocate Jmp(9), Jz(10), TryBegin(26)
-    let _rj_do_reloc = 0;
-    if _rj_tag == 9 { _rj_do_reloc = 1; };
-    if _rj_tag == 10 { _rj_do_reloc = 1; };
-    if _rj_tag == 26 { _rj_do_reloc = 1; };
-    if _rj_do_reloc == 1 {
-      if _rj_pc + 4 <= _rj_len {
-        let _rj_t = _rj_bc[_rj_pc] + _rj_bc[_rj_pc+1]*256 + _rj_bc[_rj_pc+2]*65536 + _rj_bc[_rj_pc+3]*16777216;
-        _rj_t = _rj_t + _rj_base;
-        set_at(_rj_bc, _rj_pc, _rj_t % 256);
-        set_at(_rj_bc, _rj_pc+1, __floor(_rj_t / 256) % 256);
-        set_at(_rj_bc, _rj_pc+2, __floor(_rj_t / 65536) % 256);
-        set_at(_rj_bc, _rj_pc+3, __floor(_rj_t / 16777216) % 256);
-      };
-    };
-    _rj_pc = _rj_pc + _rj_skip;
-  };
-};
-
-fn _bc_opcode_size(_os_tag, _os_bc, _os_pc, _os_len) {
-  // Return operand byte count for a codegen opcode
-  if _os_tag == 1 { if _os_pc + 2 <= _os_len { return 2 + __floor(__floor(_os_bc[_os_pc]) + __floor(_os_bc[_os_pc+1])*256) * 2; }; return 0; };
-  if _os_tag == 2 { if _os_pc < _os_len { return 1 + __floor(_os_bc[_os_pc]); }; return 0; };
-  if _os_tag == 7 { if _os_pc < _os_len { return 1 + __floor(_os_bc[_os_pc]); }; return 0; };
-  if _os_tag == 19 { if _os_pc < _os_len { return 1 + __floor(_os_bc[_os_pc]); }; return 0; };
-  if _os_tag == 20 { if _os_pc < _os_len { return 1 + __floor(_os_bc[_os_pc]); }; return 0; };
-  if _os_tag == 28 { if _os_pc < _os_len { return 1 + __floor(_os_bc[_os_pc]); }; return 0; };
-  if _os_tag == 9 { return 4; };
-  if _os_tag == 10 { return 4; };
-  if _os_tag == 14 { return 4; };
-  if _os_tag == 21 { return 8; };
-  if _os_tag == 25 { return 2; };
-  if _os_tag == 26 { return 4; };
-  if _os_tag == 37 { return 5; };
-  if _os_tag == 36 { if _os_pc < _os_len { return 1 + __floor(_os_bc[_os_pc]) + 1; }; return 0; };
-  if _os_tag == 38 { return 1; };   // LoadReg [slot:1]
-  if _os_tag == 39 { return 1; };   // StoreReg [slot:1]
-  if _os_tag == 40 { return 1; };
-  if _os_tag == 41 { return 0; };   // LeaveFrame (no operands)
-  // ClosureCapture (0x30 = 48): [param:1][capture:1][names...][body_len:4]
-  if _os_tag == 48 {
-    if _os_pc + 2 <= _os_len {
-      let _os_ccnt = __floor(_os_bc[_os_pc + 1]);
-      let _os_skip = 2;
-      let _os_ci = 0;
-      while _os_ci < _os_ccnt {
-        if _os_pc + _os_skip < _os_len { _os_skip = _os_skip + 1 + __floor(_os_bc[_os_pc + _os_skip]); };
-        _os_ci = _os_ci + 1;
-      };
-      return _os_skip + 4;
-    };
-    return 0;
-  };
-  return 0;
+  emit "  [cs] ast=" + __to_string(len(_cs_ast)) + " errors=" + __to_string(_cs_errors);
+  let _cs_result = compile_isolated(_cs_ast);
+  emit "  [cs] result=" + __to_string(len(_cs_result));
+  return _cs_result;
 };
 
 fn list_ol_files(_lof_dir) {
@@ -453,4 +395,87 @@ pub fn build_fat(config) {
 
 fn to_bytes(str) {
   return __str_bytes(str);
+};
+
+// relocate_jumps MUST be last function in file — Rust compiler generates
+// bad jump targets for complex if-else chains, corrupting later fn definitions.
+fn relocate_jumps(_rj_bc, _rj_len, _rj_base) {
+  // Scan bytecode, add _rj_base to all Jmp/Jz/TryBegin targets
+  // NOTE: Rust compiler has NO operator precedence (all left-to-right)
+  //       so ALL mixed +/* expressions MUST use explicit parentheses!
+  let _rj_pc = 0;
+  while _rj_pc < _rj_len {
+    let _rj_tag = __floor(_rj_bc[_rj_pc]);
+    _rj_pc = _rj_pc + 1;
+    let _rj_skip = 0;
+    if _rj_tag == 1 { if _rj_pc + 2 <= _rj_len { let _rj_slen = __floor(_rj_bc[_rj_pc]) + (__floor(_rj_bc[_rj_pc+1]) * 256); _rj_skip = 2 + (_rj_slen * 2); }; };
+    if _rj_tag == 2 { if _rj_pc < _rj_len { _rj_skip = 1 + __floor(_rj_bc[_rj_pc]); }; };
+    if _rj_tag == 7 { if _rj_pc < _rj_len { _rj_skip = 1 + __floor(_rj_bc[_rj_pc]); }; };
+    if _rj_tag == 19 { if _rj_pc < _rj_len { _rj_skip = 1 + __floor(_rj_bc[_rj_pc]); }; };
+    if _rj_tag == 20 { if _rj_pc < _rj_len { _rj_skip = 1 + __floor(_rj_bc[_rj_pc]); }; };
+    if _rj_tag == 28 { if _rj_pc < _rj_len { _rj_skip = 1 + __floor(_rj_bc[_rj_pc]); }; };
+    if _rj_tag == 9 { _rj_skip = 4; };
+    if _rj_tag == 10 { _rj_skip = 4; };
+    if _rj_tag == 26 { _rj_skip = 4; };
+    if _rj_tag == 14 { _rj_skip = 4; };
+    if _rj_tag == 21 { _rj_skip = 8; };
+    if _rj_tag == 25 { _rj_skip = 2; };
+    if _rj_tag == 37 { _rj_skip = 5; };
+    if _rj_tag == 36 { if _rj_pc < _rj_len { _rj_skip = 2 + __floor(_rj_bc[_rj_pc]); }; };
+    if _rj_tag == 38 { _rj_skip = 1; };
+    if _rj_tag == 39 { _rj_skip = 1; };
+    if _rj_tag == 40 { _rj_skip = 1; };
+    if _rj_tag == 48 {
+      if _rj_pc + 2 <= _rj_len {
+        let _rj_ccnt = __floor(_rj_bc[_rj_pc + 1]);
+        let _rj_cskip = 2;
+        let _rj_ci = 0;
+        while _rj_ci < _rj_ccnt {
+          if _rj_pc + _rj_cskip < _rj_len { _rj_cskip = _rj_cskip + 1 + __floor(_rj_bc[_rj_pc + _rj_cskip]); };
+          _rj_ci = _rj_ci + 1;
+        };
+        _rj_skip = _rj_cskip + 4;
+      };
+    };
+    if _rj_tag == 9 {
+      if _rj_pc + 4 <= _rj_len {
+        let _rj_b0 = __floor(_rj_bc[_rj_pc]);
+        let _rj_b1 = __floor(_rj_bc[_rj_pc+1]);
+        let _rj_b2 = __floor(_rj_bc[_rj_pc+2]);
+        let _rj_b3 = __floor(_rj_bc[_rj_pc+3]);
+        let _rj_t = _rj_b0 + (_rj_b1 * 256) + (_rj_b2 * 65536) + (_rj_b3 * 16777216) + _rj_base;
+        set_at(_rj_bc, _rj_pc, __floor(_rj_t) % 256);
+        set_at(_rj_bc, _rj_pc+1, __floor(_rj_t / 256) % 256);
+        set_at(_rj_bc, _rj_pc+2, __floor(_rj_t / 65536) % 256);
+        set_at(_rj_bc, _rj_pc+3, __floor(_rj_t / 16777216) % 256);
+      };
+    };
+    if _rj_tag == 10 {
+      if _rj_pc + 4 <= _rj_len {
+        let _rj_b0 = __floor(_rj_bc[_rj_pc]);
+        let _rj_b1 = __floor(_rj_bc[_rj_pc+1]);
+        let _rj_b2 = __floor(_rj_bc[_rj_pc+2]);
+        let _rj_b3 = __floor(_rj_bc[_rj_pc+3]);
+        let _rj_t = _rj_b0 + (_rj_b1 * 256) + (_rj_b2 * 65536) + (_rj_b3 * 16777216) + _rj_base;
+        set_at(_rj_bc, _rj_pc, __floor(_rj_t) % 256);
+        set_at(_rj_bc, _rj_pc+1, __floor(_rj_t / 256) % 256);
+        set_at(_rj_bc, _rj_pc+2, __floor(_rj_t / 65536) % 256);
+        set_at(_rj_bc, _rj_pc+3, __floor(_rj_t / 16777216) % 256);
+      };
+    };
+    if _rj_tag == 26 {
+      if _rj_pc + 4 <= _rj_len {
+        let _rj_b0 = __floor(_rj_bc[_rj_pc]);
+        let _rj_b1 = __floor(_rj_bc[_rj_pc+1]);
+        let _rj_b2 = __floor(_rj_bc[_rj_pc+2]);
+        let _rj_b3 = __floor(_rj_bc[_rj_pc+3]);
+        let _rj_t = _rj_b0 + (_rj_b1 * 256) + (_rj_b2 * 65536) + (_rj_b3 * 16777216) + _rj_base;
+        set_at(_rj_bc, _rj_pc, __floor(_rj_t) % 256);
+        set_at(_rj_bc, _rj_pc+1, __floor(_rj_t / 256) % 256);
+        set_at(_rj_bc, _rj_pc+2, __floor(_rj_t / 65536) % 256);
+        set_at(_rj_bc, _rj_pc+3, __floor(_rj_t / 16777216) % 256);
+      };
+    };
+    _rj_pc = _rj_pc + _rj_skip;
+  };
 };
