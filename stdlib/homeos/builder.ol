@@ -95,9 +95,16 @@ fn build_wasm(config, bytecode) {
 fn compile_all(_ca_stdlib_path) {
   let _ca_all_bc = [];
 
-  // Full build
+  // Compile bootstrap files explicitly (compile_dir corrupts dir path after 1st file)
   emit "  Compiling: bootstrap";
-  compile_dir(_ca_stdlib_path + "/bootstrap", _ca_all_bc);
+  emit "  codegen.ol...";
+  compile_one_file("stdlib/bootstrap/codegen.ol", _ca_all_bc);
+  emit "  lexer.ol...";
+  compile_one_file("stdlib/bootstrap/lexer.ol", _ca_all_bc);
+  emit "  parser.ol...";
+  compile_one_file("stdlib/bootstrap/parser.ol", _ca_all_bc);
+  emit "  semantic.ol...";
+  compile_one_file("stdlib/bootstrap/semantic.ol", _ca_all_bc);
   emit "  Compiling: stdlib root";
   compile_dir(_ca_stdlib_path, _ca_all_bc);
   emit "  Compiling: homeos";
@@ -125,6 +132,21 @@ fn compile_all(_ca_stdlib_path) {
 
 let _cd_global_count = [0];
 let _cd_max_files = [999];   // Set to N for testing, 999 for unlimited
+
+fn compile_one_file(_cof_path, _cof_output) {
+  let _cof_src = __file_read(_cof_path);
+  if len(_cof_src) == 0 { return; };
+  let _cof_bc = compile_source(_cof_src);
+  let _cof_bclen = len(_cof_bc);
+  emit "  " + _cof_path + " → " + __to_string(_cof_bclen) + " bytes";
+  if _cof_bclen > 1 {
+    if __floor(_cof_bc[_cof_bclen - 1]) == 15 { set_at(_cof_bc, _cof_bclen - 1, 18); };
+    let _cof_base = len(_cof_output);
+    if _cof_base > 0 { relocate_jumps(_cof_bc, _cof_bclen, _cof_base); };
+    let _cof_bi = 0;
+    while _cof_bi < _cof_bclen { push(_cof_output, _cof_bc[_cof_bi]); _cof_bi = _cof_bi + 1; };
+  };
+};
 
 fn compile_dir(_xcd_dir, _xcd_output) {
   let _xcd_flist = list_ol_files(_xcd_dir);
