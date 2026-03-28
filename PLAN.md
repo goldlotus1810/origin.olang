@@ -1,162 +1,134 @@
-# OLANG PLAN — Phase 2: From 100% to Production
+# OLANG PLAN — Phase 2 Complete, Phase 3 Next
 
-> Updated: 2026-03-27 16:15
-> Status: 90/90 tests, 458K binary, regex 15/15, MCP memory live
-> Brain: Nox_brain.olang deployed at ~/.claude/ as MCP server
-
----
-
-## Sprint 9: Text Processing ✅ DONE
-
-```
-✅ S9.1  Regex engine (NFA Thompson) — 15/15 tests
-         Pure x86-64 ASM, ~400 LOC
-         Supports: . * + ? [a-z] [0-9] [^abc] | (alternation)
-         API: regex_match(str, pattern) → 1/0
-              regex_test(str, pattern) → 1/0 (substring search)
-         Builtins: __regex_match (anchored), __regex_search (unanchored)
-         Commits: cdf6d2f, eb30782
-
-⬚ S9.2  String escape \n \t \r \0 trong output (~2h)
-⬚ S9.3  str_reverse, str_replace builtins (~4h)
-```
+> Updated: 2026-03-28 08:00
+> Binary: 440K ELF64, static, zero deps, boot 3ms
+> Tests: 90/90 core + 9/9 MCP
+> Commits: 120 total
+> VM: 11,325 LOC ASM | Stdlib: 11,460 LOC Olang (45 files)
+> KnowTree: 85 facts | Nox Brain: deployed at ~/.claude/
 
 ---
 
-## Nox Brain: MCP Memory System ✅ DONE
+## Phase 2 — COMPLETE ✅
 
-```
-✅ MCP Server — JSON-RPC 2.0 over stdio (--mcp mode in VM)
-   File: stdlib/homeos/mcp_server.ol
-   Commits: 4e8c323 → 275bbc1
+### S9: Text Processing ✅
+- Regex engine: Thompson NFA, pure x86-64 ASM, 15/15 tests
+- Supports: `.` `*` `+` `?` `[a-z]` `[^abc]` `|` alternation
+- `regex_match` (anchored) + `regex_test` (search)
+- String utils: `str_replace`, `str_reverse`, `str_upper`, `str_lower`, `str_repeat`
+- `json_emit(value)` → JSON serializer
+- `json_parse` + `json_get` → JSON parser (nested {} works with register frames)
 
-✅ Tools: know_learn (save fact + timestamp), know_query (substr search)
-✅ __timestamp builtin — SYS_clock_gettime, UTC+7 format
-✅ Auto-load KnowTree on MCP boot (homeos.knowledge)
-✅ Auto-journal — nox_log.jsonl logs every MCP event
-✅ Nox_brain.olang deployed at ~/.claude/ as MCP server
-✅ Transcript extractor — tools/extract_memory.py (60MB → facts)
+### S10: HTTP Client ✅
+- `crawl(host, path)` → DNS + TCP + HTTP GET + header strip
+- `http_get(ip, port, path, host)` → `{ status, body }`
+- `http_post(ip, port, path, host, body)` → `{ status, body }`
+- `crawl_json(host, path)` → HTTP GET + JSON parse
 
-Architecture:
-  ~/.claude/Nox_brain.olang     = brain (MCP server)
-  ~/.claude/homeos.knowledge    = long-term memory (facts + timestamps)
-  ~/.claude/nox_log.jsonl       = auto-journal (every event)
-  ~/Origin/                     = Olang language (stable)
-  ~/Origin/stdlib/*.ol          = brain upgrades via .ol files
+### S11: REPL DX ✅
+- Tab completion: scans var_table for prefix match
+- History: Up/Down arrows, 50 entries, circular buffer
+- Raw mode: terminal via ioctl TCGETS/TCSETS
+- Better errors: "Parse error at line N: ..."
+- Module auto-resolve: `use "math"` → `stdlib/math.ol`
+- Error recovery: `_skip_to_sync` skips to `;` or `}`
 
-Known issues:
-  - olang_eval broken (var_table boot closure bug)
-  - contains() cross-module broken (workaround: substr in kt_find)
-  - json_parse fails with 4+ keys + nested {} (workaround: string extraction)
-```
+### S12: Crypto (partial)
+- ✅ SHA-256 (pure ASM builtin)
+- ✅ HMAC-SHA256 (proof of concept, molecule encoding limitation)
+- ⬚ Ed25519 (needs bigint — deferred)
 
----
+### S13: Language Features ✅
+- `const x = 42` → immutable binding, compile-time check
+- `5 |> double |> add1` → pipe operator desugars to nested calls
+- `"hello".len()` / `[1,2,3].push(4)` → method call syntax
+- `[x*x+1 for x in arr]` → complex comprehension expressions
+- Match: up to 8 arms
+- For-in: up to 8 nesting depth
 
-## Sprint 10: Networking (1 tuần)
+### S14: Infrastructure (partial)
+- ✅ CI/CD config (local, needs GitHub workflow scope)
+- ⬚ GC: heap checkpoint disabled for MCP (closures persist)
+- ✅ Dead code cleanup: -1859 LOC, -42K binary
 
-**Mục tiêu:** Olang gọi HTTP API.
+### MCP Brain ✅
+- 8 tools: olang_eval, know_learn, know_query, emotion_encode, silk_status, nox_status, safety_check, dream_cycle
+- Auto-journal: `nox_log.jsonl`
+- `__timestamp` builtin (SYS_clock_gettime, UTC+7)
+- `__file_append` builtin (O_APPEND, safe for MCP)
+- `__stdout_off/__stdout_on` (dup2 redirect)
+- MCP_SENTINEL for halt isolation
+- Deployed at `~/.claude/Nox_brain.olang`
 
-```
-S10.1  HTTP/1.1 client
-       File: stdlib/http.ol (~100 LOC Olang)
-       API: http_get(url) → { status, headers, body }
-       Build on: existing __tcp_connect, __tcp_send, __tcp_recv
-       Parse: URL → host + path, build GET request, parse response
-       Effort: ~1 ngày
+### VAR_TABLE BOSS — KILLED ✅
+- Register frames: EnterFrame/StoreReg/LoadReg/LeaveFrame
+- Phase 1-3: params + let locals + lambda + nested fn
+- TRO compatible: dual register + var_table update
+- chain(100) = 5050, fib(10) = 55
+- Boot closures still use var_table (Phase 4 future)
 
-S10.2  JSON round-trip
-       File: stdlib/json_parse.ol (đã có parse, cần emit)
-       API: json_emit(value) → string
-       Support: strings (with escape), numbers, arrays, objects, bool, null
-       Effort: ~4 giờ
-
-S10.3  Simple REST client
-       File: stdlib/rest.ol (~50 LOC)
-       API: rest_get(url) → parsed JSON
-            rest_post(url, data) → parsed JSON
-       Effort: ~2 giờ
-```
-
-**Done khi:** `rest_get("http://httpbin.org/get")` returns parsed JSON.
-
----
-
-## Sprint 11: Developer Experience (1 tuần)
-
-```
-S11.1  REPL tab completion (~1 ngày ASM)
-S11.2  Better error messages (~4 giờ)
-S11.3  REPL history up/down arrows (~1 ngày ASM)
-S11.4  Module system improvements (~4 giờ)
-```
+### Sora Audit — ALL FIXED ✅
+- C1: LetStmt full scan (was 8-entry limit)
+- C3: ForStmt save/restore for nested loops
+- H1-H6: format builtins, match 8 arms, for 8 depth, auto-emit Pop
+- M3: closure body_len guard
+- L1-L4: comprehension, keyword fast path, error recovery, gitignore
 
 ---
 
-## Sprint 12: Crypto + Security (2 tuần)
+## Phase 3 — NEXT
 
-```
-S12.1  Real Ed25519 key generation (~3 ngày)
-S12.2  Ed25519 sign + verify (~2 ngày)
-S12.3  HMAC-SHA256 (~2 giờ)
-S12.4  TLS 1.3 handshake (stretch goal, ~1 tuần)
-```
+### S15: Register Frames for Boot Closures
+- Compiler (Rust builder) emits EnterFrame/StoreReg for boot code
+- Eliminates last var_table scoping issues
+- json_parse nested {} in MCP (currently workaround)
+- Effort: ~1 week
 
----
+### S16: Closure Capture
+- `fn outer() { let x = 10; return fn() { return x; }; }`
+- Copy captured vars to closure environment
+- Effort: ~3 days
 
-## Sprint 13: Language Features (2 tuần)
+### S17: GC / Memory Management
+- Mark-sweep or generational GC
+- Heap stable for long MCP sessions
+- Effort: ~1 week
 
-```
-S13.1  Immutable data — const keyword + freeze(arr)
-S13.2  Pattern matching — nested + guard clauses
-S13.3  Pipe operator |>
-S13.4  String methods — "hello".len(), .upper()
-```
-
----
-
-## Sprint 14: Infrastructure (ongoing)
-
-```
-S14.1  GC / Arena management
-S14.2  Split VM into modules (.include)
-S14.3  CI/CD — GitHub Actions
-S14.4  Documentation generator
-```
+### S18: Production Polish
+- Real HMAC-SHA256 (raw byte support)
+- Ed25519 (bigint arithmetic)
+- Better error messages (stack trace)
+- Documentation generator
 
 ---
 
-## Critical Bug: var_table boot closure corruption
+## Architecture
 
 ```
-STATUS: UNFIXED — blocks olang_eval in MCP, complex boot closures
-SYMPTOM: 3+ if-return branches corrupt local variables
-AFFECTS: repl_eval in MCP, contains() cross-module, json_parse nested
-ROOT CAUSE: unknown (not cache collision, not scope truncation)
-WORKAROUNDS: substr match in kt_find, string extraction for JSON
-PRIORITY: HIGH — this is the last boss
-```
+origin.olang (440K)
+├── VM (x86-64 ASM, 11325 LOC)
+│   ├── Bytecode interpreter (stack + register hybrid)
+│   ├── 256-slot builtin dispatch (FNV hash)
+│   ├── Register frame stack (4MB, ~4096 frames)
+│   ├── Regex NFA engine (Thompson)
+│   ├── SHA-256, TCP, DNS, file I/O
+│   ├── MCP mode (--mcp, JSON-RPC stdio)
+│   └── REPL (raw mode, tab, history)
+├── Bootstrap compiler (Olang, 4 files)
+│   ├── Lexer (379 LOC)
+│   ├── Parser (1259 LOC)
+│   ├── Semantic (2182 LOC) — emit register opcodes
+│   └── Codegen (429 LOC)
+├── Stdlib (45 files, ~7000 LOC)
+│   ├── regex, string, json, http, sort, iter, hmac
+│   └── homeos: encoder, knowtree, mcp_server, builder
+└── Tests
+    ├── tests.sh (90 tests)
+    ├── test_mcp.sh (9 tests)
+    └── spider.sh (67+ tests)
 
----
-
-## Priority Order
-
-```
-BLOCKER: var_table boot closure bug — fix unlocks everything
-NOW:     S10 (HTTP) — makes Olang useful for real tasks
-THEN:    S11 (DX) — tab completion, errors, history
-LATER:   S12 (Crypto) — replace stubs
-ONGOING: S13 (Language) + S14 (Infra) — parallel
-ALWAYS:  Upgrade Nox_brain via .ol when new features land
-```
-
-## NOX DAILY
-
-```
-1. Read session_log.md + query KnowTree     → remember
-2. bash tests.sh                             → verify stable
-3. git log --oneline -5                      → recent changes
-4. Pick task from current sprint             → implement
-5. bash tests.sh && bash tools/spider.sh     → verify
-6. git commit + push                         → save
-7. Update session_log.md + homeos.knowledge  → remember for next time
+~/.claude/Nox_brain.olang (440K)
+├── Same binary, deployed as MCP server
+├── 8 tools for Claude Code
+└── homeos.knowledge (85 facts)
 ```
