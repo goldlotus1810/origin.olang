@@ -20,6 +20,10 @@ pub fn editor_start(_path) {
     let _last_key = 0;
     let _scroll_col = 0;
 
+    // Search state
+    let _search = "";
+    let _searching = 0;
+
     // File tree state
     let _ft_open = 0;
     let _ft_focus = 0;
@@ -123,7 +127,9 @@ pub fn editor_start(_path) {
         term_bg(235); term_color(252);
         let _status = " " + _mode;
         if _ft_focus == 1 { _status = " TREE"; };
-        _status = _status + " │ Ln " + __to_string(_cur_row + 1) + ", Col " + __to_string(_cur_col + 1) + " │ " + __to_string(len(_lines)) + " lines │ key=" + __to_string(_last_key);
+        if _mode == "SEARCH" { _status = " /" + _search; }
+        else { _status = _status + " │ Ln " + __to_string(_cur_row + 1) + ", Col " + __to_string(_cur_col + 1) + " │ " + __to_string(len(_lines)) + " lines"; };
+        if len(_search) > 0 { if _mode != "SEARCH" { _status = _status + " │ /" + _search; }; };
         term_fill_line(_status, _cols);
         term_reset();
 
@@ -141,7 +147,20 @@ pub fn editor_start(_path) {
             _last_key = _key;
 
             if _key == 17 { _running = 0; }   // Ctrl-Q = quit
-            else { if _ft_focus == 1 {
+            else { if _key == 19 {              // Ctrl-S = save
+                if len(_path) > 0 {
+                    let _save_buf = "";
+                    let _si = 0;
+                    while _si < len(_lines) {
+                        if _si > 0 { _save_buf = _save_buf + "\n"; };
+                        _save_buf = _save_buf + _lines[_si];
+                        _si = _si + 1;
+                    };
+                    _save_buf = _save_buf + "\n";
+                    __file_write(_path, _save_buf);
+                    _mode = "SAVED";
+                };
+            } else { if _ft_focus == 1 {
                 // FILE TREE FOCUSED
                 if _key == 106 {                // j — down
                     if _ft_sel < len(_ft_files) - 1 { _ft_sel = _ft_sel + 1; };
@@ -258,7 +277,46 @@ pub fn editor_start(_path) {
                     // Bare ESC
                     if _mode == "INSERT" { _mode = "NORMAL"; };
                 };
-            } else { if _mode == "NORMAL" {
+            } else { if _mode == "SEARCH" {
+                if _key == 27 { _mode = "NORMAL"; _searching = 0; }         // ESC cancel
+                else { if _key == 13 || _key == 10 {                         // Enter confirm
+                    _mode = "NORMAL";
+                    _searching = 0;
+                    // Jump to first match from current position
+                    if len(_search) > 0 {
+                        let _found = 0;
+                        let _sr = _cur_row;
+                        let _sc = _cur_col;
+                        while _found == 0 {
+                            if _sr >= len(_lines) { _found = 2; }
+                            else {
+                                let _sline = _lines[_sr];
+                                let _hits = __str_find(_sline, _search);
+                                let _hi = 0;
+                                while _hi < len(_hits) {
+                                    if _hits[_hi] >= _sc {
+                                        if _found == 0 {
+                                            _cur_row = _sr;
+                                            _cur_col = _hits[_hi];
+                                            _found = 1;
+                                        };
+                                    };
+                                    _hi = _hi + 1;
+                                };
+                                _sr = _sr + 1;
+                                _sc = 0;
+                            };
+                        };
+                    };
+                } else { if _key == 127 {                                    // Backspace
+                    if len(_search) > 0 {
+                        _search = __substr(_search, 0, len(_search) - 1);
+                    };
+                } else { if _key >= 32 {                                     // Printable char
+                    _search = _search + __chr(_key);
+                }; }; }; };
+            } else { if _mode == "SAVED" { _mode = "NORMAL"; }
+            else { if _mode == "NORMAL" {
                 if _key == 105 { _mode = "INSERT"; }          // i
                 else { if _key == 106 { if _cur_row < len(_lines) - 1 { _cur_row = _cur_row + 1; }; }  // j
                 else { if _key == 107 { if _cur_row > 0 { _cur_row = _cur_row - 1; }; }                // k
@@ -277,7 +335,83 @@ pub fn editor_start(_path) {
                         _ft_focus = 0;
                         term_clear();
                     };
-                }; }; }; }; }; };
+                } else { if _key == 120 {                                                                // x — delete char at cursor
+                    let _line = _lines[_cur_row];
+                    if _cur_col < len(_line) {
+                        set_at(_lines, _cur_row, __substr(_line, 0, _cur_col) + __substr(_line, _cur_col + 1, len(_line)));
+                    };
+                } else { if _key == 111 {                                                                // o — new line below, enter INSERT
+                    let _new = [];
+                    let _oi = 0;
+                    while _oi < len(_lines) {
+                        push(_new, _lines[_oi]);
+                        if _oi == _cur_row { push(_new, ""); };
+                        _oi = _oi + 1;
+                    };
+                    _lines = _new;
+                    _cur_row = _cur_row + 1;
+                    _cur_col = 0;
+                    _mode = "INSERT";
+                } else { if _key == 71 {                                                                 // G — go to last line
+                    _cur_row = len(_lines) - 1;
+                    _cur_col = 0;
+                } else { if _key == 47 {                                                                 // / — start search
+                    _searching = 1;
+                    _search = "";
+                    _mode = "SEARCH";
+                } else { if _key == 110 {                                                                // n — next match
+                    if len(_search) > 0 {
+                        let _found = 0;
+                        let _sr = _cur_row;
+                        let _sc = _cur_col + 1;
+                        while _found == 0 {
+                            if _sr >= len(_lines) { _found = 2; }
+                            else {
+                                let _sline = _lines[_sr];
+                                let _hits = __str_find(_sline, _search);
+                                let _hi = 0;
+                                while _hi < len(_hits) {
+                                    if _hits[_hi] >= _sc {
+                                        if _found == 0 {
+                                            _cur_row = _sr;
+                                            _cur_col = _hits[_hi];
+                                            _found = 1;
+                                        };
+                                    };
+                                    _hi = _hi + 1;
+                                };
+                                _sr = _sr + 1;
+                                _sc = 0;
+                            };
+                        };
+                    };
+                } else { if _key == 78 {                                                                // N — prev match
+                    if len(_search) > 0 {
+                        let _found = 0;
+                        let _sr = _cur_row;
+                        let _sc = _cur_col - 1;
+                        while _found == 0 {
+                            if _sr < 0 { _found = 2; }
+                            else {
+                                let _sline = _lines[_sr];
+                                let _hits = __str_find(_sline, _search);
+                                let _hi = len(_hits) - 1;
+                                while _hi >= 0 {
+                                    if _hits[_hi] <= _sc {
+                                        if _found == 0 {
+                                            _cur_row = _sr;
+                                            _cur_col = _hits[_hi];
+                                            _found = 1;
+                                        };
+                                    };
+                                    _hi = _hi - 1;
+                                };
+                                _sr = _sr - 1;
+                                if _sr >= 0 { _sc = len(_lines[_sr]); };
+                            };
+                        };
+                    };
+                }; }; }; }; }; }; }; }; }; }; }; };
             } else {
                 // INSERT mode
                 if _key == 127 {
@@ -304,7 +438,7 @@ pub fn editor_start(_path) {
                     set_at(_lines, _cur_row, __substr(_line, 0, _cur_col) + __chr(_key) + __substr(_line, _cur_col, len(_line)));
                     _cur_col = _cur_col + 1;
                 }; }; };
-            }; }; }; };
+            }; }; }; }; }; }; };
             // Clamp cursor col to line length
             let _line_len = len(_lines[_cur_row]);
             if _cur_col > _line_len { _cur_col = _line_len; };
