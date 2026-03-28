@@ -2257,13 +2257,14 @@ pub fn get_compiled_pos() {
 
 pub fn reset_compiler() {
     set_at(_g_pos_box, 0, 0);
-    // Reset compiler stacks to prevent accumulation across files
-    let _ce_stack = __array_with_cap(512);
-    let _if_stack = __array_with_cap(512);
-    let _break_patches = [];
-    let _continue_patches = [];
-    let _ce_locals = __array_with_cap(256);
-    let _ce_lc = [0];
+    // Reset compiler stacks — use assignment (StoreUpdate) not let (Store)
+    // to update originals, not create shadows that get scope-restored
+    _ce_stack = __array_with_cap(512);
+    _if_stack = __array_with_cap(512);
+    _break_patches = [];
+    _continue_patches = [];
+    _ce_locals = __array_with_cap(256);
+    _ce_lc = [0];
     __const_names = [];
     __g_fn_slot_map = [];
     __g_fn_in_function = 0;
