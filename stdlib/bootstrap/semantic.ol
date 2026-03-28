@@ -2224,10 +2224,8 @@ pub fn analyze(ast) {
     // Validate
     validate(state);
 
-    // Save _g_pos and _g_output ref to box for compile_isolated
+    // Save results to box BEFORE this function returns (scope restore loses them)
     set_at(_g_ci_box, 0, _g_pos);
-    if len(_g_ci_box) < 2 { push(_g_ci_box, _g_output); }
-    else { set_at(_g_ci_box, 1, _g_output); };
 
     return state;
 }
@@ -2271,36 +2269,19 @@ pub fn reset_compiler() {
 
 // Isolated compilation: fresh buffer, compile, extract via box, restore
 pub fn compile_isolated(_ci_ast) {
-    // Save outer state
-    let _ci_saved_output = _g_output;
-    let _ci_saved_pos = _g_pos;
-    // Fresh buffer each time
-    _g_output = __array_range(65536);
-    _g_output_ready = 1;
+    // Save _g_output ref to box[1] so _emit_byte can find it via box
+    set_at(_g_ci_box, 1, _g_output);
     _g_pos = 0;
-    // Compile — analyze writes to _g_output, _g_pos advances
-    // After analyze returns, scope restore may truncate _g_pos.
-    // So we save _g_pos into the output array header (position 0 = size marker)
-    // HACK: wrap analyze in a helper that saves _g_pos to _g_ci_box
-    _ci_analyze_and_save(_ci_ast);
-    // Read result from box
+    analyze(_ci_ast);
+    // analyze saved _g_pos to _g_ci_box[0]
     let _ci_size = _g_ci_box[0];
-    let _ci_output_ref = _g_ci_box[1];
-    // Extract bytecode from the CORRECT output buffer (saved in box)
+    // Read from box[1] (the array _emit_byte wrote to, persists via box)
+    let _ci_ref = _g_ci_box[1];
     let _ci_result = [];
     let _ci_i = 0;
     while _ci_i < _ci_size {
-        push(_ci_result, __array_get(_ci_output_ref, _ci_i));
+        push(_ci_result, __array_get(_ci_ref, _ci_i));
         _ci_i = _ci_i + 1;
     };
-    // Restore outer state
-    _g_output = _ci_saved_output;
-    _g_pos = _ci_saved_pos;
     return _ci_result;
-}
-
-fn _ci_analyze_and_save(_cias_ast) {
-    // analyze() saves _g_pos + _g_output to _g_ci_box at its end
-    analyze(_cias_ast);
-    // DO NOT save _g_pos here — it's already been scope-restored to old value
 }
