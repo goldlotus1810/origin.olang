@@ -22,46 +22,54 @@ pub fn build(config) {
     return build_wasm(config, bytecode);
   };
 
-  // 2. Read VM code (pre-assembled binary for target arch)
+  // 2. Read VM binary (full ELF — used as-is, data appended after it)
   let vm_code = [];
   if config.vm_path != "" {
-    emit "  Reading VM: " + config.vm_path + "";
+    emit "  Reading VM: " + config.vm_path;
     vm_code = file_read_bytes(config.vm_path);
   };
-  emit "  VM code: " + __to_string(len(vm_code)) + " bytes";
+  let vm_size = len(vm_code);
+  emit "  VM: " + __to_string(vm_size) + " bytes";
 
   // 3. Read knowledge
   let knowledge = [];
   if config.kn_path != "" {
-    knowledge = file_read_bytes(config.kn_path);
+    if len(config.kn_path) > 0 { knowledge = file_read_bytes(config.kn_path); };
   };
   emit "  Knowledge: " + __to_string(len(knowledge)) + " bytes";
 
-  // 4. Pack
+  // 4. Build: VM binary + Origin Header + Bytecode + Knowledge + Trailer
+  // Layout: [VM ELF][Origin Hdr 32B][Bytecode][Knowledge][Trailer 8B]
+  let hdr_offset = vm_size;
+  let bc_offset = hdr_offset + 32;
+  let kn_offset = bc_offset + len(bytecode);
+
+  let binary = [];
+  // Copy VM binary as-is
+  concat_bytes(binary, vm_code);
+  // Origin Header (32 bytes)
   let origin_hdr = make_origin_header_arch(
-    152,                          // vm_offset (after ELF 120 + origin 32)
-    len(vm_code),
-    152 + len(vm_code),           // bc_offset
+    0,                            // vm_offset (not used — VM IS the binary)
+    vm_size,
+    bc_offset,                    // bc_offset
     len(bytecode),
-    152 + len(vm_code) + len(bytecode),  // kn_offset
+    kn_offset,                    // kn_offset
     len(knowledge),
-    0,                            // flags
+    1,                            // flags (1 = codegen format)
     arch
   );
-
-  // Concat all sections
-  let payload = [];
-  concat_bytes(payload, origin_hdr);
-  concat_bytes(payload, vm_code);
-  concat_bytes(payload, bytecode);
-  concat_bytes(payload, knowledge);
-
-  // Wrap in ELF for target arch
-  let binary = make_elf_arch(payload, 32, arch);
+  concat_bytes(binary, origin_hdr);
+  // Bytecode
+  concat_bytes(binary, bytecode);
+  // Knowledge
+  concat_bytes(binary, knowledge);
+  // Trailer: 8-byte u64 LE pointing to Origin Header
+  push_u64(binary, hdr_offset);
 
   // 5. Write output
+  emit "  Writing: " + __to_string(len(binary)) + " bytes";
   file_write_bytes(config.output, binary);
-  emit "  Output: " + config.output + " (" + __to_string(len(binary)) + " bytes)";
+  emit "  Output: " + config.output;
   emit "Done!";
 };
 
@@ -172,8 +180,17 @@ fn list_ol_files(_lof_dir) {
   return _lof_result;
 };
 
-fn file_read_bytes(path) {
-  return __file_read(path);
+fn file_read_bytes(_frb_path) {
+  // Read file as raw byte buffer, convert to byte value array
+  let _frb_buf = __file_read_bytes(_frb_path);
+  let _frb_len = __bytes_len(_frb_buf);
+  let _frb_arr = [];
+  let _frb_i = 0;
+  while _frb_i < _frb_len {
+    push(_frb_arr, __bytes_get(_frb_buf, _frb_i));
+    _frb_i = _frb_i + 1;
+  };
+  return _frb_arr;
 };
 
 fn file_read_string(_frs_path) {
