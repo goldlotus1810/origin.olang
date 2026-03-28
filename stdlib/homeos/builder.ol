@@ -138,10 +138,19 @@ fn compile_source(_cs_src) {
   let _cs_ntok = len(_cs_tokens);
   let _cs_parser = { tokens: _cs_tokens, pos: 0 };
   let _cs_ast = [];
+  let _cs_errors = 0;
   while _cs_parser.pos < _cs_ntok {
     let _cs_peek = _cs_tokens[_cs_parser.pos];
     if _cs_peek.text == "" { _cs_parser.pos = _cs_ntok; }
-    else { push(_cs_ast, parse_stmt(_cs_parser)); };
+    else {
+      let _cs_prev_pos = _cs_parser.pos;
+      try { push(_cs_ast, parse_stmt(_cs_parser)); }
+      catch { _cs_errors = _cs_errors + 1; };
+      // If parser didn't advance, skip token to prevent infinite loop
+      if _cs_parser.pos == _cs_prev_pos { _cs_parser.pos = _cs_parser.pos + 1; };
+      // Bail after too many errors
+      if _cs_errors > 10 { _cs_parser.pos = _cs_ntok; };
+    };
   };
   return compile_isolated(_cs_ast);
 };
@@ -171,8 +180,15 @@ fn file_read_string(_frs_path) {
   return __file_read(_frs_path);
 };
 
-fn file_write_bytes(path, data) {
-  __file_write(path, data);
+fn file_write_bytes(_fwb_path, _fwb_data) {
+  let _fwb_len = len(_fwb_data);
+  let _fwb_buf = __bytes_new(_fwb_len);
+  let _fwb_i = 0;
+  while _fwb_i < _fwb_len {
+    __bytes_set(_fwb_buf, _fwb_i, _fwb_data[_fwb_i]);
+    _fwb_i = _fwb_i + 1;
+  };
+  __bytes_write(_fwb_path, _fwb_buf, _fwb_len);
 };
 
 fn concat_bytes(dst, src) {
