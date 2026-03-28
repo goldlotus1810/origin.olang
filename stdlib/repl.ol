@@ -147,6 +147,18 @@ pub fn repl_eval(input) {
     if _ld_n > 0 { return "Loaded " + __to_string(_ld_n) + " facts. " + kt_stats(); };
     return "No homeos.knowledge file found.";
   }
+  // Debug command: test parsing
+  if src == "dbg_parse" {
+    let _dbg_t = tokenize("emit 42;");
+    emit "tokens=" + __to_string(len(_dbg_t));
+    let _dbg_pp = { tokens: _dbg_t, pos: 0 };
+    emit "parser created, pos=" + __to_string(_dbg_pp.pos);
+    let _dbg_pk = peek(_dbg_pp);
+    emit "peek text=" + _dbg_pk.text;
+    let _dbg_s = parse_stmt(_dbg_pp);
+    emit "parse_stmt done";
+    return "OK";
+  };
   if src == "help" {
     return "Code: let fn emit if while for match lambda | HOF: map filter reduce pipe any all | AI: learn respond memory | Self: diagnose benchmark selftest | test build exit";
   }
@@ -429,12 +441,31 @@ pub fn repl_eval(input) {
   // Phase 2: Parse
   let ast = parse(tokens);
 
-  // Parse error → try agent, or show helpful message
+  // Parse error → show message
   if _g_parse_error == 1 {
     _g_parse_error = 0;
     _boot_learn();
     return agent_respond(src);
   }
+
+  // Phase 3: Semantic analysis
+  set_at(_g_pos_box, 0, 0);
+  let state = analyze(ast);
+
+  // Phase 3.5: Show compiler warnings
+  let _re_warns = get_warnings();
+  let _re_wi = 0;
+  while _re_wi < len(_re_warns) {
+    __write_raw("\x1b[33m⚠ " + __array_get(_re_warns, _re_wi) + "\x1b[0m\n");
+    _re_wi = _re_wi + 1;
+  };
+
+  // Phase 4: Bytecode in _g_output (pre-filled array with set_at, no push)
+  let bc = _g_output;
+  if _g_pos_box[0] == 0 { return ""; }
+
+  // Phase 5: Execute compiled bytecode
+  return __eval_bytecode(bc);
 
   // Phase 3: Semantic analysis
   set_at(_g_pos_box, 0, 0);
