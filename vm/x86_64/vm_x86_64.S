@@ -10261,9 +10261,9 @@ op_halt:
     # Copy "editor_start(\"\")" into buffer
     lea     editor_cmd(%rip), %rsi
     mov     eval_buf(%rip), %rdi
-    mov     $18, %ecx                   # len("editor_start(\"\")\n")
+    mov     $23, %ecx                   # len("emit editor_start(\"\");\n")
     rep     movsb
-    mov     $18, %rax                   # total = 18 bytes
+    mov     $23, %rax                   # total = 23 bytes
     jmp     .eval_have_input
 .eval_read_stdin:
     # Read all stdin into buffer
@@ -10608,7 +10608,7 @@ print_hex_u64:
 .section .rodata
 
 dev_null_path: .asciz "/dev/null"
-editor_cmd: .ascii "editor_start(\"\")\n"
+editor_cmd: .ascii "emit editor_start(\"\");\n"
 repl_bs_seq: .byte 0x08, 0x20, 0x08       # backspace + space + backspace
 proc_self_exe:
     .asciz "/proc/self/exe"
