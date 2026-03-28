@@ -1498,13 +1498,12 @@ fn compile_expr(state, expr) {
             let _lm_body = body;
             let _lm_pcnt = len(_lm_params);
 
-            // Collect captures: outer locals that aren't lambda params
+            // Collect captures: enclosing function params that aren't lambda params
             let _lm_captures = [];
-            let _lm_outer_count = len(state.locals);
             let _lm_ci = 0;
-            while _lm_ci < _lm_outer_count {
-                let _lm_cname = __array_get(state.locals, _lm_ci);
-                // Check if it's a lambda param
+            while _lm_ci < len(_g_tro_params) {
+                let _lm_cname = __array_get(_g_tro_params, _lm_ci);
+                // Skip if it's also a lambda param
                 let _lm_is_param = 0;
                 let _lm_pi2 = 0;
                 while _lm_pi2 < _lm_pcnt {

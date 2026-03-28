@@ -2027,6 +2027,8 @@ op_call:
     mov     %rdx, (%rax, %rcx, 8)
     lea     closure_depth(%rip), %rax
     incq    (%rax)
+    lea     scope_gen(%rip), %rax
+    incq    (%rax)
     pop     %rdi
 .fnr_skip_scope:
     bt      $63, %rdi
@@ -2186,12 +2188,35 @@ op_call:
     cmp     $CAPTURED_CLOSURE_MARKER, %si
     jne     .call_skip
 
-    # Captured closure: restore captures first, then call
+    # Captured closure: scope save FIRST, then restore captures
     add     %rcx, %r13                  # PC past name bytes
     push    %r12
     push    %r13
-    # rax = heap_ptr to closure object
-    mov     %rax, %rbp                  # heap object base
+    mov     %rax, %rbp                  # save heap_ptr
+    mov     %rax, %rdi                  # body_pc placeholder (will read from heap later)
+    # Scope save (must happen BEFORE capture restore so captures are in current frame)
+    lea     boot_bc_base(%rip), %rsi
+    cmp     (%rsi), %r12
+    jne     .cc_do_scope2
+    lea     closure_depth(%rip), %rsi
+    cmpq    $0, (%rsi)
+    je      .cc_skip_scope2
+.cc_do_scope2:
+    lea     closure_depth(%rip), %rax
+    mov     (%rax), %rcx
+    push    %rdi
+    lea     var_table_base(%rip), %rsi
+    mov     (%rsi), %rsi
+    mov     (%rsi), %rdx
+    lea     scope_frame_ptrs(%rip), %rax
+    mov     %rdx, (%rax, %rcx, 8)
+    lea     closure_depth(%rip), %rax
+    incq    (%rax)
+    lea     scope_gen(%rip), %rax
+    incq    (%rax)
+    pop     %rdi
+.cc_skip_scope2:
+    # NOW restore captures (in current frame)
     mov     8(%rbp), %rcx              # capture_count
     test    %rcx, %rcx
     jz      .cc_restore_done
@@ -2199,20 +2224,24 @@ op_call:
 .cc_restore_loop:
     push    %rcx
     push    %rsi
-    # Load capture: [hash:8][ptr:8][len:8]
     mov     (%rsi), %rax               # hash
     mov     8(%rsi), %r8               # val_ptr
     mov     16(%rsi), %r9              # val_len
     call    var_store_hash              # store into var_table
     pop     %rsi
     pop     %rcx
-    add     $24, %rsi                  # next capture
+    add     $24, %rsi
     dec     %rcx
     jnz     .cc_restore_loop
 .cc_restore_done:
-    # Now call the closure body
+    # Jump to closure body
     mov     (%rbp), %rdi               # body_pc from heap object
-    jmp     .closure_do_scope           # continue with scope save + dispatch
+    bt      $63, %rdi
+    jc      .closure_is_eval
+    lea     boot_bc_base(%rip), %rsi
+    mov     (%rsi), %r12
+    mov     %edi, %r13d
+    jmp     vm_loop
 
 .call_is_closure:
     # Found closure in var_table — call it
@@ -2243,7 +2272,8 @@ op_call:
     mov     %rdx, (%rax, %rcx, 8)     # depth_stack[depth] = count
     lea     closure_depth(%rip), %rax
     incq    (%rax)                      # depth++
-    # No cache invalidation needed — count-based validation handles scope changes
+    lea     scope_gen(%rip), %rax
+    incq    (%rax)                      # scope generation++ (invalidate var cache)
     pop     %rdi                        # restore body_pc
 
 .closure_skip_scope:
@@ -6223,6 +6253,10 @@ op_ret:
     cmpq    $0, (%rsi)
     je      vm_loop                     # depth==0 → no scope (LeaveFrame handles it)
     decq    (%rsi)                      # depth--
+    push    %rsi
+    lea     scope_gen(%rip), %rdi
+    incq    (%rdi)                      # scope generation++ (invalidate var cache)
+    pop     %rsi
     # Check skip_scope_restore flag (module loading)
     lea     skip_scope_restore(%rip), %rax
     cmpq    $0, (%rax)
@@ -9750,11 +9784,13 @@ var_load_hash:
     imul    $24, %edx                   # × 24 bytes per entry
     cmp     %rax, (%rcx, %rdx)          # hash match?
     jne     .vlh_cache_miss
-    # Check var_table count hasn't changed (scope change detection)
+    # Check var_table count + scope_gen (scope change detection)
     lea     var_table_base(%rip), %rsi
     mov     (%rsi), %rsi
     mov     (%rsi), %rsi                # current count
-    cmp     %rsi, 16(%rcx, %rdx)        # count match?
+    lea     scope_gen(%rip), %rdi
+    add     (%rdi), %rsi                # count + scope_gen
+    cmp     %rsi, 16(%rcx, %rdx)        # match?
     jne     .vlh_cache_miss
     mov     8(%rcx, %rdx), %rcx         # entry_ptr
     mov     8(%rcx), %rax               # val_ptr
@@ -9785,11 +9821,15 @@ var_load_hash:
     imul    $24, %edx
     mov     %rax, (%rcx, %rdx)          # store hash
     mov     %rdi, 8(%rcx, %rdx)         # store entry pointer
-    # Store current var_table count for validation
+    # Store current var_table count + scope_gen for validation
     lea     var_table_base(%rip), %rax
     mov     (%rax), %rax
     mov     (%rax), %rax
-    mov     %rax, 16(%rcx, %rdx)        # store count
+    push    %rsi
+    lea     scope_gen(%rip), %rsi
+    add     (%rsi), %rax                # count + scope_gen
+    pop     %rsi
+    mov     %rax, 16(%rcx, %rdx)        # store count+gen
     pop     %rax
     mov     8(%rdi), %rax
     mov     16(%rdi), %rdx
@@ -11792,6 +11832,8 @@ loop_jit_cache:
     .space 512                          # 32 × [start_pc:8, native_ptr:8] = 16 bytes each
 _save_rbx:
     .space 8                            # temp save for rbx
+scope_gen:
+    .space 8                            # scope generation counter (for cache invalidation)
 scope_frame_ptrs:
     .space 32768                        # 4096 frame pointers × 8 bytes (max recursion depth)
     .align 8
