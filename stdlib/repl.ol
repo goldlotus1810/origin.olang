@@ -568,6 +568,52 @@ pub fn repl_eval(input) {
       return _disasm(_g_output, _da_len);
     };
   }
+  // Analyze: compile a file, report bytecode stats per function
+  if len(src) > 8 {
+    if __substr(src, 0, 8) == "analyze " {
+      let _an_path = __substr(src, 8, len(src));
+      let _an_src = __file_read(_an_path);
+      if len(_an_src) == 0 { return "Error: cannot read " + _an_path; };
+      // Count lines
+      let _an_lines = [1];
+      let _an_li = 0;
+      while _an_li < len(_an_src) { if __char_code(char_at(_an_src, _an_li)) == 10 { let _ = __set_at(_an_lines, 0, __array_get(_an_lines, 0) + 1); }; let _an_li = _an_li + 1; };
+      // Count pub fn / fn declarations
+      let _an_fns = [0];
+      let _an_pub = [0];
+      let _an_fi = 0;
+      while _an_fi < (len(_an_src) - 3) {
+          if substr(_an_src, _an_fi, _an_fi + 3) == "fn " {
+              let _ = __set_at(_an_fns, 0, __array_get(_an_fns, 0) + 1);
+              if _an_fi >= 4 { if substr(_an_src, _an_fi - 4, _an_fi + 3) == "pub fn " { let _ = __set_at(_an_pub, 0, __array_get(_an_pub, 0) + 1); }; };
+          };
+          let _an_fi = _an_fi + 1;
+      };
+      // Compile and measure bytecode
+      let _an_tokens = tokenize(_an_src);
+      let _an_ast = parse(_an_tokens);
+      if _g_parse_error == 1 { let _g_parse_error = 0; return _an_path + ": PARSE ERROR"; };
+      set_at(_g_pos_box, 0, 0);
+      _prefill_output();
+      analyze(_an_ast);
+      let _an_bclen = _g_pos_box[0];
+      // Count opcodes
+      let _an_pushes = [0];
+      let _an_calls = [0];
+      let _an_jumps = [0];
+      let _an_bi = 0;
+      while _an_bi < _an_bclen {
+          let _an_op = __floor(__array_get(_g_output, _an_bi));
+          if _an_op == 21 { let _ = __set_at(_an_pushes, 0, __array_get(_an_pushes, 0) + 1); let _an_bi = _an_bi + 8; };
+          if _an_op == 7 { let _ = __set_at(_an_calls, 0, __array_get(_an_calls, 0) + 1); };
+          if _an_op == 36 { let _ = __set_at(_an_calls, 0, __array_get(_an_calls, 0) + 1); };
+          if _an_op == 9 { let _ = __set_at(_an_jumps, 0, __array_get(_an_jumps, 0) + 1); let _an_bi = _an_bi + 4; };
+          if _an_op == 10 { let _ = __set_at(_an_jumps, 0, __array_get(_an_jumps, 0) + 1); let _an_bi = _an_bi + 4; };
+          let _an_bi = _an_bi + 1;
+      };
+      return _an_path + ":\n  " + __to_string(__array_get(_an_lines, 0)) + " lines, " + __to_string(__array_get(_an_fns, 0)) + " functions (" + __to_string(__array_get(_an_pub, 0)) + " pub)\n  " + __to_string(len(_an_tokens)) + " tokens → " + __to_string(_an_bclen) + " bytes bytecode\n  " + __to_string(__array_get(_an_pushes, 0)) + " pushes, " + __to_string(__array_get(_an_calls, 0)) + " calls, " + __to_string(__array_get(_an_jumps, 0)) + " jumps\n  " + __to_string(__floor(_an_bclen / __array_get(_an_fns, 0))) + " bytes/fn avg";
+    };
+  }
   // Build command: self-build (compile all .ol → pack binary)
   if src == "build" {
     return self_build();
