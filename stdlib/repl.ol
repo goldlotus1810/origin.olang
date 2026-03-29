@@ -316,7 +316,20 @@ pub fn repl_eval(input) {
     emit "[6] bc_len=" + __to_string(_g_pos_box[0]);
     return "OK";
   };
-  if src == "help" { return "NOX COMMANDS: inspect check evolve bench audit dead calls diff | read write replace append ls | build verify run test-all bc dasm analyze | study learn remember | version help exit"; }
+  if src == "help" { return "NOX COMMANDS: inspect check evolve bench profile audit dead calls diff | read write replace append ls | build verify run test-all bc dasm analyze | study learn remember | version help exit"; }
+  if src == "profile" {
+    let _pr = __profile_top(10);
+    let _pr_out = "=== CALL PROFILE (top 10) ===";
+    let _pr_i = 0;
+    while _pr_i < len(_pr) {
+      let _pr_hash = _pr[_pr_i];
+      let _pr_count = _pr[_pr_i + 1];
+      if _pr_count > 0 { _pr_out = _pr_out + "\n  " + __to_string(_pr_count) + " calls (hash " + __to_string(__floor(_pr_hash)) + ")"; };
+      _pr_i = _pr_i + 2;
+    };
+    return _pr_out;
+  }
+  if src == "profile-reset" { __profile_reset(); return "Profile counters reset."; }
   if src == "version" {
     return "Nox v0.6 — Session 6\n  binary: 837KB | tests: 194 | Gen1==Gen2\n  commits: 31 | lines: 11638 | functions: 467\n  introspection: 8 layers | self-modification: active\n  Olang self-hosting compiler + x86-64 VM";
   }
