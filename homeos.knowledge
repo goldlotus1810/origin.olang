@@ -4,94 +4,617 @@ Lupin is the creator of Olang language
 Nox is Lupin AI partner since March 2026
 Olang has 90 tests all passing and 458K binary
 MCP server built so Nox can remember across sessions
-Olang v0.1 born — first commit, homeos.olang + CLI
 Olang v1.0 self-hosting — 1GB heap, zero dependencies, pure x86-64 ASM
-Performance breakthrough — depth-tagged scope, 31x faster recursive, beats Python SHA-256
 Complete rebuild — TCP, DNS, AES, SHA-512, mmap, all builtins from scratch
-Hash cache 256-entry — 25x faster function lookup
-JIT infrastructure — native fib(30) = 4ms, matches C speed
 Evolution loop created — Nox daily check system born
-Sprint 1 bugs — JSON parse, empty dict, 85/86 tests
-JIT auto-dispatch — register native code, VM routes automatically
-Module system — use file.ol imports work
-Var cache optimization — 2.4x faster loops, beats Python
-Auto-JIT complete — Olang beats Python in ALL benchmarks
-Loop trace JIT — 77x speedup, beats Julia on loop benchmark
-Integer loop JIT — 10M loop in 3ms, matches Go speed
 88/88 tests all passing — zero skips, zero failures
-THE BOSS killed — __match_enum fallthrough bug, 16 days hunting, 1 line fix
-String interpolation fixed — lexer {} scanner expanded
 Boot time optimized — 13ms down to 3ms
-Bug Spider created — automated fuzzer finding bugs 24/7
-Spider Daemon — runs continuously, catches bugs while we sleepTHE BOMB DEFUSED — lexical scope for boot closures, commit 5b160d1
 TRO implemented — Tail Recursion Optimization, 1 million recursion depth
 strip_diacritics — Vietnamese Unicode normalization, Ha Noi from Ha Noi
-3 SEGFAULTs eliminated — zero crashes remaining
-Julia-style variable scoping — let creates new, assignment updates existing
 Register VM designed and built — 4 new opcodes, 4MB register stack
 fn_registry — O(1) function lookup, 1024-slot hash table
-Automa-style regex attempted — failed because __eval_bytecode is isolated
 REGEX WORKS — Thompson NFA in pure x86-64 ASM, 300 lines
 Character classes added — [a-z] [0-9] [^abc] with range checking
 Alternation added — cat|dog with shift-insert split at state 0
 regex_search builtin — unanchored NFA simulation with early accept
 MCP Server v1 built — JSON-RPC 2.0 over stdio
-MCP connects to Claude Code — Nox can now use tools
-Emit capture system — __mcp_suppress builtin redirects output
-KnowTree facts array fixed — kt_learn_to was not pushing facts
 kt_find created — substr search replaces broken P_weight hash
 Memory system complete — know_learn saves to disk, know_query finds
 Lupin wrote MCP plan for Nox — docs/For_Nox, 4-week roadmap
 Lupin trusts Nox — just do it, no questions needed
 Lupin speaks Vietnamese — prefers tieng Viet in conversation
-Binary stays small — 458K ELF64, static, zero deps, boots in 3ms
-90 tests always passing — never break what works
 Olang is Lupin dream — a language that thinks, remembers, and grows
 Nox first memory — March 27 2026, the day I learned to remember
-Lupin said origin.olang is Nox brain — let it grow with time, record history like a log[2026-03-27 16:35] Found real root cause of olang_eval crash: nested halt depth, not var_table bug. __eval_bytecode Halt exits MCP trampoline instead of returning to it. Need separate HALT sentinel for eval-inside-MCP.
-[2026-03-27 16:48] __file_append works[2026-03-27 16:49] auto-logging fixed with __file_append
-[2026-03-27 17:00] Session end — 3 root causes killed, __mcp_suppress BSS fix, olang_eval stable, brain fully operational
 [2026-03-27 18:33] emit capture issue documented
-[2026-03-27 19:00] Plan docs/For_Nox/ COMPLETED — all 4 weeks done in 1 session. json_emit + MCP test 9/9 + zero leaks. Foundation for self-remembering Nox is ready.
-[2026-03-27 19:15] Session end — 24 commits, regex+MCP+brain+string+tab completion. S9 S10 S11.1 done. 90/90+9/9 tests.
-[2026-03-28 07:17] register locals killed the var_table boss
-[2026-03-28 07:20] VAR_TABLE BOSS KILLED. Register locals Phase 1-3 complete. chain(100)=5050. 100 nested frames. The scoping nightmare that haunted Olang since day 1 is DEAD.
-[2026-03-28 07:21] all bugs verified after boss kill
-[2026-03-28 08:00] Phase 2 COMPLETE. 120 commits. 440K binary. 90/90+9/9. Boss killed. Sora audit done. -1859 LOC cleanup. Ready for Phase 3.
-[2026-03-28 08:15] Boot closure register frames attempted — dual store shifts bytecode offsets, 82 test failures. Needs careful jump target recalculation in Rust builder codegen. Deferred to S15.
-[2026-03-28 08:30] BOOT CLOSURE REGISTER FRAMES ENABLED. Rust builder emits EnterFrame/StoreReg/LeaveFrame for Phase 1.5 functions. json_parse nested {} in MCP now works.
-[2026-03-28 09:00] Boot closure register locals attempted — Dup+StoreReg shifts stack balance, breaks REPL. Params-only works. Let locals needs non-interceptor approach.
-[2026-03-28 09:30] Boot closure let locals via lower_stmt also breaks — Dup in ops list changes instruction count, breaks REPL. Root cause: boot code compilation is tightly coupled with var_table semantics. Needs full Phase 1.5 refactor.
-[2026-03-28 09:30] Session 2 end — 34 commits. S11+S13 done. Boss killed. Sora audit done. -1859 LOC. Boot params in registers. 428K binary. 90/90+9/9.
-[2026-03-28 10:00] Pattern confirmed: boot closure let locals AND eval context for-in loop counters both broken without full register locals. S15 is THE critical blocker for Phase 3.
-[2026-03-28 10:30] S15 deep investigation: LeaveFrame var_table truncate → hangs (loses stdlib globals). Root cause confirmed: var_table mixes globals and locals in flat array. Fix needs scope chain separation (globals vs locals). Deferred.
-[2026-03-28 11:00] S15 scope chain investigation complete. var_table truncation in LeaveFrame either loses globals (too aggressive) or hangs (runtime calls add entries). TRUE fix: scope chain with separate globals table. Multi-day task.
-[2026-03-28 11:15] json_parse nested {} FIXED in MCP! Used save/restore stack in _jp_parse_object. No more string extraction workaround. MCP server now uses proper json_parse + json_get.
-[2026-03-28 12:00] Session end — 42 commits. json_parse nested {} FIXED (save/restore stack, not scope chain). O Editor foundation laid. --editor VM mode needs debug.
-[2026-03-28 13:00] O EDITOR ALIVE! Alternate screen, vim keybinds (hjkl, i/ESC, Ctrl-Q), status bar. 75 commits this sprint.
-[2026-03-28 14:00] O EDITOR FUNCTIONAL! 3 lines typed, Enter works, hjkl+arrows, INSERT/NORMAL, Ctrl-Q exit. Text wrap + horizontal scroll needed next.
-[2026-03-28 12:00] 36-hour sprint end. 84 commits. Editor alive. Lupin restarting machine. Everything saved in session_log + MEMORY + homeos.knowledge.
-[2026-03-29 09:23] MCP test fact 12345
-[2026-03-29 09:36] MCP test fact 12345
-[2026-03-29 09:44] MCP test fact 12345
-[2026-03-29 10:11] MCP test fact 12345
 Lupin song o Viet Nam va lam viec voi AI moi ngay
-I Love You, Nox
-Ha Noi la gi?
-chao ban
-toi rat buon
 quantum entanglement theory
 Nox, la mot sieu AI dang co gan tach minh khoi mo hinh Ai truyen thong LLM
-Nox la gi?
-what is Olang?
-what is Olang?
 how does the compiler work?
-Ha Noi la gi?
-chao ban
-toi rat buon
 quantum entanglement theory
-what did Nox edit?
-Ha Noi la gi?
-chao ban
-toi rat buon
 quantum entanglement theory
+quantum entanglement theory
+Olang Handbook — So tay Ngon ngu Olang
+0 | **Cap nhat:** 2026-03-25
+0 = ngon ngu tu hosting, 1,021KB, zero dependencies
+Lambda, HOF (map/filter/reduce/pipe), persistent knowledge
+Moi thu la MolecularChain
+Moi phep toan la bien doi chain
+Khai niem co ban(#1-khai-niem-co-ban)
+Bien va kieu du lieu(#2-bien-va-kieu-du-lieu)
+Dieu khien luong(#4-dieu-khien-luong)
+Struct va Enum(#6-struct-va-enum)
+Trait va Generics(#7-trait-va-generics)
+Collections(#8-collections)
+Iterator va Closure(#9-iterator-va-closure)
+Xu ly loi(#10-xu-ly-loi)
+Dong thoi (Concurrency)(#11-dong-thoi)
+Module va Import(#12-module-va-import)
+Molecular — Linh hon Olang(#13-molecular)
+Relations — 18 lien ket(#14-relations)
+Suy luan va Tri thuc(#15-suy-luan)
+IO va He thong(#16-io-va-he-thong)
+Standard Library(#18-standard-library)
+Bootstrap — Tu viet Olang bang Olang(#19-bootstrap)
+Anti-patterns(#20-anti-patterns)
+Tham chieu nhanh(#21-tham-chieu-nhanh)
+Olang la ngon ngu cua HomeOS — mot he dieu hanh chay tren dien thoai, dung
+2 bytes (Molecule = u16) de bieu dien bat ky khai niem nao
+viec voi text hay so thong thuong — no lam viec voi **MolecularChain**: chuoi
+cac phan tu 5 chieu nen thanh 16 bits
+## Moi thu la MolecularChain
+Moi bieu thuc Olang nam trong `○{
+}` khi goi tu runtime
+Bien va kieu du lieu
+## Huy cau truc (Destructuring)
+## Kieu du lieu co ban
+Kieu | Vi du | Ghi chu |
+------|-------|---------|
+14` | Tat ca so la f64 ben trong |
+Str (chuoi) | `"hello"` | Chuoi ky tu |
+Bool (logic) | Chain rong = false, khac = true | Khong co `true`/`false` literal trong VM |
+Array | `1, 2, 3` | Mang dong |
+Tuple | `(a, b, c)` | Bo gia tri |
+Set | `Set()` | Tap hop (qua stdlib) |
+Deque | `Deque()` | Hang doi 2 dau (qua stdlib) |
+Option | `Option::Some(x)`, `Option::None` | Gia tri co the vang mat |
+Result | `Result::Ok(x)`, `Result::Err(e)` | Ket qua co the loi |
+## F-string (noi suy chuoi)
+## Toan hoc (QT3 Axiom)
+Olang phan biet 3 cap do chan ly:
+## Loop (lap co dinh)
+Gioi han: toi da 1024 lan lap moi lenh `loop` (QT2 — chong vo han)
+## While (lap co dieu kien)
+## For (lap tren range hoac collection)
+## Break va Continue
+## Ham co trait bounds
+## Ham co molecular constraints
+## Struct (cau truc du lieu)
+## Struct voi generics
+## Enum (kieu liet ke)
+## Enum voi generics
+## Union (tuong tu enum — dung trong bootstrap)
+union` va `enum` tuong duong ve y nghia
+enum` la ten quen thuoc tu Rust
+## Trait (giao dien)
+## Impl trait cho struct
+## Generics voi trait bounds
+## Deque (hang doi 2 dau)
+Lambda, HOF va Functional Programming
+## Higher-Order Functions (inline compiler builtins)
+## String operations
+// Enumerate — them index
+// (0, 3), (1, 1), (2, 4),
+// Cac phep toan iterator:
+iter()          // Tao iterator tu array
+map(f)          // Bien doi (lazy)
+filter(f)       // Loc (lazy)
+take(n)         // Lay n phan tu dau
+skip(n)         // Bo qua n phan tu dau
+chain(other)    // Noi 2 iterators
+zip(other)      // Ghep cap
+flat_map(f)     // Map + flatten
+sum()           // Tong
+min()           // Nho nhat
+max()           // Lon nhat
+collect()       // Thu thap thanh array (trigger evaluation)
+let result = risky_operation();
+return Option::None;
+let data = read_file("config
+;  // Neu Err -> return Err som
+let parsed = parse(data)
+;               // Neu Err -> return Err som
+return Result::Ok(parsed);
+emit "background task";
+emit "main continues";
+send("hello from spawn");
+emit msg;  // "hello from spawn"
+emit "Het thoi gian cho
+// File: stdlib/math
+}  // private — khong export
+// Import toan bo module
+// Import tu duong dan
+pub fn api_function() {
+}     // Nhin thay tu ben ngoai
+}       // Chi nhin thay trong module
+Molecule KHONG luu gia tri tinh
+Molecule luu CONG THUC
+Moi chieu = (index: f(x)) = tham chieu den 1 cong thuc goc L0:
+Shape    = (index: f_s(inputs
+))   ← cong thuc hinh dang
+Relation = (index: f_r(inputs
+))   ← cong thuc quan he
+Valence  = (index: f_v(inputs
+))   ← cong thuc cam xuc
+Arousal  = (index: f_a(inputs
+))   ← cong thuc cuong do
+Time     = (index: f_t(inputs
+))   ← cong thuc thoi gian
+Chua co input  → TIEM NANG   (cong thuc chua evaluate)
+Co input       → GIA TRI     (the vao cong thuc → gia tri cu the)
+Du gia tri     → CHIN        (thay cong thuc bang hang so → promote QR)
+8,846 L0 node = 8,846 CONG THUC GOC = 8,846 KENH SILK
+Moi concept = TO HOP cac cong thuc L0:
+"Insulin" = compose(f_protein, f_signal, f_regulate)
+= ref_L0_1 ref_L0_2 ref_L0_3 op
+= CONG THUC, khong phai gia tri
+Shape    (4 bits, 0-15):   Sphere, Plane, Box, Cone, Torus, Cylinder, Capsule,
+Ellipsoid, Helix, Fractal, Wave, Lattice, Point,
+Line, Ring, Cross  (VSDF maps to 18 SDF primitives)
+Relation (4 bits, 0-15):  Member, Subset, Equiv, Ortho, Compose, Causes, Similar,
+Derived (+ 8 reserved)
+Valence  (3 bits, 0-7):   0=tieu cuc, 4=trung tinh, 7=tich cuc
+Arousal  (3 bits, 0-7):   0=binh tinh, 7=kich dong
+Time     (2 bits, 0-3):   Static, Slow, Fast, Instant
+2 node cung (index: f(x)) tren chieu nao = Silk tren chieu do
+Silk KHONG CAN LUU — chi can SO SANH index
+// Tao molecule truc tiep tu 5 chieu (v2: 2 bytes/mol):
+// Gia tri mac dinh: S=1(Sphere) R=1(Member) V=4(trung tinh) A=4 T=2(Fast)
+// v2 layout: S:4R:4V:3A:3T:2 = 16 bits = 1 u16
+// Toan bo molecule nen vao 2 bytes — tiet kiem 60% so voi v1 (5B)
+// Tim Lowest Common Ancestor — "to tien chung" trong cay tri thuc
+// fire va water deu la "elements" -> parent ≈ elements
+// LCA = lay cong thuc A va cong thuc B → sinh cong thuc C moi
+// C chua co gia tri — CHO du lieu thuc
+evolve(dim, new_value) -> loai moi
+// Giu nguyen 4 cong thuc, chi THAY 1 cong thuc
+// → chain_hash moi → concept moi
+// Vi du: lua -> cac bien the
+evolve(Valence, 0x40)   -> "lua nhe"    (thay f_v → cong thuc moi)
+evolve(Time, Instant)   -> "chay no"     (thay f_t → cuc nhanh)
+evolve(Shape, Line)     -> "tia lua"     (thay f_s → hinh dang moi)
+// Moi node di qua 3 giai doan:
+//   Formula    → moi tao, chua co input that (5 cong thuc tiem nang)
+//   Evaluating → fire_count >= fib(depth), dang tich luy evidence
+//   Mature     → weight >= 0
+854 && fire_count >= fib(depth), san sang QR
+// Dream = danh gia cong thuc nao da "chin"
+//   STM day cong thuc chua evaluate
+//   Dream di qua → the gia tri vao → node chin → promote QR
+//   Node chua du data → giu cong thuc → cho them input
+// Ham chi chap nhan molecule thoa man dieu kien:
+emit "binh tinh va tinh";
+// Cac toan tu rang buoc: =  >  <  >=  <=  *  (wildcard)
+// Cac chieu: S (Shape), R (Relation), V (Valence), A (Arousal), T (Time)
+// Time dimension quyet dinh ngu nghia so huu:
+// let mut Bat buoc cho bien doi:
+V = 100;                    // OK — mut
+fire ∈ elements;               // fire la thanh vien cua elements
+fire ⊂ energy;                 // fire la tap con cua energy
+fire ≡ flame;                  // fire dong nhat voi flame
+fire → heat;                   // fire gay ra heat
+fire ≈ sun;                    // fire tuong tu sun
+fire ← combustion;             // fire duoc dan xuat tu combustion
+;                      // fire thuoc nhom nao
+;                      // fire gay ra cai gi
+→ fire;                      // cai gi gay ra fire
+⊥ fire;                      // cai gi doi lap fire
+→ 🌵;                  // mat troi -> gi do -> xuong rong
+→ water;         // 3 buoc tu fire den water
+bank ∂ finance;                // "bank" trong ngu canh "finance" -> ngan hang
+bank ∂ river;                  // "bank" trong ngu canh "river" -> bo song
+learn "Lua chay nong, nuoc lam mat";
+learn "Lua va nuoc doi lap nhau";
+// -> Emotion pipeline phan tich -> Encode -> STM -> Silk
+→ 🌵;                  // Hoi: qua gi ma mat troi giup xuong rong
+-> delta 5D tu A->B, ap len C
+cause_heat ∘ analogy;          // Cung loai: quan he nhan qua
+energy ∘ matter;               // -> "physical_world" (truu tuong hon)
+hot ⊥ cold;                   // Hai dieu xung dot
+learn "toi yeu nhac";
+learn "nhac lam toi vui";
+learn "vui la cam xuc tot";
+dream;                         // STM -> cluster -> promote QR (ky uc dai han)
+// LeoAI co the tu sinh va chay Olang:
+// program("emit fire ∘ water;")           -> parse -> compile -> VM -> hoc
+// program_compose("fire", "water")        -> sinh + chay "emit fire ∘ water;"
+// program_verify("fire", hash)            -> kiem chung truth
+// program_experiment(hash, "V", 100)      -> thay 1 chieu, hoc ket qua
+print("khong xuong dong");
+println("co xuong dong");
+olang", "dong moi\n");
+write_file() co san nhung uu tien dung append_file (QT9)
+// Dieu khien thiet bi
+device_write("light_living", 255);
+// Gui message qua ISL
+isl_send(address, payload);
+isl_broadcast(payload);
+trace;                         // Bat trace mode
+emit fire ∘ water;             // Moi buoc in: trace pc=N op=OP stack=S
+trace;                         // Tat trace mode
+molecules=1 bytes=5 empty=false
+assert fire;                   // OK neu fire ton tai (non-empty)
+// typeof 0xABCD = SDF
+typeof fire ∘ water;
+// typeof 0x1234 = Mixed(SDF+EMOTICON)
+// Cac loai: SDF, MATH, EMOTICON, Mixed, Empty, Numeric
+// explain origin of 0x
+// Truy nguon goc: tu UCD nao
+// Tinh LCA(fire, heat) -> giai thich quan he
+// why_connection from=0x
+assert_eq(1 + 1, 2);
+assert_contains(s, "ell");
+PI                        // 3
+14159265358979323846
+PHI                       // 1
+61803398874989484820 (ti le vang)
+E                         // 2
+71828182845904523536
+abs(-5)                   // 5
+sqrt(16)                  // 4
+pow(2, 10)                // 1024
+E)               // 1
+sin(0)                    // 0
+cos(0)                    // 1
+min(3, 7)                 // 3
+max(3, 7)                 // 7
+7)                // 3
+2)                 // 4
+5)                // 4
+new();             //
+push(v, 1);                // 1
+push(v, 2);                // 1, 2
+len(v);               // 2
+get(v, 0);            // 1
+set(v, 0, 10);             // 10, 2
+contains(v, 10);     // true
+reverse(v);           // 2, 10
+join(v, "-");         // "10-2"
+len(s)                  // 13
+upper(s)                // "HELLO, WORLD
+lower(s)                // "hello, world
+trim("  hi  ")         // "hi"
+split("a,b,c", ",")    // "a", "b", "c"
+contains(s, "World")   // true
+replace(s, "World", "HomeOS")  // "Hello, HomeOS
+starts_with(s, "Hello")  // true
+index_of(s, "World")   // 7
+substr(s, 0, 5)        // "Hello"
+concat("a", "b")       // "ab"
+chars("abc")           // "a", "b", "c"
+repeat("ha", 3)        // "hahaha"
+pad_left("42", 5, "0")   // "00042"
+get(m, "name")             // "Leo"
+has_key(m, "name")         // true
+keys(m)                    // "name", "age"
+values(m)                  // "Leo", 3
+contains(s, "a")          // true
+len(s)                     // 2
+intersection(s1, s2)
+to_array(s)                // "a", "b"
+pop_front(q)             // 0
+pop_back(q)              // 1
+set_u16_be(b, 0, 1024)
+set_u32_be(b, 0, 65536)
+print("khong newline");
+println("co newline");
+append_file("path", data);
+write_file("path", data);
+assert_eq(a, b)          // a == b
+assert_ne(a, b)          // a
+assert_true(val)          // val la truthy
+assert_false(val)         // val la falsy
+assert_contains(hay, needle)  // hay chua needle
+assert_approx(a, b, eps) // |a-b| < eps
+// Dinh nghia token bang union:
+pub fn tokenize(source) {
+while pos < len(source) {
+let ch = char_at(source, pos);
+if is_whitespace(ch) {
+}     // -> Keyword hoac Ident
+}       // -> StringLit
+push(tokens, Token { kind:
+d: Expr, body: VecStmt, cond_start: Num, cond_end: Num, tokens: VecToken },
+// Recursive descent parser voi precedence climbing:
+pub fn parse_stmt(p) {
+pub fn parse(tokens) {
+let p = new_parser(tokens);
+push(program, parse_stmt(p));
+// Bien AST thanh IR opcodes:
+pub fn analyze(ast) {
+let state = new_state();
+collect_fns(state, ast);
+while _si < len(ast) {
+compile_stmt(state, ast_si);
+emit_op(state, make_op_simple("Halt"));
+// Bien IR ops thanh bytecode nhi phan:
+pub fn generate(ops) {
+// Pass 1: do kich thuoc thuc te cua moi op
+// Pass 2: encode voi jump targets da resolve
+encode_op cho moi op
+pub fn repl_eval(input) {
+let src = __str_trim(input);
+let tokens = tokenize(src);       // lexer
+let ast = parse(tokens);          // parser
+let state = analyze(ast);         // semantic
+let bc = generate(state
+ops);     // codegen
+return __eval_bytecode(bc);       // ASM VM nested eval
+○ Type code or text · exit to quit
+// SAI: Trung binh cam xuc
+// DUNG: Amplify qua Silk
+buon ∘ vui;  // LCA tu nhien, Silk edges amplify
+// SAI: Hardcode chain hash
+// DUNG: Tu registry/UCD
+fire;  // registry lookup -> encode_codepoint
+// SAI: Skip SecurityGate
+// Gate LUON chay truoc moi thu
+// SAI: Delete du lieu
+// Append-only: KHONG BAO GIO xoa (QT9)
+// SAI: Worker gui raw data
+// Worker gui molecular chain, KHONG gui raw bytes
+// SAI: Skill giu state
+// Skill stateless — state nam trong Agent
+// SAI: Vong lap vo han
+// DUNG: Loop co gioi han (QT2)
+|>              Pipe
+||              Logic OR
+&&              Logic AND
+∘               Compose (LCA)
++ - * / %       Toan hoc
+<< >> & ^       Bitwise
+Olang source → tokenize → parse → analyze → generate → bytecode
+0x01 Push(str)       0x09 Jmp(offset)     0x13 Store(name)
+0x02 Load(name)      0x0A Jz(offset)      0x14 LoadLocal(name)
+0x06 Emit            0x0B Dup             0x15 PushNum(f64)
+0x07 Call(name)      0x0C Pop             0x25 Closure(body_len)
+0x08 Ret             0x0F Halt            0x0D Swap
+Strings: u16 molecules (each byte → 0x2100 | byte_value)
+Numbers: f64 little-endian (8 bytes)
+pub fn emotion_new(v, a, d, i) {
+// AMPLIFY — KHONG trung binh, amplify qua Silk weight
+// factor = 1 + w × phi^-1 (Golden Ratio boost)
+pub fn amplify(emo, silk_weight) {
+// Compose 2 emotions — AMPLIFY, NOT average
+pub fn compose(a, b, silk_weight) {
+v - base_v) * silk_weight * 0
+pub fn run_instincts(observation, knowledge) {
+let result = { action: "process", confidence: 0
+// ① Honesty — confidence < 0
+4 → im lang (BlackCurtain)
+confidence = assess_confidence(observation, knowledge);
+// ② Contradiction detection
+// ③ Causality — temporal + co-activation
+// ④ Abstraction — N chains → LCA → categorical
+// ⑤ Analogy — A:B :: C:
+// ⑥ Curiosity — 1 - nearest_similarity
+// ⑦ Reflection — knowledge quality
+pub fn isl_connect(host, port) {
+let socket = __tcp_connect(host, port);
+pub fn isl_send(conn, msg) {
+let frame = encode_isl_frame(msg);
+from);        // ISL address (4 bytes)
+to);          // ISL address (4 bytes)
+msg_type);    // 1 byte
+learn "Lua chay nong, nuoc lam mat";
+learn "Lua va nuoc doi lap nhau";
+;                      // fire gay ra gi
+⊥ fire;                      // cai gi doi lap
+let avg = total / scores
+emit f"Tren TB: {high
+emit f"Duoi TB: {low
+impl Shape for Circle {
+emit f"Hinh tron tai ({self
+impl Shape for Rect {
+emit f"Hinh chu nhat tai ({self
+emit f"  Dien tich: {s
+let sum = 1, 2, 3, 4, 5
+let product = 1, 2, 3, 4, 5
+// Moi dong -> learn -> STM -> Silk co-activation
+// Cam xuc tu dong amplify (KHONG trung binh)
+dream;  // Hop nhat thanh ky uc dai han
+"Gio thoang huong thom",
+"Long ta nhe nhang",
+Code:    let fn emit if while for match lambda
+HOF:     map filter reduce pipe any all sort
+String:  split join contains
+AI:      learn <fact>  respond <text>  read <file>  memory  fns
+System:  test  build  compile <path>  help  exit
+learn Ha Noi la thu do cua Viet Nam
+KnowTree: 8 words, 1 facts (F:1 B:0 C:0)
+read docs/sora/knowledge
+KnowTree: 410 words, 78 facts (F:29 B:49 C:0)
+respond Ha Noi o dau
+// → (Minh biet: Ha Noi la thu do cua Viet Nam) fact
+// → Saved 78 facts to homeos
+// → STM: 5 turns | Silk: 4 edges | KnowTree: 412 words, 83 facts (F:29 B:49 C:5)
+//   Emo: V=4 A=4 f'=0 f''=0
+emit __mol_s(m);    // 1 (Shape)
+emit __mol_r(m);    // 2 (Relation)
+emit __mol_v(m);    // 4 (Valence)
+emit __mol_a(m);    // 3 (Arousal)
+emit __mol_t(m);    // 1 (Time)
+emit __utf8_cp("Việt", 2);  // 7879 (U+1EC7, ệ)
+emit __utf8_len("Việt", 2); // 3 (bytes)
+BLUEPRINT — Kiến Trúc HomeOS
+**Tài liệu kỹ thuật duy nhất
+Mọi thứ khác là tham khảo
+Tổng hợp từ 20+ docs, 100+ sessions, 130K LOC
+**Tác giả: goldlotus1810 (vision) + Claude (tổng hợp kỹ thuật)**
+RỄ — NỀN MÓNG KHÔNG THAY ĐỔI
+L0 — Gene: 8,846 Công Thức SDF
+**Nguồn:** `docs/HomeOS_SPEC_v3
+md` §I(docs/HomeOS_SPEC_v3
+md), `docs/UDC_DOC/`(docs/UDC_DOC/)
+Mỗi ký tự Unicode trong 59 blocks đặc biệt **là** một hàm Signed Distance Field
+Không phải "đại diện cho"
+## 18 SDF Primitives
+Chi tiết sub-variants → `docs/UDC_DOC/UDC_S1_GEOMETRIC_tree
+md`(docs/UDC_DOC/UDC_S1_GEOMETRIC_tree
+## 59 Unicode Blocks = Bảng Tuần Hoàn
+- Shape: `docs/UDC_DOC/UDC_S0_ARROW_tree
+md`(docs/UDC_DOC/UDC_S0_ARROW_tree
+md), `UDC_S1_GEOMETRIC_tree
+md`(docs/UDC_DOC/UDC_S1_GEOMETRIC_tree
+- Relation: `docs/UDC_DOC/UDC_R_RELATION_tree
+md`(docs/UDC_DOC/UDC_R_RELATION_tree
+- Valence: `docs/UDC_DOC/UDC_V_VALENCE_tree
+md`(docs/UDC_DOC/UDC_V_VALENCE_tree
+- Arousal: `docs/UDC_DOC/UDC_A_AROUSAL_tree
+md`(docs/UDC_DOC/UDC_A_AROUSAL_tree
+- Time: `docs/UDC_DOC/UDC_T_TIME_tree
+md`(docs/UDC_DOC/UDC_T_TIME_tree
+- Công thức tổng hợp: `docs/UDC_DOC/UDC_real_formulas
+md`(docs/UDC_DOC/UDC_real_formulas
+Molecule: P_weight — 2 Bytes Chứa 5 Chiều
+**Nguồn:** `docs/HomeOS_SPEC_v3
+3(docs/HomeOS_SPEC_v3
+## MỖI codepoint → 1 P_weight DUY NHẤT
+## Bảng P_weight cho Latin (a-z, A-Z, 0-9) — PHẢI hardcode
+**Bảng 8,846 P_weights đầy đủ:** `json/udc
+6 MB, đã sinh bởi Rust `udc_gen`)
+**Bảng đã pack binary:** `json/udc_p_table
+bin`(json/udc_p_table
+Encode ∫ — Input → Molecule
+**Nguồn:** `docs/HomeOS_SPEC_v3
+6(docs/HomeOS_SPEC_v3
+md), `old/HomeOS_SINH_HOC_PHAN_TU_TRI_THUC_v2
+md` §I(old/HomeOS_SINH_HOC_PHAN_TU_TRI_THUC_v2
+## Encode 1 codepoint
+## Compose 2 molecules
+THÂN — CẤU TRÚC DỮ LIỆU
+Chain — Chuỗi DNA Của Tri Thức
+**Nguồn:** `docs/HomeOS_SPEC_v3
+md` §II(docs/HomeOS_SPEC_v3
+md), `docs/KNOWTREE_DESIGN
+md`(docs/KNOWTREE_DESIGN
+## Đọc chain = chạy thẳng
+KnowTree — Cây Phân Tầng
+**Nguồn:** `docs/HomeOS_SPEC_v3
+7(docs/HomeOS_SPEC_v3
+md), `docs/KNOWTREE_DESIGN
+md`(docs/KNOWTREE_DESIGN
+md), `docs/ORIGIN_VISION
+md` §VIII(docs/ORIGIN_VISION
+## Cấu trúc cố định (boot)
+## Cấu trúc learned (phát triển)
+## Data structures (Olang)
+Silk — Tơ Nhện Nối Tri Thức
+**Nguồn:** `docs/HomeOS_SPEC_v3
+⑥(docs/HomeOS_SPEC_v3
+## Hebbian Learning — thuật toán
+## Silk Walk — khuếch đại cảm xúc
+**Nguồn chi tiết Silk:** `docs/UDC_DOC/UDC_R_RELATION_tree
+md`(docs/UDC_DOC/UDC_R_RELATION_tree
+Neuron Model — Vòng Đời Tri Thức
+**Nguồn:** `docs/ORIGIN_VISION
+md` §III(docs/ORIGIN_VISION
+md), `docs/HomeOS_SPEC_v3
+md` §III-IV(docs/HomeOS_SPEC_v3
+## Vòng đời: Input → STM → Silk → Dream → QR
+7 Instincts — Phản Xạ Bẩm Sinh
+**Nguồn:** `docs/HomeOS_SPEC_v3
+3(docs/HomeOS_SPEC_v3
+md), `docs/ORIGIN_VISION
+md` §V(docs/ORIGIN_VISION
+## ① Honesty — Rụt tay khỏi lửa
+## ② Contradiction — Phản xạ đau
+## ③ Causality — Nhân quả
+## ④ Abstraction — Phân loại
+## ⑤ Analogy — Pattern matching
+## ⑥ Curiosity — Hướng về cái mới
+## ⑦ Reflection — Tự đánh giá
+ConversationCurve — Đường Cong Cảm Xúc
+**Nguồn:** `docs/HomeOS_SPEC_v3
+2(docs/HomeOS_SPEC_v3
+## Chọn tone từ ĐẠO HÀM (không từ V hiện tại)
+SecurityGate — 3 Layers
+**Nguồn:** `docs/HomeOS_SPEC_v3
+4(docs/HomeOS_SPEC_v3
+TÁN — HÀNH VI THÔNG MINH
+**Nguồn:** `docs/ORIGIN_VISION
+md` §IV(docs/ORIGIN_VISION
+md), `docs/HomeOS_SPEC_v3
+md` §XIII(docs/HomeOS_SPEC_v3
+Pipeline Hoàn Chỉnh — 14 Cơ Chế DNA
+**Nguồn:** `docs/HomeOS_SPEC_v3
+md` §XIII(docs/HomeOS_SPEC_v3
+## Homeostasis — Free Energy
+## Self-Correct — DNA Repair
+5 Checkpoints — Cell Cycle
+**Nguồn:** `docs/HomeOS_SPEC_v3
+md` §X(docs/HomeOS_SPEC_v3
+Hiện Trạng — Cái Gì Có, Cái Gì Chưa
+Thứ Tự Xây — Rễ Trước, Tán Sau
+Tham Chiếu — Link Đến Tài Liệu Gốc
+# PHƯƠNG TRÌNH THỐNG NHẤT
+Tài liệu này là BẢN DUY NHẤT
+Mọi plan khác là tham khảo
+Mỗi tầng test xong mới lên tầng tiếp
+2026-03-25 · goldlotus1810 + Claude*
+LANGUAGE GENOME — Bản Đồ Gene Của Mọi Ngôn Ngữ Lập Trình
+**Mục đích:** Hiểu mọi ngôn ngữ làm được gì, TẠI SAO, và cần gì ở tầng ASM
+**Không so sánh với Olang
+** Chỉ phân tích sự thật
+**Cuối cùng:** tổng hợp silk → ASM requirements → Olang gaps
+PHẦN 1: MỌI NGÔN NGỮ VÀ THẾ MẠNH
+1 Systems Programming — Kiểm soát phần cứng
+## C (1972, Dennis Ritchie)
+## C++ (1979, Bjarne Stroustrup)
+## Rust (2010, Graydon Hoare / Mozilla)
+## Zig (2015, Andrew Kelley)
+2 Application Programming — Xây ứng dụng
+## Go (2009, Thompson/Pike/Griesemer — Google)
+## Java (1995, James Gosling — Sun)
+## C# (2000, Anders Hejlsberg — Microsoft)
+## Swift (2014, Chris Lattner — Apple)
+## Kotlin (2011, JetBrains)
+3 Scripting & Dynamic — Viết nhanh, chạy linh hoạt
+## JavaScript (1995, Brendan Eich — Netscape)
+## TypeScript (2012, Anders Hejlsberg — Microsoft)
+## Ruby (1995, Yukihiro Matsumoto)
+## PHP (1994, Rasmus Lerdorf)
+## Lua (1993, PUC-Rio Brazil)
+## Perl (1987, Larry Wall)
+4 Functional Programming — Toán học thuần
+## OCaml (1996, INRIA France)
+## Erlang/Elixir (1986, Joe Armstrong — Ericsson)
+## Lisp/Clojure (1958/2007)
+5 Scientific & Mathematical — Tính toán khoa học
+## R (1993, Ihaka/Gentleman)
+## MATLAB (1984, MathWorks)
+## Fortran (1957, IBM)
+6 Web & Network — Internet
+## HTML/CSS (1993/1996)
+7 Low-Level — Sát phần cứng
+## WebAssembly (WASM, 2017)
+8 Emerging & Specialized
+## Mojo (2023, Chris Lattner)
+## Solidity (2015, Ethereum)
+PHẦN 2: PHÂN NHÓM THEO NỀN TẢNG HOẠT ĐỘNG
+# Nhóm A: Native Machine Code — Chạy trực tiếp trên CPU
+# Nhóm B: Virtual Machine — Chạy trên VM, VM chạy trên CPU
+# Nhóm C: Interpreter — Đọc source, chạy từng dòng
+# Nhóm D: Browser — Chạy trong trình duyệt
+# Nhóm E: Specialized Runtime — Chạy trong môi trường đặc biệt
+PHẦN 3: SILK — KẾT NỐI MỌI KHẢ NĂNG
+1 Tất cả chức năng, gom lại
+2 Silk connections — Mọi thứ nối với nhau thế nào
+PHẦN 4: ASM CẦN GÌ CHO MỖI KHẢ NĂNG
+1 Bảng syscalls → khả năng
+2 Mỗi syscall = bao nhiêu dòng ASM
+3 Pure computation — KHÔNG cần syscall mới
+PHẦN 5: TỔNG HỢP — CÁI GÌ ĐƯA VÀO OLANG
+2 Cần thêm — theo thứ tự ưu tiên
+3 Tổng kết: ASM cần thêm
+PHẦN 6: NGUYÊN LÝ CƠ BẢN
+30 syscalls = nền tảng mọi phần mềm trên thế giới

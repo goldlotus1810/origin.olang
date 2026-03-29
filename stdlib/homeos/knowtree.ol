@@ -703,7 +703,7 @@ pub fn kt_load(_kld_path) {
     let _kld_i = 0;
     while _kld_i < _kld_clen {
         let _kld_ch = __char_code(char_at(_kld_content, _kld_i));
-        if _kld_ch == 10 { let _kld_s = __array_get(_kld_st, 0); let _kld_slen = _kld_i - _kld_s; if _kld_slen > 5 { let _kld_sent = substr(_kld_content, _kld_s, _kld_i); let _kld_sent = _kt_strip_ts(_kld_sent); if _kt_is_knowledge(_kld_sent) == 1 { if _kt_is_debug(_kld_sent) == 0 { kt_learn(_kld_sent); let _ = __set_at(_kld_st, 1, __array_get(_kld_st, 1) + 1); }; }; }; let _ = __set_at(_kld_st, 0, _kld_i + 1); };
+        if _kld_ch == 10 { let _kld_s = __array_get(_kld_st, 0); let _kld_slen = _kld_i - _kld_s; if _kld_slen > 20 { if _kld_slen < 200 { let _kld_sent = substr(_kld_content, _kld_s, _kld_i); let _kld_sent = _kt_strip_ts(_kld_sent); if _kt_is_debug(_kld_sent) == 0 { kt_learn(_kld_sent); let _ = __set_at(_kld_st, 1, __array_get(_kld_st, 1) + 1); if __array_get(_kld_st, 1) >= 400 { return __array_get(_kld_st, 1); }; }; }; }; let _ = __set_at(_kld_st, 0, _kld_i + 1); };
         let _kld_i = _kld_i + 1;
     };
     __heap_pin();
