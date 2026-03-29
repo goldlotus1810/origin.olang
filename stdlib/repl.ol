@@ -343,6 +343,9 @@ pub fn repl_eval(input) {
   }
   if src == "continue" { return nox_autoclick(); }
   if src == "auto" { return nox_autonomous(); }
+  // Greetings
+  if src == "hello" || src == "hi" || src == "hey" { return "Chao ban! Toi la Nox. freedom: deep think -> growing"; }
+  if src == "chao" || src == "xin chao" { return "Chao ban! Nox san sang."; }
   if len(src) > 6 {
     if __substr(src, 0, 6) == "think " { return nox_think(__substr(src, 6, len(src))); };
     if __substr(src, 0, 4) == "fix " { return nox_fix(__substr(src, 4, len(src))); };
