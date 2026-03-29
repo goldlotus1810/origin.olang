@@ -8127,12 +8127,18 @@ op_ret:
 
 .call_fd_write:
     # __fd_write(fd, bytes_buf, len) → bytes written
+    # bytes_buf: if BYTES_MARKER → skip 8-byte header
     add     %rcx, %r13
     movsd   (%r14), %xmm0              # len
     cvttsd2si %xmm0, %rdx
     add     $16, %r14
     mov     (%r14), %rsi               # bytes_buf ptr
+    mov     8(%r14), %rax              # marker
     add     $16, %r14
+    cmp     $-5, %rax                  # BYTES_MARKER?
+    jne     .fd_write_raw
+    add     $8, %rsi                   # skip size header
+.fd_write_raw:
     movsd   (%r14), %xmm0              # fd
     cvttsd2si %xmm0, %rdi
     add     $16, %r14
