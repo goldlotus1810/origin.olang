@@ -12348,7 +12348,7 @@ rx_alt_patch:
 fn_registry_count:
     .space 8                            # number of registered functions
 try_stack:
-    .space 2048                         # 64 try frames × 32 bytes
+    .space 131072                       # 4096 try frames × 32 bytes (handles Rust-bootstrap try_depth leak)
 try_depth:
     .space 8                            # current try nesting depth (0 = no try)
 throw_buf:
