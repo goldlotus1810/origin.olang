@@ -341,8 +341,26 @@ pub fn repl_eval(input) {
     _st = _st + "\n  binary: 881KB";
     return _st;
   }
-  // (dump command removed)
-  if src == "diagnose" || src == "diag" { return self_diagnostic(); }
+  if src == "wake" {
+    let _w = [];
+    push(_w, "=== NOX WAKING UP ===");
+    push(_w, "  health: math=" + __to_string(__floor(__exp(0))) + " sha=" + __to_string(len(__sha256("abc"))));
+    push(_w, "  heap: " + __to_string(__floor(__heap_used() / 1024)) + "KB");
+    push(_w, "  folds: " + __to_string(_g_fold_count[0]));
+    // Last benchmark
+    let _w_bm = __file_read("nox_benchmark.log");
+    if len(_w_bm) > 10 {
+      let _w_li = len(_w_bm) - 2;
+      while _w_li > 0 {
+        if __char_code(char_at(_w_bm, _w_li)) == 10 {
+          push(_w, "  last: " + substr(_w_bm, _w_li + 1, len(_w_bm) - 1));
+          _w_li = 0;
+        } else { _w_li = _w_li - 1; };
+      };
+    };
+    push(_w, "=== READY ===");
+    return join(_w, "\n");
+  }
   // Growth: show evolution history
   if src == "growth" {
     let _gr_bm = __file_read("nox_benchmark.log");
