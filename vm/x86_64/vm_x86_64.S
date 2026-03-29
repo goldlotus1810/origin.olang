@@ -8373,11 +8373,11 @@ op_ret:
     cmpq    $0, (%rsi)
     je      .throw_no_handler
 
-    # Pop try frame
-    decq    (%rsi)                      # try_depth--
-    mov     (%rsi), %rdx               # new depth
+    # Read try frame at depth-1 (DON'T decrement — CatchEnd will do it)
+    mov     (%rsi), %rdx               # current depth
+    dec     %rdx                        # index = depth - 1
     lea     try_stack(%rip), %rdi
-    imul    $32, %rdx                   # depth * 32 (expanded entry)
+    imul    $32, %rdx                   # index * 32
     mov     (%rdi, %rdx), %rcx         # catch_PC → rcx (temp)
     mov     8(%rdi, %rdx), %r14        # restore VM stack pointer
     # Restore closure_depth and CPU stack (exception unwind)

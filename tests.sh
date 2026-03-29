@@ -815,6 +815,9 @@ run_olang_test "try/catch_in_fn" \
 run_olang_test "try/catch_loop" \
     'let ok=0;let i=0;while i<50{try{let i=i+1;let ok=ok+1;}catch{};};emit ok;' "50"
 
+run_olang_test "try/catch_rethrow" \
+    'let r="";try{try{__throw("x");}catch{r=r+"inner ";};__throw("y");}catch{r=r+"outer";};emit r;' "inner outer"
+
 # ─── SECTION: Scope & assignment ─────────────────────────────
 echo -e "${CYAN}── Scope ──${NC}"
 

@@ -50,7 +50,7 @@ fn ch_send(_cs_msg) {
 }
 
 fn ch_close() {
-    let _ch_active = 0;
+    // No-op: single-shot mode uses __system, no persistent process to kill
 }
 
 fn ch_render(_cr_top, _cr_height, _cr_width) {
