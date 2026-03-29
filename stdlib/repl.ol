@@ -570,8 +570,7 @@ pub fn repl_eval(input) {
   // Study command: read a file and learn from it (chunked, safe)
   if len(src) > 6 {
     if __substr(src, 0, 6) == "study " {
-      // Mark boot as done — study IS learning, don't double-load on next turn
-      let __boot_learned = 1;
+      _boot_learn();
       let _rs_path = __substr(src, 6, len(src));
       let _rs_content = __file_read(_rs_path);
       if len(_rs_content) == 0 { return "Error: cannot read " + _rs_path; };
@@ -580,7 +579,7 @@ pub fn repl_eval(input) {
       if len(_rs_path) > 3 {
           if __substr(_rs_path, len(_rs_path) - 3, len(_rs_path)) == ".md" { let _ = __set_at(_rs_is_md, 0, 1); };
       };
-      // Limit to 8KB per turn (heap safe)
+      // Limit to 8KB per turn (tested safe with boot_learn + 510 facts)
       if len(_rs_content) > 8000 { let _rs_content = substr(_rs_content, 0, 8000); };
       spider_feed(_rs_content, _rs_path);
       __heap_pin();
