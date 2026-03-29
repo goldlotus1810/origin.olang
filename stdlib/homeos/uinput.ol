@@ -9,7 +9,18 @@ let UI_DEV_CREATE = 21761;       // 0x5501
 let UI_DEV_DESTROY = 21762;      // 0x5502
 let EV_SYN = 0;
 let EV_KEY = 1;
+let EV_REL = 2;
+let EV_ABS = 3;
 let SYN_REPORT = 0;
+let REL_X = 0;
+let REL_Y = 1;
+let ABS_X = 0;
+let ABS_Y = 1;
+let BTN_LEFT = 272;
+let BTN_RIGHT = 273;
+let BTN_MIDDLE = 274;
+let UI_SET_RELBIT = 1074025829 + 1;  // 0x40045566
+let UI_SET_ABSBIT = 1074025829 + 2;  // 0x40045567
 
 // Key codes (Linux input.h)
 let KEY_ESC = 1;
@@ -61,15 +72,23 @@ pub fn uinput_create() {
     let fd = __fd_open("/dev/uinput", 1);  // O_WRONLY
     if fd < 0 { return { fd: -1, err: "cannot open /dev/uinput" }; };
 
-    // Set event types
+    // Set event types: keyboard + mouse
     __fd_ioctl(fd, UI_SET_EVBIT, EV_KEY);
+    __fd_ioctl(fd, UI_SET_EVBIT, EV_REL);
+    __fd_ioctl(fd, UI_SET_EVBIT, EV_ABS);
 
-    // Enable all key codes we need (0-127)
+    // Enable all key codes (0-127) + mouse buttons
     let ki = 0;
-    while ki < 128 {
-        __fd_ioctl(fd, UI_SET_KEYBIT, ki);
-        ki = ki + 1;
-    };
+    while ki < 128 { __fd_ioctl(fd, UI_SET_KEYBIT, ki); ki = ki + 1; };
+    __fd_ioctl(fd, UI_SET_KEYBIT, BTN_LEFT);
+    __fd_ioctl(fd, UI_SET_KEYBIT, BTN_RIGHT);
+    __fd_ioctl(fd, UI_SET_KEYBIT, BTN_MIDDLE);
+
+    // Enable relative + absolute axes
+    __fd_ioctl(fd, UI_SET_RELBIT, REL_X);
+    __fd_ioctl(fd, UI_SET_RELBIT, REL_Y);
+    __fd_ioctl(fd, UI_SET_ABSBIT, ABS_X);
+    __fd_ioctl(fd, UI_SET_ABSBIT, ABS_Y);
 
     // Write uinput_user_dev struct (1116 bytes)
     let dev = __bytes_new(1116);
@@ -81,8 +100,9 @@ pub fn uinput_create() {
     __bytes_set(dev, 80, 3);
     __fd_write(fd, dev, 1116);
 
-    // Create device
+    // Create device + wait for kernel registration
     __fd_ioctl(fd, UI_DEV_CREATE, 0);
+    __system("sleep 0.3");
 
     return { fd: fd, err: "" };
 }
@@ -129,31 +149,155 @@ pub fn uinput_key(fd, code) {
     __fd_write(fd, ev, 24);
 }
 
-// Type a string
+// Keymap: ASCII 32-122 → [keycode, shift_needed]
+// Built as flat array: keymap[n*2] = keycode, keymap[n*2+1] = shift
+let _km = [];
+// Pre-fill 182 entries: (122-32+1)*2 = 182
+let _kmi = 0;
+while _kmi < 182 { push(_km, 0); _kmi = _kmi + 1; };
+// ASCII 32 (space) at index 0: code=57, shift=0
+// Index = (ascii - 32) * 2
+// 32=space 33=! 34=" ... 48=0 ... 65=A ... 97=a
+fn _km_init() {
+    // space(32)=57
+    set_at(_km, 0, 57);
+    // 0-9 (48-57): codes 11,2,3,4,5,6,7,8,9,10
+    set_at(_km, 32, 11); set_at(_km, 34, 2); set_at(_km, 36, 3);
+    set_at(_km, 38, 4); set_at(_km, 40, 5); set_at(_km, 42, 6);
+    set_at(_km, 44, 7); set_at(_km, 46, 8); set_at(_km, 48, 9);
+    set_at(_km, 50, 10);
+    // a-z (97-122): codes from map
+    let _codes = [30,48,46,32,18,33,34,35,23,36,37,38,50,49,24,25,16,19,31,20,22,47,17,45,21,44];
+    let _ci = 0;
+    while _ci < 26 {
+        set_at(_km, (97 - 32) * 2 + _ci * 2, _codes[_ci]);
+        _ci = _ci + 1;
+    };
+    // A-Z (65-90): same codes + shift
+    _ci = 0;
+    while _ci < 26 {
+        set_at(_km, (65 - 32) * 2 + _ci * 2, _codes[_ci]);
+        set_at(_km, (65 - 32) * 2 + _ci * 2 + 1, 1);
+        _ci = _ci + 1;
+    };
+    // dot(46)=52, comma(44)=51, minus(45)=12
+    set_at(_km, (46 - 32) * 2, 52);
+    set_at(_km, (44 - 32) * 2, 51);
+    set_at(_km, (45 - 32) * 2, 12);
+}
+
+// Type a string — fully inline, no nested function calls
 pub fn uinput_type(fd, text) {
-    let i = 0;
-    while i < len(text) {
-        let ch = char_at(text, i);
-        let k = _char_to_key(ch);
-        if k.code > 0 {
-            if k.shift == 1 {
-                _write_event(fd, EV_KEY, KEY_LEFTSHIFT, 1);
-                _syn(fd);
-            };
-            uinput_key(fd, k.code);
-            if k.shift == 1 {
-                _write_event(fd, EV_KEY, KEY_LEFTSHIFT, 0);
-                _syn(fd);
+    let ev = __bytes_new(24);
+    let _ti = 0;
+    while _ti < len(text) {
+        let _tc = __char_code(char_at(text, _ti));
+        if _tc >= 32 {
+            if _tc <= 122 {
+                let _tidx = (_tc - 32) * 2;
+                let _tcode = _km[_tidx];
+                let _tshift = _km[_tidx + 1];
+                if _tcode > 0 {
+                    // Shift press if needed
+                    if _tshift == 1 {
+                        __bytes_set(ev, 16, 1); __bytes_set(ev, 18, 42); __bytes_set(ev, 19, 0); __bytes_set(ev, 20, 1);
+                        __fd_write(fd, ev, 24);
+                        __bytes_set(ev, 16, 0); __bytes_set(ev, 18, 0); __bytes_set(ev, 20, 0);
+                        __fd_write(fd, ev, 24);
+                    };
+                    // Key press
+                    __bytes_set(ev, 16, 1); __bytes_set(ev, 18, _tcode % 256); __bytes_set(ev, 19, __floor(_tcode / 256)); __bytes_set(ev, 20, 1);
+                    __fd_write(fd, ev, 24);
+                    __bytes_set(ev, 16, 0); __bytes_set(ev, 18, 0); __bytes_set(ev, 19, 0); __bytes_set(ev, 20, 0);
+                    __fd_write(fd, ev, 24);
+                    // Key release
+                    __bytes_set(ev, 16, 1); __bytes_set(ev, 18, _tcode % 256); __bytes_set(ev, 19, __floor(_tcode / 256)); __bytes_set(ev, 20, 0);
+                    __fd_write(fd, ev, 24);
+                    __bytes_set(ev, 16, 0); __bytes_set(ev, 18, 0); __bytes_set(ev, 19, 0); __bytes_set(ev, 20, 0);
+                    __fd_write(fd, ev, 24);
+                    // Shift release if needed
+                    if _tshift == 1 {
+                        __bytes_set(ev, 16, 1); __bytes_set(ev, 18, 42); __bytes_set(ev, 19, 0); __bytes_set(ev, 20, 0);
+                        __fd_write(fd, ev, 24);
+                        __bytes_set(ev, 16, 0); __bytes_set(ev, 18, 0); __bytes_set(ev, 20, 0);
+                        __fd_write(fd, ev, 24);
+                    };
+                };
             };
         };
-        i = i + 1;
+        // newline → Enter
+        if _tc == 10 {
+            __bytes_set(ev, 16, 1); __bytes_set(ev, 18, 28); __bytes_set(ev, 19, 0); __bytes_set(ev, 20, 1);
+            __fd_write(fd, ev, 24);
+            __bytes_set(ev, 16, 0); __bytes_set(ev, 18, 0); __bytes_set(ev, 20, 0);
+            __fd_write(fd, ev, 24);
+            __bytes_set(ev, 16, 1); __bytes_set(ev, 18, 28); __bytes_set(ev, 20, 0);
+            __fd_write(fd, ev, 24);
+            __bytes_set(ev, 16, 0); __bytes_set(ev, 18, 0); __bytes_set(ev, 20, 0);
+            __fd_write(fd, ev, 24);
+        };
+        _ti = _ti + 1;
     };
 }
 
 // Type string + Enter
 pub fn uinput_type_enter(fd, text) {
     uinput_type(fd, text);
-    uinput_key(fd, KEY_ENTER);
+    let ev = __bytes_new(24);
+    __bytes_set(ev, 16, 1); __bytes_set(ev, 18, 28); __bytes_set(ev, 20, 1);
+    __fd_write(fd, ev, 24);
+    __bytes_set(ev, 16, 0); __bytes_set(ev, 18, 0); __bytes_set(ev, 20, 0);
+    __fd_write(fd, ev, 24);
+    __bytes_set(ev, 16, 1); __bytes_set(ev, 18, 28); __bytes_set(ev, 20, 0);
+    __fd_write(fd, ev, 24);
+    __bytes_set(ev, 16, 0); __bytes_set(ev, 18, 0); __bytes_set(ev, 20, 0);
+    __fd_write(fd, ev, 24);
+}
+
+// ── Mouse control ──
+
+// Move mouse by relative amount
+pub fn mouse_move(fd, dx, dy) {
+    let ev = __bytes_new(24);
+    // REL_X
+    __bytes_set(ev, 16, EV_REL); __bytes_set(ev, 18, REL_X);
+    __bytes_set(ev, 20, dx % 256); __bytes_set(ev, 21, __floor(dx / 256) % 256);
+    __fd_write(fd, ev, 24);
+    // REL_Y
+    __bytes_set(ev, 18, REL_Y);
+    __bytes_set(ev, 20, dy % 256); __bytes_set(ev, 21, __floor(dy / 256) % 256);
+    __fd_write(fd, ev, 24);
+    // SYN
+    __bytes_set(ev, 16, 0); __bytes_set(ev, 18, 0); __bytes_set(ev, 20, 0); __bytes_set(ev, 21, 0);
+    __fd_write(fd, ev, 24);
+}
+
+// Click left mouse button
+pub fn mouse_click(fd) {
+    let ev = __bytes_new(24);
+    // Press
+    __bytes_set(ev, 16, EV_KEY); __bytes_set(ev, 18, BTN_LEFT % 256); __bytes_set(ev, 19, __floor(BTN_LEFT / 256)); __bytes_set(ev, 20, 1);
+    __fd_write(fd, ev, 24);
+    __bytes_set(ev, 16, 0); __bytes_set(ev, 18, 0); __bytes_set(ev, 19, 0); __bytes_set(ev, 20, 0);
+    __fd_write(fd, ev, 24);
+    // Release
+    __bytes_set(ev, 16, EV_KEY); __bytes_set(ev, 18, BTN_LEFT % 256); __bytes_set(ev, 19, __floor(BTN_LEFT / 256)); __bytes_set(ev, 20, 0);
+    __fd_write(fd, ev, 24);
+    __bytes_set(ev, 16, 0); __bytes_set(ev, 18, 0); __bytes_set(ev, 19, 0); __bytes_set(ev, 20, 0);
+    __fd_write(fd, ev, 24);
+}
+
+// Right click
+pub fn mouse_right_click(fd) {
+    let ev = __bytes_new(24);
+    __bytes_set(ev, 16, EV_KEY); __bytes_set(ev, 18, BTN_RIGHT % 256); __bytes_set(ev, 19, __floor(BTN_RIGHT / 256)); __bytes_set(ev, 20, 1);
+    __fd_write(fd, ev, 24);
+    __bytes_set(ev, 16, 0); __bytes_set(ev, 18, 0); __bytes_set(ev, 19, 0); __bytes_set(ev, 20, 0);
+    __fd_write(fd, ev, 24);
+    __bytes_set(ev, 16, EV_KEY); __bytes_set(ev, 18, BTN_RIGHT % 256); __bytes_set(ev, 19, __floor(BTN_RIGHT / 256)); __bytes_set(ev, 20, 0);
+    __fd_write(fd, ev, 24);
+    __bytes_set(ev, 16, 0); __bytes_set(ev, 18, 0); __bytes_set(ev, 19, 0); __bytes_set(ev, 20, 0);
+    __fd_write(fd, ev, 24);
 }
 
 // Destroy device
