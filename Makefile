@@ -45,15 +45,22 @@ fixed-point: self-build
 	fi
 	@rm -f origin_new.olang
 
-# Bootstrap: initial build with Rust compiler (one-time setup)
+# Bootstrap: use committed binary (no Rust needed)
 bootstrap: vm
-	@test -d ../Origin_project || (echo "ERROR: ../Origin_project not found (Rust compiler)"; exit 1)
+	@test -f origin_bootstrap.olang || (echo "ERROR: origin_bootstrap.olang not found"; exit 1)
+	cp origin_bootstrap.olang $(OUTPUT)
+	chmod +x $(OUTPUT)
+	@echo "Bootstrap from committed binary: $(OUTPUT)"
+
+# Bootstrap from Rust (only if origin_bootstrap.olang is lost)
+bootstrap-rust: vm
+	@test -d ../Origin_project || (echo "ERROR: ../Origin_project not found"; exit 1)
 	../Origin_project/target/release/builder \
 		--vm $(VM_BIN) --wrap \
 		--stdlib $(STDLIB) --codegen \
 		-o $(OUTPUT)
 	chmod +x $(OUTPUT)
-	@echo "Bootstrap: $(OUTPUT) ($$(stat -c%s $(OUTPUT)) bytes)"
+	@echo "Bootstrap (Rust): $(OUTPUT) ($$(stat -c%s $(OUTPUT)) bytes)"
 
 # Run all tests
 test:
