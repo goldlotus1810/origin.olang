@@ -97,7 +97,7 @@ pub fn encode_codepoint(cp) {
 
 fn _enc_max(a, b) { if a > b { return a; }; return b; }
 fn _enc_min(a, b) { if a < b { return a; }; return b; }
-fn _enc_abs(x) { if x < 0 { return 0 - x; }; return x; }
+// _enc_abs removed — dead code (0 calls)
 
 // Unpack mol dimensions (using / and % instead of >> and & — VM lacks bit ops)
 fn _mol_s(mol) { return __floor(mol / 4096) % 16; }
@@ -455,45 +455,7 @@ pub fn word_affect(_wa_word) {
 }
 
 // Text → emotion { v, a } (scan words + punctuation)
-pub fn text_emotion(_te_text) {
-    let _te_v = 4;
-    let _te_a = 4;
-    let _te_hits = 0;
-    // Split text into words, check each against word_affect
-    let _te_w = "";
-    let _te_i = 0;
-    while _te_i < len(_te_text) {
-        let _te_ch = char_at(_te_text, _te_i);
-        let _te_code = __char_code(_te_ch);
-        if _te_code == 32 {
-            if len(_te_w) >= 2 {
-                let _te_affect = word_affect(_te_w);
-                if _te_affect.v != 4 {
-                    _te_v = _te_affect.v;
-                    _te_a = _te_affect.a;
-                    _te_hits = _te_hits + 1;
-                };
-            };
-            _te_w = "";
-        } else {
-            // Punctuation
-            if _te_code == 33 { _te_a = _enc_min(7, _te_a + 1); _te_v = _enc_min(7, _te_v + 1); };
-            if _te_code == 63 { _te_a = _enc_min(7, _te_a + 1); };
-            if _te_code == 46 { _te_a = _enc_max(0, _te_a - 1); };
-            _te_w = _te_w + _te_ch;
-        };
-        let _te_i = _te_i + 1;
-    };
-    // Check last word
-    if len(_te_w) >= 2 {
-        let _te_affect = word_affect(_te_w);
-        if _te_affect.v != 4 {
-            _te_v = _te_affect.v;
-            _te_a = _te_affect.a;
-        };
-    };
-    return { v: _te_v, a: _te_a };
-}
+// text_emotion removed — dead code (replaced by text_emotion_v2, 0 calls)
 
 // ════════════════════════════════════════════════════════════════
 // Sensor + System event encoding
@@ -854,7 +816,8 @@ let __silk_decay_counter = 0;
 // LG.3: Silk edges use mol (u16 number) instead of string keys
 // Comparison = number compare (1 cycle) vs string compare (N cycles)
 // Storage: ~24 bytes/edge (was 50+)
-fn silk_co_activate(_sca_wa, _sca_wb, _sca_intent) {
+// silk_co_activate: kept as stub (0 calls but may be called from future code)
+pub fn silk_co_activate(_sca_wa, _sca_wb, _sca_intent) {
     // Encode words → mol for compact storage + fast compare
     let _sca_ma = _word_to_mol(_sca_wa);
     let _sca_mb = _word_to_mol(_sca_wb);
@@ -1423,16 +1386,7 @@ fn _text_to_chain(_ttc_text) {
 
 // Molecule distance: |Va-Vb| + |Aa-Ab| (Manhattan on V,A — the emotional axes)
 
-// Similarity: normalized 5D distance → 0..10 scale
-fn _mol_similarity(_ms_a, _ms_b) {
-    let _ms_dist = _mol_distance(_ms_a, _ms_b);
-    // Max distance = 15+15+7+7+3 = 47
-    let _ms_sim = 10 - __floor((_ms_dist * 10) / 47);
-    if _ms_sim < 0 { return 0; };
-    return _ms_sim;
-}
-
-// Chain similarity: average molecule similarity across chain pairs
+// _mol_similarity removed — dead code (0 calls)
 
 
 
