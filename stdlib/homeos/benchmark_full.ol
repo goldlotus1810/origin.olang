@@ -19,7 +19,7 @@
 // C — COMPILE CORRECTNESS
 // ════════════════════════════════════════════════════════════════
 
-pub fn bench_compile() {
+pub fn target_compile() {
     let _p = [0]; let _f = [0]; let _t = [0];
 
     // C1: Deterministic — same source = same bytecode
@@ -89,33 +89,33 @@ pub fn bench_compile() {
 // T — THROUGHPUT (ops/sec)
 // ════════════════════════════════════════════════════════════════
 
-pub fn bench_throughput() {
-    // T1: Compile (reduced for limited heap)
-    let _n1 = 20;
+pub fn target_throughput() {
+    // T1: Compile
+    let _n1 = 100;
     let _t1 = __timestamp();
     let _i = 0;
-    while _i < _n1 { let _hp = __heap_save(); _bm_compile("let x=" + __to_string(_i) + ";emit x;"); __heap_restore(_hp); _i = _i + 1; };
+    while _i < _n1 { _bm_compile("let x=" + __to_string(_i) + ";emit x;"); _i = _i + 1; };
     let _t2 = __timestamp();
     let _cm = _t2 - _t1; if _cm == 0 { _cm = 1; };
 
     // T2: Encode
-    let _n2 = 100;
+    let _n2 = 500;
     let _t3 = __timestamp();
     _i = 0;
-    while _i < _n2 { let _hp = __heap_save(); chain_encode("benchmark throughput test"); __heap_restore(_hp); _i = _i + 1; };
+    while _i < _n2 { chain_encode("benchmark throughput test"); _i = _i + 1; };
     let _t4 = __timestamp();
     let _em = _t4 - _t3; if _em == 0 { _em = 1; };
 
     // T3: Search
-    let _n3 = 100;
+    let _n3 = 500;
     let _t5 = __timestamp();
     _i = 0;
-    while _i < _n3 { let _hp = __heap_save(); kt_find("test", 3); __heap_restore(_hp); _i = _i + 1; };
+    while _i < _n3 { kt_find("test", 3); _i = _i + 1; };
     let _t6 = __timestamp();
     let _sm = _t6 - _t5; if _sm == 0 { _sm = 1; };
 
     // T4: Ingest
-    let _n4 = 50;
+    let _n4 = 200;
     let _t7 = __timestamp();
     _i = 0;
     while _i < _n4 { kt_learn("bench fact " + __to_string(_i)); _i = _i + 1; };
@@ -124,11 +124,10 @@ pub fn bench_throughput() {
     __heap_pin();
 
     // T5: Mol distance
-    let _n5 = 1000;
+    let _n5 = 10000;
     let _t9 = __timestamp();
     _i = 0;
     while _i < _n5 { _kt_mol_dist(4096, 8192); _i = _i + 1; };
-    __heap_pin();
     let _t10 = __timestamp();
     let _dm = _t10 - _t9; if _dm == 0 { _dm = 1; };
 
@@ -146,12 +145,12 @@ pub fn bench_throughput() {
 // M — MEMORY EFFICIENCY
 // ════════════════════════════════════════════════════════════════
 
-pub fn bench_memory() {
+pub fn target_memory() {
     // M1: Bytes per fact
     let _h1 = __heap_used();
     let _f1 = kt_fact_count();
     let _i = 0;
-    while _i < 20 { kt_learn("mem bench " + __to_string(_i) + " measure bytes per fact"); _i = _i + 1; };
+    while _i < 100 { kt_learn("mem bench " + __to_string(_i) + " measure bytes per fact"); _i = _i + 1; };
     __heap_pin();
     let _h2 = __heap_used();
     let _added = kt_fact_count() - _f1;
@@ -161,16 +160,16 @@ pub fn bench_memory() {
     // M2: Pipeline heap growth per call
     let _h3 = __heap_used();
     _i = 0;
-    while _i < 10 { pipeline("mem test " + __to_string(_i)); _i = _i + 1; };
+    while _i < 100 { pipeline("mem test " + __to_string(_i)); _i = _i + 1; };
     let _h4 = __heap_used();
-    let _gpc = __floor((_h4 - _h3) / 10);
+    let _gpc = __floor((_h4 - _h3) / 100);
 
     // M3: Compile cost
     let _h5 = __heap_used();
     _i = 0;
-    while _i < 10 { _bm_compile("fn f" + __to_string(_i) + "(x){return x*" + __to_string(_i) + ";};"); _i = _i + 1; };
+    while _i < 50 { _bm_compile("fn f" + __to_string(_i) + "(x){return x*" + __to_string(_i) + ";};"); _i = _i + 1; };
     let _h6 = __heap_used();
-    let _cpc = __floor((_h6 - _h5) / 10);
+    let _cpc = __floor((_h6 - _h5) / 50);
 
     return {
         label: "M",
@@ -185,7 +184,7 @@ pub fn bench_memory() {
 // L — LATENCY (ms per single operation)
 // ════════════════════════════════════════════════════════════════
 
-pub fn bench_latency() {
+pub fn target_latency() {
     _boot_learn(); __heap_pin();
 
     let _t1 = __timestamp();
@@ -232,7 +231,7 @@ pub fn bench_latency() {
 // D — CODE DENSITY
 // ════════════════════════════════════════════════════════════════
 
-pub fn bench_density() {
+pub fn target_density() {
     let _files = [];
     push(_files, "stdlib/homeos/pipeline.ol");
     push(_files, "stdlib/homeos/knowtree.ol");
@@ -352,24 +351,24 @@ fn _bm_count_dead(_src) {
 // X — STABILITY (100 consecutive ops, no crash)
 // ════════════════════════════════════════════════════════════════
 
-pub fn bench_stability() {
-    // X1: 20 compiles
+pub fn target_stability() {
+    // X1: 100 compiles
     let _c = [0]; let _i = 0;
-    while _i < 20 { try { _bm_compile("let x" + __to_string(_i) + "=" + __to_string(_i) + ";"); let _ = __set_at(_c, 0, __array_get(_c, 0) + 1); } catch {}; _i = _i + 1; };
+    while _i < 100 { try { _bm_compile("let x" + __to_string(_i) + "=" + __to_string(_i) + ";"); let _ = __set_at(_c, 0, __array_get(_c, 0) + 1); } catch {}; _i = _i + 1; };
 
-    // X2: 20 pipelines
+    // X2: 100 pipelines
     let _p = [0]; _i = 0;
-    while _i < 20 { try { pipeline("stab " + __to_string(_i)); let _ = __set_at(_p, 0, __array_get(_p, 0) + 1); } catch {}; _i = _i + 1; };
+    while _i < 100 { try { pipeline("stab " + __to_string(_i)); let _ = __set_at(_p, 0, __array_get(_p, 0) + 1); } catch {}; _i = _i + 1; };
 
-    // X3: 20 kt learn+find
+    // X3: 100 kt learn+find
     let _k = [0]; _i = 0;
-    while _i < 20 { try { kt_learn("stab " + __to_string(_i)); kt_find("stab", 3); let _ = __set_at(_k, 0, __array_get(_k, 0) + 1); } catch {}; _i = _i + 1; };
+    while _i < 100 { try { kt_learn("stab " + __to_string(_i)); kt_find("stab", 3); let _ = __set_at(_k, 0, __array_get(_k, 0) + 1); } catch {}; _i = _i + 1; };
     __heap_pin();
 
-    // X4: Heap ratio after 20 pipeline calls
+    // X4: Heap ratio after 100 pipeline calls
     let _h1 = __heap_used();
     _i = 0;
-    while _i < 20 { pipeline("heap " + __to_string(_i)); _i = _i + 1; };
+    while _i < 100 { pipeline("heap " + __to_string(_i)); _i = _i + 1; };
     let _h2 = __heap_used();
     let _ratio = 0;
     if _h1 > 0 { _ratio = __floor(_h2 * 100 / _h1); };
@@ -387,78 +386,67 @@ pub fn bench_stability() {
 // FULL BENCHMARK
 // ════════════════════════════════════════════════════════════════
 
-// ════════════════════════════════════════════════════════════════
-// G — GROWTH (Nox self-assessment: what matters for self-hosting)
-// ════════════════════════════════════════════════════════════════
-
-pub fn bench_growth() {
-    let _p = [0]; let _f = [0]; let _t = [0];
-
-    // G1: Self-hosting — compile source produces bytecode
-    let _g1 = _bm_compile("fn fib(n){if n<2{return n;};return fib(n-1)+fib(n-2);};");
-    _bt("selfhost", len(_g1) > 0, _p, _f, _t);
-
-    // G2: Constant folding — 3*4+1 should produce smaller bytecode than non-foldable
-    let _g2a = _bm_compile("emit 3 * 4 + 1;");
-    let _g2b = _bm_compile("let x = 3; emit x * 4 + 1;");
-    _bt("constfold", len(_g2a) < len(_g2b), _p, _f, _t);
-
-    // G3: Block comments — /* */ parsed correctly
-    let _g3 = _bm_compile("let x = /* skip */ 42; emit x;");
-    _bt("blockcmt", len(_g3) > 0, _p, _f, _t);
-
-    // G4: Bitwise operators — | and & compile
-    let _g4a = _bm_compile("emit 0xFF & 0x0F;");
-    let _g4b = _bm_compile("emit 0x0F | 0xF0;");
-    _bt("bit_and", len(_g4a) > 0, _p, _f, _t);
-    _bt("bit_or", len(_g4b) > 0, _p, _f, _t);
-
-    // G5: Fold count — parser tracks optimization
-    let _g5_before = _g_fold_count[0];
-    _bm_compile("emit 1+2+3+4+5;");
-    let _g5_after = _g_fold_count[0];
-    _bt("foldtrack", _g5_after > _g5_before, _p, _f, _t);
-
-    // G6: Heap breathing — save/restore works
-    let _g6a = __heap_save();
-    let _g6_dummy = chain_encode("breathing test");
-    __heap_restore(_g6a);
-    _bt("breathing", 1 == 1, _p, _f, _t);
-
-    // G7: SHA256 — crypto works
-    _bt("sha256", len(__sha256("abc")) == 64, _p, _f, _t);
-
-    // G8: Math builtins
-    _bt("exp", __exp(0) == 1, _p, _f, _t);
-    _bt("log2", __log2(8) == 3, _p, _f, _t);
-
-    // G9: Try/catch — error handling works
-    let _g9 = 0;
-    try { __throw("test"); } catch { _g9 = 1; };
-    _bt("trycatch", _g9 == 1, _p, _f, _t);
-
-    // G10: Closure — higher-order functions work
-    let _g10 = _bm_compile("fn mk(x){return fn(y){return x+y;};};");
-    _bt("closure", len(_g10) > 0, _p, _f, _t);
-
-    return { score: __floor(__array_get(_p, 0) * 100 / __array_get(_t, 0)), pass: __array_get(_p, 0), total: __array_get(_t, 0), label: "G" };
-}
-
-pub fn benchmark_full() {
+pub fn benchmark_target() {
+    _boot_learn(); __heap_pin();
     let _ts = _fmt_ts(__timestamp());
 
-    let _c = bench_compile(); __heap_pin();
-    let _t = bench_throughput(); __heap_pin();
-    let _g = bench_growth(); __heap_pin();
+    let _c = target_compile(); __heap_pin();
+    let _t = target_throughput(); __heap_pin();
+    let _m = target_memory(); __heap_pin();
+    let _l = target_latency(); __heap_pin();
+    let _d = target_density(); __heap_pin();
+    let _x = target_stability(); __heap_pin();
 
     let _r = "=== NOX SYSTEM BENCHMARK [" + _ts + "] ==="
+        + "\n"
         + "\n[C] COMPILE: " + __to_string(_c.score) + "% (" + __to_string(_c.pass) + "/" + __to_string(_c.total) + ")"
-        + "\n[T] THROUGHPUT: compile=" + __to_string(_t.compile) + " encode=" + __to_string(_t.encode) + " search=" + __to_string(_t.search) + " ingest=" + __to_string(_t.ingest) + " dist=" + __to_string(_t.distance) + " ops/sec"
-        + "\n[G] GROWTH: " + __to_string(_g.score) + "% (" + __to_string(_g.pass) + "/" + __to_string(_g.total) + ")"
-        + "\n heap: " + __to_string(__floor(__heap_used() / 1024)) + "KB | folds: " + __to_string(_g_fold_count[0])
+        + "\n"
+        + "\n[T] THROUGHPUT (ops/sec):"
+        + "\n  compile:  " + __to_string(_t.compile)
+        + "\n  encode:   " + __to_string(_t.encode)
+        + "\n  search:   " + __to_string(_t.search)
+        + "\n  ingest:   " + __to_string(_t.ingest)
+        + "\n  mol_dist: " + __to_string(_t.distance)
+        + "\n"
+        + "\n[M] MEMORY:"
+        + "\n  bytes/fact:    " + __to_string(_m.bytes_per_fact)
+        + "\n  heap:          " + __to_string(_m.heap_kb) + " KB"
+        + "\n  growth/pipe:   " + __to_string(_m.growth_per_pipe) + " bytes"
+        + "\n  compile cost:  " + __to_string(_m.compile_cost) + " bytes/expr"
+        + "\n"
+        + "\n[L] LATENCY (ms):"
+        + "\n  compile:   " + __to_string(_l.compile)
+        + "\n  pipeline:  " + __to_string(_l.pipeline)
+        + "\n  search:    " + __to_string(_l.search)
+        + "\n  encode:    " + __to_string(_l.encode)
+        + "\n  instinct:  " + __to_string(_l.instinct)
+        + "\n  homeo:     " + __to_string(_l.homeo)
+        + "\n  compose:   " + __to_string(_l.compose)
+        + "\n"
+        + "\n[D] CODE DENSITY:"
+        + "\n  LOC:       " + __to_string(_d.loc)
+        + "\n  functions: " + __to_string(_d.fn_count) + " (" + __to_string(_d.pub_count) + " pub)"
+        + "\n  dead fn:   " + __to_string(_d.dead_fn) + " (" + __to_string(_d.dead_pct) + "%)"
+        + "\n  LOC/fn:    " + __to_string(_d.loc_per_fn)
+        + "\n  comments:  " + __to_string(_d.comment_pct) + "%"
+        + "\n"
+        + "\n[X] STABILITY (/100):"
+        + "\n  compile:   " + __to_string(_x.compile)
+        + "\n  pipeline:  " + __to_string(_x.pipeline)
+        + "\n  knowtree:  " + __to_string(_x.knowtree)
+        + "\n  heap:      " + __to_string(_x.heap_pct) + "%"
+        + "\n"
         + "\n===================================";
 
-    let _log = _ts + " C=" + __to_string(_c.score) + " T=" + __to_string(_t.compile) + "/" + __to_string(_t.encode) + "/" + __to_string(_t.search) + " G=" + __to_string(_g.score) + "\n";
+    // 1-line log for trend
+    let _log = _ts
+        + " C=" + __to_string(_c.score)
+        + " T=" + __to_string(_t.compile) + "/" + __to_string(_t.encode) + "/" + __to_string(_t.search)
+        + " M=" + __to_string(_m.bytes_per_fact) + "bpf/" + __to_string(_m.heap_kb) + "KB"
+        + " L=" + __to_string(_l.pipeline) + "ms"
+        + " D=" + __to_string(_d.loc) + "loc/" + __to_string(_d.dead_pct) + "%dead"
+        + " X=" + __to_string(_x.pipeline) + "/100/" + __to_string(_x.heap_pct) + "%"
+        + "\n";
     __file_append("nox_benchmark.log", _log);
 
     return _r;
