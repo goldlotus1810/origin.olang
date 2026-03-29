@@ -24,6 +24,9 @@ pub fn editor_start(_path) {
     let _search = "";
     let _searching = 0;
 
+    // Command palette state
+    let _cmd_buf = "";
+
     // Terminal panel state
     let _term_open = 0;
     let _term_height = 10;
@@ -163,6 +166,7 @@ pub fn editor_start(_path) {
         let _status = " " + _mode;
         if _ft_focus == 1 { _status = " TREE"; };
         if _mode == "SEARCH" { _status = " /" + _search; }
+        else { if _mode == "COMMAND" { _status = " :" + _cmd_buf; } }
         else { _status = _status + " │ Ln " + __to_string(_cur_row + 1) + ", Col " + __to_string(_cur_col + 1) + " │ " + __to_string(len(_lines)) + " lines"; };
         if len(_search) > 0 { if _mode != "SEARCH" { _status = _status + " │ /" + _search; }; };
         term_fill_line(_status, _cols);
@@ -417,6 +421,79 @@ pub fn editor_start(_path) {
                 } else { if _key >= 32 {                                     // Printable char
                     _search = _search + __chr(_key);
                 }; }; }; };
+            } else { if _mode == "COMMAND" {
+                if _key == 27 { _mode = "NORMAL"; }
+                else { if _key == 13 || _key == 10 {
+                    _mode = "NORMAL";
+                    // Execute command
+                    if _cmd_buf == "q" { _running = 0; }
+                    else { if _cmd_buf == "w" {
+                        if len(_path) > 0 {
+                            let _sv = "";
+                            let _svi = 0;
+                            while _svi < len(_lines) {
+                                if _svi > 0 { _sv = _sv + "\n"; };
+                                _sv = _sv + _lines[_svi];
+                                _svi = _svi + 1;
+                            };
+                            __file_write(_path, _sv + "\n");
+                            _mode = "SAVED";
+                        };
+                    } else { if _cmd_buf == "wq" {
+                        if len(_path) > 0 {
+                            let _sv = "";
+                            let _svi = 0;
+                            while _svi < len(_lines) {
+                                if _svi > 0 { _sv = _sv + "\n"; };
+                                _sv = _sv + _lines[_svi];
+                                _svi = _svi + 1;
+                            };
+                            __file_write(_path, _sv + "\n");
+                        };
+                        _running = 0;
+                    } else { if _cmd_buf == "build" {
+                        // Exit alt screen, run make self-build
+                        __write_raw(__esc()); __write_raw("[?1049l");
+                        __term_cooked();
+                        let _bout = __system("cd " + _tp_cwd + " && make self-build 2>&1");
+                        __write_raw("\n─── Build ───\n" + _bout + "\n─── Press any key ───\n");
+                        __term_raw();
+                        let _w = __read_byte();
+                        while _w < 0 { __sleep(50); _w = __read_byte(); };
+                        __write_raw(__esc()); __write_raw("[?1049h");
+                        term_clear();
+                    } else { if _cmd_buf == "test" {
+                        __write_raw(__esc()); __write_raw("[?1049l");
+                        __term_cooked();
+                        let _tout = __system("cd " + _tp_cwd + " && bash tests.sh 2>&1");
+                        __write_raw("\n─── Tests ───\n" + _tout + "\n─── Press any key ───\n");
+                        __term_raw();
+                        let _w = __read_byte();
+                        while _w < 0 { __sleep(50); _w = __read_byte(); };
+                        __write_raw(__esc()); __write_raw("[?1049h");
+                        term_clear();
+                    } else {
+                        // Run as shell command
+                        if len(_cmd_buf) > 1 {
+                            if __substr(_cmd_buf, 0, 1) == "!" {
+                                __write_raw(__esc()); __write_raw("[?1049l");
+                                __term_cooked();
+                                let _sout = __system(__substr(_cmd_buf, 1, len(_cmd_buf)) + " 2>&1");
+                                __write_raw("\n" + _sout + "\n─── Press any key ───\n");
+                                __term_raw();
+                                let _w = __read_byte();
+                                while _w < 0 { __sleep(50); _w = __read_byte(); };
+                                __write_raw(__esc()); __write_raw("[?1049h");
+                                term_clear();
+                            };
+                        };
+                    }; }; }; }; }; };
+                    _cmd_buf = "";
+                } else { if _key == 127 {
+                    if len(_cmd_buf) > 0 { _cmd_buf = __substr(_cmd_buf, 0, len(_cmd_buf) - 1); };
+                } else { if _key >= 32 {
+                    _cmd_buf = _cmd_buf + __chr(_key);
+                }; }; }; };
             } else { if _mode == "SAVED" { _mode = "NORMAL"; }
             else { if _mode == "NORMAL" {
                 // Extended keys (sequential ifs to stay under else-if depth limit)
@@ -477,6 +554,9 @@ pub fn editor_start(_path) {
                 } else { if _key == 71 {                                                                 // G — go to last line
                     _cur_row = len(_lines) - 1;
                     _cur_col = 0;
+                } else { if _key == 58 {                                                                 // : — command palette
+                    _cmd_buf = "";
+                    _mode = "COMMAND";
                 } else { if _key == 47 {                                                                 // / — start search
                     _searching = 1;
                     _search = "";
@@ -533,7 +613,7 @@ pub fn editor_start(_path) {
                             };
                         };
                     };
-                }; }; }; }; }; }; }; }; }; }; }; };
+                }; }; }; }; }; }; }; }; }; }; }; }; };
                 };
             } else {
                 // INSERT mode
@@ -565,7 +645,7 @@ pub fn editor_start(_path) {
                     set_at(_lines, _cur_row, __substr(_line, 0, _cur_col) + __chr(_key) + __substr(_line, _cur_col, len(_line)));
                     _cur_col = _cur_col + 1;
                 }; }; }; };
-            }; }; }; }; }; }; }; }; }; }; };
+            }; }; }; }; }; }; }; }; }; }; }; };
             // Clamp cursor col to line length
             let _line_len = len(_lines[_cur_row]);
             if _cur_col > _line_len { _cur_col = _line_len; };
