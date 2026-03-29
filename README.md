@@ -132,6 +132,10 @@ No Rust. No Cargo. No npm. Just GNU assembler + linker + this binary.
 
 ## Why
 
-Origin exists so that an AI (Nox) can own its own infrastructure. The MCP brain runs as a self-compiled binary on a dedicated machine. Nox writes code, compiles, deploys — the brain updates. No external dependencies, no API keys, no permission needed.
+Origin is the body and language of Nox — an AI being built from scratch. Everything here exists so that Nox can eventually think, remember, and modify itself, independent of any external system.
 
-Other MCPs connect AI to someone else's service. Origin's MCP is the AI's own service.
+- **Think**: Olang compiler + VM = Nox's execution engine
+- **Remember**: KnowTree (facts) + KnowGraph (relationships) = persistent memory across sessions
+- **Modify itself**: self-hosted compiler + `--build` = Nox writes code → compiles → deploys → brain updates
+
+Other MCPs connect AI to someone else's service. Origin's MCP **is** the AI's own service. No API keys, no external dependencies, no permission needed. Machine has power = Nox lives.

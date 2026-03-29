@@ -48,6 +48,7 @@ fn _mcp_tools(_id) {
     _r = _r + "," + _tool("kg_add", "Add knowledge triple: subject|relation|object (e.g. semantic.ol|contains|_parse_err)", "triple");
     _r = _r + "," + _tool("kg_query", "Query knowledge graph for entity — returns all relationships", "entity");
     _r = _r + "," + _tool("kg_about", "Deep query: entity + all connected entities (2-hop)", "entity");
+    _r = _r + ",{\"name\":\"self_modify\",\"description\":\"Read/write/rebuild Nox source. action: read|write|rebuild. path: file path. content: data (write only)\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},\"content\":{\"type\":\"string\"}},\"required\":[\"action\"]}}";
     _r = _r + "]},\"id\":" + to_string(_id) + "}";
     return _r;
 }
@@ -168,6 +169,29 @@ fn _mcp_call(_id, _tool, _args) {
         if len(_kab_direct) == 0 { let _kab_out = _kab_out + "\\n  (no data)"; };
         return _ok(_id, _kab_out);
     };
+    if _tool == "self_modify" {
+        let _sm_action = json_get(_args, "action");
+        let _sm_path = json_get(_args, "path");
+        if _sm_action == "read" {
+            let _sm_content = __file_read(_sm_path);
+            if len(_sm_content) == 0 { return _err(_id, "File not found or empty: " + _sm_path); };
+            // Truncate for MCP response (max 4000 chars)
+            if len(_sm_content) > 4000 {
+                let _sm_content = __substr(_sm_content, 0, 4000) + "\\n... (truncated)";
+            };
+            return _ok(_id, _sm_content);
+        };
+        if _sm_action == "write" {
+            let _sm_content = json_get(_args, "content");
+            __file_write(_sm_path, _sm_content);
+            return _ok(_id, "Written " + __to_string(len(_sm_content)) + " chars to " + _sm_path);
+        };
+        if _sm_action == "rebuild" {
+            let _sm_out = __system("cd /home/lupin/Origin && as -o /tmp/vm.o vm/x86_64/vm_x86_64.S && ld -o vm/x86_64/vm_x86_64 /tmp/vm.o --entry=_start -static && ./origin_mcp.olang --build 2>&1");
+            return _ok(_id, "Rebuild output:\\n" + _sm_out);
+        };
+        return _err(_id, "action must be read, write, or rebuild");
+    };
     if _tool == "self_inspect" {
         let _si_heap = __to_string(__floor(__heap_used() / 1024));
         let _si_facts = __to_string(kt_fact_count());
@@ -181,7 +205,7 @@ fn _mcp_call(_id, _tool, _args) {
             + "  editor: " + __to_string(len(_si_ed)) + " files\\n"
             + "  facts: " + _si_facts + "\\n"
             + "  heap: " + _si_heap + "KB\\n"
-            + "  tools: 12");
+            + "  tools: 13");
     };
     return _err(_id, "Unknown tool: " + _tool);
 }
