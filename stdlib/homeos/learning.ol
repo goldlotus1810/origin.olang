@@ -13,9 +13,10 @@ let _qr_times = [];        // promotion timestamp
 let _dn_threshold = [3];   // fire count needed for promotion
 
 // Hebbian co-activation: track recent observations for edge creation
-let _hebb_recent = [];     // last N observed facts (sliding window)
-let _hebb_window = [5];    // window size: facts within this window co-activate
-let _hebb_min_co = [2];    // minimum co-fires to create edge
+// Use boxed array ref so functions can update it
+let _hebb_recent_box = [[]];  // box containing the recent facts array
+let _hebb_window = [5];       // window size
+let _hebb_min_co = [2];       // minimum co-fires to create edge
 
 pub fn dn_observe(fact) {
     // Check if already QR (proven) — reinforce, don't duplicate
@@ -64,28 +65,26 @@ pub fn dn_observe(fact) {
 
 fn _hebb_coactivate(fact) {
     // For each fact in recent window, this fact co-activates with it
+    let _hc_recent = _hebb_recent_box[0];
     let _hc_i = 0;
-    while _hc_i < len(_hebb_recent) {
-        let _hc_other = _hebb_recent[_hc_i];
+    while _hc_i < len(_hc_recent) {
+        let _hc_other = _hc_recent[_hc_i];
         if _hc_other != fact {
-            // Check if edge already exists in graph, if so it's already tracked
-            // Create co-activation edge: "fact --co_activates--> other"
             kg_add(fact, "co_activates", _hc_other);
         };
         let _hc_i = _hc_i + 1;
     };
     // Add to recent window
-    push(_hebb_recent, fact);
-    // Trim window to max size
-    while len(_hebb_recent) > _hebb_window[0] {
-        // Remove oldest (shift left)
+    push(_hc_recent, fact);
+    // Trim window: keep only last N items
+    if len(_hc_recent) > _hebb_window[0] {
         let _hc_new = [];
-        let _hc_j = 1;
-        while _hc_j < len(_hebb_recent) {
-            push(_hc_new, _hebb_recent[_hc_j]);
+        let _hc_j = len(_hc_recent) - _hebb_window[0];
+        while _hc_j < len(_hc_recent) {
+            push(_hc_new, _hc_recent[_hc_j]);
             let _hc_j = _hc_j + 1;
         };
-        let _hebb_recent = _hc_new;
+        set_at(_hebb_recent_box, 0, _hc_new);
     };
 }
 
