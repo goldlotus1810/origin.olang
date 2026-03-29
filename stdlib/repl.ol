@@ -324,7 +324,7 @@ pub fn repl_eval(input) {
       return _rr_content;
     };
   }
-  // Write file (overwrite — restricted to test/ and docs/ for safety)
+  // Write file (overwrite — allowed: test/ docs/ stdlib/)
   if len(src) > 6 {
     if __substr(src, 0, 6) == "write " {
       let _ww_rest = __substr(src, 6, len(src));
@@ -335,15 +335,49 @@ pub fn repl_eval(input) {
       };
       if _ww_sp > 0 {
         let _ww_path = substr(_ww_rest, 0, _ww_sp);
-        // Safety: only allow test/ and docs/
         let _ww_safe = 0;
         if len(_ww_path) >= 5 { if __substr(_ww_path, 0, 5) == "test/" { let _ww_safe = 1; }; };
         if len(_ww_path) >= 5 { if __substr(_ww_path, 0, 5) == "docs/" { let _ww_safe = 1; }; };
-        if _ww_safe == 0 { return "Safety: write only to test/ or docs/"; };
+        if len(_ww_path) >= 7 { if __substr(_ww_path, 0, 7) == "stdlib/" { let _ww_safe = 2; }; };
+        if _ww_safe == 0 { return "Safety: write only to test/ docs/ stdlib/"; };
+        // stdlib writes tracked via git (no runtime backup needed)
         let _ww_content = substr(_ww_rest, _ww_sp + 1, len(_ww_rest));
         __file_write(_ww_path, _ww_content);
+        if _ww_safe == 2 { return "Written " + __to_string(len(_ww_content)) + " chars to " + _ww_path + " (backup: " + _ww_path + ".bak)"; };
         return "Written " + __to_string(len(_ww_content)) + " chars to " + _ww_path;
       };
+    };
+  }
+  // Replace: find and replace text in a file (self-modification)
+  if len(src) > 8 {
+    if __substr(src, 0, 8) == "replace " {
+      // replace <path> <old> → <new>
+      let _rp_rest = __substr(src, 8, len(src));
+      // Parse: first word = path
+      let _rp_sp1 = 0;
+      while _rp_sp1 < len(_rp_rest) { if __char_code(char_at(_rp_rest, _rp_sp1)) == 32 { break; }; let _rp_sp1 = _rp_sp1 + 1; };
+      let _rp_path = substr(_rp_rest, 0, _rp_sp1);
+      let _rp_body = substr(_rp_rest, _rp_sp1 + 1, len(_rp_rest));
+      // Find "|||" separator
+      let _rp_arrow = _pl_find_in(_rp_body, "|||");
+      if _rp_arrow < 0 { return "Usage: replace <path> <old>|||<new>"; };
+      let _rp_old = substr(_rp_body, 0, _rp_arrow);
+      let _rp_new = substr(_rp_body, _rp_arrow + 3, len(_rp_body));
+      // Safety check
+      let _rp_safe = 0;
+      if len(_rp_path) >= 7 { if __substr(_rp_path, 0, 7) == "stdlib/" { let _rp_safe = 1; }; };
+      if len(_rp_path) >= 5 { if __substr(_rp_path, 0, 5) == "test/" { let _rp_safe = 1; }; };
+      if _rp_safe == 0 { return "Safety: replace only in stdlib/ or test/"; };
+      // Read file
+      let _rp_content = __file_read(_rp_path);
+      if len(_rp_content) == 0 { return "Error: cannot read " + _rp_path; };
+      // Find old text
+      let _rp_pos = _pl_find_in(_rp_content, _rp_old);
+      if _rp_pos < 0 { return "Not found: " + _rp_old; };
+      // Replace
+      let _rp_result = substr(_rp_content, 0, _rp_pos) + _rp_new + substr(_rp_content, _rp_pos + len(_rp_old), len(_rp_content));
+      __file_write(_rp_path, _rp_result);
+      return "Replaced in " + _rp_path;
     };
   }
   // Write/append to file (self-modification)
