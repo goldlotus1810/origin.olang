@@ -16,6 +16,9 @@ let _ce_stack = __array_with_cap(512);
 let _if_stack = __array_with_cap(512);
 let _break_patches = [];
 let _continue_patches = [];
+let _g_while_start = [0];     // box: current while-loop start for direct continue emit
+let _g_break_stack = [];      // stack of break-patch arrays for nesting
+let _g_cont_stack = [];       // stack of continue-patch arrays for nesting
 let _ce_locals = __array_with_cap(256);
 let _ce_lc = [0];
 let __const_names = [];
@@ -463,32 +466,34 @@ fn compile_expr(state, expr) {
             // Short-circuit for && and ||
             if op == "&&" {
                 // Short-circuit: Dup → Jz(end) → Pop → rhs → end
-                // Save rhs before compile_expr(lhs) — overwrites global rhs
                 push(_ce_stack, rhs);
                 compile_expr(state, lhs);
                 let _and_rhs = pop(_ce_stack);
                 emit_op(state, make_op_simple("Dup"));
-                let jz_pos = current_pos(state);
+                let _and_jz = current_pos(state);
                 emit_op(state, make_op_num("Jz", 0));
                 emit_op(state, make_op_simple("Pop"));
+                push(_ce_stack, _and_jz);
                 compile_expr(state, _and_rhs);
-                patch_jump(state, jz_pos, current_pos(state));
+                let _and_jz = pop(_ce_stack);
+                patch_jump(state, _and_jz, current_pos(state));
             } else {
                 if op == "||" {
                     // Short-circuit: Dup → Jz(false) → Jmp(end) → false: Pop → rhs → end
-                    // Save rhs before compile_expr(lhs) — lhs compilation overwrites global rhs
                     push(_ce_stack, rhs);
                     compile_expr(state, lhs);
                     let _or_rhs = pop(_ce_stack);
                     emit_op(state, make_op_simple("Dup"));
-                    let jz_pos = current_pos(state);
+                    let _or_jz = current_pos(state);
                     emit_op(state, make_op_num("Jz", 0));
-                    let jmp_pos = current_pos(state);
+                    let _or_jmp = current_pos(state);
                     emit_op(state, make_op_num("Jmp", 0));
-                    patch_jump(state, jz_pos, current_pos(state));
+                    patch_jump(state, _or_jz, current_pos(state));
                     emit_op(state, make_op_simple("Pop"));
+                    push(_ce_stack, _or_jmp);
                     compile_expr(state, _or_rhs);
-                    patch_jump(state, jmp_pos, current_pos(state));
+                    let _or_jmp = pop(_ce_stack);
+                    patch_jump(state, _or_jmp, current_pos(state));
                 } else {
                     push(_ce_stack, op);
                     push(_ce_stack, rhs);
@@ -1379,16 +1384,20 @@ fn compile_expr(state, expr) {
         let then_expr = __enum_field(expr, 1);
         let else_expr = __enum_field(expr, 2);
         compile_expr(state, cond);
-        let jz_pos = current_pos(state);
+        let _ie_jz = current_pos(state);
         emit_op(state, make_op_num("Jz", 0));
         emit_op(state, make_op_simple("Pop"));
+        push(_ce_stack, _ie_jz);
         compile_expr(state, then_expr);
-        let jmp_pos = current_pos(state);
+        let _ie_jz = pop(_ce_stack);
+        let _ie_jmp = current_pos(state);
         emit_op(state, make_op_num("Jmp", 0));
-        patch_jump(state, jz_pos, current_pos(state));
+        patch_jump(state, _ie_jz, current_pos(state));
         emit_op(state, make_op_simple("Pop"));
+        push(_ce_stack, _ie_jmp);
         compile_expr(state, else_expr);
-        patch_jump(state, jmp_pos, current_pos(state));
+        let _ie_jmp = pop(_ce_stack);
+        patch_jump(state, _ie_jmp, current_pos(state));
     } else { if __match_enum(expr, "Expr::MolLiteral") == 1 {
         let packed = __enum_field(expr, 0);
         // packed u16 [S:4][R:4][V:3][A:3][T:2] — already packed by parser
@@ -1402,19 +1411,32 @@ fn compile_expr(state, expr) {
         let subj_name = "__match_subj";
         emit_op(state, make_op_name("Store", subj_name));
             push_local(state, subj_name);
-            let _m_mi = 0;
-            while _m_mi < 32 { set_at(__g_mej, _m_mi, -1); _m_mi = _m_mi + 1; };
-            let ai = 0;
             let _m_num_arms = len(arms);
             if _m_num_arms > 32 { emit "Error: match too many arms (max 32)"; };
+            // Save arm data to locals BEFORE loop (nested match re-parse corrupts globals)
+            let _m_local_pats = [];
+            let _m_local_bss = [];
+            let _m_local_bes = [];
+            let _m_local_tokens = __g_ma_tokens;
+            let _m_local_mej = __array_range(32);
+            let _m_ci = 0;
+            while _m_ci < _m_num_arms {
+                push(_m_local_pats, __array_get(__g_ma_pats, _m_ci));
+                push(_m_local_bss, __array_get(__g_ma_bss, _m_ci));
+                push(_m_local_bes, __array_get(__g_ma_bes, _m_ci));
+                _m_ci = _m_ci + 1;
+            };
+            let _m_mi = 0;
+            while _m_mi < 32 { set_at(_m_local_mej, _m_mi, -1); _m_mi = _m_mi + 1; };
+            let ai = 0;
             while ai < _m_num_arms {
-                // Read pattern + body token range from GLOBALS (dict fields corrupt)
+                // Read pattern + body token range from LOCALS (safe from nested match)
                 let _m_pattern = "";
                 let _m_body_s = 0;
                 let _m_body_e = 0;
-                _m_pattern = __array_get(__g_ma_pats, ai);
-                _m_body_s = __array_get(__g_ma_bss, ai);
-                _m_body_e = __array_get(__g_ma_bes, ai);
+                _m_pattern = __array_get(_m_local_pats, ai);
+                _m_body_s = __array_get(_m_local_bss, ai);
+                _m_body_e = __array_get(_m_local_bes, ai);
                 let _m_bindings = _m_bindings;
                 let _m_body = _m_body;
                 if _m_pattern != "_" {
@@ -1456,7 +1478,7 @@ fn compile_expr(state, expr) {
                     let _m_skip_jmp = current_pos(state);
                     emit_jmp(state, 0);              // skip → body_start
                     let _mej_pos = current_pos(state);
-                    set_at(__g_mej, ai, _mej_pos);
+                    set_at(_m_local_mej, ai, _mej_pos);
 
 
 
@@ -1471,7 +1493,7 @@ fn compile_expr(state, expr) {
                     // Compile arm body via re-parse
                     let _m_bpos = _m_body_s + 1;
                     while _m_bpos < (_m_body_e - 1) {
-                        let _m_bp2 = new_parser(__g_ma_tokens);
+                        let _m_bp2 = new_parser(_m_local_tokens);
                         _m_bp2.pos = _m_bpos;
                         if is_symbol_tok(peek(_m_bp2), "}") { break; };
                         if is_eof(peek(_m_bp2)) { break; };
@@ -1487,7 +1509,7 @@ fn compile_expr(state, expr) {
                     let _m_wskip = current_pos(state);
                     emit_jmp(state, 0);
                     let _mej_pos = current_pos(state);
-                    set_at(__g_mej, ai, _mej_pos);
+                    set_at(_m_local_mej, ai, _mej_pos);
 
 
 
@@ -1501,7 +1523,7 @@ fn compile_expr(state, expr) {
                     patch_jump(state, _m_wskip, _m_wbody_begin);
                     let _m_wpos = _m_body_s + 1;
                     while _m_wpos < (_m_body_e - 1) {
-                        let _m_wp2 = new_parser(__g_ma_tokens);
+                        let _m_wp2 = new_parser(_m_local_tokens);
                         _m_wp2.pos = _m_wpos;
                         if is_symbol_tok(peek(_m_wp2), "}") { break; };
                         if is_eof(peek(_m_wp2)) { break; };
@@ -1519,7 +1541,7 @@ fn compile_expr(state, expr) {
             emit_op(state, make_op_num("PushNum", 0));
             let _m_pi = 0;
             while _m_pi < _m_num_arms {
-                let _m_pj = __array_get(__g_mej, _m_pi);
+                let _m_pj = __array_get(_m_local_mej, _m_pi);
                 if _m_pj >= 0 { patch_jump(state, _m_pj, _m_end); };
                 _m_pi = _m_pi + 1;
             };
@@ -1908,13 +1930,13 @@ fn compile_stmt(state, stmt) {
     } else { if __match_enum(stmt, "Stmt::WhileStmt") == 1 {
         let cond = __enum_field(stmt, 0);
         let body = __enum_field(stmt, 1);
-        // Save outer break/continue context
-        let _wl_old_breaks = _break_patches;
-        let _wl_old_conts = _continue_patches;
-        let _break_patches = [];
-        let _continue_patches = [];
+        // Push new break/continue arrays onto global stacks (avoids scope collision)
+        push(_g_break_stack, []);
+        push(_g_cont_stack, []);
         let _wl_body = body;
             let _wl_start = current_pos(state);
+            let _wl_saved_ws = _g_while_start[0];
+            set_at(_g_while_start, 0, _wl_start);
             // Re-parse condition from tokens (avoids dict corruption)
             // WhileStmt has cond_start, cond_end, tokens fields
             let _wl_cond_start = stmt.cond_start;
@@ -1940,32 +1962,29 @@ fn compile_stmt(state, stmt) {
                 push(_ce_stack, _wl_body);
                 push(_ce_stack, _wl_jz);
                 push(_ce_stack, _wl_start);
+                push(_ce_stack, _wl_saved_ws);
                 push(_ce_stack, _wl_bi);
                 compile_stmt(state, _wl_body[_wl_bi]);
                 let _wl_bi = pop(_ce_stack);
+                let _wl_saved_ws = pop(_ce_stack);
                 let _wl_start = pop(_ce_stack);
                 let _wl_jz = pop(_ce_stack);
                 let _wl_body = pop(_ce_stack);
                 let _wl_bi = _wl_bi + 1;
             };
-            // Patch continue → _wl_start
-            let _wl_cp = 0;
-            while _wl_cp < len(_continue_patches) {
-                patch_jump(state, _continue_patches[_wl_cp], _wl_start);
-                let _wl_cp = _wl_cp + 1;
-            };
-            emit_jmp(state, _wl_start);
+            emit_jmp(state, _g_while_start[0]);
             // Patch break → after loop
             let _wl_exit = current_pos(state);
             patch_jump(state, _wl_jz, _wl_exit);
-            let _bp_i = 0;
-            while _bp_i < len(_break_patches) {
-                patch_jump(state, _break_patches[_bp_i], _wl_exit);
-                let _bp_i = _bp_i + 1;
+            let _wl_bp_arr = pop(_g_break_stack);
+            let _wl_bp_i = 0;
+            while _wl_bp_i < len(_wl_bp_arr) {
+                patch_jump(state, _wl_bp_arr[_wl_bp_i], _wl_exit);
+                let _wl_bp_i = _wl_bp_i + 1;
             };
+            pop(_g_cont_stack);
             // Restore outer context
-        let _break_patches = _wl_old_breaks;
-        let _continue_patches = _wl_old_conts;
+        set_at(_g_while_start, 0, _wl_saved_ws);
     } else { if __match_enum(stmt, "Stmt::ForStmt") == 1 {
         let var = __enum_field(stmt, 0);
         let iter = __enum_field(stmt, 1);
@@ -1990,11 +2009,9 @@ fn compile_stmt(state, stmt) {
             let _fl_idx = "__for_" + _fl_d + "_idx";
             _g_for_depth = _g_for_depth + 1;
 
-            // Save outer break/continue context
-            let _fl_old_breaks = _break_patches;
-            let _fl_old_conts = _continue_patches;
-            let _break_patches = [];
-            let _continue_patches = [];
+            // Push new break/continue arrays onto global stacks
+            push(_g_break_stack, []);
+            push(_g_cont_stack, []);
 
             // Evaluate and store iterator (re-parse from tokens — dict field corrupt)
             let _fl_ip = new_parser(__g_fi_tokens);
@@ -2092,23 +2109,21 @@ fn compile_stmt(state, stmt) {
             // Patch break + exit
             let _fl_exit = current_pos(state);
             patch_jump(state, _fl_jz, _fl_exit);
+            let _fl_bp_arr = pop(_g_break_stack);
             let _fl_bp = 0;
-            while _fl_bp < len(_break_patches) {
-                patch_jump(state, _break_patches[_fl_bp], _fl_exit);
+            while _fl_bp < len(_fl_bp_arr) {
+                patch_jump(state, _fl_bp_arr[_fl_bp], _fl_exit);
                 let _fl_bp = _fl_bp + 1;
             };
-            // Restore
-            let _break_patches = _fl_old_breaks;
-            let _continue_patches = _fl_old_conts;
+            pop(_g_cont_stack);
         _g_for_depth = _g_for_depth - 1;
     } else { if __match_enum(stmt, "Stmt::BreakStmt") == 1 {
         let _brk_pos = current_pos(state);
         emit_op(state, make_op_num("Jmp", 0));
-        push(_break_patches, _brk_pos);
+        push(_g_break_stack[len(_g_break_stack) - 1], _brk_pos);
     } else { if __match_enum(stmt, "Stmt::ContinueStmt") == 1 {
-        let _cont_pos = current_pos(state);
-        emit_op(state, make_op_num("Jmp", 0));
-        push(_continue_patches, _cont_pos);
+        // Emit jump directly to while-loop start (avoid deferred patch corruption)
+        emit_jmp(state, _g_while_start[0]);
     } else { if __match_enum(stmt, "Stmt::TypeDef") == 1 {
         let name = __enum_field(stmt, 0);
         let fields = __enum_field(stmt, 1);

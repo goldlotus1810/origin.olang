@@ -108,19 +108,6 @@ fn compile_all(_ca_stdlib_path) {
   compile_dir("stdlib/homeos", _ca_all_bc);
   emit "  (stdlib/homeos/editor skipped for boot test)";
 
-  // Debug: emit "BOOT OK" before final Halt to confirm all files executed
-  // Push "BOOT OK" string: [0x01][len:2][molecules]
-  let _boot_msg = "BOOT_OK";
-  push(_ca_all_bc, 1);  // Push opcode
-  push(_ca_all_bc, len(_boot_msg) % 256);
-  push(_ca_all_bc, 0);
-  let _bm_i = 0;
-  while _bm_i < len(_boot_msg) {
-    push(_ca_all_bc, __char_code(char_at(_boot_msg, _bm_i)));
-    push(_ca_all_bc, 33);  // 0x21 molecule high byte
-    _bm_i = _bm_i + 1;
-  };
-  push(_ca_all_bc, 6);   // Emit opcode
   // Final Halt
   push(_ca_all_bc, 15);
   return _ca_all_bc;
