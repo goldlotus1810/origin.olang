@@ -716,6 +716,123 @@ run_olang_test "cmp/ge" \
 run_olang_test "cmp/ne" \
     'emit __to_string(1!=2);' "1"
 
+# ─── SECTION: Types/Structs ──────────────────────────────────
+echo -e "${CYAN}── Types ──${NC}"
+
+run_olang_test "type/struct_create" \
+    'type Point{x:Num,y:Num};let p=Point{x:3,y:4};emit p.x;' "3"
+
+run_olang_test "type/struct_field" \
+    'type Rect{w:Num,h:Num};let r=Rect{w:10,h:5};emit r.w*r.h;' "50"
+
+run_olang_test "type/struct_fn" \
+    'type V{x:Num};fn mag(v){return v.x*v.x;};emit mag(V{x:7});' "49"
+
+run_olang_test "type/struct_pass" \
+    'type V{x:Num};fn get(v){return v.x;};let a=V{x:99};emit get(a);' "99"
+
+# ─── SECTION: String interpolation ──────────────────────────
+echo -e "${CYAN}── Interpolation ──${NC}"
+
+run_olang_test "interp/basic" \
+    'let x=42;emit $"val={x}";' "val=42"
+
+run_olang_test "interp/expr" \
+    'let a=3;let b=4;emit $"{a}+{b}={a+b}";' "3+4=7"
+
+run_olang_test "interp/string" \
+    'let name="Nox";emit $"Hello {name}!";' "Hello Nox!"
+
+# ─── SECTION: Factorial/recursion ────────────────────────────
+echo -e "${CYAN}── Recursion ──${NC}"
+
+run_olang_test "recurse/factorial" \
+    'fn fact(n){if n<=1{return 1;};return n*fact(n-1);};emit fact(10);' "3628800"
+
+run_olang_test "recurse/gcd" \
+    'fn gcd(a,b){if b==0{return a;};return gcd(b,a%b);};emit gcd(48,18);' "6"
+
+run_olang_test "recurse/power" \
+    'fn pow(b,e){if e==0{return 1;};return b*pow(b,e-1);};emit pow(2,10);' "1024"
+
+run_olang_test "recurse/sum_list" \
+    'fn sum(a,i){if i>=len(a){return 0;};return a[i]+sum(a,i+1);};emit sum([10,20,30,40],0);' "100"
+
+# ─── SECTION: Complex patterns ──────────────────────────────
+echo -e "${CYAN}── Complex ──${NC}"
+
+run_olang_test "complex/fizzbuzz" \
+    'let r="";let i=1;while i<=15{if i%15==0{r=r+"FizzBuzz ";}else{if i%3==0{r=r+"Fizz ";}else{if i%5==0{r=r+"Buzz ";}else{r=r+__to_string(i)+" ";};};};let i=i+1;};emit r;' "1 2 Fizz 4 Buzz Fizz 7 8 Fizz Buzz 11 Fizz 13 14 FizzBuzz "
+
+run_olang_test "complex/array_build" \
+    'let a=[];let i=0;while i<5{push(a,i*i);let i=i+1;};emit a;' "[0, 1, 4, 9, 16]"
+
+run_olang_test "complex/max" \
+    'fn max(a,b){if a>b{return a;};return b;};emit max(max(3,7),max(5,2));' "7"
+
+run_olang_test "complex/count_if" \
+    'fn count(a,f){let r=0;for x in a{if f(x){r=r+1;};};return r;};emit count([1,2,3,4,5,6],fn(x){return x%2==0;});' "3"
+
+run_olang_test "complex/sum_even" \
+    'let r=0;for x in [1,2,3,4,5,6,7,8]{if x%2==0{r=r+x;};};emit r;' "20"
+
+run_olang_test "complex/closure_counter" \
+    'fn mk(start){return fn(n){return start+n;};};let f=mk(100);emit __to_string(f(1))+" "+__to_string(f(50));' "101 150"
+
+# ─── SECTION: Pipe operator ─────────────────────────────────
+echo -e "${CYAN}── Pipe ──${NC}"
+
+run_olang_test "pipe/basic" \
+    'fn double(x){return x*2;};fn inc(x){return x+1;};emit 5 |> double |> inc;' "11"
+
+run_olang_test "pipe/chain" \
+    'fn sq(x){return x*x;};fn neg(x){return 0-x;};emit 3 |> sq |> neg;' "-9"
+
+# ─── SECTION: Const declarations ────────────────────────────
+echo -e "${CYAN}── Const ──${NC}"
+
+run_olang_test "const/basic" \
+    'const PI=3;emit PI;' "3"
+
+run_olang_test "const/use_in_fn" \
+    'const MAX=100;fn check(x){if x>MAX{return "over";};return "ok";};emit check(50)+" "+check(200);' "ok over"
+
+# ─── SECTION: Scope & assignment ─────────────────────────────
+echo -e "${CYAN}── Scope ──${NC}"
+
+run_olang_test "scope/shadow" \
+    'let x=1;fn f(){let x=2;return x;};emit __to_string(f())+" "+__to_string(x);' "2 1"
+
+run_olang_test "scope/reassign_outer" \
+    'let x=10;fn f(){x=20;};f();emit x;' "20"
+
+run_olang_test "scope/loop_var" \
+    'let r=0;let i=0;while i<3{let x=i*10;r=r+x;let i=i+1;};emit r;' "30"
+
+# ─── SECTION: HOF patterns ──────────────────────────────────
+echo -e "${CYAN}── HOF patterns ──${NC}"
+
+run_olang_test "hof/any_true" \
+    'emit __to_string(any([1,3,5,7],fn(x){return x>6;}));' "1"
+
+run_olang_test "hof/any_false" \
+    'emit __to_string(any([1,3,5],fn(x){return x>10;}));' "0"
+
+run_olang_test "hof/all_true" \
+    'emit __to_string(all([2,4,6],fn(x){return x%2==0;}));' "1"
+
+run_olang_test "hof/all_false" \
+    'emit __to_string(all([2,4,5],fn(x){return x%2==0;}));' "0"
+
+run_olang_test "hof/map_string" \
+    'emit map(["a","b","c"],fn(s){return s+s;});' "[aa, bb, cc]"
+
+run_olang_test "hof/filter_empty" \
+    'emit filter([1,2,3],fn(x){return x>10;});' "[]"
+
+run_olang_test "hof/pipe_chain" \
+    'fn dbl(x){return x*2;};fn add1(x){return x+1;};fn sq(x){return x*x;};emit 3 |> dbl |> add1 |> sq;' "49"
+
 # ─── SECTION: Closure capture tests ─────────────────────────
 echo -e "${CYAN}── Closure capture ──${NC}"
 
@@ -815,6 +932,11 @@ sb_test "selfbuild/for_break" 'let r=0;for x in [1,2,3,4,5]{if x==4{break;};r=r+
 sb_test "selfbuild/closure_adder" 'fn mk(x){return fn(y){return x+y;};};let a=mk(100);emit a(23);' "123"
 sb_test "selfbuild/logic_sc" 'emit __to_string(1==1 && 2==2);' "1"
 sb_test "selfbuild/for_continue" 'let r=0;for x in [1,2,3,4,5]{if x==3{continue;};r=r+x;};emit r;' "12"
+sb_test "selfbuild/struct"  'type P{x:Num,y:Num};let p=P{x:3,y:4};emit p.x+p.y;' "7"
+sb_test "selfbuild/interp"  'let n="Nox";emit $"Hi {n}";' "Hi Nox"
+sb_test "selfbuild/fact"    'fn f(n){if n<=1{return 1;};return n*f(n-1);};emit f(10);' "3628800"
+sb_test "selfbuild/pipe"    'fn d(x){return x*2;};emit 5 |> d;' "10"
+sb_test "selfbuild/fizz"    'let r="";let i=1;while i<=5{if i%3==0{r=r+"F";}else{r=r+__to_string(i);};let i=i+1;};emit r;' "12F45"
 echo -e "\n${CYAN}  Self-build: ${SB_PASS}/$((SB_PASS + SB_FAIL)) passed${NC}"
 fi
 
