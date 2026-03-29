@@ -542,6 +542,174 @@ fi
 
 echo ""
 
+# ─── SECTION: Break/Continue ──────────────────────────────────
+echo -e "${CYAN}── Break/Continue ──${NC}"
+
+run_olang_test "flow/break_simple" \
+    'let i=0;while i<10{if i==3{break;};let i=i+1;};emit i;' "3"
+
+run_olang_test "flow/break_nested" \
+    'let r="";let i=0;while i<3{let j=0;while j<3{if j==2{break;};r=r+__to_string(j);let j=j+1;};let i=i+1;};emit r;' "010101"
+
+run_olang_test "flow/continue_simple" \
+    'let r=0;let i=0;while i<5{let i=i+1;if i==3{continue;};r=r+i;};emit r;' "12"
+
+run_olang_test "flow/continue_nested" \
+    'let r=0;let i=0;while i<3{let i=i+1;let j=0;while j<3{let j=j+1;if j==2{continue;};r=r+1;};};emit r;' "6"
+
+run_olang_test "flow/break_value" \
+    'let r=0;let i=0;while i<100{r=r+i;if r>10{break;};let i=i+1;};emit r;' "15"
+
+# ─── SECTION: Match expressions ──────────────────────────────
+echo -e "${CYAN}── Match ──${NC}"
+
+run_olang_test "match/number" \
+    'let x=2;match x{1=>{emit "one";},2=>{emit "two";},_=>{emit "other";}};' "two"
+
+run_olang_test "match/wildcard" \
+    'let x=99;match x{1=>{emit "a";},_=>{emit "wild";}};' "wild"
+
+run_olang_test "match/string" \
+    'let s="hi";match s{"hi"=>{emit "hello";},_=>{emit "?";}};' "hello"
+
+run_olang_test "match/in_fn" \
+    'fn check(x){match x{1=>{return "one";},2=>{return "two";},_=>{return "?";}};};emit check(2);' "two"
+
+# ─── SECTION: For loops ─────────────────────────────────────
+echo -e "${CYAN}── For loops ──${NC}"
+
+run_olang_test "for/basic" \
+    'let r=0;for i in [1,2,3,4,5]{r=r+i;};emit r;' "15"
+
+run_olang_test "for/string" \
+    'let r="";for s in ["a","b","c"]{r=r+s;};emit r;' "abc"
+
+run_olang_test "for/nested" \
+    'let r=0;for i in [1,2,3]{for j in [10,20]{r=r+i+j;};};emit r;' "102"
+
+run_olang_test "for/break" \
+    'let r=0;for i in [1,2,3,4,5]{if i==4{break;};r=r+i;};emit r;' "6"
+
+# ─── SECTION: Nested control flow ───────────────────────────
+echo -e "${CYAN}── Nested flow ──${NC}"
+
+run_olang_test "nested/if_in_while" \
+    'let r="";let i=0;while i<5{if i%2==0{r=r+"E";}else{r=r+"O";};let i=i+1;};emit r;' "EOEOE"
+
+run_olang_test "nested/while_in_if" \
+    'let r=0;if 1==1{let i=0;while i<5{r=r+i;let i=i+1;};};emit r;' "10"
+
+run_olang_test "nested/triple_while" \
+    'let r=0;let a=0;while a<2{let b=0;while b<2{let c=0;while c<2{r=r+1;let c=c+1;};let b=b+1;};let a=a+1;};emit r;' "8"
+
+run_olang_test "nested/fn_in_while" \
+    'fn sq(x){return x*x;};let r=0;let i=1;while i<=3{r=r+sq(i);let i=i+1;};emit r;' "14"
+
+# ─── SECTION: Edge cases ────────────────────────────────────
+echo -e "${CYAN}── Edge cases ──${NC}"
+
+run_olang_test "edge/empty_array" \
+    'let a=[];emit len(a);' "0"
+
+run_olang_test "edge/empty_string" \
+    'emit len("");' "0"
+
+run_olang_test "edge/zero" \
+    'emit 0;' "0"
+
+run_olang_test "edge/negative" \
+    'emit 0-5;' "-5"
+
+run_olang_test "edge/bool_true" \
+    'emit __to_string(1==1);' "1"
+
+run_olang_test "edge/bool_false" \
+    'emit __to_string(1==2);' "0"
+
+run_olang_test "edge/large_number" \
+    'emit 1000000*1000000;' "1000000000000"
+
+run_olang_test "edge/string_escape" \
+    'emit "a\\tb";' "a\tb"
+
+run_olang_test "edge/array_of_arrays" \
+    'let a=[[1,2],[3,4]];emit len(a);' "2"
+
+run_olang_test "edge/recursive_deep" \
+    'fn f(n){if n==0{return 0;};return 1+f(n-1);};emit f(100);' "100"
+
+# ─── SECTION: Advanced functions ─────────────────────────────
+echo -e "${CYAN}── Advanced fn ──${NC}"
+
+run_olang_test "fn/multireturn" \
+    'fn test(x){if x>0{return "pos";};if x<0{return "neg";};return "zero";};emit test(5)+" "+test(0-1)+" "+test(0);' "pos neg zero"
+
+run_olang_test "fn/fib20" \
+    'fn fib(n){if n<2{return n;};return fib(n-1)+fib(n-2);};emit fib(20);' "6765"
+
+run_olang_test "fn/mutual" \
+    'fn isE(n){if n==0{return 1;};return isO(n-1);};fn isO(n){if n==0{return 0;};return isE(n-1);};emit __to_string(isE(10))+" "+__to_string(isO(10));' "1 0"
+
+run_olang_test "fn/default_scope" \
+    'let x=10;fn f(){return x;};emit f();' "10"
+
+# ─── SECTION: String operations extended ─────────────────────
+echo -e "${CYAN}── String ext ──${NC}"
+
+run_olang_test "string/repeat" \
+    'let r="";let i=0;while i<5{r=r+"x";let i=i+1;};emit r;' "xxxxx"
+
+run_olang_test "string/char_code" \
+    'emit __char_code("A");' "65"
+
+run_olang_test "string/chr" \
+    'emit __chr(65);' "A"
+
+run_olang_test "string/to_string" \
+    'emit __to_string(42);' "42"
+
+run_olang_test "string/to_num" \
+    'emit to_num("123")+1;' "124"
+
+# ─── SECTION: Array operations extended ──────────────────────
+echo -e "${CYAN}── Array ext ──${NC}"
+
+run_olang_test "array/range" \
+    'let a=__array_range(5);emit len(a);' "5"
+
+run_olang_test "array/get" \
+    'let a=[10,20,30];emit __array_get(a,1);' "20"
+
+run_olang_test "array/sort_dup" \
+    'let a=[3,1,4,1,5];emit sort(a);' "[1, 1, 3, 4, 5]"
+
+run_olang_test "array/filter_gt" \
+    'let a=filter([1,2,3,4,5],fn(x){return x>3;});emit a;' "[4, 5]"
+
+run_olang_test "array/map_square" \
+    'emit map([1,2,3],fn(x){return x*x;});' "[1, 4, 9]"
+
+# ─── SECTION: Logic/comparison extended ──────────────────────
+echo -e "${CYAN}── Logic ext ──${NC}"
+
+run_olang_test "logic/chain_and" \
+    'emit __to_string(1==1 && 2==2 && 3==3);' "1"
+
+run_olang_test "logic/chain_or" \
+    'emit __to_string(0==1 || 0==2 || 1==1);' "1"
+
+run_olang_test "logic/mixed" \
+    'emit __to_string((1==1 && 2==3) || (3==3 && 4==4));' "1"
+
+run_olang_test "cmp/le" \
+    'emit __to_string(3<=3);' "1"
+
+run_olang_test "cmp/ge" \
+    'emit __to_string(5>=5);' "1"
+
+run_olang_test "cmp/ne" \
+    'emit __to_string(1!=2);' "1"
+
 # ─── SECTION: Closure capture tests ─────────────────────────
 echo -e "${CYAN}── Closure capture ──${NC}"
 
@@ -633,6 +801,13 @@ sb_test "selfbuild/array"  'let a=[1,2,3]; push(a,4); emit len(a);' "4"
 sb_test "selfbuild/sort"   'emit sort([5,3,1,4,2]);'           "1, 2, 3, 4, 5"
 sb_test "selfbuild/map"    'emit map([1,2,3], fn(x){return x*10;});' "10, 20, 30"
 sb_test "selfbuild/sha256" 'emit __sha256("abc");'             "ba7816bf"
+sb_test "selfbuild/break"  'let i=0;while i<10{if i==5{break;};let i=i+1;};emit i;' "5"
+sb_test "selfbuild/continue" 'let r=0;let i=0;while i<5{let i=i+1;if i==3{continue;};r=r+i;};emit r;' "12"
+sb_test "selfbuild/match"  'let x=2;match x{1=>{emit "a";},2=>{emit "b";},_=>{emit "c";}};' "b"
+sb_test "selfbuild/nested_while" 'let r=0;let i=0;while i<3{let j=0;while j<3{r=r+1;let j=j+1;};let i=i+1;};emit r;' "9"
+sb_test "selfbuild/for_break" 'let r=0;for x in [1,2,3,4,5]{if x==4{break;};r=r+x;};emit r;' "6"
+sb_test "selfbuild/closure_adder" 'fn mk(x){return fn(y){return x+y;};};let a=mk(100);emit a(23);' "123"
+sb_test "selfbuild/logic_sc" 'emit __to_string(1==1 && 2==2);' "1"
 echo -e "\n${CYAN}  Self-build: ${SB_PASS}/$((SB_PASS + SB_FAIL)) passed${NC}"
 fi
 
