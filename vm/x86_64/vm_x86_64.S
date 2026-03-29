@@ -1362,6 +1362,9 @@ op_call:
     movabs  $0xA5845725C8B01606, %rdx
     cmp     %rdx, %rax
     je      .call_file_read_bytes
+    movabs  $0xA6097EB1CA418D06, %rdx
+    cmp     %rdx, %rax
+    je      .call_fd_close
     jmp     .call_not_builtin
 
 .builtin_slot_10:
@@ -1449,6 +1452,9 @@ op_call:
     movabs  $0xB2E2F645F237541B, %rdx
     cmp     %rdx, %rax
     je      .call_bytes_new
+    movabs  $0xC2FAFED09F36E21B, %rdx
+    cmp     %rdx, %rax
+    je      .call_fd_ioctl
     jmp     .call_not_builtin
 
 .builtin_slot_28:
@@ -1595,6 +1601,12 @@ op_call:
     je      .call_file_write
     jmp     .call_not_builtin
 
+.builtin_slot_98:
+    movabs  $0xC60CB074703A7C62, %rdx
+    cmp     %rdx, %rax
+    je      .call_fd_open
+    jmp     .call_not_builtin
+
 .builtin_slot_101:
     movabs  $0xB810EF14843FBB65, %rdx
     cmp     %rdx, %rax
@@ -1698,6 +1710,9 @@ op_call:
     movabs  $0x31F6E47C4AE5A082, %rdx
     cmp     %rdx, %rax
     je      .call_bit_or
+    movabs  $0xC7FBC9042B95D482, %rdx
+    cmp     %rdx, %rax
+    je      .call_fd_read
     jmp     .call_not_builtin
 
 .builtin_slot_131:
@@ -1953,6 +1968,12 @@ op_call:
     movabs  $0x33D6385F6238A2E4, %rdx
     cmp     %rdx, %rax
     je      .call_stdout_on
+    jmp     .call_not_builtin
+
+.builtin_slot_229:
+    movabs  $0xD48EFC296014D4E5, %rdx
+    cmp     %rdx, %rax
+    je      .call_fd_write
     jmp     .call_not_builtin
 
 .builtin_slot_230:
@@ -8065,6 +8086,117 @@ op_ret:
     mov     %rax, 8(%r14)
     jmp     vm_loop
 
+# ── Raw FD operations: Nox controls everything ──────────────────
+
+.call_fd_open:
+    # __fd_open(path_str, flags) → fd number
+    # flags: 0=O_RDONLY, 1=O_WRONLY, 2=O_RDWR, 65=O_WRONLY|O_CREAT
+    add     %rcx, %r13
+    movsd   (%r14), %xmm0              # flags
+    cvttsd2si %xmm0, %rsi              # rsi = flags
+    add     $16, %r14
+    mov     (%r14), %rdi               # path chain ptr
+    mov     8(%r14), %rdx              # mol count
+    add     $16, %r14
+    # Decode string → ASCII on heap
+    push    %rsi                        # save flags
+    mov     %r15, %r8                   # decode buf
+    mov     %rdx, %rcx
+    test    %rcx, %rcx
+    jz      .fd_open_empty
+.fd_open_decode:
+    movzwl  (%rdi), %eax
+    movb    %al, (%r15)
+    add     $2, %rdi
+    inc     %r15
+    dec     %rcx
+    jnz     .fd_open_decode
+    movb    $0, (%r15)                  # null terminate
+    inc     %r15
+.fd_open_empty:
+    pop     %rsi                        # restore flags
+    mov     %r8, %rdi                   # path
+    mov     $0x1B6, %edx               # mode 0666
+    mov     $2, %eax                    # SYS_open
+    syscall
+    sub     $16, %r14
+    cvtsi2sd %rax, %xmm0              # fd as f64
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+.call_fd_write:
+    # __fd_write(fd, bytes_buf, len) → bytes written
+    add     %rcx, %r13
+    movsd   (%r14), %xmm0              # len
+    cvttsd2si %xmm0, %rdx
+    add     $16, %r14
+    mov     (%r14), %rsi               # bytes_buf ptr
+    add     $16, %r14
+    movsd   (%r14), %xmm0              # fd
+    cvttsd2si %xmm0, %rdi
+    add     $16, %r14
+    mov     $1, %eax                    # SYS_write
+    syscall
+    sub     $16, %r14
+    cvtsi2sd %rax, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+.call_fd_read:
+    # __fd_read(fd, len) → bytes_buf
+    add     %rcx, %r13
+    movsd   (%r14), %xmm0              # len
+    cvttsd2si %xmm0, %rdx
+    add     $16, %r14
+    movsd   (%r14), %xmm0              # fd
+    cvttsd2si %xmm0, %rdi
+    add     $16, %r14
+    mov     %r15, %rsi                  # read into heap
+    mov     $0, %eax                    # SYS_read
+    syscall
+    # Return as bytes buffer
+    sub     $16, %r14
+    mov     %r15, (%r14)               # buf ptr
+    mov     %rax, 8(%r14)              # bytes read
+    add     %rax, %r15                  # bump heap
+    jmp     vm_loop
+
+.call_fd_close:
+    # __fd_close(fd) → 0
+    add     %rcx, %r13
+    movsd   (%r14), %xmm0
+    cvttsd2si %xmm0, %rdi
+    add     $16, %r14
+    mov     $3, %eax                    # SYS_close
+    syscall
+    sub     $16, %r14
+    xorpd   %xmm0, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+.call_fd_ioctl:
+    # __fd_ioctl(fd, request, arg) → result
+    add     %rcx, %r13
+    movsd   (%r14), %xmm0              # arg
+    cvttsd2si %xmm0, %rdx
+    add     $16, %r14
+    movsd   (%r14), %xmm0              # request
+    cvttsd2si %xmm0, %rsi
+    add     $16, %r14
+    movsd   (%r14), %xmm0              # fd
+    cvttsd2si %xmm0, %rdi
+    add     $16, %r14
+    mov     $16, %eax                   # SYS_ioctl
+    syscall
+    sub     $16, %r14
+    cvtsi2sd %rax, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
 .call_heap_save:
     # __heap_save() → stores r15 in BSS, returns index as f64
     add     %rcx, %r13
@@ -12355,7 +12487,7 @@ builtin_jump_table:
     .quad   .builtin_slot_95
     .quad   .call_not_builtin
     .quad   .builtin_slot_97
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_98
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .builtin_slot_101
@@ -12486,7 +12618,7 @@ builtin_jump_table:
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .builtin_slot_228
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_229
     .quad   .builtin_slot_230
     .quad   .call_not_builtin
     .quad   .call_not_builtin
