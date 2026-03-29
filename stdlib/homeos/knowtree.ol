@@ -180,20 +180,40 @@ fn _kt_dim_index(_kdi_fidx, _kdi_mol) {
     push(__kt_fact_mol, _kdi_mol);
 }
 
-// Set intersection of two fact-index arrays
+// Set intersection — O(a+b) using bitmap instead of O(a×b) nested loop
+// Bitmap: 1024 slots, hash index → mark/check
+let __kt_isect_map = [];
+let __kt_isect_inited = [0];
+
 fn _kt_intersect(_kti_a, _kti_b) {
-    let _kti_out = [];
+    // Init bitmap once
+    if __array_get(__kt_isect_inited, 0) == 0 {
+        let _kti_mi = 0;
+        while _kti_mi < 1024 { push(__kt_isect_map, 0); let _kti_mi = _kti_mi + 1; };
+        let _ = __set_at(__kt_isect_inited, 0, 1);
+    };
+    // Mark set A
     let _kti_ai = 0;
     while _kti_ai < len(_kti_a) {
-        let _kti_v = __array_get(_kti_a, _kti_ai);
-        let _kti_f = [0];
-        let _kti_bi = 0;
-        while _kti_bi < len(_kti_b) {
-            if __array_get(_kti_b, _kti_bi) == _kti_v { let _ = __set_at(_kti_f, 0, 1); };
-            let _kti_bi = _kti_bi + 1;
-        };
-        if __array_get(_kti_f, 0) == 1 { push(_kti_out, _kti_v); };
+        let _kti_idx = __bit_and(__array_get(_kti_a, _kti_ai), 1023);
+        let _ = __set_at(__kt_isect_map, _kti_idx, __array_get(_kti_a, _kti_ai) + 1);
         let _kti_ai = _kti_ai + 1;
+    };
+    // Check set B against marks
+    let _kti_out = [];
+    let _kti_bi = 0;
+    while _kti_bi < len(_kti_b) {
+        let _kti_v = __array_get(_kti_b, _kti_bi);
+        let _kti_idx = __bit_and(_kti_v, 1023);
+        if __array_get(__kt_isect_map, _kti_idx) == (_kti_v + 1) { push(_kti_out, _kti_v); };
+        let _kti_bi = _kti_bi + 1;
+    };
+    // Clear marks (only the ones we set)
+    let _kti_ci = 0;
+    while _kti_ci < len(_kti_a) {
+        let _kti_idx = __bit_and(__array_get(_kti_a, _kti_ci), 1023);
+        let _ = __set_at(__kt_isect_map, _kti_idx, 0);
+        let _kti_ci = _kti_ci + 1;
     };
     return _kti_out;
 }

@@ -573,15 +573,16 @@ fn _pl_text_search(_pts_input) {
         let _pts_wi = _pts_wi + 1;
     };
     if len(_pts_qwords) == 0 { return []; };
-    // Collect all candidate facts with IDF weighting
-    // Rare words = more discriminating = higher weight
+    // Collect candidates with IDF weighting + hash dedup O(n) instead of O(n²)
     let _pts_facts = [];
     let _pts_scores = [];
+    let _pts_seen = __array_range(256);  // hash dedup: fact_hash → position+1 (0=empty)
+    let _pts_si = 0;
+    while _pts_si < 256 { let _ = __set_at(_pts_seen, _pts_si, 0); let _pts_si = _pts_si + 1; };
     let _pts_qi = 0;
     while _pts_qi < len(_pts_qwords) {
         let _pts_qw = __array_get(_pts_qwords, _pts_qi);
         let _pts_found = kt_find_fast(_pts_qw, 10);
-        // IDF weight: fewer matches = higher weight (max 5, min 1)
         let _pts_idf = 1;
         if len(_pts_found) > 0 { let _pts_idf = __floor(10 / len(_pts_found)); };
         if _pts_idf < 1 { let _pts_idf = 1; };
@@ -589,17 +590,13 @@ fn _pl_text_search(_pts_input) {
         let _pts_fi = 0;
         while _pts_fi < len(_pts_found) {
             let _pts_fact = __array_get(_pts_found, _pts_fi);
-            // Find or add to results
-            let _pts_idx = [0 - 1];
-            let _pts_di = 0;
-            while _pts_di < len(_pts_facts) {
-                if __array_get(_pts_facts, _pts_di) == _pts_fact { let _ = __set_at(_pts_idx, 0, _pts_di); };
-                let _pts_di = _pts_di + 1;
-            };
+            // Hash dedup: O(1) lookup instead of O(n) scan
+            let _pts_fh = __bit_and(_kt_word_hash(_pts_fact), 255);
+            let _pts_idx = [__array_get(_pts_seen, _pts_fh) - 1];  // -1 = not found
             if __array_get(_pts_idx, 0) >= 0 {
-                // Already seen → increment by IDF weight (rare words boost more)
-                let _pts_si = __array_get(_pts_idx, 0);
-                let _ = __set_at(_pts_scores, _pts_si, __array_get(_pts_scores, _pts_si) + _pts_idf);
+                // Already seen → increment by IDF weight
+                let _pts_existing = __array_get(_pts_idx, 0);
+                let _ = __set_at(_pts_scores, _pts_existing, __array_get(_pts_scores, _pts_existing) + _pts_idf);
             };
             if __array_get(_pts_idx, 0) < 0 {
                 // New fact — score: IDF base + position bonus + length bonus - timestamp penalty
@@ -610,8 +607,10 @@ fn _pl_text_search(_pts_input) {
                 if _pts_len_bonus > 2 { let _pts_len_bonus = 2; };
                 let _pts_ts_pen = 0;
                 if len(_pts_fact) > 0 { if __char_code(char_at(_pts_fact, 0)) == 91 { let _pts_ts_pen = 3; }; };
+                let _pts_new_pos = len(_pts_facts);
                 push(_pts_facts, _pts_fact);
                 push(_pts_scores, _pts_idf + _pts_pos_bonus + _pts_len_bonus - _pts_ts_pen);
+                let _ = __set_at(_pts_seen, _pts_fh, _pts_new_pos + 1);
             };
             let _pts_fi = _pts_fi + 1;
         };
