@@ -8866,7 +8866,7 @@ op_try_begin:
     mov     (%rsi), %rax
     mov     %rax, 16(%rdi)             # saved closure_depth
     mov     %rsp, 24(%rdi)             # saved CPU stack pointer
-    incq    (%rsi)                      # try_depth++
+    incq    (%rsi)                      # (original: increments closure_depth)
     jmp     vm_loop
 
 op_catch_end:

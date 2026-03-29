@@ -797,6 +797,10 @@ run_olang_test "const/basic" \
 run_olang_test "const/use_in_fn" \
     'const MAX=100;fn check(x){if x>MAX{return "over";};return "ok";};emit check(50)+" "+check(200);' "ok over"
 
+# ─── SECTION: Try/catch (pending VM fix for try_depth) ───────
+# TODO: try/catch tests disabled until TryBegin try_depth fix is complete
+# The VM currently increments closure_depth instead of try_depth in TryBegin
+
 # ─── SECTION: Scope & assignment ─────────────────────────────
 echo -e "${CYAN}── Scope ──${NC}"
 

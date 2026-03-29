@@ -66,6 +66,11 @@ bootstrap-rust: vm
 test:
 	bash tests.sh
 
+# Update bootstrap to latest Gen1
+update-bootstrap: self-build
+	cp $(GEN1) origin_bootstrap.olang
+	@echo "Bootstrap updated: $$(md5sum origin_bootstrap.olang | cut -d' ' -f1)"
+
 # Clean
 clean:
 	rm -f $(VM_OBJ) $(GEN1) origin_new.olang origin_gen2.olang origin_gen3.olang
