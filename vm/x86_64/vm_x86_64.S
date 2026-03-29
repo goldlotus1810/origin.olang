@@ -10523,6 +10523,16 @@ op_halt:
     pop     %rbx                        # restore bytecode size
     pop     %r13                        # restore PC
     pop     %r12                        # restore bytecode base
+    # Restore heap to checkpoint — free all temp allocations from this eval
+    # (tokens, AST, intermediate strings, compiled bytecode — all garbage now)
+    # Only skip if __heap_pin() was called (checkpoint moved forward during eval)
+    lea     repl_heap_checkpoint(%rip), %rax
+    mov     (%rax), %rcx
+    test    %rcx, %rcx
+    jz      .repl_loop                  # no checkpoint → skip restore
+    cmp     %rcx, %r15
+    jbe     .repl_loop                  # checkpoint >= r15 → nothing to free
+    mov     %rcx, %r15                  # restore heap pointer
     jmp     .repl_loop                  # back to REPL prompt
 
 .halt_mcp:
@@ -11159,6 +11169,16 @@ op_halt:
     # (was: hardcoded msg_help, caused BUG-BOOT-SHADOW)
 
 .repl_try_eval:
+    # Save heap checkpoint — restored after eval in .halt_repl
+    # Each REPL turn frees its temp allocations (tokens, AST, strings)
+    # __heap_pin() during eval moves checkpoint forward to protect persistent data
+    push    %rcx
+    push    %rdi
+    lea     repl_heap_checkpoint(%rip), %rax
+    mov     %r15, (%rax)
+    pop     %rdi
+    pop     %rcx
+
     # Construct trampoline bytecode on heap that:
     #   1. Pushes input string
     #   2. Calls repl_eval(input)
