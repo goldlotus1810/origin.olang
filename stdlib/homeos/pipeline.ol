@@ -209,8 +209,10 @@ pub fn homeostasis(_hom_input_mol, _hom_predicted_mol) {
 // σ(F − φ⁻¹): sigmoid gate, returns 0-1000
 pub fn lambda_gate(_lg_f) {
     let _lg_x = _lg_f - _phi_inv;
-    // σ(x) = 1000 / (1 + e^(-5x/1000))
     let _lg_exp_arg = (0 - 5) * _lg_x / 1000;
+    // Bounds: clamp to [-700, 700] to avoid inf/nan
+    if _lg_exp_arg > 700 { return 0; };
+    if _lg_exp_arg < -700 { return 1000; };
     let _lg_e = __exp(_lg_exp_arg);
     return __floor(1000 / (1 + _lg_e));
 }
@@ -348,7 +350,8 @@ fn _is_fact_entropy(_ife_facts) {
         let _ife_c = __array_get(_ife_counts, _ife_si);
         if _ife_c > 0 {
             // p = c/n, log2(p) = log2(c) - log2(n)
-            let _ife_p_log = __log2(_ife_c) - __log2(_ife_n);
+            let _ife_p_log = 0;
+            if _ife_c > 0 { if _ife_n > 0 { let _ife_p_log = __log2(_ife_c) - __log2(_ife_n); }; };
             let _ife_p = _ife_c / _ife_n;
             let _ife_contrib = __floor(0 - (_ife_p * _ife_p_log * 1000));
             let _ = __set_at(_ife_h, 0, __array_get(_ife_h, 0) + _ife_contrib);
@@ -411,18 +414,26 @@ fn _repair_weakest(_rw_mol, _rw_target) {
     let _rw_tv = _kt_mol_v(_rw_target);
     let _rw_ta = _kt_mol_a(_rw_target);
     let _rw_tt = _kt_mol_t(_rw_target);
-    // Find largest delta
+    // Find deltas
     let _rw_ds = _kt_abs(_rw_s - _rw_ts);
     let _rw_dr = _kt_abs(_rw_r - _rw_tr);
     let _rw_dv = _kt_abs(_rw_v - _rw_tv);
     let _rw_da = _kt_abs(_rw_a - _rw_ta);
     let _rw_dt = _kt_abs(_rw_t - _rw_tt);
-    // Move weakest dimension halfway toward target
-    let _rw_max = _rw_ds;
-    if _rw_dr > _rw_max { let _rw_max = _rw_dr; let _rw_r = __floor((_rw_r + _rw_tr) / 2); };
-    if _rw_dv > _rw_max { let _rw_max = _rw_dv; let _rw_v = __floor((_rw_v + _rw_tv) / 2); };
-    if _rw_da > _rw_max { let _rw_max = _rw_da; let _rw_a = __floor((_rw_a + _rw_ta) / 2); };
-    if _rw_ds >= _rw_max { let _rw_s = __floor((_rw_s + _rw_ts) / 2); };
+    // Find THE weakest (largest delta) — one dimension only
+    let _rw_worst = [0];  // 0=S 1=R 2=V 3=A 4=T
+    let _rw_max = [_rw_ds];
+    if _rw_dr > __array_get(_rw_max, 0) { let _ = __set_at(_rw_worst, 0, 1); let _ = __set_at(_rw_max, 0, _rw_dr); };
+    if _rw_dv > __array_get(_rw_max, 0) { let _ = __set_at(_rw_worst, 0, 2); let _ = __set_at(_rw_max, 0, _rw_dv); };
+    if _rw_da > __array_get(_rw_max, 0) { let _ = __set_at(_rw_worst, 0, 3); let _ = __set_at(_rw_max, 0, _rw_da); };
+    if _rw_dt > __array_get(_rw_max, 0) { let _ = __set_at(_rw_worst, 0, 4); let _ = __set_at(_rw_max, 0, _rw_dt); };
+    // Fix ONLY the weakest dimension — move halfway toward target
+    let _rw_w = __array_get(_rw_worst, 0);
+    if _rw_w == 0 { let _rw_s = __floor((_rw_s + _rw_ts) / 2); };
+    if _rw_w == 1 { let _rw_r = __floor((_rw_r + _rw_tr) / 2); };
+    if _rw_w == 2 { let _rw_v = __floor((_rw_v + _rw_tv) / 2); };
+    if _rw_w == 3 { let _rw_a = __floor((_rw_a + _rw_ta) / 2); };
+    if _rw_w == 4 { let _rw_t = __floor((_rw_t + _rw_tt) / 2); };
     return (_rw_s * 4096) + (_rw_r * 256) + (_rw_v * 32) + (_rw_a * 4) + _rw_t;
 }
 
@@ -432,11 +443,6 @@ fn _repair_weakest(_rw_mol, _rw_target) {
 // ════════════════════════════════════════════════════════════════
 
 pub fn pipeline(_pl_input) {
-    // ALWAYS record input — Nox remembers everything
-    if len(_pl_input) > 5 {
-        kt_learn(_pl_input);
-        __file_append("homeos.knowledge", _pl_input + "\n");
-    };
     // ──── CHECKPOINT 1: GATE ────
     let _pl_safe = instinct_route(_pl_input);
     if _pl_safe.instinct == "SAFETY" { return "Khong the tra loi."; };
@@ -531,7 +537,7 @@ pub fn pipeline(_pl_input) {
     };
 
     // ⑥ Hebbian + ⑦ Dream
-    if _pl_home.mode == "LEARN" { dn_observe(_pl_input); __file_append("homeos.knowledge", _pl_input + "\n"); };
+    if _pl_home.mode == "LEARN" { dn_observe(_pl_input); kt_learn(_pl_input); __file_append("homeos.knowledge", _pl_input + "\n"); };
 
     // ──── CHECKPOINT 5: RESPONSE ────
     let _pl_out_safe = instinct_route(_pl_response);

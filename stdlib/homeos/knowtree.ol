@@ -629,7 +629,6 @@ fn _kt_is_knowledge(_kik_text) {
         let _kik_w = substr(_kik_text, _kik_i, _kik_i + 4);
         if _kik_w == " is " { return 1; };
         if _kik_w == " la " { return 1; };
-        if _kik_w == " ha " { return 1; };
         let _kik_i = _kik_i + 1;
     };
     let _kik_i = 0;

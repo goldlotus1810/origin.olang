@@ -384,7 +384,7 @@ pub fn repl_eval(input) {
   }
   // Self-build: recompile from source
   if src == "build" || src == "rebuild" {
-    return __system("cd /home/lupin/Origin && make self-build 2>&1 | tail -5");
+    return __system("make self-build 2>&1 | tail -5");
   }
   // Run a test file
   if len(src) > 4 {
@@ -434,7 +434,7 @@ pub fn repl_eval(input) {
   }
   // Fixed-point: verify Gen1==Gen2
   if src == "fixed-point" || src == "verify" {
-    return __system("cd /home/lupin/Origin && make fixed-point 2>&1 | tail -3");
+    return __system("make fixed-point 2>&1 | tail -3");
   }
   if src == "benchmark" || src == "bench" { return self_benchmark(); }
   if src == "selftest" { return self_test(); }
