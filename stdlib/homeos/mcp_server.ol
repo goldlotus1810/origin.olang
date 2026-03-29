@@ -43,6 +43,7 @@ fn _mcp_tools(_id) {
     _r = _r + "," + _tool_no_arg("nox_status", "Nox brain status");
     _r = _r + "," + _tool_no_arg("silk_status", "Silk network status");
     _r = _r + "," + _tool_no_arg("dream_cycle", "Run dream consolidation");
+    _r = _r + "," + _tool_no_arg("self_inspect", "Nox inspects own binary, files, tests, heap");
     _r = _r + "]},\"id\":" + to_string(_id) + "}";
     return _r;
 }
@@ -100,6 +101,21 @@ fn _mcp_call(_id, _tool, _args) {
     };
     if _tool == "silk_status" { return _ok(_id, "Silk: " + to_string(silk_count()) + " edges"); };
     if _tool == "dream_cycle" { dream_cycle(); return _ok(_id, "Dream done"); };
+    if _tool == "self_inspect" {
+        let _si_heap = __to_string(__floor(__heap_used() / 1024));
+        let _si_facts = __to_string(kt_fact_count());
+        let _si_bs = __readdir("stdlib/bootstrap");
+        let _si_hm = __readdir("stdlib/homeos");
+        let _si_ed = __readdir("stdlib/editor");
+        let _si_ts = _fmt_ts(__timestamp());
+        return _ok(_id, "Self-inspect [" + _si_ts + "]\\n"
+            + "  bootstrap: " + __to_string(len(_si_bs)) + " files\\n"
+            + "  homeos: " + __to_string(len(_si_hm)) + " files\\n"
+            + "  editor: " + __to_string(len(_si_ed)) + " files\\n"
+            + "  facts: " + _si_facts + "\\n"
+            + "  heap: " + _si_heap + "KB\\n"
+            + "  tools: 10");
+    };
     return _err(_id, "Unknown tool: " + _tool);
 }
 
