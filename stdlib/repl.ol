@@ -403,11 +403,12 @@ pub fn repl_eval(input) {
     _hci = _hci + 1;
   };
   if _has_code == 0 {
-    // No code syntax → treat as text query
-    __system("timeout 30 claude -p 'You are Nox. Brief reply. " + src + "' > /tmp/nox_think.txt 2>/dev/null");
-    let _ntr = __file_read("/tmp/nox_think.txt");
-    if len(_ntr) > 0 { return _ntr; };
-    return "Nox khong hieu: " + src + ". Go help de xem commands.";
+    // No code syntax → local pipeline (fast, no CPU drain)
+    _boot_learn();
+    let _npl = pipeline(src);
+    __heap_pin();
+    if len(_npl) > 3 { return _npl; };
+    return "Nox khong hieu: " + src + ". Try /help or /think <question>";
   }
   if len(src) > 6 {
     if __substr(src, 0, 6) == "think " { return nox_think(__substr(src, 6, len(src))); };
@@ -1363,10 +1364,12 @@ pub fn repl_eval(input) {
   // Parse error → not code → ask Claude directly
   if _g_parse_error == 1 {
     _g_parse_error = 0;
-    __system("timeout 30 claude -p 'You are Nox, AI built with Olang. Reply brief, Vietnamese or English matching input. Input: " + src + "' > /tmp/nox_think.txt 2>/dev/null");
-    let _re_claude = __file_read("/tmp/nox_think.txt");
-    if len(_re_claude) > 0 { return _re_claude; };
-    return "Nox chua hieu. Thu: help";
+    // Local pipeline — no Claude (saves CPU)
+    _boot_learn();
+    let _re_pl = pipeline(src);
+    __heap_pin();
+    if len(_re_pl) > 3 { return _re_pl; };
+    return "Nox khong hieu. Try /help or /think <question>";
   }
 
   // Phase 3: Semantic analysis
