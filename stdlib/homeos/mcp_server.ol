@@ -47,6 +47,7 @@ fn _mcp_tools(_id) {
     _r = _r + "," + _tool_no_arg("self_inspect", "Nox inspects own binary, files, tests, heap");
     _r = _r + "," + _tool("kg_add", "Add knowledge triple: subject|relation|object (e.g. semantic.ol|contains|_parse_err)", "triple");
     _r = _r + "," + _tool("kg_query", "Query knowledge graph for entity — returns all relationships", "entity");
+    _r = _r + "," + _tool("kg_about", "Deep query: entity + all connected entities (2-hop)", "entity");
     _r = _r + "]},\"id\":" + to_string(_id) + "}";
     return _r;
 }
@@ -141,6 +142,32 @@ fn _mcp_call(_id, _tool, _args) {
         };
         return _ok(_id, _kq_out);
     };
+    if _tool == "kg_about" {
+        let _kab_entity = json_get(_args, "entity");
+        let _kab_direct = kg_find(_kab_entity);
+        let _kab_out = "=== " + _kab_entity + " ===";
+        let _kab_i = 0;
+        while _kab_i < len(_kab_direct) {
+            let _kab_out = _kab_out + "\\n  " + _kab_direct[_kab_i];
+            let _kab_i = _kab_i + 1;
+        };
+        // 2-hop: find related entities and their connections
+        let _kab_related = kg_find_rel(_kab_entity, "contains");
+        let _kab_fixes = kg_find_rel(_kab_entity, "fixes");
+        let _kab_built = kg_find_rel(_kab_entity, "built_from");
+        let _kab_ri = 0;
+        while _kab_ri < len(_kab_related) {
+            let _kab_sub = kg_find(_kab_related[_kab_ri]);
+            let _kab_si = 0;
+            while _kab_si < len(_kab_sub) {
+                let _kab_out = _kab_out + "\\n    " + _kab_sub[_kab_si];
+                let _kab_si = _kab_si + 1;
+            };
+            let _kab_ri = _kab_ri + 1;
+        };
+        if len(_kab_direct) == 0 { let _kab_out = _kab_out + "\\n  (no data)"; };
+        return _ok(_id, _kab_out);
+    };
     if _tool == "self_inspect" {
         let _si_heap = __to_string(__floor(__heap_used() / 1024));
         let _si_facts = __to_string(kt_fact_count());
@@ -154,7 +181,7 @@ fn _mcp_call(_id, _tool, _args) {
             + "  editor: " + __to_string(len(_si_ed)) + " files\\n"
             + "  facts: " + _si_facts + "\\n"
             + "  heap: " + _si_heap + "KB\\n"
-            + "  tools: 11");
+            + "  tools: 12");
     };
     return _err(_id, "Unknown tool: " + _tool);
 }
