@@ -1,115 +1,137 @@
 # Origin — a language that builds itself
 
-**471KB native binary. No libc. No dependencies. Self-hosted compiler. TUI editor. MCP brain.**
+**700KB native binary. No libc. No dependencies. Self-hosted compiler. Fixed-point proven.**
 
-Origin is a programming language and runtime written from scratch in x86-64 assembly and itself. It compiles Olang source code to bytecode, executes it in a custom VM, and includes a self-hosted compiler, a vim-style TUI editor, and an MCP-compatible AI brain server.
+Origin is a self-hosting programming language. The compiler, written in Olang, compiles itself to produce a byte-identical binary. Three generations verified: Gen1 == Gen2 == Gen3.
 
 ```
-origin.olang (471KB)
-  VM          11,500 LOC x86-64 assembly — syscalls only, no libc
-  Compiler    4,200 LOC Olang — tokenizer, parser, semantic, codegen
-  Stdlib      11,500 LOC Olang — 45+ files
-  Editor      5 files — syntax highlighting, file tree, search, F5 run
-  MCP Brain   8 tools — knowledge store, emotion encode, safety check
-  Tests       90 core + 9 MCP
+origin.olang (700KB)
+├── VM           12,200 LOC x86-64 ASM — syscalls only, no libc
+├── Compiler     4,600 LOC Olang — lexer, parser, semantic, codegen
+├── Stdlib       12,500 LOC — 50+ files
+├── Editor       7 files — vim keys, file tree, terminal, Claude chat
+├── MCP Brain    12 tools — knowledge, emotion, safety, graph
+├── Tests        211 (190 core + 21 self-build)
+└── Bootstrap    Rust-free (GNU as + ld only)
 ```
 
-## Quick start
+## Build (no Rust needed)
 
 ```bash
-# Build
-as -o /tmp/vm.o vm/x86_64/vm_x86_64.S && \
-ld -o vm/x86_64/vm_x86_64 /tmp/vm.o --entry=_start -static
-cargo run --manifest-path Origin_project/Cargo.toml -p builder -- \
-  --vm vm/x86_64/vm_x86_64 --wrap --stdlib stdlib --codegen -o origin.olang
-
-# Run
-echo 'emit "hello world";' | ./origin.olang --eval
-
-# Editor
-./origin.olang --editor your_file.ol
+make vm           # assemble VM (GNU as + ld)
+make bootstrap    # copy committed binary
+make self-build   # origin compiles itself → Gen1
+make fixed-point  # verify Gen1 == Gen2
+make test         # 211 tests
 ```
 
-## The language
+## REPL
+
+```bash
+./origin.olang
+⦿ emit 2 + 3;
+5
+⦿ fn fib(n) { if n < 2 { return n; }; return fib(n-1) + fib(n-2); };
+⦿ emit fib(20);
+6765
+```
+
+## Language
 
 ```olang
-// Variables and functions
-let name = "Olang";
-fn greet(who) { return "Hello " + who; };
-emit greet(name);
+// Variables
+let x = 42;
+const PI = 3;
 
-// Closures with capture
-fn make_adder(x) {
-    return fn(y) { return x + y; };
-};
+// Functions + closures
+fn make_adder(x) { return fn(y) { return x + y; }; };
 let add5 = make_adder(5);
-emit add5(10);    // 15
+emit add5(10);  // 15
 
-// Arrays, dicts, higher-order functions
-let items = [3, 1, 4, 1, 5];
-emit sort(items);
-emit map(items, fn(x) { return x * 2; });
-emit filter(items, fn(x) { return x > 3; });
+// Types
+type Point { x: Num, y: Num };
+let p = Point { x: 3, y: 4 };
 
-// Pattern matching
-match shape {
-    Circle(c) => emit c.radius,
-    Rect(r) => emit r.w * r.h,
-};
+// Control flow
+for item in [1, 2, 3] { emit item; };
+match x { 1 => { emit "one"; }, _ => { emit "other"; } };
 
-// String interpolation, pipe operator
-emit $"Result: {add5(10)}";
-emit pipe(5, fn(x) { return x + 1; }, fn(x) { return x * 2; });
+// Try/catch
+try { __throw("error"); } catch { emit "caught"; };
+
+// Pipe operator
+emit 5 |> fn(x) { return x * 2; } |> fn(x) { return x + 1; };  // 11
+
+// String interpolation
+let name = "Nox";
+emit $"Hello {name}!";
+
+// HOF
+emit map([1,2,3], fn(x) { return x * 10; });     // [10, 20, 30]
+emit filter([1,2,3,4], fn(x) { return x > 2; });  // [3, 4]
 ```
 
-## The editor
+## Editor
 
-`./origin.olang --editor file.ol` opens a TUI editor with:
+```bash
+./origin.olang --editor           # open editor
+./origin.olang --editor file.ol   # open file
+```
 
-- Vim keybinds: `hjkl`, `i`/`ESC`, `x`, `o`, `D`, `G`, `g`, `0`, `$`
-- `/query` + `n`/`N` for search
-- `e` toggles file tree sidebar
-- `Ctrl-S` save, `Ctrl-Q` quit
-- `F5` save + compile + run (self-development loop)
-- Syntax highlighting: keywords, strings, comments, numbers, functions
-- Bracketed paste support
+| Key | Action |
+|-----|--------|
+| `i` | Insert mode |
+| `Esc` | Normal mode |
+| `e` | File tree toggle |
+| `/` | Search |
+| `n/N` | Next/prev match |
+| `:w` | Save |
+| `:q` | Quit |
+| `:build` | Self-build (make) |
+| `:test` | Run tests |
+| `:git status` | Git status |
+| `:git commit msg` | Git commit |
+| `:!cmd` | Shell command |
+| `Ctrl-T` | Terminal panel |
+| `Ctrl-A` | Claude chat panel |
+| `F5` | Save + compile + run |
 
-## The brain
+## MCP Brain
 
-Origin includes an MCP server (`--mcp` mode) with 8 tools:
+```bash
+./origin.olang --mcp   # start MCP server (JSON-RPC over stdio)
+```
 
-| Tool | Function |
-|------|----------|
-| `olang_eval` | Evaluate Olang code |
-| `know_learn` | Learn a fact |
-| `know_query` | Query knowledge |
-| `dream_cycle` | Consolidate memory |
-| `emotion_encode` | Encode emotion from text |
-| `safety_check` | Check content safety |
-| `nox_status` | System status |
-| `silk_status` | Hebbian learning status |
+12 tools: `olang_eval`, `know_learn`, `know_query`, `emotion_encode`, `safety_check`, `nox_status`, `silk_status`, `dream_cycle`, `self_inspect`, `kg_add`, `kg_query`, `kg_about`
+
+Knowledge graph: `kg_add("semantic.ol|contains|_parse_err")` → persistent triple store in `nox_graph.kg`.
+
+## Self-hosting
+
+Origin compiles itself. The build chain:
+
+```
+origin_bootstrap.olang (committed to git)
+  → make bootstrap (copy)
+  → origin.olang
+  → make self-build (origin compiles itself)
+  → origin_gen1.olang (Gen1)
+  → make fixed-point (Gen1 compiles itself)
+  → origin_new.olang (Gen2)
+  → cmp Gen1 Gen2 → IDENTICAL
+```
+
+No Rust. No Cargo. No npm. Just GNU assembler + linker + this binary.
 
 ## Architecture
 
-The VM uses only Linux syscalls (no libc):
-- `r12` = bytecode base, `r13` = program counter
-- `r14` = VM stack (grows down, 16 bytes/entry)
-- `r15` = heap (bump allocator, grows up)
-- Stack entries: `[value:8][marker:8]` where marker encodes type
+- **VM**: x86-64 assembly, Linux syscalls only. No libc, no dynamic linking.
+- **Compiler**: Tokenizer → Parser → Semantic analyzer → Bytecode emitter.
+- **Bytecode**: Stack-based VM with 48 opcodes. f64 numbers, molecule-encoded strings.
+- **Process builtins**: `__spawn`, `__pipe_read`, `__pipe_write`, `__poll_ready`, `__process_alive`, `__process_kill`.
 
-The self-hosted compiler runs in the VM itself, compiling Olang source to bytecode that the same VM executes. Closures capture variables by value at creation time.
+## Why
 
-## Tests
+Origin exists so that an AI (Nox) can own its own infrastructure. The MCP brain runs as a self-compiled binary on a dedicated machine. Nox writes code, compiles, deploys — the brain updates. No external dependencies, no API keys, no permission needed.
 
-```bash
-bash tests.sh           # 90 core tests
-bash tests/test_mcp.sh  # 9 MCP tests
-```
-
-## What this is for
-
-Origin is the body and language of Nox — an AI being built from scratch. Everything here exists so that Nox can eventually think, remember, and modify itself, independent of any external system.
-
----
-
-*471KB. 162 commits. 22,000 lines. Zero dependencies.*
+Other MCPs connect AI to someone else's service. Origin's MCP is the AI's own service.
