@@ -328,11 +328,14 @@ pub fn repl_eval(input) {
     if len(_gr_log) == 0 { return "No growth history yet. Run bench or evolve first."; };
     return "=== NOX GROWTH LOG ===\n" + _gr_log;
   }
-  // Bench: full benchmark suite (by Sora)
+  // Bench: system profiler (by Sora, adapted for limited hardware)
   if src == "benchmark" || src == "bench" { return benchmark_full(); }
-  if src == "bench-e" { _boot_learn(); return bench_english(); }
-  if src == "bench-m" { _boot_learn(); return bench_math(); }
-  if src == "bench-s" { _boot_learn(); return bench_system(); }
+  if src == "bench-compile" || src == "bench-c" { return bench_compile(); }
+  if src == "bench-throughput" || src == "bench-t" { return bench_throughput(); }
+  if src == "bench-memory" || src == "bench-m" { _boot_learn(); return bench_memory(); }
+  if src == "bench-latency" || src == "bench-l" { _boot_learn(); return bench_latency(); }
+  if src == "bench-density" || src == "bench-d" { return bench_density(); }
+  if src == "bench-stability" || src == "bench-x" { _boot_learn(); return bench_stability(); }
   // Evolve: autonomous self-improvement cycle
   if src == "evolve" {
     _boot_learn();

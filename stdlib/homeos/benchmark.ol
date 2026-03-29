@@ -1,339 +1,434 @@
-// stdlib/homeos/benchmark.ol — Nox Benchmark Suite
+// stdlib/homeos/benchmark.ol — Nox System Profiler
 //
-// 3 languages. 3 scores. Run daily. Track trend.
-//   E = English (command comprehension, fact retrieval)
-//   M = Math/Logic (encode, decode, compose, infer, homeostasis)
-//   S = System (compile time, binary size, heap, throughput)
+// NOT a chatbot test. A SYSTEM benchmark.
+// 6 categories: Compile, Throughput, Memory, Latency, Density, Stability
 //
-// Usage: benchmark (full) | bench-e | bench-m | bench-s
+// Run: benchmark | bench-compile | bench-throughput | bench-memory
+//      bench-latency | bench-density | bench-stability
+// Log: nox_benchmark.log (append every run, track trend)
+//
+// Output:
+//   [C] COMPILE:    15 tests — determinism, arithmetic, recursion, closure, mutation
+//   [T] THROUGHPUT: ops/sec — compile, encode, search, ingest, mol_dist
+//   [M] MEMORY:     bytes/fact, heap growth, compile cost
+//   [L] LATENCY:    ms per operation — compile, pipeline, search, encode, instinct
+//   [D] DENSITY:    LOC, fn count, bytecode/LOC, dead %, comment %
+//   [X] STABILITY:  100 consecutive ops — compile, pipeline, knowtree, heap ratio
 
 // ════════════════════════════════════════════════════════════════
-// E — ENGLISH: Does Nox understand and respond correctly?
+// C — COMPILE CORRECTNESS
 // ════════════════════════════════════════════════════════════════
 
-pub fn bench_english() {
-    let _be_pass = [0];
-    let _be_fail = [0];
-    let _be_total = [0];
+pub fn bench_compile() {
+    let _p = [0]; let _f = [0]; let _t = [0];
 
-    // Seed facts (deterministic — same every run)
-    kt_learn("water boils at 100 degrees Celsius");
-    kt_learn("Earth orbits the Sun in 365 days");
-    kt_learn("Olang is a self-hosting programming language");
-    kt_learn("the speed of light is 300000 kilometers per second");
-    kt_learn("pi is approximately 3.14159");
-    kt_learn("Nox is an AI built with Olang on x86-64 ASM");
-    kt_learn("DNA has 4 bases adenine thymine guanine cytosine");
-    kt_learn("gravity is the force of attraction between masses");
-    kt_learn("SHA-256 produces a 64 character hex digest");
-    kt_learn("fibonacci sequence is 1 1 2 3 5 8 13 21 34");
+    // C1: Deterministic — same source = same bytecode
+    let _c1a = _bm_compile("let x = 42; emit x;");
+    let _c1b = _bm_compile("let x = 42; emit x;");
+    let _c1_match = 1;
+    if len(_c1a) != len(_c1b) { _c1_match = 0; } else {
+        let _ci = 0;
+        while _ci < len(_c1a) {
+            if __floor(__array_get(_c1a, _ci)) != __floor(__array_get(_c1b, _ci)) { _c1_match = 0; };
+            _ci = _ci + 1;
+        };
+    };
+    _bt("determ", _c1_match == 1, _p, _f, _t);
+
+    // C2: Empty = safe
+    _bt("empty", len(_bm_compile("")) == 0, _p, _f, _t);
+
+    // C3-5: Arithmetic
+    _bt("add", _bm_eval("emit 2 + 3;") == "5", _p, _f, _t);
+    _bt("mul", _bm_eval("emit 10 * 7;") == "70", _p, _f, _t);
+    _bt("sub", _bm_eval("emit 100 - 37;") == "63", _p, _f, _t);
+
+    // C6: Function
+    _bt("fn", _bm_eval("fn f(x){return x*2;};emit f(21);") == "42", _p, _f, _t);
+
+    // C7: Recursion
+    _bt("rec", _bm_eval("fn fib(n){if n<2{return n;};return fib(n-1)+fib(n-2);};emit fib(10);") == "55", _p, _f, _t);
+
+    // C8: Closure
+    _bt("cls", _bm_eval("fn mk(x){return fn(y){return x+y;};};let a=mk(5);emit a(10);") == "15", _p, _f, _t);
+
+    // C9: Array
+    _bt("arr", _bm_eval("let a=[10,20,30];emit a[1];") == "20", _p, _f, _t);
+
+    // C10: String
+    _bt("str", _bm_eval("emit len(\"hello\");") == "5", _p, _f, _t);
+
+    // C11: Try/catch
+    _bt("try", _bm_eval("let r=\"ok\";try{__throw(\"e\");}catch{r=\"caught\";};emit r;") == "caught", _p, _f, _t);
+
+    // C12: For loop
+    _bt("for", _bm_eval("let s=0;for x in [1,2,3,4,5]{s=s+x;};emit s;") == "15", _p, _f, _t);
+
+    // C13: Bytecode compact
+    let _c13 = _bm_compile("emit 42;");
+    _bt("compact", len(_c13) < 50, _p, _f, _t);
+    _bt("nonzero", len(_c13) > 0, _p, _f, _t);
+
+    // C14: Mutation detection
+    let _c14a = _bm_compile("emit 42;");
+    let _c14b = _bm_compile("emit 43;");
+    let _c14_diff = 0;
+    if len(_c14a) != len(_c14b) { _c14_diff = 1; } else {
+        let _ci = 0;
+        while _ci < len(_c14a) {
+            if __floor(__array_get(_c14a, _ci)) != __floor(__array_get(_c14b, _ci)) { _c14_diff = 1; };
+            _ci = _ci + 1;
+        };
+    };
+    _bt("mutdet", _c14_diff == 1, _p, _f, _t);
+
+    return { score: __floor(__array_get(_p, 0) * 100 / __array_get(_t, 0)), pass: __array_get(_p, 0), total: __array_get(_t, 0), label: "C" };
+}
+
+// ════════════════════════════════════════════════════════════════
+// T — THROUGHPUT (ops/sec)
+// ════════════════════════════════════════════════════════════════
+
+pub fn bench_throughput() {
+    // T1: Compile (reduced for limited heap)
+    let _n1 = 20;
+    let _t1 = __timestamp();
+    let _i = 0;
+    while _i < _n1 { let _hp = __heap_save(); _bm_compile("let x=" + __to_string(_i) + ";emit x;"); __heap_restore(_hp); _i = _i + 1; };
+    let _t2 = __timestamp();
+    let _cm = _t2 - _t1; if _cm == 0 { _cm = 1; };
+
+    // T2: Encode
+    let _n2 = 100;
+    let _t3 = __timestamp();
+    _i = 0;
+    while _i < _n2 { let _hp = __heap_save(); chain_encode("benchmark throughput test"); __heap_restore(_hp); _i = _i + 1; };
+    let _t4 = __timestamp();
+    let _em = _t4 - _t3; if _em == 0 { _em = 1; };
+
+    // T3: Search
+    let _n3 = 100;
+    let _t5 = __timestamp();
+    _i = 0;
+    while _i < _n3 { let _hp = __heap_save(); kt_find("test", 3); __heap_restore(_hp); _i = _i + 1; };
+    let _t6 = __timestamp();
+    let _sm = _t6 - _t5; if _sm == 0 { _sm = 1; };
+
+    // T4: Ingest
+    let _n4 = 50;
+    let _t7 = __timestamp();
+    _i = 0;
+    while _i < _n4 { kt_learn("bench fact " + __to_string(_i)); _i = _i + 1; };
+    let _t8 = __timestamp();
+    let _im = _t8 - _t7; if _im == 0 { _im = 1; };
     __heap_pin();
 
-    // E1: Exact retrieval — query contains keyword, answer contains keyword
-    _be_check("water", pipeline("what does water boil at?"), "100", _be_pass, _be_fail, _be_total);
-    _be_check("earth", pipeline("how long does Earth orbit?"), "365", _be_pass, _be_fail, _be_total);
-    _be_check("light", pipeline("speed of light?"), "300000", _be_pass, _be_fail, _be_total);
-    _be_check("pi", pipeline("what is pi?"), "3.14", _be_pass, _be_fail, _be_total);
-    _be_check("dna", pipeline("what bases does DNA have?"), "adenine", _be_pass, _be_fail, _be_total);
+    // T5: Mol distance
+    let _n5 = 1000;
+    let _t9 = __timestamp();
+    _i = 0;
+    while _i < _n5 { _kt_mol_dist(4096, 8192); _i = _i + 1; };
+    __heap_pin();
+    let _t10 = __timestamp();
+    let _dm = _t10 - _t9; if _dm == 0 { _dm = 1; };
 
-    // E2: Greeting recognition
-    let _be_g1 = pipeline("hello");
-    _be_contains("greet1", _be_g1, "Chao", _be_pass, _be_fail, _be_total);
-    let _be_g2 = pipeline("hi there");
-    _be_contains("greet2", _be_g2, "Chao", _be_pass, _be_fail, _be_total);
-
-    // E3: Meta — self-knowledge
-    let _be_m1 = pipeline("what are you?");
-    _be_contains("meta1", _be_m1, "Nox", _be_pass, _be_fail, _be_total);
-
-    // E4: Unknown — should NOT hallucinate
-    let _be_u1 = pipeline("what is the capital of Mars?");
-    let _be_u1_ok = 0;
-    if _be_has(_be_u1, "chua biet") == 1 { _be_u1_ok = 1; };
-    if _be_has(_be_u1, "khong") == 1 { _be_u1_ok = 1; };
-    if _be_has(_be_u1, "hoc them") == 1 { _be_u1_ok = 1; };
-    if _be_u1_ok == 1 {
-        let _ = __set_at(_be_pass, 0, __array_get(_be_pass, 0) + 1);
-    } else {
-        let _ = __set_at(_be_fail, 0, __array_get(_be_fail, 0) + 1);
-    };
-    let _ = __set_at(_be_total, 0, __array_get(_be_total, 0) + 1);
-
-    // E5: Learning — feed then retrieve
-    pipeline("fact: gold has atomic number 79");
-    let _be_l1 = pipeline("atomic number of gold?");
-    _be_contains("learn1", _be_l1, "79", _be_pass, _be_fail, _be_total);
-
-    let _be_p = __array_get(_be_pass, 0);
-    let _be_t = __array_get(_be_total, 0);
-    let _be_score = 0;
-    if _be_t > 0 { _be_score = __floor(_be_p * 100 / _be_t); };
-    return { score: _be_score, pass: _be_p, total: _be_t, label: "E" };
-}
-
-fn _be_check(_name, _response, _keyword, _pass, _fail, _total) {
-    let _ = __set_at(_total, 0, __array_get(_total, 0) + 1);
-    if _be_has(_response, _keyword) == 1 {
-        let _ = __set_at(_pass, 0, __array_get(_pass, 0) + 1);
-    } else {
-        let _ = __set_at(_fail, 0, __array_get(_fail, 0) + 1);
-    };
-}
-
-fn _be_contains(_name, _text, _word, _pass, _fail, _total) {
-    _be_check(_name, _text, _word, _pass, _fail, _total);
-}
-
-fn _be_has(_text, _word) {
-    let _bh_i = 0;
-    let _bh_wl = len(_word);
-    let _bh_tl = len(_text);
-    if _bh_tl < _bh_wl { return 0; };
-    while _bh_i <= (_bh_tl - _bh_wl) {
-        if substr(_text, _bh_i, _bh_i + _bh_wl) == _word { return 1; };
-        let _bh_i = _bh_i + 1;
-    };
-    return 0;
-}
-
-// ════════════════════════════════════════════════════════════════
-// M — MATH/LOGIC: Are the 14 DNA mechanisms correct?
-// ════════════════════════════════════════════════════════════════
-
-pub fn bench_math() {
-    let _bm_pass = [0];
-    let _bm_fail = [0];
-    let _bm_total = [0];
-
-    // M1: P_weight lookup — known codepoints return non-zero
-    _bm_test("pw_A", p_weight(65) > 0, _bm_pass, _bm_fail, _bm_total);
-    _bm_test("pw_z", p_weight(122) > 0, _bm_pass, _bm_fail, _bm_total);
-    _bm_test("pw_0", p_weight(48) > 0, _bm_pass, _bm_fail, _bm_total);
-
-    // M2: Chain encode — output length proportional to input
-    let _bm_c1 = chain_encode("hello");
-    let _bm_c2 = chain_encode("hello world test");
-    _bm_test("chain_len", len(_bm_c1) > 0, _bm_pass, _bm_fail, _bm_total);
-    _bm_test("chain_prop", len(_bm_c2) > len(_bm_c1), _bm_pass, _bm_fail, _bm_total);
-
-    // M3: Chain summary — deterministic (same input = same output)
-    let _bm_s1 = chain_summary(_bm_c1);
-    let _bm_s2 = chain_summary(_bm_c1);
-    _bm_test("summary_det", _bm_s1 == _bm_s2, _bm_pass, _bm_fail, _bm_total);
-    _bm_test("summary_nz", _bm_s1 > 0, _bm_pass, _bm_fail, _bm_total);
-
-    // M4: Different inputs produce different summaries
-    let _bm_s3 = chain_summary(chain_encode("anger hate destroy"));
-    let _bm_s4 = chain_summary(chain_encode("love peace harmony"));
-    _bm_test("summary_diff", _bm_s3 != _bm_s4, _bm_pass, _bm_fail, _bm_total);
-
-    // M5: Mol dimension extraction — within valid ranges
-    let _bm_mol = chain_summary(chain_encode("test"));
-    _bm_test("mol_s_range", _kt_mol_s(_bm_mol) >= 0, _bm_pass, _bm_fail, _bm_total);
-    _bm_test("mol_s_max", _kt_mol_s(_bm_mol) < 16, _bm_pass, _bm_fail, _bm_total);
-    _bm_test("mol_v_range", _kt_mol_v(_bm_mol) >= 0, _bm_pass, _bm_fail, _bm_total);
-    _bm_test("mol_v_max", _kt_mol_v(_bm_mol) < 8, _bm_pass, _bm_fail, _bm_total);
-
-    // M6: Homeostasis — identical input = ACT, distant = LEARN
-    let _bm_h1 = homeostasis(1000, 1000);
-    _bm_test("home_same", _bm_h1.mode == "ACT", _bm_pass, _bm_fail, _bm_total);
-    let _bm_h2 = homeostasis(1000, 60000);
-    _bm_test("home_diff", _bm_h2.mode == "LEARN", _bm_pass, _bm_fail, _bm_total);
-
-    // M7: Compose — average of inputs
-    let _bm_co = compose([4096, 8192]);
-    _bm_test("compose_nz", _bm_co > 0, _bm_pass, _bm_fail, _bm_total);
-    // Compose of [X, X] should ≈ X
-    let _bm_co2 = compose([4096, 4096]);
-    _bm_test("compose_idem", _bm_co2 == 4096, _bm_pass, _bm_fail, _bm_total);
-
-    // M8: Mol distance — self = 0, different > 0
-    let _bm_d1 = _kt_mol_dist(4096, 4096);
-    _bm_test("dist_self", _bm_d1 == 0, _bm_pass, _bm_fail, _bm_total);
-    let _bm_d2 = _kt_mol_dist(4096, 8192);
-    _bm_test("dist_diff", _bm_d2 > 0, _bm_pass, _bm_fail, _bm_total);
-
-    // M9: __exp and __log2 — mathematical correctness
-    _bm_test("exp_0", __exp(0) == 1, _bm_pass, _bm_fail, _bm_total);
-    _bm_test("exp_1", __floor(__exp(1)) == 2, _bm_pass, _bm_fail, _bm_total);
-    _bm_test("log2_8", __log2(8) == 3, _bm_pass, _bm_fail, _bm_total);
-    _bm_test("log2_1", __log2(1) == 0, _bm_pass, _bm_fail, _bm_total);
-
-    // M10: Entropy — uniform = high, concentrated = low
-    // Single S bucket = entropy 0
-    let _bm_e1 = _is_fact_entropy(["same same same"]);
-    _bm_test("entropy_one", _bm_e1 == 0, _bm_pass, _bm_fail, _bm_total);
-
-    // M11: DNA repair — bounded iterations
-    let _bm_r1 = dna_repair(4096, 8192, 3);
-    _bm_test("repair_nz", _bm_r1 > 0, _bm_pass, _bm_fail, _bm_total);
-
-    // M12: Instinct routing — deterministic
-    let _bm_ir1 = instinct_route("hello friend");
-    _bm_test("inst_greet", _bm_ir1.instinct == "GREETING", _bm_pass, _bm_fail, _bm_total);
-    let _bm_ir2 = instinct_route("what is pi?");
-    _bm_test("inst_quest", _bm_ir2.instinct == "QUESTION", _bm_pass, _bm_fail, _bm_total);
-    let _bm_ir3 = instinct_route("who are you");
-    _bm_test("inst_meta", _bm_ir3.instinct == "META", _bm_pass, _bm_fail, _bm_total);
-
-    let _bm_p = __array_get(_bm_pass, 0);
-    let _bm_t = __array_get(_bm_total, 0);
-    let _bm_score = 0;
-    if _bm_t > 0 { _bm_score = __floor(_bm_p * 100 / _bm_t); };
-    return { score: _bm_score, pass: _bm_p, total: _bm_t, label: "M" };
-}
-
-fn _bm_test(_name, _cond, _pass, _fail, _total) {
-    let _ = __set_at(_total, 0, __array_get(_total, 0) + 1);
-    if _cond == 1 {
-        let _ = __set_at(_pass, 0, __array_get(_pass, 0) + 1);
-    } else {
-        let _ = __set_at(_fail, 0, __array_get(_fail, 0) + 1);
-    };
-}
-
-// ════════════════════════════════════════════════════════════════
-// S — SYSTEM: Performance, size, throughput, stability
-// ════════════════════════════════════════════════════════════════
-
-pub fn bench_system() {
-    let _bs_pass = [0];
-    let _bs_fail = [0];
-    let _bs_total = [0];
-
-    // S1: Binary exists and is reasonable size (< 1MB)
-    // 830KB target, allow 600-1200KB range
-    let _bs_bin = __file_read("origin.olang");
-    let _bs_bsize = len(_bs_bin);
-    _bm_test("bin_exists", _bs_bsize > 0, _bs_pass, _bs_fail, _bs_total);
-    _bm_test("bin_under_1M", _bs_bsize < 1200000, _bs_pass, _bs_fail, _bs_total);
-    _bm_test("bin_over_500K", _bs_bsize > 500000, _bs_pass, _bs_fail, _bs_total);
-
-    // S2: Heap usage — should be under 100MB after boot
-    let _bs_heap = __heap_used();
-    _bm_test("heap_under_100M", _bs_heap < 104857600, _bs_pass, _bs_fail, _bs_total);
-    _bm_test("heap_over_1M", _bs_heap > 1048576, _bs_pass, _bs_fail, _bs_total);
-
-    // S3: Fact storage — should have seeded facts
-    let _bs_facts = kt_fact_count();
-    _bm_test("facts_exist", _bs_facts > 10, _bs_pass, _bs_fail, _bs_total);
-
-    // S4: Compile throughput — compile "emit 42" should produce bytecode
-    let _bs_t1 = __timestamp();
-    let _bs_tk = tokenize("emit 42;");
-    let _bs_ast = parse(_bs_tk);
-    set_at(_g_pos_box, 0, 0);
-    _prefill_output();
-    analyze(_bs_ast);
-    let _bs_bclen = _g_pos_box[0];
-    let _bs_t2 = __timestamp();
-    _bm_test("compile_ok", _bs_bclen > 0, _bs_pass, _bs_fail, _bs_total);
-    let _bs_compile_ms = _bs_t2 - _bs_t1;
-    _bm_test("compile_fast", _bs_compile_ms < 1000, _bs_pass, _bs_fail, _bs_total);
-
-    // S5: Pipeline throughput — 10 queries under 5 seconds
-    let _bs_pt1 = __timestamp();
-    let _bs_pi = 0;
-    while _bs_pi < 10 {
-        pipeline("test query " + __to_string(_bs_pi));
-        _bs_pi = _bs_pi + 1;
-    };
-    let _bs_pt2 = __timestamp();
-    let _bs_pipe_ms = _bs_pt2 - _bs_pt1;
-    _bm_test("pipe_10_ok", _bs_pipe_ms < 5000, _bs_pass, _bs_fail, _bs_total);
-
-    // S6: KnowTree search speed — 100 searches under 2 seconds
-    let _bs_st1 = __timestamp();
-    let _bs_si = 0;
-    while _bs_si < 100 {
-        kt_find("test", 5);
-        _bs_si = _bs_si + 1;
-    };
-    let _bs_st2 = __timestamp();
-    _bm_test("search_100", (_bs_st2 - _bs_st1) < 2000, _bs_pass, _bs_fail, _bs_total);
-
-    // S7: Encode throughput — 100 chain_encode under 1 second
-    let _bs_et1 = __timestamp();
-    let _bs_ei = 0;
-    while _bs_ei < 100 {
-        chain_encode("benchmark throughput test string number " + __to_string(_bs_ei));
-        _bs_ei = _bs_ei + 1;
-    };
-    let _bs_et2 = __timestamp();
-    _bm_test("encode_100", (_bs_et2 - _bs_et1) < 1000, _bs_pass, _bs_fail, _bs_total);
-
-    // S8: Heap stability — 10 pipeline calls, heap should not grow > 5MB
-    let _bs_h1 = __heap_used();
-    let _bs_hi = 0;
-    while _bs_hi < 10 {
-        pipeline("stability test " + __to_string(_bs_hi));
-        _bs_hi = _bs_hi + 1;
-    };
-    let _bs_h2 = __heap_used();
-    let _bs_heap_growth = _bs_h2 - _bs_h1;
-    _bm_test("heap_stable", _bs_heap_growth < 5242880, _bs_pass, _bs_fail, _bs_total);
-
-    // S9: Process builtins exist
-    _bm_test("has_spawn", 1 == 1, _bs_pass, _bs_fail, _bs_total);
-    _bm_test("has_exp", __exp(0) == 1, _bs_pass, _bs_fail, _bs_total);
-    _bm_test("has_log2", __log2(1) == 0, _bs_pass, _bs_fail, _bs_total);
-
-    let _bs_p = __array_get(_bs_pass, 0);
-    let _bs_t = __array_get(_bs_total, 0);
-    let _bs_score = 0;
-    if _bs_t > 0 { _bs_score = __floor(_bs_p * 100 / _bs_t); };
     return {
-        score: _bs_score, pass: _bs_p, total: _bs_t, label: "S",
-        heap_kb: __floor(__heap_used() / 1024),
-        compile_ms: _bs_compile_ms,
-        pipe_10_ms: _bs_pipe_ms,
-        search_100_ms: (_bs_st2 - _bs_st1),
-        encode_100_ms: (_bs_et2 - _bs_et1),
-        heap_growth_kb: __floor(_bs_heap_growth / 1024)
+        label: "T",
+        compile: __floor(_n1 * 1000 / _cm),
+        encode: __floor(_n2 * 1000 / _em),
+        search: __floor(_n3 * 1000 / _sm),
+        ingest: __floor(_n4 * 1000 / _im),
+        distance: __floor(_n5 * 1000 / _dm)
     };
 }
 
 // ════════════════════════════════════════════════════════════════
-// FULL BENCHMARK — Run all 3, produce single report
+// M — MEMORY EFFICIENCY
+// ════════════════════════════════════════════════════════════════
+
+pub fn bench_memory() {
+    // M1: Bytes per fact
+    let _h1 = __heap_used();
+    let _f1 = kt_fact_count();
+    let _i = 0;
+    while _i < 20 { kt_learn("mem bench " + __to_string(_i) + " measure bytes per fact"); _i = _i + 1; };
+    __heap_pin();
+    let _h2 = __heap_used();
+    let _added = kt_fact_count() - _f1;
+    let _bpf = 0;
+    if _added > 0 { _bpf = __floor((_h2 - _h1) / _added); };
+
+    // M2: Pipeline heap growth per call
+    let _h3 = __heap_used();
+    _i = 0;
+    while _i < 10 { pipeline("mem test " + __to_string(_i)); _i = _i + 1; };
+    let _h4 = __heap_used();
+    let _gpc = __floor((_h4 - _h3) / 10);
+
+    // M3: Compile cost
+    let _h5 = __heap_used();
+    _i = 0;
+    while _i < 10 { _bm_compile("fn f" + __to_string(_i) + "(x){return x*" + __to_string(_i) + ";};"); _i = _i + 1; };
+    let _h6 = __heap_used();
+    let _cpc = __floor((_h6 - _h5) / 10);
+
+    return {
+        label: "M",
+        bytes_per_fact: _bpf,
+        heap_kb: __floor(__heap_used() / 1024),
+        growth_per_pipe: _gpc,
+        compile_cost: _cpc
+    };
+}
+
+// ════════════════════════════════════════════════════════════════
+// L — LATENCY (ms per single operation)
+// ════════════════════════════════════════════════════════════════
+
+pub fn bench_latency() {
+    _boot_learn(); __heap_pin();
+
+    let _t1 = __timestamp();
+    _bm_compile("fn t(x){return x+1;};emit t(41);");
+    let _t2 = __timestamp();
+
+    let _t3 = __timestamp();
+    pipeline("latency test");
+    let _t4 = __timestamp();
+
+    let _t5 = __timestamp();
+    kt_find("test", 5);
+    let _t6 = __timestamp();
+
+    let _t7 = __timestamp();
+    chain_encode("latency benchmark string");
+    let _t8 = __timestamp();
+
+    let _t9 = __timestamp();
+    instinct_route("hello world");
+    let _t10 = __timestamp();
+
+    let _t11 = __timestamp();
+    homeostasis(4096, 8192);
+    let _t12 = __timestamp();
+
+    let _t13 = __timestamp();
+    compose([4096, 8192, 12288, 16384, 20480]);
+    let _t14 = __timestamp();
+
+    return {
+        label: "L",
+        compile: _t2 - _t1,
+        pipeline: _t4 - _t3,
+        search: _t6 - _t5,
+        encode: _t8 - _t7,
+        instinct: _t10 - _t9,
+        homeo: _t12 - _t11,
+        compose: _t14 - _t13
+    };
+}
+
+// ════════════════════════════════════════════════════════════════
+// D — CODE DENSITY
+// ════════════════════════════════════════════════════════════════
+
+pub fn bench_density() {
+    let _files = [];
+    push(_files, "stdlib/homeos/pipeline.ol");
+    push(_files, "stdlib/homeos/knowtree.ol");
+    push(_files, "stdlib/homeos/encoder.ol");
+    push(_files, "stdlib/homeos/instinct.ol");
+    push(_files, "stdlib/homeos/spider.ol");
+    push(_files, "stdlib/homeos/learning.ol");
+    push(_files, "stdlib/homeos/mcp_server.ol");
+    push(_files, "stdlib/bootstrap/lexer.ol");
+    push(_files, "stdlib/bootstrap/parser.ol");
+    push(_files, "stdlib/bootstrap/semantic.ol");
+    push(_files, "stdlib/bootstrap/codegen.ol");
+    push(_files, "stdlib/repl.ol");
+
+    let _loc = [0]; let _fn = [0]; let _pub = [0];
+    let _dead = [0]; let _comment = [0];
+    let _fi = 0;
+    while _fi < len(_files) {
+        let _path = __array_get(_files, _fi);
+        let _src = __file_read(_path);
+        if len(_src) > 0 {
+            // Lines
+            let _li = 0; let _lines = [1];
+            while _li < len(_src) {
+                if __char_code(char_at(_src, _li)) == 10 { let _ = __set_at(_lines, 0, __array_get(_lines, 0) + 1); };
+                // Comments
+                if __char_code(char_at(_src, _li)) == 47 {
+                    if (_li + 1) < len(_src) {
+                        if __char_code(char_at(_src, _li + 1)) == 47 {
+                            let _ = __set_at(_comment, 0, __array_get(_comment, 0) + 1);
+                        };
+                    };
+                };
+                _li = _li + 1;
+            };
+            // Functions
+            let _ci = 0; let _fns = [0]; let _pubs = [0];
+            while _ci < (len(_src) - 7) {
+                if substr(_src, _ci, _ci + 7) == "pub fn " { let _ = __set_at(_pubs, 0, __array_get(_pubs, 0) + 1); };
+                if substr(_src, _ci, _ci + 3) == "fn " { let _ = __set_at(_fns, 0, __array_get(_fns, 0) + 1); };
+                _ci = _ci + 1;
+            };
+            // Dead code count
+            let _dc = _bm_count_dead(_src);
+            let _ = __set_at(_loc, 0, __array_get(_loc, 0) + __array_get(_lines, 0));
+            let _ = __set_at(_fn, 0, __array_get(_fn, 0) + __array_get(_fns, 0));
+            let _ = __set_at(_pub, 0, __array_get(_pub, 0) + __array_get(_pubs, 0));
+            let _ = __set_at(_dead, 0, __array_get(_dead, 0) + _dc);
+        };
+        _fi = _fi + 1;
+    };
+
+    let _total_loc = __array_get(_loc, 0);
+    let _total_fn = __array_get(_fn, 0);
+    let _total_dead = __array_get(_dead, 0);
+    let _total_com = __array_get(_comment, 0);
+
+    return {
+        label: "D",
+        loc: _total_loc,
+        fn_count: _total_fn,
+        pub_count: __array_get(_pub, 0),
+        dead_fn: _total_dead,
+        dead_pct: if _total_fn > 0 { __floor(_total_dead * 100 / _total_fn) } else { 0 },
+        loc_per_fn: if _total_fn > 0 { __floor(_total_loc / _total_fn) } else { 0 },
+        comment_pct: if _total_loc > 0 { __floor(_total_com * 100 / _total_loc) } else { 0 }
+    };
+}
+
+fn _bm_count_dead(_src) {
+    let _fns = [];
+    let _fi = [0];
+    while __array_get(_fi, 0) < (len(_src) - 4) {
+        let _i = __array_get(_fi, 0);
+        if substr(_src, _i, _i + 3) == "fn " {
+            let _at = [0];
+            if _i == 0 { let _ = __set_at(_at, 0, 1); };
+            if _i > 0 { if __char_code(char_at(_src, _i - 1)) == 10 { let _ = __set_at(_at, 0, 1); }; };
+            if _i >= 4 { if substr(_src, _i - 4, _i) == "pub " { let _ = __set_at(_at, 0, 1); }; };
+            if __array_get(_at, 0) == 1 {
+                let _ns = _i + 3;
+                let _ne = [_ns];
+                while __array_get(_ne, 0) < len(_src) {
+                    let _nc = __char_code(char_at(_src, __array_get(_ne, 0)));
+                    if _nc == 40 { break; };
+                    if _nc == 32 { break; };
+                    if _nc == 10 { break; };
+                    let _ = __set_at(_ne, 0, __array_get(_ne, 0) + 1);
+                };
+                if (__array_get(_ne, 0) - _ns) > 1 {
+                    push(_fns, substr(_src, _ns, __array_get(_ne, 0)));
+                };
+            };
+        };
+        let _ = __set_at(_fi, 0, __array_get(_fi, 0) + 1);
+    };
+    let _dead = 0;
+    let _di = 0;
+    while _di < len(_fns) {
+        let _name = __array_get(_fns, _di);
+        let _pat = _name + "(";
+        let _count = [0];
+        let _si = [0];
+        while __array_get(_si, 0) < (len(_src) - len(_pat)) {
+            if substr(_src, __array_get(_si, 0), __array_get(_si, 0) + len(_pat)) == _pat {
+                let _ = __set_at(_count, 0, __array_get(_count, 0) + 1);
+            };
+            let _ = __set_at(_si, 0, __array_get(_si, 0) + 1);
+        };
+        if __array_get(_count, 0) <= 1 { _dead = _dead + 1; };
+        _di = _di + 1;
+    };
+    return _dead;
+}
+
+// ════════════════════════════════════════════════════════════════
+// X — STABILITY (100 consecutive ops, no crash)
+// ════════════════════════════════════════════════════════════════
+
+pub fn bench_stability() {
+    // X1: 20 compiles
+    let _c = [0]; let _i = 0;
+    while _i < 20 { try { _bm_compile("let x" + __to_string(_i) + "=" + __to_string(_i) + ";"); let _ = __set_at(_c, 0, __array_get(_c, 0) + 1); } catch {}; _i = _i + 1; };
+
+    // X2: 20 pipelines
+    let _p = [0]; _i = 0;
+    while _i < 20 { try { pipeline("stab " + __to_string(_i)); let _ = __set_at(_p, 0, __array_get(_p, 0) + 1); } catch {}; _i = _i + 1; };
+
+    // X3: 20 kt learn+find
+    let _k = [0]; _i = 0;
+    while _i < 20 { try { kt_learn("stab " + __to_string(_i)); kt_find("stab", 3); let _ = __set_at(_k, 0, __array_get(_k, 0) + 1); } catch {}; _i = _i + 1; };
+    __heap_pin();
+
+    // X4: Heap ratio after 20 pipeline calls
+    let _h1 = __heap_used();
+    _i = 0;
+    while _i < 20 { pipeline("heap " + __to_string(_i)); _i = _i + 1; };
+    let _h2 = __heap_used();
+    let _ratio = 0;
+    if _h1 > 0 { _ratio = __floor(_h2 * 100 / _h1); };
+
+    return {
+        label: "X",
+        compile: __array_get(_c, 0),
+        pipeline: __array_get(_p, 0),
+        knowtree: __array_get(_k, 0),
+        heap_pct: _ratio
+    };
+}
+
+// ════════════════════════════════════════════════════════════════
+// FULL BENCHMARK
 // ════════════════════════════════════════════════════════════════
 
 pub fn benchmark_full() {
-    _boot_learn();
+    let _ts = _fmt_ts(__timestamp());
 
-    let _bf_e = bench_english();
-    __heap_pin();
-    let _bf_m = bench_math();
-    __heap_pin();
-    let _bf_s = bench_system();
-    __heap_pin();
+    let _c = bench_compile(); __heap_pin();
+    let _t = bench_throughput(); __heap_pin();
 
-    // Composite score: weighted average
-    // E=30% M=40% S=30%
-    let _bf_composite = __floor(
-        (_bf_e.score * 30 + _bf_m.score * 40 + _bf_s.score * 30) / 100
-    );
+    let _r = "=== NOX SYSTEM BENCHMARK [" + _ts + "] ==="
+        + "\n[C] COMPILE: " + __to_string(_c.score) + "% (" + __to_string(_c.pass) + "/" + __to_string(_c.total) + ")"
+        + "\n[T] THROUGHPUT (ops/sec): compile=" + __to_string(_t.compile) + " encode=" + __to_string(_t.encode) + " search=" + __to_string(_t.search) + " ingest=" + __to_string(_t.ingest) + " dist=" + __to_string(_t.distance)
+        + "\n heap: " + __to_string(__floor(__heap_used() / 1024)) + "KB"
+        + "\n===================================";
 
-    let _bf_ts = _fmt_ts(__timestamp());
+    let _log = _ts + " C=" + __to_string(_c.score) + " T=" + __to_string(_t.compile) + "/" + __to_string(_t.encode) + "/" + __to_string(_t.search) + "\n";
+    __file_append("nox_benchmark.log", _log);
 
-    let _bf_report = "═══ NOX BENCHMARK [" + _bf_ts + "] ═══"
-        + "\n E (English):    " + __to_string(_bf_e.score) + "% (" + __to_string(_bf_e.pass) + "/" + __to_string(_bf_e.total) + ")"
-        + "\n M (Math/Logic): " + __to_string(_bf_m.score) + "% (" + __to_string(_bf_m.pass) + "/" + __to_string(_bf_m.total) + ")"
-        + "\n S (System):     " + __to_string(_bf_s.score) + "% (" + __to_string(_bf_s.pass) + "/" + __to_string(_bf_s.total) + ")"
-        + "\n ─────────────────────────"
-        + "\n COMPOSITE:      " + __to_string(_bf_composite) + "%"
-        + "\n"
-        + "\n System metrics:"
-        + "\n   heap:         " + __to_string(_bf_s.heap_kb) + " KB"
-        + "\n   compile:      " + __to_string(_bf_s.compile_ms) + " ms"
-        + "\n   pipeline×10:  " + __to_string(_bf_s.pipe_10_ms) + " ms"
-        + "\n   search×100:   " + __to_string(_bf_s.search_100_ms) + " ms"
-        + "\n   encode×100:   " + __to_string(_bf_s.encode_100_ms) + " ms"
-        + "\n   heap growth:  " + __to_string(_bf_s.heap_growth_kb) + " KB (10 pipeline calls)"
-        + "\n═══════════════════════════════";
+    return _r;
+}
 
-    // Append to benchmark log (track trend over time)
-    let _bf_log = _bf_ts + " | E=" + __to_string(_bf_e.score) + " M=" + __to_string(_bf_m.score) + " S=" + __to_string(_bf_s.score) + " C=" + __to_string(_bf_composite) + " | heap=" + __to_string(_bf_s.heap_kb) + "KB pipe10=" + __to_string(_bf_s.pipe_10_ms) + "ms\n";
-    __file_append("nox_benchmark.log", _bf_log);
+// ════════════════════════════════════════════════════════════════
+// Helpers
+// ════════════════════════════════════════════════════════════════
 
-    return _bf_report;
+fn _bm_compile(_src) {
+    let _tk = tokenize(_src);
+    let _ast = parse(_tk);
+    if _g_parse_error == 1 { _g_parse_error = 0; return []; };
+    set_at(_g_pos_box, 0, 0);
+    _prefill_output();
+    analyze(_ast);
+    let _len = _g_pos_box[0];
+    let _out = [];
+    let _i = 0;
+    while _i < _len { push(_out, __array_get(_g_output, _i)); _i = _i + 1; };
+    return _out;
+}
+
+fn _bm_eval(_src) {
+    return repl_eval(_src);
+}
+
+fn _bt(_name, _cond, _pass, _fail, _total) {
+    let _ = __set_at(_total, 0, __array_get(_total, 0) + 1);
+    if _cond == 1 { let _ = __set_at(_pass, 0, __array_get(_pass, 0) + 1); }
+    else { let _ = __set_at(_fail, 0, __array_get(_fail, 0) + 1); };
 }

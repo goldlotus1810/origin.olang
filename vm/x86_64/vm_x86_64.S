@@ -8055,12 +8055,16 @@ op_ret:
 
 .call_heap_restore:
     # __heap_restore(index) → resets r15 from saved checkpoint
+    # Also resets cp_count to index so slots are reusable (stack-like)
     add     %rcx, %r13
     movsd   (%r14), %xmm0
     cvttsd2si %xmm0, %rax              # index
     add     $16, %r14                   # pop
     lea     heap_checkpoints(%rip), %rdx
     mov     (%rdx, %rax, 8), %r15      # restore r15
+    # Reset checkpoint count to this index (free higher slots)
+    lea     heap_cp_count(%rip), %rdx
+    mov     %rax, (%rdx)
     # Push dummy result
     sub     $16, %r14
     xor     %eax, %eax
