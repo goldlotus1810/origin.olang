@@ -1203,7 +1203,7 @@ pub fn agent_respond(text) {
     // ── SC.16 CHECKPOINT 4: Promote ──
     // Decide if knowledge should be promoted (high confidence + high fire)
     // This is where Dream would cluster hot patterns
-    if _ar_conf >= 90 { if _ar_novelty < 3 { /* well-known, stable */ }; };
+    if _ar_conf >= 90 { if _ar_novelty < 3 { }; }; // well-known, stable
 
     // ── 8. UDC DECODE (molecule → mood label) ──
     let _ar_mood = udc_describe(mol);

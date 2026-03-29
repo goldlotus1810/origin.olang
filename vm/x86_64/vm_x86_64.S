@@ -11155,20 +11155,8 @@ op_halt:
     je      .repl_exit
 
 .repl_check_help:
-    # Check for "help\n" (5 bytes)
-    cmp     $5, %rcx
-    jne     .repl_try_eval
-    cmpl    $0x706C6568, (%rdi)         # "help" little-endian
-    jne     .repl_try_eval
-    cmpb    $0x0A, 4(%rdi)
-    jne     .repl_try_eval
-    # Print help message
-    lea     msg_help(%rip), %rsi
-    mov     $msg_help_len, %edx
-    mov     $1, %edi                    # stdout
-    mov     $SYS_WRITE, %eax
-    syscall
-    jmp     .repl_loop
+    # "help" now handled by repl_eval() in bytecode — no VM intercept
+    # (was: hardcoded msg_help, caused BUG-BOOT-SHADOW)
 
 .repl_try_eval:
     # Construct trampoline bytecode on heap that:
