@@ -688,6 +688,70 @@ pub fn repl_eval(input) {
       return _an_path + ":\n  " + __to_string(__array_get(_an_lines, 0)) + " lines, " + __to_string(__array_get(_an_fns, 0)) + " functions (" + __to_string(__array_get(_an_pub, 0)) + " pub)\n  " + __to_string(len(_an_tokens)) + " tokens → " + __to_string(_an_bclen) + " bytes bytecode\n  " + __to_string(__array_get(_an_pushes, 0)) + " pushes, " + __to_string(__array_get(_an_calls, 0)) + " calls, " + __to_string(__array_get(_an_jumps, 0)) + " jumps\n  " + __to_string(__floor(_an_bclen / __array_get(_an_fns, 0))) + " bytes/fn avg";
     };
   }
+  // Dead code: find functions defined but never called
+  if len(src) > 5 {
+    if __substr(src, 0, 5) == "dead " {
+      let _dc_path = __substr(src, 5, len(src));
+      let _dc_src = __file_read(_dc_path);
+      if len(_dc_src) == 0 { return "Error: cannot read " + _dc_path; };
+      // Pass 1: extract function names (find "fn <name>(")
+      let _dc_fns = [];
+      let _dc_fi = [0];
+      while __array_get(_dc_fi, 0) < (len(_dc_src) - 4) {
+          let _dc_i = __array_get(_dc_fi, 0);
+          if substr(_dc_src, _dc_i, _dc_i + 3) == "fn " {
+              // Check it's at line start or after "pub "
+              let _dc_at_start = [0];
+              if _dc_i == 0 { let _ = __set_at(_dc_at_start, 0, 1); };
+              if _dc_i > 0 { if __char_code(char_at(_dc_src, _dc_i - 1)) == 10 { let _ = __set_at(_dc_at_start, 0, 1); }; };
+              if _dc_i >= 4 { if substr(_dc_src, _dc_i - 4, _dc_i) == "pub " { let _ = __set_at(_dc_at_start, 0, 1); }; };
+              if __array_get(_dc_at_start, 0) == 1 {
+                  // Extract name: from "fn " to "("
+                  let _dc_ns = _dc_i + 3;
+                  let _dc_ne = [_dc_ns];
+                  while __array_get(_dc_ne, 0) < len(_dc_src) {
+                      let _dc_nc = __char_code(char_at(_dc_src, __array_get(_dc_ne, 0)));
+                      if _dc_nc == 40 { break; };
+                      if _dc_nc == 32 { break; };
+                      if _dc_nc == 10 { break; };
+                      let _ = __set_at(_dc_ne, 0, __array_get(_dc_ne, 0) + 1);
+                  };
+                  if (__array_get(_dc_ne, 0) - _dc_ns) > 1 {
+                      push(_dc_fns, substr(_dc_src, _dc_ns, __array_get(_dc_ne, 0)));
+                  };
+              };
+          };
+          let _ = __set_at(_dc_fi, 0, __array_get(_dc_fi, 0) + 1);
+      };
+      // Pass 2: for each function, count calls (name + "(")
+      let _dc_dead = [];
+      let _dc_ci = 0;
+      while _dc_ci < len(_dc_fns) {
+          let _dc_name = __array_get(_dc_fns, _dc_ci);
+          let _dc_pattern = _dc_name + "(";
+          let _dc_count = [0];
+          let _dc_si = [0];
+          while __array_get(_dc_si, 0) < (len(_dc_src) - len(_dc_pattern)) {
+              let _dc_pos = __array_get(_dc_si, 0);
+              if substr(_dc_src, _dc_pos, _dc_pos + len(_dc_pattern)) == _dc_pattern {
+                  let _ = __set_at(_dc_count, 0, __array_get(_dc_count, 0) + 1);
+              };
+              let _ = __set_at(_dc_si, 0, __array_get(_dc_si, 0) + 1);
+          };
+          // Count includes the definition itself (1). If only 1 = never called.
+          if __array_get(_dc_count, 0) <= 1 { push(_dc_dead, _dc_name); };
+          let _dc_ci = _dc_ci + 1;
+      };
+      if len(_dc_dead) == 0 { return _dc_path + ": no dead code found (" + __to_string(len(_dc_fns)) + " functions)"; };
+      let _dc_out = _dc_path + ": " + __to_string(len(_dc_dead)) + " potentially unused:";
+      let _dc_di = 0;
+      while _dc_di < len(_dc_dead) {
+          let _dc_out = _dc_out + "\n  " + __array_get(_dc_dead, _dc_di);
+          let _dc_di = _dc_di + 1;
+      };
+      return _dc_out;
+    };
+  }
   // Audit: self-review all source files
   if src == "audit" {
     let _au_dirs = [];

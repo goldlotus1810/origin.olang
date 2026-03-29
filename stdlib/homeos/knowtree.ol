@@ -640,33 +640,7 @@ fn _kt_strip_ts(_kst_text) {
     return _kst_text;
 }
 
-// Filter: is this line real knowledge (not a session log entry)?
-fn _kt_is_knowledge(_kik_text) {
-    if len(_kik_text) < 20 { return 0; };
-    // Must contain definitional pattern: " is " or " la " or " are " or " has " or " co "
-    let _kik_i = 0;
-    while _kik_i < (len(_kik_text) - 4) {
-        let _kik_w = substr(_kik_text, _kik_i, _kik_i + 4);
-        if _kik_w == " is " { return 1; };
-        if _kik_w == " la " { return 1; };
-        let _kik_i = _kik_i + 1;
-    };
-    let _kik_i = 0;
-    while _kik_i < (len(_kik_text) - 5) {
-        let _kik_w = substr(_kik_text, _kik_i, _kik_i + 5);
-        if _kik_w == " are " { return 1; };
-        if _kik_w == " has " { return 1; };
-        if _kik_w == " was " { return 1; };
-        let _kik_i = _kik_i + 1;
-    };
-    // Also accept lines starting with known entity names
-    if len(_kik_text) > 4 {
-        if substr(_kik_text, 0, 4) == "Nox " { return 1; };
-        if substr(_kik_text, 0, 5) == "Olang" { return 1; };
-        if substr(_kik_text, 0, 5) == "Lupin" { return 1; };
-    };
-    return 0;
-}
+// _kt_is_knowledge removed — dead code (filter disabled, kt_load uses _kt_is_debug only)
 
 // Reject debug/progress log entries
 fn _kt_is_debug(_kid_text) {
@@ -718,132 +692,13 @@ pub fn kt_read_book(_rb_path) {
     return kt_ingest_book(_rb_path);
 }
 
-// ════════════════════════════════════════════════════════════════
-// I. KnowTree Sampling — Adaptive Fibonacci sampling
-// ════════════════════════════════════════════════════════════════
-// Instead of scanning all 65,536 slots, sample K = Fib(gen+3) entries.
-// gen0 (UDC): K=2, gen1 (base): K=5, gen2 (expert): K=13, gen3 (new): K=55
-//
-// Samples the TOP-K most frequent P_weights from the FH table.
-// Returns: array of [pw, freq] pairs (sorted by freq descending).
+// Dead code removed by Nox self-audit:
+// - kt_sample (Fibonacci sampling — never called)
+// - kt_q_reward, kt_q_get, kt_q_search (Q-table — never integrated)
+// - _kt_q_init, __kt_qtable, __kt_q_inited (Q-table infrastructure)
 
-let __kt_fib_cache = [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144];
-
-pub fn kt_sample(_kts_gen) {
-    _kt_ensure_init();
-    // K = Fib(gen + 3), clamped to cache
-    let _kts_idx = _kts_gen + 3;
-    if _kts_idx > 12 { let _kts_idx = 12; };
-    let _kts_k = __array_get(__kt_fib_cache, _kts_idx);
-    // Collect top-K from __kt_pw_freq using selection
-    let _kts_result = [];
-    let _kts_used = __array_range(256);
-    let _kts_ui = 0;
-    while _kts_ui < 256 { let _ = __set_at(_kts_used, _kts_ui, 0); let _kts_ui = _kts_ui + 1; };
-    let _kts_round = [0];
-    while __array_get(_kts_round, 0) < _kts_k {
-        let _kts_best_i = [0];
-        let _kts_best_f = [0];
-        let _kts_j = 0;
-        while _kts_j < 65536 {
-            let _kts_f = __array_get(__kt_pw_freq, _kts_j);
-            if _kts_f > __array_get(_kts_best_f, 0) {
-                // Check not already used (scan used array)
-                let _kts_is_used = 0;
-                let _kts_ck = 0;
-                while _kts_ck < __array_get(_kts_round, 0) { if __array_get(_kts_used, _kts_ck) == _kts_j { let _kts_is_used = 1; }; let _kts_ck = _kts_ck + 1; };
-                if _kts_is_used == 0 { let _ = __set_at(_kts_best_i, 0, _kts_j); let _ = __set_at(_kts_best_f, 0, _kts_f); };
-            };
-            let _kts_j = _kts_j + 1;
-        };
-        if __array_get(_kts_best_f, 0) == 0 { break; };
-        let _ = __set_at(_kts_used, __array_get(_kts_round, 0), __array_get(_kts_best_i, 0));
-        let _ = __push(_kts_result, __array_get(_kts_best_i, 0));
-        let _ = __push(_kts_result, __array_get(_kts_best_f, 0));
-        let _ = __set_at(_kts_round, 0, __array_get(_kts_round, 0) + 1);
-    };
-    return _kts_result;
-}
-
-// ════════════════════════════════════════════════════════════════
-// J. Bellman Path — Q-table for search path optimization
-// ════════════════════════════════════════════════════════════════
-// Q(node, direction) = reward + φ⁻¹ × max Q(child, direction')
-// Cache: __kt_qtable[65536] = Q-value per FH slot
-// Decay: Q *= φ⁻¹ ≈ 0.618 when KnowTree evolves
-//
-// Update rule: on successful search hit, propagate reward backward.
-// On KnowTree mutation (learn), decay all Q-values.
-
-let __kt_qtable = [];
-let __kt_q_inited = [0];
-
-fn _kt_q_init() {
-    if __array_get(__kt_q_inited, 0) == 1 { return; };
-    let _ = __set_at(__kt_q_inited, 0, 1);
-    __kt_qtable = __array_range(65536);
-    let _qi = 0;
-    while _qi < 65536 { let _ = __set_at(__kt_qtable, _qi, 0); let _qi = _qi + 1; };
-}
-
-// Update Q-value after successful search hit
-pub fn kt_q_reward(_kqr_pw, _kqr_reward) {
-    _kt_q_init();
-    let _kqr_idx = __bit_and(_kqr_pw * 40503, 65535);
-    let _kqr_old = __array_get(__kt_qtable, _kqr_idx);
-    // Q = old + reward (simple accumulate, Bellman update)
-    let _ = __set_at(__kt_qtable, _kqr_idx, _kqr_old + _kqr_reward);
-}
-
-// Decay all Q-values by φ⁻¹ ≈ 0.618 (called after KnowTree mutation)
-pub fn kt_q_decay() {
-    _kt_q_init();
-    let _kqd_i = 0;
-    while _kqd_i < 65536 {
-        let _kqd_v = __array_get(__kt_qtable, _kqd_i);
-        if _kqd_v > 0 {
-            // Q *= φ⁻¹ ≈ 618/1000 (integer approx)
-            let _kqd_nv = __floor(_kqd_v * 618 / 1000);
-            let _ = __set_at(__kt_qtable, _kqd_i, _kqd_nv);
-        };
-        let _kqd_i = _kqd_i + 1;
-    };
-}
-
-// Get Q-value for a P_weight (used to prioritize search direction)
-pub fn kt_q_get(_kqg_pw) {
-    _kt_q_init();
-    let _kqg_idx = __bit_and(_kqg_pw * 40503, 65535);
-    return __array_get(__kt_qtable, _kqg_idx);
-}
-
-// Q-guided search: use __text_to_pw for query, prefer high-Q paths
-pub fn kt_q_search(_kqs_query) {
-    _kt_ensure_init();
-    _kt_q_init();
-    let _kqs_pw = __text_to_pw(_kqs_query, __kt_tbl);
-    let _kqs_plen = __array_len(_kqs_pw);
-    let _kqs_hits = [0];
-    let _kqs_total_freq = [0];
-    let _kqs_total_q = [0];
-    let _kqs_i = 0;
-    while _kqs_i < _kqs_plen {
-        let _kqs_p = __array_get(_kqs_pw, _kqs_i);
-        let _kqs_idx = __bit_and(_kqs_p * 40503, 65535);
-        let _kqs_f = __array_get(__kt_pw_freq, _kqs_idx);
-        // Flat: compute all at depth 1, single if at depth 2
-        if _kqs_f > 0 {
-            let _ = __set_at(_kqs_hits, 0, __array_get(_kqs_hits, 0) + 1);
-            let _ = __set_at(_kqs_total_freq, 0, __array_get(_kqs_total_freq, 0) + _kqs_f);
-            let _kqs_qv = __array_get(__kt_qtable, _kqs_idx);
-            let _ = __set_at(_kqs_total_q, 0, __array_get(_kqs_total_q, 0) + _kqs_qv);
-            let _ = __set_at(__kt_qtable, _kqs_idx, _kqs_qv + 1);
-        };
-        let _kqs_i = _kqs_i + 2;
-    };
-    return { text: "hits=" + __to_string(__array_get(_kqs_hits, 0)) + " freq=" + __to_string(__array_get(_kqs_total_freq, 0)) + " Q=" + __to_string(__array_get(_kqs_total_q, 0)), score: __array_get(_kqs_hits, 0) + __array_get(_kqs_total_q, 0) };
-}
-
+// [Removed: __kt_fib_cache, kt_sample, Q-table — dead code]
+// Kept: kt_ingest_full (used by http.ol)
 // ════════════════════════════════════════════════════════════════
 // Full pipeline: ingest book with Silk + STM + Dream
 // ════════════════════════════════════════════════════════════════
@@ -915,7 +770,7 @@ pub fn kt_ingest_full(_kif_path) {
         let _kif_di = _kif_di + 1;
     };
     // Decay Silk weights
-    kt_q_decay();
+    // kt_q_decay removed (dead code)
     // Stats
     let _kif_sedges = [0]; let _kif_sfires = [0];
     let _kif_ski = 0;
