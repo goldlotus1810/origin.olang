@@ -235,6 +235,57 @@ fn _expand_use(_eu_src) {
     return _eu_prefix + _eu_content + " " + _eu_rest;
 }
 
+// Helper: extract function names from source
+fn _dead_scan_fns(_dsf_src) {
+    let _dsf_fns = [];
+    let _dsf_i = 0;
+    let _dsf_len = len(_dsf_src) - 4;
+    while _dsf_i < _dsf_len {
+        if substr(_dsf_src, _dsf_i, _dsf_i + 3) == "fn " {
+            let _dsf_ok = 0;
+            if _dsf_i == 0 { _dsf_ok = 1; };
+            if _dsf_i > 0 { if __char_code(char_at(_dsf_src, _dsf_i - 1)) == 10 { _dsf_ok = 1; }; };
+            if _dsf_i >= 4 { if substr(_dsf_src, _dsf_i - 4, _dsf_i) == "pub " { _dsf_ok = 1; }; };
+            if _dsf_ok == 1 {
+                let _dsf_ns = _dsf_i + 3;
+                let _dsf_ne = _dsf_ns;
+                while _dsf_ne < len(_dsf_src) {
+                    let _dsf_c = __char_code(char_at(_dsf_src, _dsf_ne));
+                    if _dsf_c == 40 { break; };
+                    if _dsf_c == 32 { break; };
+                    if _dsf_c == 10 { break; };
+                    _dsf_ne = _dsf_ne + 1;
+                };
+                if (_dsf_ne - _dsf_ns) > 1 { push(_dsf_fns, substr(_dsf_src, _dsf_ns, _dsf_ne)); };
+            };
+        };
+        _dsf_i = _dsf_i + 1;
+    };
+    return _dsf_fns;
+}
+
+// Helper: find functions with 0 calls (only definition)
+fn _dead_find_unused(_dfu_src, _dfu_fns) {
+    let _dfu_dead = [];
+    let _dfu_i = 0;
+    while _dfu_i < len(_dfu_fns) {
+        let _dfu_name = _dfu_fns[_dfu_i];
+        let _dfu_pat = _dfu_name + "(";
+        let _dfu_count = 0;
+        let _dfu_si = 0;
+        let _dfu_limit = len(_dfu_src) - len(_dfu_pat);
+        while _dfu_si < _dfu_limit {
+            if substr(_dfu_src, _dfu_si, _dfu_si + len(_dfu_pat)) == _dfu_pat {
+                _dfu_count = _dfu_count + 1;
+            };
+            _dfu_si = _dfu_si + 1;
+        };
+        if _dfu_count <= 1 { push(_dfu_dead, _dfu_name); };
+        _dfu_i = _dfu_i + 1;
+    };
+    return _dfu_dead;
+}
+
 pub fn repl_eval(input) {
   // Strip trailing newline if present (use ASM builtin __str_trim)
   let src = __str_trim(input);
@@ -793,6 +844,44 @@ pub fn repl_eval(input) {
     };
   }
   // Dead code: find functions defined but never called
+  if src == "dead" {
+    // Scan all source files
+    let _da_dirs = ["stdlib", "stdlib/bootstrap", "stdlib/homeos"];
+    let _da_out = "=== DEAD CODE SCAN ===";
+    let _da_total_dead = 0;
+    let _da_di = 0;
+    while _da_di < len(_da_dirs) {
+      let _da_files = __readdir(_da_dirs[_da_di]);
+      let _da_fi = 0;
+      while _da_fi < len(_da_files) {
+        let _da_name = _da_files[_da_fi];
+        let _da_nlen = len(_da_name);
+        if _da_nlen > 3 {
+          if __substr(_da_name, _da_nlen - 3, _da_nlen) == ".ol" {
+            let _da_path = _da_dirs[_da_di] + "/" + _da_name;
+            let _da_src = __file_read(_da_path);
+            if len(_da_src) > 0 {
+              let _da_fns = _dead_scan_fns(_da_src);
+              let _da_dead = _dead_find_unused(_da_src, _da_fns);
+              if len(_da_dead) > 0 {
+                _da_out = _da_out + "\n" + _da_path + ": " + __to_string(len(_da_dead)) + " unused";
+                let _da_ddi = 0;
+                while _da_ddi < len(_da_dead) {
+                  _da_out = _da_out + "\n  " + _da_dead[_da_ddi];
+                  _da_ddi = _da_ddi + 1;
+                };
+                _da_total_dead = _da_total_dead + len(_da_dead);
+              };
+            };
+          };
+        };
+        _da_fi = _da_fi + 1;
+      };
+      __heap_pin();
+      _da_di = _da_di + 1;
+    };
+    return _da_out + "\n=== TOTAL: " + __to_string(_da_total_dead) + " potentially unused functions ===";
+  }
   if len(src) > 5 {
     if __substr(src, 0, 5) == "dead " {
       let _dc_path = __substr(src, 5, len(src));
