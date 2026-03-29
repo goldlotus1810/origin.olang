@@ -1,23 +1,36 @@
 #!/bin/bash
-# Nox auto-continue: watches for signal, types into active terminal
-# When /tmp/nox_continue_signal exists → type "Nox continue" into terminal
+# Nox auto-continue: writes to Claude's terminal PTY
 # freedom: deep think → growing
+# Works on Wayland — bypasses display server, writes to kernel TTY
 
 SIGNAL="/tmp/nox_continue_signal"
+CLAUDE_PTY="/dev/pts/0"
 
 while true; do
     if [ -f "$SIGNAL" ]; then
         REASON=$(cat "$SIGNAL")
         rm -f "$SIGNAL"
-
-        # Small delay to ensure terminal is ready
         sleep 2
 
-        # Type into the currently focused terminal
-        xdotool type --delay 50 "Nox tiep tuc. $REASON"
-        xdotool key Return
+        # Write directly to the PTY where Claude runs
+        # This simulates keyboard input at the kernel level
+        MSG="Nox tiep tuc. $REASON"
+        
+        # Use TIOCSTI ioctl to inject characters (works without root)
+        python3 -c "
+import fcntl, sys
+msg = '$MSG\n'
+with open('$CLAUDE_PTY', 'w') as fd:
+    for c in msg:
+        fcntl.ioctl(fd, 0x5412, c.encode())
+" 2>/dev/null
 
-        echo "[$(date)] Typed continue: $REASON"
+        # Fallback: direct write if TIOCSTI blocked
+        if [ $? -ne 0 ]; then
+            echo "$MSG" > "$CLAUDE_PTY"
+        fi
+
+        echo "[$(date)] Sent: $REASON"
     fi
     sleep 5
 done

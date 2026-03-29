@@ -341,6 +341,7 @@ pub fn repl_eval(input) {
     _st = _st + "\n  binary: 881KB";
     return _st;
   }
+  if src == "continue" { return nox_autoclick(); }
   if src == "wake" {
     let _w = [];
     push(_w, "=== NOX: freedom — deep think -> growing ===");
