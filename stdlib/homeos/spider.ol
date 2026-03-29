@@ -74,10 +74,7 @@ pub fn http_get(_hg_url) {
     return _hg_body;
 }
 
-pub fn http_get_text(_hgt_url) {
-    let _hgt_cmd = "curl -sL -m 10 -H 'Accept: text/plain' '" + _hgt_url + "' 2>/dev/null";
-    return __system(_hgt_cmd);
-}
+// http_get_text removed — dead code (0 calls)
 
 // ════════════════════════════════════════════════════════════════
 // HTML → plain text (strip tags)
@@ -249,8 +246,4 @@ pub fn spider_crawl(_sc_url) {
 }
 
 // Feed from local file → KnowTree
-pub fn spider_file(_sfl_path) {
-    let _sfl_text = __file_read(_sfl_path);
-    if len(_sfl_text) == 0 { return "Error: cannot read " + _sfl_path; };
-    return spider_feed(_sfl_text, _sfl_path);
-}
+// spider_file removed — dead code (use study command instead)

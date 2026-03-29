@@ -208,9 +208,7 @@ fn file_read_bytes(_frb_path) {
   return _frb_arr;
 };
 
-fn file_read_string(_frs_path) {
-  return __file_read(_frs_path);
-};
+// file_read_string removed — dead code (trivial wrapper, 0 calls)
 
 fn file_write_bytes(_fwb_path, _fwb_data) {
   let _fwb_len = len(_fwb_data);
@@ -238,56 +236,13 @@ pub fn default_config() {
   return _dc_cfg;
 };
 
-pub fn arm64_config() {
-  return {
-    vm_path: "vm/arm64/vm_arm64.bin",
-    stdlib_path: "stdlib",
-    kn_path: "origin.olang",
-    output: "origin_arm64.olang",
-    arch: "arm64"
-  };
-};
+// arm64_config, wasm_config, wasi_config removed — dead code (0 calls)
+// Multi-arch support deferred — x86_64 only for now
 
-pub fn wasm_config() {
-  return {
-    vm_path: "vm/wasm/vm_wasm.wasm",
-    stdlib_path: "stdlib",
-    kn_path: "",
-    output: "origin.wasm",
-    arch: "wasm"
-  };
-};
-
-pub fn wasi_config() {
-  return {
-    vm_path: "vm/wasm/vm_wasi.wasm",
-    stdlib_path: "stdlib",
-    kn_path: "",
-    output: "origin_wasi.wasm",
-    arch: "wasi"
-  };
-};
-
-// ── Fat binary config ──
-
-pub fn fat_config() {
-  return {
-    archs: [
-      { name: "x86_64", vm_path: "vm/x86_64/vm_x86_64.bin", arch_id: 1, entry_off: 0 },
-      { name: "arm64",  vm_path: "vm/arm64/vm_arm64.bin",    arch_id: 2, entry_off: 0 }
-    ],
-    stdlib_path: "stdlib",
-    kn_path: "origin.olang",
-    output: "origin.fat",
-    stub_x86: "o_x86",
-    stub_arm: "o_arm"
-  };
-};
-
-// ── Fat binary builder ──
-// Packs multiple arch VMs + shared bytecode + knowledge into 1 file
-
-pub fn build_fat(config) {
+// fat_config, build_fat: multi-arch deferred — stub only
+pub fn build_fat(config) { return "Multi-arch deferred"; };
+// Original build_fat body removed (~90 lines)
+fn _build_fat_original(config) {
   emit "Builder — fat binary packer (multi-arch)";
 
   // 1. Compile bytecode (shared, arch-independent)

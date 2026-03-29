@@ -56,20 +56,7 @@ pub fn kg_find_rel(subj, rel) {
     return _kr_results;
 }
 
-pub fn kg_find_by(rel, obj) {
-    // Find subjects that have relation to object (reverse lookup)
-    let _kb_results = [];
-    let _kb_i = 0;
-    while _kb_i < len(_kg_subjects) {
-        if _kg_relations[_kb_i] == rel {
-            if _kg_objects[_kb_i] == obj {
-                push(_kb_results, _kg_subjects[_kb_i]);
-            };
-        };
-        let _kb_i = _kb_i + 1;
-    };
-    return _kb_results;
-}
+// kg_find_by removed — dead code (0 calls)
 
 pub fn kg_count() {
     return len(_kg_subjects);
