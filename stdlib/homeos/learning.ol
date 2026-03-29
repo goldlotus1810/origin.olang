@@ -60,6 +60,7 @@ pub fn dn_observe(fact) {
     push(_dn_times, _fmt_ts(__timestamp()));
     // Hebbian: co-activate with recent observations
     _hebb_coactivate(fact);
+    __heap_pin();
     return "ĐN (new, fire=1/" + __to_string(_dn_threshold[0]) + ")";
 }
 

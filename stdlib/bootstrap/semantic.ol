@@ -110,12 +110,11 @@ type SemanticState {
 let _g_output_ready = 0;
 
 fn _prefill_output() {
-    // Only allocate ONCE — reuse on subsequent calls
-    if _g_output_ready == 0 {
-        _g_output = __array_range(262144);
-        set_at(_g_output_box, 0, _g_output);
-        _g_output_ready = 1;
-    };
+    // Re-allocate each REPL turn — heap reset between turns invalidates old array
+    _g_output = __array_range(262144);
+    set_at(_g_output_box, 0, _g_output);
+    _g_output_ready = 1;
+    __heap_pin();
     // NOTE: _g_pos NOT reset here — streaming compiler accumulates.
     // Caller must reset _g_pos explicitly when starting a new compilation.
 }

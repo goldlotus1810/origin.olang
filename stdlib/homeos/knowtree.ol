@@ -1,12 +1,15 @@
-// homeos/knowtree.ol — KnowTree v2: FH-based storage
+// homeos/knowtree.ol — KnowTree v3: FH + 5D Hierarchical Index
 //
 // Storage: 3 Fibonacci Hash tables (fixed 65,536 slots each)
 //   __kt_pw_freq[fh(pw)]  = frequency count
 //   __kt_pw_text[fh(pw)]  = representative text (first seen word)
 //   __kt_facts_arr[]       = flat array of fact texts (for search)
 //
-// No dicts, no per-word arrays. Total heap = ~3MB fixed.
-// Supports 65,536 unique P_weights = entire Unicode range.
+// Hierarchical: 5D dimension index (S:16 R:16 V:8 A:8 T:4)
+//   Each bucket = array of fact indices → O(1) lookup per dimension
+//   Path query: [dim, val, dim, val, ...] → set intersection → O(k) results
+//
+// No dicts, no per-word arrays. Total heap = ~3MB fixed + small buckets.
 
 let __kt_pw_freq = [];
 let __kt_pw_text = [];
@@ -16,6 +19,18 @@ let __kt_word_count = [0];
 let __kt_inited = [0];
 let __kt_tbl = [];
 
+// ════════════════════════════════════════════════════════════════
+// 5D Dimension Index — hierarchical buckets for O(depth) lookup
+// S:4bits(0-15) R:4bits(0-15) V:3bits(0-7) A:3bits(0-7) T:2bits(0-3)
+// ════════════════════════════════════════════════════════════════
+let __kt_dim_s = [];
+let __kt_dim_r = [];
+let __kt_dim_v = [];
+let __kt_dim_a = [];
+let __kt_dim_t = [];
+let __kt_fact_mol = [];
+let __kt_dim_inited = [0];
+
 fn _kt_ensure_init() {
     if __array_get(__kt_inited, 0) == 1 { return; };
     let _ = __set_at(__kt_inited, 0, 1);
@@ -24,6 +39,134 @@ fn _kt_ensure_init() {
     __kt_tbl = __file_read_bytes("json/udc_p_table.bin");
     let _i = 0;
     while _i < 65536 { let _ = __set_at(__kt_pw_freq, _i, 0); let _ = __set_at(__kt_pw_text, _i, 0); let _i = _i + 1; };
+}
+
+// ════════════════════════════════════════════════════════════════
+// Dimension index init + helpers
+// ════════════════════════════════════════════════════════════════
+
+fn _kt_dim_init() {
+    if __array_get(__kt_dim_inited, 0) == 1 { return; };
+    let _ = __set_at(__kt_dim_inited, 0, 1);
+    let _di = 0;
+    while _di < 16 { push(__kt_dim_s, []); push(__kt_dim_r, []); let _di = _di + 1; };
+    let _di = 0;
+    while _di < 8 { push(__kt_dim_v, []); push(__kt_dim_a, []); let _di = _di + 1; };
+    let _di = 0;
+    while _di < 4 { push(__kt_dim_t, []); let _di = _di + 1; };
+}
+
+// Extract dimensions from P_weight (u16 packed: S:4 R:4 V:3 A:3 T:2)
+fn _kt_mol_s(_m) { return (__floor(_m / 4096)) % 16; }
+fn _kt_mol_r(_m) { return (__floor(_m / 256)) % 16; }
+fn _kt_mol_v(_m) { return (__floor(_m / 32)) % 8; }
+fn _kt_mol_a(_m) { return (__floor(_m / 4)) % 8; }
+fn _kt_mol_t(_m) { return _m % 4; }
+
+// Compute composite molecule for a text
+// Stage 1: blend word P_weights from UDC table → S, R, T dimensions
+// Stage 2: overlay emotional V, A from text_emotion_v2() → semantic placement
+fn _kt_fact_mol_compute(_kfm_text) {
+    _kt_ensure_init();
+    // Stage 1: UDC P_weight composite → gives S, R, T
+    let _kfm_pw = __text_to_pw(_kfm_text, __kt_tbl);
+    let _kfm_plen = __array_len(_kfm_pw);
+    if _kfm_plen == 0 { return 0; };
+    let _kfm_mol = [__array_get(_kfm_pw, 0)];
+    let _kfm_i = 2;
+    while _kfm_i < _kfm_plen {
+        let _kfm_cur = __array_get(_kfm_mol, 0);
+        let _kfm_nw = __array_get(_kfm_pw, _kfm_i);
+        if _kfm_nw > 0 {
+            let _cs = (__floor(_kfm_cur / 4096)) % 16;
+            let _cr = (__floor(_kfm_cur / 256)) % 16;
+            let _cv = (__floor(_kfm_cur / 32)) % 8;
+            let _ca = (__floor(_kfm_cur / 4)) % 8;
+            let _ct = _kfm_cur % 4;
+            let _ns = (__floor(_kfm_nw / 4096)) % 16;
+            let _nr = (__floor(_kfm_nw / 256)) % 16;
+            let _nv = (__floor(_kfm_nw / 32)) % 8;
+            let _na = (__floor(_kfm_nw / 4)) % 8;
+            let _nt = _kfm_nw % 4;
+            let _rs = (__floor(((_cs * 2) + _ns) / 3)) % 16;
+            let _rr = (__floor(((_cr * 2) + _nr) / 3)) % 16;
+            let _rv = (__floor(((_cv * 2) + _nv) / 3)) % 8;
+            let _ra = (__floor(((_ca * 2) + _na) / 3)) % 8;
+            let _rt = (__floor(((_ct * 2) + _nt) / 3)) % 4;
+            let _kfm_res = (_rs * 4096) + (_rr * 256) + (_rv * 32) + (_ra * 4) + _rt;
+            let _ = __set_at(_kfm_mol, 0, _kfm_res);
+        };
+        let _kfm_i = _kfm_i + 2;
+    };
+    // Stage 2: Emotional overlay — replace V/A with text_emotion_v2()
+    let _kfm_emo = text_emotion_v2(_kfm_text);
+    let _kfm_base = __array_get(_kfm_mol, 0);
+    let _kfm_s = (__floor(_kfm_base / 4096)) % 16;
+    let _kfm_r = (__floor(_kfm_base / 256)) % 16;
+    let _kfm_t = _kfm_base % 4;
+    // V/A from emotion (0-7 range, matches dimension width)
+    let _kfm_ev = _kfm_emo.v;
+    let _kfm_ea = _kfm_emo.a;
+    if _kfm_ev > 7 { let _kfm_ev = 7; };
+    if _kfm_ea > 7 { let _kfm_ea = 7; };
+    return (_kfm_s * 4096) + (_kfm_r * 256) + (_kfm_ev * 32) + (_kfm_ea * 4) + _kfm_t;
+}
+
+// Fast molecule: hash text chars → u16 mol (NO heap allocation, NO text_emotion_v2)
+fn _kt_fast_mol(_kfm_text) {
+    let _kfm_h = [0];
+    let _kfm_i = 0;
+    let _kfm_tlen = len(_kfm_text);
+    while _kfm_i < _kfm_tlen {
+        let _kfm_c = __char_code(char_at(_kfm_text, _kfm_i));
+        let _ = __set_at(_kfm_h, 0, __bit_and((__array_get(_kfm_h, 0) * 31) + _kfm_c, 65535));
+        let _kfm_i = _kfm_i + 1;
+    };
+    return __array_get(_kfm_h, 0);
+}
+
+// Index a fact into all 5 dimension buckets
+fn _kt_dim_index(_kdi_fidx, _kdi_mol) {
+    _kt_dim_init();
+    let _kdi_s = _kt_mol_s(_kdi_mol);
+    let _kdi_r = _kt_mol_r(_kdi_mol);
+    let _kdi_v = _kt_mol_v(_kdi_mol);
+    let _kdi_a = _kt_mol_a(_kdi_mol);
+    let _kdi_t = _kt_mol_t(_kdi_mol);
+    push(__kt_dim_s[_kdi_s], _kdi_fidx);
+    push(__kt_dim_r[_kdi_r], _kdi_fidx);
+    push(__kt_dim_v[_kdi_v], _kdi_fidx);
+    push(__kt_dim_a[_kdi_a], _kdi_fidx);
+    push(__kt_dim_t[_kdi_t], _kdi_fidx);
+    push(__kt_fact_mol, _kdi_mol);
+}
+
+// Set intersection of two fact-index arrays
+fn _kt_intersect(_kti_a, _kti_b) {
+    let _kti_out = [];
+    let _kti_ai = 0;
+    while _kti_ai < len(_kti_a) {
+        let _kti_v = __array_get(_kti_a, _kti_ai);
+        let _kti_f = [0];
+        let _kti_bi = 0;
+        while _kti_bi < len(_kti_b) {
+            if __array_get(_kti_b, _kti_bi) == _kti_v { let _ = __set_at(_kti_f, 0, 1); };
+            let _kti_bi = _kti_bi + 1;
+        };
+        if __array_get(_kti_f, 0) == 1 { push(_kti_out, _kti_v); };
+        let _kti_ai = _kti_ai + 1;
+    };
+    return _kti_out;
+}
+
+// Get bucket for a dimension (0=S, 1=R, 2=V, 3=A, 4=T)
+fn _kt_dim_bucket(_kdb_dim, _kdb_val) {
+    if _kdb_dim == 0 { return __kt_dim_s[_kdb_val]; };
+    if _kdb_dim == 1 { return __kt_dim_r[_kdb_val]; };
+    if _kdb_dim == 2 { return __kt_dim_v[_kdb_val]; };
+    if _kdb_dim == 3 { return __kt_dim_a[_kdb_val]; };
+    if _kdb_dim == 4 { return __kt_dim_t[_kdb_val]; };
+    return [];
 }
 
 // L2 tree branches (keep for compatibility)
@@ -65,7 +208,8 @@ pub fn kt_learn(_kl_text) {
 
 pub fn kt_learn_to(_klt_text, _klt_branch) {
     _kt_ensure_init();
-    let _ = __set_at(__kt_fact_count, 0, __array_get(__kt_fact_count, 0) + 1);
+    let _klt_fidx = __array_get(__kt_fact_count, 0);
+    let _ = __set_at(__kt_fact_count, 0, _klt_fidx + 1);
     push(__kt_facts_arr, _klt_text);
     // Split into words using substr, store each word's P_weight
     let _klt_tlen = len(_klt_text);
@@ -78,7 +222,12 @@ pub fn kt_learn_to(_klt_text, _klt_branch) {
     };
     let _klt_ws = __array_get(_klt_st, 0);
     if _klt_tlen > _klt_ws { let _klt_w = substr(_klt_text, _klt_ws, _klt_tlen); _kt_learn_word(_klt_w); };
-    return __array_get(__kt_fact_count, 0);
+    // Index into 5D dimension tree — lightweight hash (no __text_to_pw allocation)
+    let _klt_mol = _kt_fast_mol(_klt_text);
+    _kt_dim_index(_klt_fidx, _klt_mol);
+    // Pin heap every 50 facts (batch-friendly, protects persistent data)
+    if (_klt_fidx % 50) == 0 { __heap_pin(); };
+    return _klt_fidx + 1;
 }
 
 fn _kt_learn_word(_klw_text) {
@@ -170,8 +319,12 @@ pub fn kt_search(_ks_query) {
 // ════════════════════════════════════════════════════════════════
 
 pub fn kt_stats() {
-    return "KnowTree: " + __to_string(__array_get(__kt_word_count, 0)) + " words, " +
+    let _kst_base = "KnowTree: " + __to_string(__array_get(__kt_word_count, 0)) + " words, " +
            __to_string(__array_get(__kt_fact_count, 0)) + " facts";
+    if __array_get(__kt_dim_inited, 0) == 1 {
+        let _kst_base = _kst_base + " [5D indexed: " + __to_string(len(__kt_fact_mol)) + "]";
+    };
+    return _kst_base;
 }
 
 pub fn kt_find(_kf_query, _kf_max) {
@@ -204,8 +357,257 @@ pub fn kt_fact_count() {
 }
 
 // ════════════════════════════════════════════════════════════════
+// Hierarchical query API — O(1) bucket + O(k) results
+// ════════════════════════════════════════════════════════════════
+
+// Query one dimension: dim 0=S 1=R 2=V 3=A 4=T, val = bucket index
+// Returns array of fact texts
+pub fn kt_get_dim(_kgd_dim, _kgd_val) {
+    _kt_dim_init();
+    let _kgd_bucket = _kt_dim_bucket(_kgd_dim, _kgd_val);
+    let _kgd_out = [];
+    let _kgd_i = 0;
+    while _kgd_i < len(_kgd_bucket) {
+        let _kgd_idx = __array_get(_kgd_bucket, _kgd_i);
+        if _kgd_idx < len(__kt_facts_arr) { push(_kgd_out, __array_get(__kt_facts_arr, _kgd_idx)); };
+        let _kgd_i = _kgd_i + 1;
+    };
+    return _kgd_out;
+}
+
+// Multi-dimension path query: [dim, val, dim, val, ...]
+// Returns facts matching ALL dimension constraints (intersection)
+pub fn kt_get_path(_kgp_path) {
+    _kt_dim_init();
+    let _kgp_plen = len(_kgp_path);
+    if _kgp_plen < 2 { return []; };
+    // Start with first dimension bucket
+    let _kgp_set = _kt_dim_bucket(__array_get(_kgp_path, 0), __array_get(_kgp_path, 1));
+    // Intersect with remaining dimensions
+    let _kgp_pi = 2;
+    while _kgp_pi < _kgp_plen {
+        let _kgp_d = __array_get(_kgp_path, _kgp_pi);
+        let _kgp_v = __array_get(_kgp_path, _kgp_pi + 1);
+        let _kgp_other = _kt_dim_bucket(_kgp_d, _kgp_v);
+        let _kgp_set = _kt_intersect(_kgp_set, _kgp_other);
+        let _kgp_pi = _kgp_pi + 2;
+    };
+    // Convert indices to fact texts
+    let _kgp_out = [];
+    let _kgp_i = 0;
+    while _kgp_i < len(_kgp_set) {
+        let _kgp_idx = __array_get(_kgp_set, _kgp_i);
+        if _kgp_idx < len(__kt_facts_arr) { push(_kgp_out, __array_get(__kt_facts_arr, _kgp_idx)); };
+        let _kgp_i = _kgp_i + 1;
+    };
+    return _kgp_out;
+}
+
+// Nearest neighbor: find facts near a molecule (±radius on ALL 5 dimensions)
+// Returns array of {text, distance, mol} sorted by distance (closest first)
+pub fn kt_nearby(_knb_mol, _knb_radius) {
+    _kt_dim_init();
+    let _knb_s = _kt_mol_s(_knb_mol);
+    let _knb_v = _kt_mol_v(_knb_mol);
+    let _knb_a = _kt_mol_a(_knb_mol);
+    // Collect candidates from S dimension (widest spread = best filter)
+    let _knb_cands = [];
+    let _knb_ds = 0 - _knb_radius;
+    while _knb_ds <= _knb_radius {
+        let _knb_si = _knb_s + _knb_ds;
+        if _knb_si >= 0 {
+            if _knb_si < 16 {
+                let _knb_bucket = __kt_dim_s[_knb_si];
+                let _knb_bi = 0;
+                while _knb_bi < len(_knb_bucket) {
+                    let _knb_idx = __array_get(_knb_bucket, _knb_bi);
+                    if _knb_idx < len(__kt_facts_arr) {
+                        // Compute Manhattan distance in 5D
+                        let _knb_fmol = __array_get(__kt_fact_mol, _knb_idx);
+                        let _knb_dist = _kt_mol_dist(_knb_mol, _knb_fmol);
+                        push(_knb_cands, { text: __array_get(__kt_facts_arr, _knb_idx), distance: _knb_dist, mol: _knb_fmol });
+                    };
+                    let _knb_bi = _knb_bi + 1;
+                };
+            };
+        };
+        let _knb_ds = _knb_ds + 1;
+    };
+    // Sort by distance (selection sort — safe with Olang scoping)
+    let _knb_si = 0;
+    while _knb_si < len(_knb_cands) {
+        let _knb_min_idx = [_knb_si];
+        let _knb_min_d = [__array_get(_knb_cands, _knb_si).distance];
+        let _knb_sj = _knb_si + 1;
+        while _knb_sj < len(_knb_cands) {
+            let _knb_cd = __array_get(_knb_cands, _knb_sj).distance;
+            if _knb_cd < __array_get(_knb_min_d, 0) {
+                let _ = __set_at(_knb_min_idx, 0, _knb_sj);
+                let _ = __set_at(_knb_min_d, 0, _knb_cd);
+            };
+            let _knb_sj = _knb_sj + 1;
+        };
+        // Swap
+        let _knb_mi = __array_get(_knb_min_idx, 0);
+        if _knb_mi != _knb_si {
+            let _knb_tmp = __array_get(_knb_cands, _knb_si);
+            let _ = __set_at(_knb_cands, _knb_si, __array_get(_knb_cands, _knb_mi));
+            let _ = __set_at(_knb_cands, _knb_mi, _knb_tmp);
+        };
+        let _knb_si = _knb_si + 1;
+    };
+    return _knb_cands;
+}
+
+// Manhattan distance between two molecules in 5D
+fn _kt_mol_dist(_kmd_a, _kmd_b) {
+    let _kmd_ds = _kt_abs(_kt_mol_s(_kmd_a) - _kt_mol_s(_kmd_b));
+    let _kmd_dr = _kt_abs(_kt_mol_r(_kmd_a) - _kt_mol_r(_kmd_b));
+    let _kmd_dv = _kt_abs(_kt_mol_v(_kmd_a) - _kt_mol_v(_kmd_b));
+    let _kmd_da = _kt_abs(_kt_mol_a(_kmd_a) - _kt_mol_a(_kmd_b));
+    let _kmd_dt = _kt_abs(_kt_mol_t(_kmd_a) - _kt_mol_t(_kmd_b));
+    return _kmd_ds + _kmd_dr + _kmd_dv + _kmd_da + _kmd_dt;
+}
+
+fn _kt_abs(_v) { if _v < 0 { return 0 - _v; }; return _v; }
+
+// ════════════════════════════════════════════════════════════════
+// Decode ∂ — the inverse of Encode ∫
+// Given query text → compute molecule → find nearest facts → return
+// This is the "partial derivative": descend one dimension at a time
+// ════════════════════════════════════════════════════════════════
+
+pub fn kt_decode(_kd_query) {
+    _kt_dim_init();
+    // Compute query molecule (same pipeline as encode)
+    let _kd_mol = _kt_fact_mol_compute(_kd_query);
+    if _kd_mol == 0 { return { facts: [], mol: 0, dims: "none" }; };
+    let _kd_s = _kt_mol_s(_kd_mol);
+    let _kd_r = _kt_mol_r(_kd_mol);
+    let _kd_v = _kt_mol_v(_kd_mol);
+    let _kd_a = _kt_mol_a(_kd_mol);
+    // Step 1: Exact match — S AND V (most discriminating pair)
+    let _kd_exact = kt_get_path([0, _kd_s, 2, _kd_v]);
+    if len(_kd_exact) > 0 {
+        return { facts: _kd_exact, mol: _kd_mol, dims: "S=" + __to_string(_kd_s) + " V=" + __to_string(_kd_v), match: "exact" };
+    };
+    // Step 2: Relax — try S only
+    let _kd_s_only = kt_get_dim(0, _kd_s);
+    if len(_kd_s_only) > 0 {
+        return { facts: _kd_s_only, mol: _kd_mol, dims: "S=" + __to_string(_kd_s), match: "partial" };
+    };
+    // Step 3: Nearest neighbor — expand radius
+    let _kd_near = kt_nearby(_kd_mol, 2);
+    let _kd_texts = [];
+    let _kd_ni = 0;
+    let _kd_max = 10;
+    while _kd_ni < len(_kd_near) {
+        if _kd_ni < _kd_max {
+            let _kd_entry = __array_get(_kd_near, _kd_ni);
+            push(_kd_texts, _kd_entry.text);
+        };
+        let _kd_ni = _kd_ni + 1;
+    };
+    if len(_kd_texts) > 0 {
+        return { facts: _kd_texts, mol: _kd_mol, dims: "nearby(r=2)", match: "nearby" };
+    };
+    return { facts: [], mol: _kd_mol, dims: "empty", match: "none" };
+}
+
+// Get molecule for a fact by index
+pub fn kt_fact_mol_at(_kfma_idx) {
+    if _kfma_idx < len(__kt_fact_mol) { return __array_get(__kt_fact_mol, _kfma_idx); };
+    return 0;
+}
+
+// Dimension stats: count facts in each bucket
+pub fn kt_dim_stats() {
+    _kt_dim_init();
+    let _kds_out = "DimIndex:";
+    let _kds_total = [0];
+    let _kds_i = 0;
+    while _kds_i < 16 {
+        let _kds_n = len(__kt_dim_s[_kds_i]);
+        if _kds_n > 0 { let _ = __set_at(_kds_total, 0, __array_get(_kds_total, 0) + _kds_n); };
+        let _kds_i = _kds_i + 1;
+    };
+    let _kds_out = _kds_out + " S=" + __to_string(__array_get(_kds_total, 0));
+    let _ = __set_at(_kds_total, 0, 0);
+    let _kds_i = 0;
+    while _kds_i < 8 {
+        let _kds_n = len(__kt_dim_v[_kds_i]);
+        if _kds_n > 0 { let _ = __set_at(_kds_total, 0, __array_get(_kds_total, 0) + _kds_n); };
+        let _kds_i = _kds_i + 1;
+    };
+    let _kds_out = _kds_out + " V=" + __to_string(__array_get(_kds_total, 0));
+    return _kds_out;
+}
+
+// ════════════════════════════════════════════════════════════════
 // Save / Load
 // ════════════════════════════════════════════════════════════════
+
+// Strip "[YYYY-MM-DD HH:MM] " timestamp from knowledge entries at load time
+fn _kt_strip_ts(_kst_text) {
+    if len(_kst_text) < 20 { return _kst_text; };
+    if __char_code(char_at(_kst_text, 0)) != 91 { return _kst_text; };
+    let _kst_i = 1;
+    while _kst_i < 20 {
+        if __char_code(char_at(_kst_text, _kst_i)) == 93 {
+            let _kst_start = _kst_i + 1;
+            if _kst_start < len(_kst_text) {
+                if __char_code(char_at(_kst_text, _kst_start)) == 32 { let _kst_start = _kst_start + 1; };
+            };
+            return substr(_kst_text, _kst_start, len(_kst_text));
+        };
+        let _kst_i = _kst_i + 1;
+    };
+    return _kst_text;
+}
+
+// Filter: is this line real knowledge (not a session log entry)?
+fn _kt_is_knowledge(_kik_text) {
+    if len(_kik_text) < 20 { return 0; };
+    // Must contain definitional pattern: " is " or " la " or " are " or " has " or " co "
+    let _kik_i = 0;
+    while _kik_i < (len(_kik_text) - 4) {
+        let _kik_w = substr(_kik_text, _kik_i, _kik_i + 4);
+        if _kik_w == " is " { return 1; };
+        if _kik_w == " la " { return 1; };
+        if _kik_w == " ha " { return 1; };
+        let _kik_i = _kik_i + 1;
+    };
+    let _kik_i = 0;
+    while _kik_i < (len(_kik_text) - 5) {
+        let _kik_w = substr(_kik_text, _kik_i, _kik_i + 5);
+        if _kik_w == " are " { return 1; };
+        if _kik_w == " has " { return 1; };
+        if _kik_w == " was " { return 1; };
+        let _kik_i = _kik_i + 1;
+    };
+    // Also accept lines starting with known entity names
+    if len(_kik_text) > 4 {
+        if substr(_kik_text, 0, 4) == "Nox " { return 1; };
+        if substr(_kik_text, 0, 5) == "Olang" { return 1; };
+        if substr(_kik_text, 0, 5) == "Lupin" { return 1; };
+    };
+    return 0;
+}
+
+// Reject debug/progress log entries
+fn _kt_is_debug(_kid_text) {
+    let _kid_i = 0;
+    while _kid_i < (len(_kid_text) - 5) {
+        let _kid_w = substr(_kid_text, _kid_i, _kid_i + 5);
+        if _kid_w == "fixed" { return 1; };
+        if _kid_w == "error" { return 1; };
+        if _kid_w == " bug " { return 1; };
+        if _kid_w == "crash" { return 1; };
+        if _kid_w == "debug" { return 1; };
+        let _kid_i = _kid_i + 1;
+    };
+    return 0;
+}
 
 pub fn kt_save(_ks_path) {
     let _ks_out = "";
@@ -227,9 +629,10 @@ pub fn kt_load(_kld_path) {
     let _kld_i = 0;
     while _kld_i < _kld_clen {
         let _kld_ch = __char_code(char_at(_kld_content, _kld_i));
-        if _kld_ch == 10 { let _kld_s = __array_get(_kld_st, 0); let _kld_slen = _kld_i - _kld_s; if _kld_slen > 5 { let _kld_sent = substr(_kld_content, _kld_s, _kld_i); kt_learn(_kld_sent); let _ = __set_at(_kld_st, 1, __array_get(_kld_st, 1) + 1); }; let _ = __set_at(_kld_st, 0, _kld_i + 1); };
+        if _kld_ch == 10 { let _kld_s = __array_get(_kld_st, 0); let _kld_slen = _kld_i - _kld_s; if _kld_slen > 5 { let _kld_sent = substr(_kld_content, _kld_s, _kld_i); let _kld_sent = _kt_strip_ts(_kld_sent); if _kt_is_knowledge(_kld_sent) == 1 { if _kt_is_debug(_kld_sent) == 0 { kt_learn(_kld_sent); let _ = __set_at(_kld_st, 1, __array_get(_kld_st, 1) + 1); }; }; }; let _ = __set_at(_kld_st, 0, _kld_i + 1); };
         let _kld_i = _kld_i + 1;
     };
+    __heap_pin();
     return __array_get(_kld_st, 1);
 }
 

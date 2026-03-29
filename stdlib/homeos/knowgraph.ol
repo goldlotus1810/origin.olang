@@ -24,6 +24,7 @@ pub fn kg_add(subj, rel, obj) {
     push(_kg_relations, rel);
     push(_kg_objects, obj);
     push(_kg_times, _fmt_ts(__timestamp()));
+    __heap_pin();
     return 1;
 }
 

@@ -1493,10 +1493,22 @@ op_call:
     je      .call_sha256
     jmp     .call_not_builtin
 
+.builtin_slot_53:
+    movabs  $0x9AC7CE5A9EB9FA35, %rdx
+    cmp     %rdx, %rax
+    je      .call_heap_pin
+    jmp     .call_not_builtin
+
 .builtin_slot_56:
     movabs  $0x89275829827A6638, %rdx
     cmp     %rdx, %rax
     je      .call_aes_encrypt
+    jmp     .call_not_builtin
+
+.builtin_slot_67:
+    movabs  $0xF446B504F965A543, %rdx
+    cmp     %rdx, %rax
+    je      .call_log2
     jmp     .call_not_builtin
 
 .builtin_slot_59:
@@ -1695,6 +1707,12 @@ op_call:
     movabs  $0x8C886912ECD5B384, %rdx
     cmp     %rdx, %rax
     je      .call_pipe_read
+    jmp     .call_not_builtin
+
+.builtin_slot_138:
+    movabs  $0xD6D2AFF66DBA308A, %rdx
+    cmp     %rdx, %rax
+    je      .call_exp
     jmp     .call_not_builtin
 
 .builtin_slot_134:
@@ -8050,6 +8068,64 @@ op_ret:
     movq    $F64_MARKER, 8(%r14)
     jmp     vm_loop
 
+.call_heap_pin:
+    # __heap_pin() → move REPL checkpoint to current r15 (protect persistent data)
+    add     %rcx, %r13
+    mov     %r15, %rax
+    lea     repl_heap_checkpoint(%rip), %rcx
+    mov     %rax, (%rcx)               # update REPL checkpoint to current heap position
+    sub     $16, %r14
+    xor     %eax, %eax
+    mov     %rax, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+.call_exp:
+    # __exp(x) → e^x using x87 FPU
+    # Algorithm: e^x = 2^(x * log2(e))
+    add     %rcx, %r13
+    movsd   (%r14), %xmm0              # x
+    add     $16, %r14                   # pop arg
+    sub     $8, %rsp
+    movsd   %xmm0, (%rsp)
+    fldl    (%rsp)                      # ST(0) = x
+    fldl2e                              # ST(0) = log2(e), ST(1) = x
+    fmulp   %st, %st(1)                # ST(0) = x * log2(e)
+    fld     %st(0)                      # duplicate
+    frndint                             # ST(0) = int part, ST(1) = x*log2e
+    fsubr   %st, %st(1)                # ST(1) = frac part, ST(0) = int
+    fxch    %st(1)                      # ST(0) = frac, ST(1) = int
+    f2xm1                              # ST(0) = 2^frac - 1
+    fld1                                # ST(0) = 1
+    faddp   %st, %st(1)                # ST(0) = 2^frac
+    fscale                              # ST(0) = 2^frac * 2^int = e^x
+    fstp    %st(1)                      # clean up int from stack
+    fstpl   (%rsp)                      # store result
+    movsd   (%rsp), %xmm0
+    add     $8, %rsp
+    sub     $16, %r14
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+.call_log2:
+    # __log2(x) → log base 2 of x using x87 FPU
+    add     %rcx, %r13
+    movsd   (%r14), %xmm0              # x
+    add     $16, %r14                   # pop arg
+    sub     $8, %rsp
+    movsd   %xmm0, (%rsp)
+    fld1                                # ST(0) = 1.0
+    fldl    (%rsp)                      # ST(0) = x, ST(1) = 1.0
+    fyl2x                               # ST(0) = 1.0 * log2(x) = log2(x)
+    fstpl   (%rsp)                      # store result
+    movsd   (%rsp), %xmm0
+    add     $8, %rsp
+    sub     $16, %r14
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
 .call_bytes_len:
     # __bytes_len(buf) → f64 size
     add     %rcx, %r13
@@ -12116,7 +12192,7 @@ builtin_jump_table:
     .quad   .call_not_builtin
     .quad   .builtin_slot_51
     .quad   .builtin_slot_52
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_53
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .builtin_slot_56
@@ -12130,7 +12206,7 @@ builtin_jump_table:
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .builtin_slot_66
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_67
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .call_not_builtin
@@ -12201,7 +12277,7 @@ builtin_jump_table:
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .call_not_builtin
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_138
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .call_not_builtin

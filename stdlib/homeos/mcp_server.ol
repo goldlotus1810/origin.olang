@@ -83,16 +83,23 @@ fn _mcp_call(_id, _tool, _args) {
     };
     if _tool == "know_query" {
         let _q = json_get(_args, "question");
+        // Text search first (reliable), then pipeline for intelligence
         let _results = kt_find(_q, 10);
-        if len(_results) == 0 { return _ok(_id, "No facts for: " + _q + " (" + to_string(kt_fact_count()) + " total)"); };
-        let _out = "";
-        let _i = 0;
-        while _i < len(_results) {
-            if _i > 0 { _out = _out + "\\n"; };
-            _out = _out + _results[_i];
-            _i = _i + 1;
+        if len(_results) > 0 {
+            let _out = "";
+            let _i = 0;
+            while _i < len(_results) {
+                if _i > 0 { _out = _out + "\\n"; };
+                _out = _out + _results[_i];
+                _i = _i + 1;
+            };
+            return _ok(_id, _out);
         };
-        return _ok(_id, _out);
+        // No text match → try pipeline (molecular search + instincts)
+        let _pl_result = pipeline(_q);
+        __heap_pin();
+        if len(_pl_result) > 0 { return _ok(_id, _pl_result); };
+        return _ok(_id, "No facts for: " + _q + " (" + to_string(kt_fact_count()) + " total)");
     };
     if _tool == "emotion_encode" {
         let _e = text_emotion_v2(json_get(_args, "text"));
@@ -105,7 +112,7 @@ fn _mcp_call(_id, _tool, _args) {
     };
     if _tool == "nox_status" {
         let _heap_mb = to_string(__floor(__heap_used() / 1048576));
-        return _ok(_id, "Nox [" + _fmt_ts(__timestamp()) + "] " + to_string(kt_fact_count()) + " facts, " + _heap_mb + "MB heap");
+        return _ok(_id, "Nox [" + _fmt_ts(__timestamp()) + "] " + to_string(kt_fact_count()) + " facts, " + _heap_mb + "MB heap, 14 DNA pipeline active");
     };
     if _tool == "silk_status" { return _ok(_id, "Silk: " + to_string(silk_count()) + " edges"); };
     if _tool == "dream_cycle" { dream_cycle(); return _ok(_id, "Dream done"); };

@@ -1,6 +1,7 @@
-// homeos/spider.ol — Bug Spider
-// Runs as eval code (not boot closure) to avoid var_table overflow.
-// Usage: type "spider" in REPL
+// homeos/spider.ol — Bug Spider + HTTP Client + KnowTree Feeder
+// Part 1: Bug Spider (test runner via eval)
+// Part 2: HTTP client (curl workaround) + text → KnowTree pipeline
+// Usage: type "spider" in REPL for tests, spider_crawl(url) for HTTP
 
 pub fn spider() {
     // Spider runs tests via eval to avoid boot closure limitations.
@@ -60,4 +61,184 @@ pub fn spider() {
     if _g_pos == 0 { return "SPIDER: EMPTY"; };
     __eval_bytecode(_sp_bc);
     return "";
+}
+
+// ════════════════════════════════════════════════════════════════
+// Part 2: HTTP Client — curl workaround for HTTPS
+// ════════════════════════════════════════════════════════════════
+
+pub fn http_get(_hg_url) {
+    let _hg_cmd = "curl -sL -m 10 '" + _hg_url + "' 2>/dev/null";
+    let _hg_body = __system(_hg_cmd);
+    if len(_hg_body) == 0 { return ""; };
+    return _hg_body;
+}
+
+pub fn http_get_text(_hgt_url) {
+    let _hgt_cmd = "curl -sL -m 10 -H 'Accept: text/plain' '" + _hgt_url + "' 2>/dev/null";
+    return __system(_hgt_cmd);
+}
+
+// ════════════════════════════════════════════════════════════════
+// HTML → plain text (strip tags)
+// ════════════════════════════════════════════════════════════════
+
+// Strip markdown: remove code blocks, # > * | [ ] ` ~
+pub fn md_strip(_ms_text) {
+    let _ms_out = "";
+    let _ms_in_code = [0];
+    let _ms_i = [0];
+    let _ms_tlen = len(_ms_text);
+    while __array_get(_ms_i, 0) < _ms_tlen {
+        let _ms_ci = __array_get(_ms_i, 0);
+        let _ms_c = __char_code(char_at(_ms_text, _ms_ci));
+        // Detect ``` code fence
+        if _ms_c == 96 {
+            if (_ms_ci + 2) < _ms_tlen {
+                if __char_code(char_at(_ms_text, _ms_ci + 1)) == 96 {
+                    if __char_code(char_at(_ms_text, _ms_ci + 2)) == 96 {
+                        // Toggle code mode, skip to end of line
+                        let _ = __set_at(_ms_in_code, 0, 1 - __array_get(_ms_in_code, 0));
+                        let _ = __set_at(_ms_i, 0, _ms_ci + 3);
+                        // Skip rest of fence line
+                        while __array_get(_ms_i, 0) < _ms_tlen {
+                            if __char_code(char_at(_ms_text, __array_get(_ms_i, 0))) == 10 { break; };
+                            let _ = __set_at(_ms_i, 0, __array_get(_ms_i, 0) + 1);
+                        };
+                    };
+                };
+            };
+        };
+        if __array_get(_ms_in_code, 0) == 0 {
+            let _ms_skip = [0];
+            if _ms_c == 35 { let _ = __set_at(_ms_skip, 0, 1); };
+            if _ms_c == 62 { let _ = __set_at(_ms_skip, 0, 1); };
+            if _ms_c == 42 { let _ = __set_at(_ms_skip, 0, 1); };
+            if _ms_c == 124 { let _ = __set_at(_ms_skip, 0, 1); };
+            if _ms_c == 91 { let _ = __set_at(_ms_skip, 0, 1); };
+            if _ms_c == 93 { let _ = __set_at(_ms_skip, 0, 1); };
+            if _ms_c == 96 { let _ = __set_at(_ms_skip, 0, 1); };
+            if _ms_c == 126 { let _ = __set_at(_ms_skip, 0, 1); };
+            if __array_get(_ms_skip, 0) == 0 {
+                if _ms_c >= 32 { let _ms_out = _ms_out + char_at(_ms_text, _ms_ci); };
+            };
+        };
+        let _ = __set_at(_ms_i, 0, __array_get(_ms_i, 0) + 1);
+    };
+    return _ms_out;
+}
+
+pub fn html_strip(_hs_html) {
+    let _hs_out = "";
+    let _hs_in_tag = [0];
+    let _hs_i = 0;
+    while _hs_i < len(_hs_html) {
+        let _hs_c = __char_code(char_at(_hs_html, _hs_i));
+        if _hs_c == 60 { let _ = __set_at(_hs_in_tag, 0, 1); };
+        if __array_get(_hs_in_tag, 0) == 0 {
+            if _hs_c >= 32 { let _hs_out = _hs_out + char_at(_hs_html, _hs_i); };
+        };
+        if _hs_c == 62 { let _ = __set_at(_hs_in_tag, 0, 0); };
+        let _hs_i = _hs_i + 1;
+    };
+    return _hs_out;
+}
+
+// ════════════════════════════════════════════════════════════════
+// Text → sentences → kt_learn (feed KnowTree)
+// ════════════════════════════════════════════════════════════════
+
+pub fn spider_feed(_sf_text, _sf_source) {
+    let _sf_count = [0];
+    let _sf_start = [0];
+    let _sf_tlen = len(_sf_text);
+    let _sf_i = 0;
+    while _sf_i < _sf_tlen {
+        let _sf_c = __char_code(char_at(_sf_text, _sf_i));
+        let _sf_is_end = [0];
+        if _sf_c == 46 { let _ = __set_at(_sf_is_end, 0, 1); };
+        if _sf_c == 33 { let _ = __set_at(_sf_is_end, 0, 1); };
+        if _sf_c == 63 { let _ = __set_at(_sf_is_end, 0, 1); };
+        if __array_get(_sf_is_end, 0) == 1 {
+            let _sf_s = __array_get(_sf_start, 0);
+            let _sf_slen = _sf_i - _sf_s;
+            if _sf_slen > 10 {
+                let _sf_sent = substr(_sf_text, _sf_s, _sf_i);
+                if _sf_is_prose(_sf_sent) == 1 {
+                    kt_learn(_sf_sent);
+                    let _ = __set_at(_sf_count, 0, __array_get(_sf_count, 0) + 1);
+                };
+            };
+            let _ = __set_at(_sf_start, 0, _sf_i + 1);
+        };
+        let _sf_i = _sf_i + 1;
+    };
+    let _sf_s = __array_get(_sf_start, 0);
+    if (_sf_tlen - _sf_s) > 10 {
+        let _sf_last = substr(_sf_text, _sf_s, _sf_tlen);
+        if _sf_is_prose(_sf_last) == 1 {
+            kt_learn(_sf_last);
+            let _ = __set_at(_sf_count, 0, __array_get(_sf_count, 0) + 1);
+        };
+    };
+    __heap_pin();
+    return "Fed " + __to_string(__array_get(_sf_count, 0)) + " sentences from " + _sf_source + ". " + kt_stats();
+}
+
+// Filter: is this text prose (not code)?
+// Code indicators: { } ; // fn let if while emit return → skip
+fn _sf_is_prose(_sip_text) {
+    let _sip_len = len(_sip_text);
+    let _sip_braces = [0];
+    let _sip_slashes = [0];
+    let _sip_semis = [0];
+    let _sip_i = 0;
+    while _sip_i < _sip_len {
+        let _sip_c = __char_code(char_at(_sip_text, _sip_i));
+        if _sip_c == 123 { let _ = __set_at(_sip_braces, 0, __array_get(_sip_braces, 0) + 1); };
+        if _sip_c == 125 { let _ = __set_at(_sip_braces, 0, __array_get(_sip_braces, 0) + 1); };
+        if _sip_c == 59 { let _ = __set_at(_sip_semis, 0, __array_get(_sip_semis, 0) + 1); };
+        if _sip_c == 47 {
+            if (_sip_i + 1) < _sip_len {
+                if __char_code(char_at(_sip_text, _sip_i + 1)) == 47 {
+                    let _ = __set_at(_sip_slashes, 0, __array_get(_sip_slashes, 0) + 1);
+                };
+            };
+        };
+        let _sip_i = _sip_i + 1;
+    };
+    // Too many code indicators → not prose
+    if __array_get(_sip_braces, 0) >= 2 { return 0; };
+    if __array_get(_sip_semis, 0) >= 3 { return 0; };
+    if __array_get(_sip_slashes, 0) >= 2 { return 0; };
+    // Check first 3 chars for code keywords
+    if _sip_len >= 3 {
+        let _sip_3 = substr(_sip_text, 0, 3);
+        if _sip_3 == "fn " { return 0; };
+        if _sip_3 == "let" { return 0; };
+        if _sip_3 == "if " { return 0; };
+    };
+    return 1;
+}
+
+// Feed markdown file → strip → sentences → KnowTree
+pub fn spider_feed_md(_sfm_text, _sfm_source) {
+    let _sfm_clean = md_strip(_sfm_text);
+    return spider_feed(_sfm_clean, _sfm_source);
+}
+
+// Full pipeline: URL → fetch → strip HTML → feed KnowTree
+pub fn spider_crawl(_sc_url) {
+    let _sc_html = http_get(_sc_url);
+    if len(_sc_html) == 0 { return "Error: no response from " + _sc_url; };
+    let _sc_text = html_strip(_sc_html);
+    if len(_sc_text) < 20 { return "Error: no text content from " + _sc_url; };
+    return spider_feed(_sc_text, _sc_url);
+}
+
+// Feed from local file → KnowTree
+pub fn spider_file(_sfl_path) {
+    let _sfl_text = __file_read(_sfl_path);
+    if len(_sfl_text) == 0 { return "Error: cannot read " + _sfl_path; };
+    return spider_feed(_sfl_text, _sfl_path);
 }

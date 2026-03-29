@@ -120,6 +120,7 @@ fn compile_one_file(_cof_path, _cof_output) {
   let _cof_src = __file_read(_cof_path);
   if len(_cof_src) == 0 { return; };
   let _cof_bc = compile_source(_cof_src);
+  __heap_pin();
   let _cof_bclen = len(_cof_bc);
   emit "  " + _cof_path + " → " + __to_string(_cof_bclen) + " bytes";
   if _cof_bclen < 2 { return; };
@@ -131,25 +132,26 @@ fn compile_one_file(_cof_path, _cof_output) {
 };
 
 fn compile_dir(_xcd_dir, _xcd_output) {
+  // Read file list once, pin heap to protect strings from compile_source corruption
   let _xcd_flist = list_ol_files(_xcd_dir);
+  __heap_pin();
   let _xcd_idx = 0;
   let _xcd_total = len(_xcd_flist);
   while _xcd_idx < _xcd_total {
-    // Re-read file list each iteration (compile_source corrupts heap strings)
-    emit "    dir=" + _xcd_dir + " len=" + __to_string(len(_xcd_dir));
-    let _xcd_fresh = list_ol_files(_xcd_dir);
-    emit "    fresh files=" + __to_string(len(_xcd_fresh));
-    let _xcd_src = __file_read(_xcd_fresh[_xcd_idx]);
-    emit "    src len=" + __to_string(len(_xcd_src));
-    let _xcd_bc = compile_source(_xcd_src);
-    let _xcd_bclen = len(_xcd_bc);
-    emit "  #" + __to_string(_xcd_idx) + " → " + __to_string(_xcd_bclen) + " bytes";
-    if _xcd_bclen > 0 {
-      if __floor(_xcd_bc[_xcd_bclen - 1]) == 15 { set_at(_xcd_bc, _xcd_bclen - 1, 18); };
-      let _xcd_base = len(_xcd_output);
-      if _xcd_base > 0 { relocate_jumps(_xcd_bc, _xcd_bclen, _xcd_base); };
-      let _xcd_bi = 0;
-      while _xcd_bi < _xcd_bclen { push(_xcd_output, _xcd_bc[_xcd_bi]); _xcd_bi = _xcd_bi + 1; };
+    let _xcd_path = _xcd_flist[_xcd_idx];
+    let _xcd_src = __file_read(_xcd_path);
+    if len(_xcd_src) > 0 {
+      let _xcd_bc = compile_source(_xcd_src);
+      let _xcd_bclen = len(_xcd_bc);
+      emit "  #" + __to_string(_xcd_idx) + " → " + __to_string(_xcd_bclen) + " bytes";
+      if _xcd_bclen > 0 {
+        if __floor(_xcd_bc[_xcd_bclen - 1]) == 15 { set_at(_xcd_bc, _xcd_bclen - 1, 18); };
+        let _xcd_base = len(_xcd_output);
+        if _xcd_base > 0 { relocate_jumps(_xcd_bc, _xcd_bclen, _xcd_base); };
+        let _xcd_bi = 0;
+        while _xcd_bi < _xcd_bclen { push(_xcd_output, _xcd_bc[_xcd_bi]); _xcd_bi = _xcd_bi + 1; };
+      };
+      __heap_pin();
     };
     _xcd_idx = _xcd_idx + 1;
   };

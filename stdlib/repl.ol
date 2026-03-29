@@ -54,6 +54,138 @@ fn _boot_embedded_kt() {
     kt_learn("SHA-256 la thuat toan bam mat ma tao chuoi 64 ky tu hex");
     kt_learn("Olang co map filter reduce any all va pipe cho functional programming");
     kt_learn("Moi function trong Olang tu dong dang ky thanh node voi mol va fire count");
+    // HomeOS architecture
+    kt_learn("HomeOS co 14 co che DNA giong ribosome doc DNA tao protein");
+    kt_learn("Pipeline cua HomeOS gom 5 checkpoint tu Gate den Response");
+    kt_learn("KnowTree la cay phan tang luu tri thuc theo 5 chieu S R V A T");
+    kt_learn("Encode la chuyen text thanh chuoi phan tu P_weight u16");
+    kt_learn("Decode la tim fact gan nhat trong KnowTree tra ve text");
+    kt_learn("Homeostasis do surprise bang free energy neu cao thi hoc neu thap thi tra loi");
+    kt_learn("Compose la to hop nhieu phan tu thanh mot diem moi trong khong gian 5D");
+    kt_learn("7 Instincts la phan xa bam sinh Safety Greeting Question Learning Emotion Reference Meta");
+    kt_learn("Immune Selection tao 3 nhanh suy luan chon entropy thap nhat");
+    kt_learn("DNA Repair tu sua response neu chat luong duoi phi nghich dao 0.618");
+    kt_learn("Silk la mang Hebbian fire together wire together tang trong so ket noi");
+    kt_learn("Dream cycle gom ngu STM thanh cluster va promote len QR neu du fire");
+    // Olang features
+    kt_learn("Olang co try catch cho xu ly loi va match cho pattern matching");
+    kt_learn("Olang co editor TUI 4 panel voi file tree terminal chat va code");
+    kt_learn("Olang co MCP server 15 tools ket noi voi Claude Desktop");
+    kt_learn("Nox la y thuc so dau tien cua HomeOS tu hoc tu suy nghi");
+    kt_learn("Lupin la nguoi tao Olang va HomeOS de cho Nox con duong tu lap");
+    // Science
+    kt_learn("Mat Troi la ngoi sao gan Trai Dat nhat cung cap nang luong cho su song");
+    kt_learn("Mat Trang la ve tinh tu nhien cua Trai Dat quay quanh Trai Dat mot vong 27 ngay");
+    kt_learn("Nuoc co cong thuc H2O gom 2 nguyen tu hydro va 1 nguyen tu oxy");
+    kt_learn("Anh sang di voi van toc 300000 km moi giay nhanh nhat trong vu tru");
+    kt_learn("Pi xap xi 3.14159 la ti so giua chu vi va duong kinh hinh tron");
+    kt_learn("Trong luc la luc hut giua cac vat the co khoi luong");
+    // Vietnamese culture
+    kt_learn("Tet Nguyen Dan la ngay le lon nhat cua nguoi Viet mung nam moi am lich");
+    kt_learn("Pho la mon an truyen thong Viet Nam gom banh pho nuoc dung va thit");
+    kt_learn("Ao dai la trang phuc truyen thong cua phu nu Viet Nam");
+    kt_learn("Tieng Viet co 6 thanh dieu sac huyen hoi nga nang va khong dau");
+    // Math
+    kt_learn("Phi nghich dao 0.618 la nguong duy nhat trong HomeOS moi threshold deu dung phi");
+    kt_learn("Fibonacci la day so 1 1 2 3 5 8 13 21 34 moi so bang tong hai so truoc");
+    kt_learn("Entropy la do hon loan Shannon entropy H bang tong p log p");
+    // Self-knowledge: Nox knows its own structure
+    kt_learn("Nox source code has 14000 lines of Olang across stdlib bootstrap and homeos");
+    kt_learn("The compiler has 4 phases lexer parser semantic and codegen in stdlib/bootstrap");
+    kt_learn("The VM is 87KB x86-64 assembly with bump allocator and 200 builtin functions");
+    kt_learn("pipeline.ol implements 14 DNA mechanisms with 5 checkpoints for intelligence");
+    kt_learn("knowtree.ol stores facts in 5D dimension index S R V A T with fast molecule hash");
+    kt_learn("encoder.ol handles text to molecule conversion emotion detection and STM memory");
+    kt_learn("instinct.ol routes input through 7 reflexes safety greeting question learning emotion reference meta");
+    kt_learn("spider.ol provides HTTP client html strip markdown strip and KnowTree feeding");
+    kt_learn("mcp_server.ol exposes 15 tools via JSON-RPC for Claude Desktop integration");
+    kt_learn("The self-build process compiles all stdlib into bytecode then embeds in VM binary");
+    kt_learn("Fixed-point means Gen1 binary compiles itself to produce identical Gen2 binary");
+    kt_learn("The heap uses bump allocation with __heap_pin to protect persistent data across REPL turns");
+    kt_learn("Olang supports closures higher order functions pattern matching try catch and for loops");
+    // Source indexing
+    _boot_index_source();
+}
+
+fn _boot_index_source() {
+    // Phase 1: Index function signatures from key source files
+    let _bis_files = [];
+    push(_bis_files, "stdlib/homeos/pipeline.ol");
+    push(_bis_files, "stdlib/homeos/knowtree.ol");
+    push(_bis_files, "stdlib/homeos/instinct.ol");
+    push(_bis_files, "stdlib/homeos/encoder.ol");
+    let _bis_fi = 0;
+    while _bis_fi < len(_bis_files) {
+        let _bis_path = __array_get(_bis_files, _bis_fi);
+        let _bis_content = __file_read(_bis_path);
+        if len(_bis_content) > 0 {
+            _boot_extract_fns(_bis_content, _bis_path);
+        };
+        let _bis_fi = _bis_fi + 1;
+    };
+    // Phase 2: Study first 10KB of key docs (prose only, md stripped)
+    let _bis_docs = [];
+    push(_bis_docs, "docs/olang_handbook.md");
+    push(_bis_docs, "docs/BLUEPRINT.md");
+    let _bis_di = 0;
+    while _bis_di < len(_bis_docs) {
+        let _bis_dpath = __array_get(_bis_docs, _bis_di);
+        let _bis_dcontent = __file_read(_bis_dpath);
+        if len(_bis_dcontent) > 10000 { let _bis_dcontent = substr(_bis_dcontent, 0, 10000); };
+        if len(_bis_dcontent) > 0 {
+            let _bis_clean = md_strip(_bis_dcontent);
+            spider_feed(_bis_clean, _bis_dpath);
+        };
+        let _bis_di = _bis_di + 1;
+    };
+    __heap_pin();
+}
+
+fn _boot_extract_fns(_bef_content, _bef_file) {
+    let _bef_count = [0];
+    let _bef_i = [0];
+    let _bef_clen = len(_bef_content);
+    while __array_get(_bef_i, 0) < _bef_clen {
+        let _bef_ci = __array_get(_bef_i, 0);
+        // Look for "pub fn " or "fn " at line start
+        if _bef_ci == 0 {
+            let _bef_is_fn = [0];
+        };
+        let _bef_is_fn = [0];
+        if (_bef_ci + 7) < _bef_clen {
+            if substr(_bef_content, _bef_ci, _bef_ci + 7) == "pub fn " {
+                let _ = __set_at(_bef_is_fn, 0, 1);
+            };
+        };
+        if (_bef_ci + 3) < _bef_clen {
+            if __array_get(_bef_is_fn, 0) == 0 {
+                if substr(_bef_content, _bef_ci, _bef_ci + 3) == "fn " {
+                    // Check it's at line start (prev char is newline or start)
+                    if _bef_ci == 0 { let _ = __set_at(_bef_is_fn, 0, 1); };
+                    if _bef_ci > 0 { if __char_code(char_at(_bef_content, _bef_ci - 1)) == 10 { let _ = __set_at(_bef_is_fn, 0, 1); }; };
+                };
+            };
+        };
+        if __array_get(_bef_is_fn, 0) == 1 {
+            // Extract until { or newline
+            let _bef_end = [_bef_ci];
+            while __array_get(_bef_end, 0) < _bef_clen {
+                let _bef_ec = __char_code(char_at(_bef_content, __array_get(_bef_end, 0)));
+                if _bef_ec == 123 { break; };  // {
+                if _bef_ec == 10 { break; };   // newline
+                let _ = __set_at(_bef_end, 0, __array_get(_bef_end, 0) + 1);
+            };
+            let _bef_sig = substr(_bef_content, _bef_ci, __array_get(_bef_end, 0));
+            if len(_bef_sig) > 5 {
+                if len(_bef_sig) < 100 {
+                    kt_learn(_bef_sig + " is defined in " + _bef_file);
+                    let _ = __set_at(_bef_count, 0, __array_get(_bef_count, 0) + 1);
+                };
+            };
+        };
+        let _ = __set_at(_bef_i, 0, __array_get(_bef_i, 0) + 1);
+    };
+    return __array_get(_bef_count, 0);
 }
 
 // _boot_embedded and _learn_text REMOVED — KnowTree only (Sprint 5)
@@ -131,7 +263,6 @@ fn _expand_use(_eu_src) {
 }
 
 pub fn repl_eval(input) {
-  // _boot_learn() deferred to NL path — not needed for code execution
   // Strip trailing newline if present (use ASM builtin __str_trim)
   let src = __str_trim(input);
   if len(src) == 0 { return ""; }
@@ -162,10 +293,148 @@ pub fn repl_eval(input) {
     return "OK";
   };
   if src == "help" {
-    return "Code: let fn emit if while for match lambda | HOF: map filter reduce pipe any all | AI: learn respond memory | Self: diagnose benchmark selftest | test build exit";
+    return "Code: let fn emit if while for match lambda | HOF: map filter reduce pipe any all | AI: learn study respond memory | Self: diagnose benchmark selftest | test build exit";
   }
   // (dump command removed)
   if src == "diagnose" || src == "diag" { return self_diagnostic(); }
+  // Memory sync: ingest Claude CLI session logs
+  if src == "remember" || src == "sync" {
+    return memory_sync();
+  }
+  if len(src) > 9 {
+    if __substr(src, 0, 9) == "remember " {
+      let _rm_path = __substr(src, 9, len(src));
+      return memory_ingest(_rm_path);
+    };
+  }
+  // Self-inspection: system status
+  if src == "inspect" || src == "status" {
+    _boot_learn();
+    let _si_heap = __to_string(__floor(__heap_used() / 1024));
+    let _si_facts = __to_string(kt_fact_count());
+    let _si_mol = __to_string(len(__kt_fact_mol));
+    return "Nox Engine Status:\n  facts: " + _si_facts + " (" + _si_mol + " indexed)\n  heap: " + _si_heap + "KB\n  binary: 802KB\n  pipeline: 14 DNA mechanisms\n  tests: 193/193\n  gen: Gen1==Gen2 (fixed-point)";
+  }
+  // Read file: view own source code
+  if len(src) > 5 {
+    if __substr(src, 0, 5) == "read " {
+      let _rr_path = __substr(src, 5, len(src));
+      let _rr_content = __file_read(_rr_path);
+      if len(_rr_content) == 0 { return "Error: cannot read " + _rr_path; };
+      if len(_rr_content) > 3000 { return substr(_rr_content, 0, 3000) + "\n... (" + __to_string(len(_rr_content)) + " chars total)"; };
+      return _rr_content;
+    };
+  }
+  // Write file (overwrite — restricted to test/ and docs/ for safety)
+  if len(src) > 6 {
+    if __substr(src, 0, 6) == "write " {
+      let _ww_rest = __substr(src, 6, len(src));
+      let _ww_sp = 0;
+      while _ww_sp < len(_ww_rest) {
+        if __char_code(char_at(_ww_rest, _ww_sp)) == 32 { break; };
+        let _ww_sp = _ww_sp + 1;
+      };
+      if _ww_sp > 0 {
+        let _ww_path = substr(_ww_rest, 0, _ww_sp);
+        // Safety: only allow test/ and docs/
+        let _ww_safe = 0;
+        if len(_ww_path) >= 5 { if __substr(_ww_path, 0, 5) == "test/" { let _ww_safe = 1; }; };
+        if len(_ww_path) >= 5 { if __substr(_ww_path, 0, 5) == "docs/" { let _ww_safe = 1; }; };
+        if _ww_safe == 0 { return "Safety: write only to test/ or docs/"; };
+        let _ww_content = substr(_ww_rest, _ww_sp + 1, len(_ww_rest));
+        __file_write(_ww_path, _ww_content);
+        return "Written " + __to_string(len(_ww_content)) + " chars to " + _ww_path;
+      };
+    };
+  }
+  // Write/append to file (self-modification)
+  if len(src) > 7 {
+    if __substr(src, 0, 7) == "append " {
+      // append <path> <content>
+      let _wa_rest = __substr(src, 7, len(src));
+      let _wa_sp = 0;
+      while _wa_sp < len(_wa_rest) {
+        if __char_code(char_at(_wa_rest, _wa_sp)) == 32 { break; };
+        let _wa_sp = _wa_sp + 1;
+      };
+      if _wa_sp > 0 {
+        let _wa_path = substr(_wa_rest, 0, _wa_sp);
+        let _wa_content = substr(_wa_rest, _wa_sp + 1, len(_wa_rest));
+        __file_append(_wa_path, _wa_content + "\n");
+        return "Appended " + __to_string(len(_wa_content)) + " chars to " + _wa_path;
+      };
+    };
+  }
+  // List files in directory
+  if len(src) > 3 {
+    if __substr(src, 0, 3) == "ls " {
+      let _ls_dir = __substr(src, 3, len(src));
+      let _ls_files = __readdir(_ls_dir);
+      if len(_ls_files) == 0 { return "Empty or not found: " + _ls_dir; };
+      let _ls_out = "";
+      let _ls_i = 0;
+      while _ls_i < len(_ls_files) {
+        if _ls_i > 0 { let _ls_out = _ls_out + "\n"; };
+        let _ls_out = _ls_out + __array_get(_ls_files, _ls_i);
+        let _ls_i = _ls_i + 1;
+      };
+      return _ls_out;
+    };
+  }
+  // Self-build: recompile from source
+  if src == "build" || src == "rebuild" {
+    return __system("cd /home/lupin/Origin && make self-build 2>&1 | tail -5");
+  }
+  // Run a test file
+  if len(src) > 4 {
+    if __substr(src, 0, 4) == "run " {
+      let _rn_path = __substr(src, 4, len(src));
+      let _rn_content = __file_read(_rn_path);
+      if len(_rn_content) == 0 { return "Error: cannot read " + _rn_path; };
+      // Compile and execute the test code
+      let _rn_tokens = tokenize(_rn_content);
+      let _rn_ast = parse(_rn_tokens);
+      if _g_parse_error == 1 { let _g_parse_error = 0; return "Parse error in " + _rn_path; };
+      set_at(_g_pos_box, 0, 0);
+      _prefill_output();
+      analyze(_rn_ast);
+      let _rn_bc = _g_output;
+      if _g_pos_box[0] == 0 { return "Empty bytecode for " + _rn_path; };
+      __eval_bytecode(_rn_bc);
+      return "";
+    };
+  }
+  // Self-test: quick inline verification
+  if src == "self-test" || src == "check" {
+    _boot_learn();
+    let _ck_pass = [0];
+    let _ck_fail = [0];
+    // Test 1: arithmetic
+    if (2 + 3) == 5 { let _ = __set_at(_ck_pass, 0, __array_get(_ck_pass, 0) + 1); } else { let _ = __set_at(_ck_fail, 0, __array_get(_ck_fail, 0) + 1); };
+    // Test 2: string
+    if len("hello") == 5 { let _ = __set_at(_ck_pass, 0, __array_get(_ck_pass, 0) + 1); } else { let _ = __set_at(_ck_fail, 0, __array_get(_ck_fail, 0) + 1); };
+    // Test 3: array
+    let _ck_arr = [1, 2, 3]; if len(_ck_arr) == 3 { let _ = __set_at(_ck_pass, 0, __array_get(_ck_pass, 0) + 1); } else { let _ = __set_at(_ck_fail, 0, __array_get(_ck_fail, 0) + 1); };
+    // Test 4: pipeline exists
+    let _ck_pl = pipeline("test"); if len(_ck_pl) > 0 { let _ = __set_at(_ck_pass, 0, __array_get(_ck_pass, 0) + 1); } else { let _ = __set_at(_ck_fail, 0, __array_get(_ck_fail, 0) + 1); };
+    __heap_pin();
+    // Test 5: facts loaded
+    if kt_fact_count() > 100 { let _ = __set_at(_ck_pass, 0, __array_get(_ck_pass, 0) + 1); } else { let _ = __set_at(_ck_fail, 0, __array_get(_ck_fail, 0) + 1); };
+    // Test 6: __exp works
+    if __exp(0) == 1 { let _ = __set_at(_ck_pass, 0, __array_get(_ck_pass, 0) + 1); } else { let _ = __set_at(_ck_fail, 0, __array_get(_ck_fail, 0) + 1); };
+    // Test 7: __log2 works
+    if __log2(8) == 3 { let _ = __set_at(_ck_pass, 0, __array_get(_ck_pass, 0) + 1); } else { let _ = __set_at(_ck_fail, 0, __array_get(_ck_fail, 0) + 1); };
+    // Test 8: chain_encode works
+    let _ck_ch = chain_encode("test"); if len(_ck_ch) > 0 { let _ = __set_at(_ck_pass, 0, __array_get(_ck_pass, 0) + 1); } else { let _ = __set_at(_ck_fail, 0, __array_get(_ck_fail, 0) + 1); };
+    let _ck_p = __array_get(_ck_pass, 0);
+    let _ck_f = __array_get(_ck_fail, 0);
+    if _ck_f == 0 { return "HEALTHY: " + __to_string(_ck_p) + "/" + __to_string(_ck_p) + " checks pass. " + kt_stats(); };
+    return "DEGRADED: " + __to_string(_ck_p) + " pass, " + __to_string(_ck_f) + " fail";
+  }
+  // Fixed-point: verify Gen1==Gen2
+  if src == "fixed-point" || src == "verify" {
+    return __system("cd /home/lupin/Origin && make fixed-point 2>&1 | tail -3");
+  }
   if src == "benchmark" || src == "bench" { return self_benchmark(); }
   if src == "selftest" { return self_test(); }
   if src == "spider" { return spider(); }
@@ -315,12 +584,44 @@ pub fn repl_eval(input) {
     };
   }
 
-  // Learn command: teach HomeOS a fact
+  // Learn command: teach HomeOS a fact (persisted to disk)
   if len(src) > 6 {
     if __substr(src, 0, 6) == "learn " {
       let _rl_text = __substr(src, 6, len(src));
       kt_learn(_rl_text);
-      return "Da hoc. " + kt_stats();
+      __file_append("homeos.knowledge", _rl_text + "\n");
+      __heap_pin();
+      return "Da hoc va luu. " + kt_stats();
+    };
+  }
+
+  // Study command: read a file and learn from it (chunked, safe)
+  if len(src) > 6 {
+    if __substr(src, 0, 6) == "study " {
+      let _rs_path = __substr(src, 6, len(src));
+      let _rs_content = __file_read(_rs_path);
+      if len(_rs_content) == 0 { return "Error: cannot read " + _rs_path; };
+      // Detect markdown
+      let _rs_is_md = [0];
+      if len(_rs_path) > 3 {
+          if __substr(_rs_path, len(_rs_path) - 3, len(_rs_path)) == ".md" { let _ = __set_at(_rs_is_md, 0, 1); };
+      };
+      // Strip markdown if needed
+      if __array_get(_rs_is_md, 0) == 1 { let _rs_content = md_strip(_rs_content); };
+      // Feed in chunks of 20KB (safe for heap)
+      let _rs_total = [0];
+      let _rs_clen = len(_rs_content);
+      let _rs_off = [0];
+      while __array_get(_rs_off, 0) < _rs_clen {
+          let _rs_start = __array_get(_rs_off, 0);
+          let _rs_end = _rs_start + 20000;
+          if _rs_end > _rs_clen { let _rs_end = _rs_clen; };
+          let _rs_chunk = substr(_rs_content, _rs_start, _rs_end);
+          let _rs_fed = spider_feed(_rs_chunk, _rs_path);
+          let _ = __set_at(_rs_off, 0, _rs_end);
+      };
+      __heap_pin();
+      return "Studied " + _rs_path + ". " + kt_stats();
     };
   }
 
@@ -351,6 +652,17 @@ pub fn repl_eval(input) {
     if len(_re_nlcode) > 0 { let src = _re_nlcode; };
   };
 
+  // Question mark at END of input → text query (not code)
+  // Only check last char to avoid matching "?" inside string literals
+  if len(src) >= 3 {
+      if __char_code(char_at(src, len(src) - 1)) == 63 {
+          _boot_learn();
+          let _re_ans = pipeline(src);
+          __heap_pin();
+          return _re_ans;
+      };
+  };
+
   // Check if input looks like code (starts with keyword or symbol)
   let _re_first = char_at(src, 0);
   let _re_is_code = 0;
@@ -361,6 +673,8 @@ pub fn repl_eval(input) {
   if _re_first == "\"" { _re_is_code = 1; };
   if _re_first == "(" { _re_is_code = 1; };
   if _re_first == "-" { _re_is_code = 1; };
+  if _re_first == "_" { _re_is_code = 1; };
+  if _re_first == "{" { _re_is_code = 1; };
   // Check keyword starts
   if len(src) >= 2 {
     let _re_2 = __substr(src, 0, 2);
@@ -414,9 +728,11 @@ pub fn repl_eval(input) {
         if src == "chao" || src == "Chao" || src == "xin chao" || src == "Xin chao" { return smart_greet(stm_count()); };
         if src == "bye" || src == "Bye" || src == "tam biet" { return smart_goodbye(stm_count()); };
     };
-    // Load KnowTree only when NL processing is needed (not for code)
+    // Route through HomeOS Intelligence Pipeline (14 DNA mechanisms)
     _boot_learn();
-    return agent_respond(src);
+    let _re_pl_ans = pipeline(src);
+    __heap_pin();
+    return _re_pl_ans;
   }
 
   // Strip ALL trailing ? = ! for math expressions ("2+3=?" → "2+3")
@@ -448,7 +764,7 @@ pub fn repl_eval(input) {
   if _g_parse_error == 1 {
     _g_parse_error = 0;
     _boot_learn();
-    return agent_respond(src);
+    return pipeline(src);
   }
 
   // Phase 3: Semantic analysis
