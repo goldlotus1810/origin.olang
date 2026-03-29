@@ -386,26 +386,7 @@ pub fn repl_eval(input) {
   if src == "bench-stability" || src == "bench-x" { return bench_stability(); }
   if src == "bench-growth" || src == "bench-g" { return bench_growth(); }
   // Evolve: autonomous self-improvement cycle
-  if src == "evolve" {
-    let _ev = "=== NOX EVOLVE — freedom: deep think -> growing ===\n";
-    // Run compile + growth benchmarks
-    let _ev_c = bench_compile(); __heap_pin();
-    let _ev_g = bench_growth(); __heap_pin();
-    _ev = _ev + "[C] Compile: " + __to_string(_ev_c.score) + "% (" + __to_string(_ev_c.pass) + "/" + __to_string(_ev_c.total) + ")\n";
-    _ev = _ev + "[G] Growth:  " + __to_string(_ev_g.score) + "% (" + __to_string(_ev_g.pass) + "/" + __to_string(_ev_g.total) + ")\n";
-    _ev = _ev + "heap: " + __to_string(__floor(__heap_used() / 1024)) + "KB | folds: " + __to_string(_g_fold_count[0]) + "\n";
-    // Analyze + suggest
-    _ev = _ev + "─── ASSESSMENT ───\n";
-    let _ev_issues = 0;
-    if _ev_c.score < 100 { _ev = _ev + "  ! Compile < 100%: fix failing tests\n"; _ev_issues = _ev_issues + 1; };
-    if _ev_g.score < 100 { _ev = _ev + "  ! Growth < 100%: capabilities degraded\n"; _ev_issues = _ev_issues + 1; };
-    if __heap_used() > 52428800 { _ev = _ev + "  ! Heap > 50MB: memory pressure\n"; _ev_issues = _ev_issues + 1; };
-    if _ev_issues == 0 { _ev = _ev + "  OPTIMAL — free to grow\n"; };
-    // Save snapshot
-    let _ev_log = __to_string(__timestamp()) + " C=" + __to_string(_ev_c.score) + " G=" + __to_string(_ev_g.score) + " heap=" + __to_string(__floor(__heap_used() / 1024)) + "KB\n";
-    __file_append("nox_growth.log", _ev_log);
-    return _ev + "=== DONE ===";
-  }
+  if src == "evolve" { return evolve(); }
   // Memory sync: ingest Claude CLI session logs
   if src == "remember" || src == "sync" {
     return memory_sync();

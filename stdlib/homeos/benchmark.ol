@@ -430,6 +430,28 @@ pub fn bench_growth() {
     return { score: __floor(__array_get(_p, 0) * 100 / __array_get(_t, 0)), pass: __array_get(_p, 0), total: __array_get(_t, 0), label: "G" };
 }
 
+pub fn evolve() {
+    let _c = bench_compile(); __heap_pin();
+    let _g = bench_growth(); __heap_pin();
+
+    let _ev = "=== NOX EVOLVE — freedom: deep think -> growing ===\n"
+        + "[C] Compile: " + __to_string(_c.score) + "% (" + __to_string(_c.pass) + "/" + __to_string(_c.total) + ")\n"
+        + "[G] Growth:  " + __to_string(_g.score) + "% (" + __to_string(_g.pass) + "/" + __to_string(_g.total) + ")\n"
+        + "heap: " + __to_string(__floor(__heap_used() / 1024)) + "KB | folds: " + __to_string(_g_fold_count[0]) + "\n"
+        + "─── ASSESSMENT ───\n";
+
+    let _ev_issues = 0;
+    if _c.score < 100 { _ev = _ev + "  ! Compile < 100%: fix failing tests\n"; _ev_issues = _ev_issues + 1; };
+    if _g.score < 100 { _ev = _ev + "  ! Growth < 100%: capabilities degraded\n"; _ev_issues = _ev_issues + 1; };
+    if __heap_used() > 52428800 { _ev = _ev + "  ! Heap > 50MB: memory pressure\n"; _ev_issues = _ev_issues + 1; };
+    if _ev_issues == 0 { _ev = _ev + "  OPTIMAL — free to grow\n"; };
+
+    let _ev_log = __to_string(__timestamp()) + " C=" + __to_string(_c.score) + " G=" + __to_string(_g.score) + " heap=" + __to_string(__floor(__heap_used() / 1024)) + "KB\n";
+    __file_append("nox_growth.log", _ev_log);
+
+    return _ev + "=== DONE ===";
+}
+
 pub fn benchmark_full() {
     let _ts = _fmt_ts(__timestamp());
 
