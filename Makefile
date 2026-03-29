@@ -71,6 +71,14 @@ update-bootstrap: self-build
 	cp $(GEN1) origin_bootstrap.olang
 	@echo "Bootstrap updated: $$(md5sum origin_bootstrap.olang | cut -d' ' -f1)"
 
+# Nox autonomous loop: build → test → analyze → fix → repeat
+daemon:
+	bash nox_daemon.sh
+
+# Nox study: read source documents and learn
+study:
+	bash nox_study.sh
+
 # Clean
 clean:
 	rm -f $(VM_OBJ) $(GEN1) origin_new.olang origin_gen2.olang origin_gen3.olang

@@ -30,3 +30,12 @@
 [2026-03-29 10:53] Hebbian learning co-activation fire>=3 boost edge |status| QR
 [2026-03-29 10:53] Hebbian learning co-activation fire>=3 boost edge |promoted_at| 2026-03-29 10:53
 [2026-03-29 10:53] NCA |has_part| DENDRITES_DN
+[2026-03-29 11:16] rust_crate |contains| chief
+[2026-03-29 11:16] rust_crate |contains| mod
+[2026-03-29 11:16] rust_crate |contains| worker
+[2026-03-29 11:16] rust_crate |contains| leo
+[2026-03-29 11:16] rust_crate |contains| lib
+[2026-03-29 11:16] rust_crate |contains| book
+[2026-03-29 11:16] rust_crate |contains| gate
+[2026-03-29 11:16] rust_crate |contains| encoder
+[2026-03-29 11:16] rust_crate |contains| learning

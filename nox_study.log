@@ -1,0 +1,70 @@
+[Sun Mar 29 11:16:13 AM +07 2026] Study session started
+[Sun Mar 29 11:16:13 AM +07 2026] Studying Origin_project Go code...
+[Sun Mar 29 11:16:13 AM +07 2026] Studying concect documents...
+  Reading: /home/lupin/Bản tải về/homeos_v19_final (1)/concect1.md
+  observed: DENDRITES = ShortTermMemory  (ĐN — ngắn hạn, tự do thay đổi)
+  observed: AXON      = LongTermMemory   (QR — dài hạn, append-only, ED25519)
+  observed: SOMA      = AAM              (stateless orchestrator)
+  observed: → DreamSkill (kiểm chứng khi rảnh)
+  observed: → MsgPropose → AAM.ProposalHandlerSkill
+  observed: → QR (Silk Tree, bất biến)
+  Reading: /home/lupin/Bản tải về/homeos_v19_final (1)/concect2.md
+  observed: → Hệ điều hành tư duy xây từ vật lý học đầu tiên
+  observed: → Tự định nghĩa quy tắc vũ trụ → xây ngôn ngữ → bộ nhớ 
+  observed: → Từ đó sinh ra mọi Agent, Skill, và tri thức trong hệ thống
+  observed: → olang compile → bất kỳ ngôn ngữ nào
+  observed: → Go:   for range
+  observed: → Rust: .iter()
+  observed: → C:    for(;;)
+  observed: → x86:  DEC+JNZ
+  observed: → ARM:  BNE LOOP
+  observed: → WASM: loop/br_if/end
+  Reading: /home/lupin/Bản tải về/homeos_v19_final (1)/concect3.md
+  observed: ISDF = Isometric projection + SDF evaluation + Silk signal overlay
+  observed: → Ánh sáng thay đổi theo giờ trong ngày — vật lý thật (QT3)
+  observed: TRUNK = [
+  observed: ISL_FLOWS = [
+  observed: → Bóng tối học từ môi trường
+  observed: → Node được chiếu sáng nhiều → cp[0] tăng → sáng hơn
+  observed: → Node trong bóng → cp[0] giảm → tối hơn
+  observed: → "Neurons that fire together, wire together" áp dụng cho rendering
+  observed: → Chỉ 6 TYPE: RAW·ATOM·SDF·FORK·COMPOSE·BOND
+  observed: → DNA = L0 opcodes đúng theo từng TYPE
+[Sun Mar 29 11:16:27 AM +07 2026] Studying ISL/SDF patterns...
+  triple: rust_crate|contains|chief
+  triple: rust_crate|contains|mod
+  triple: rust_crate|contains|worker
+  triple: rust_crate|contains|leo
+  triple: rust_crate|contains|lib
+  triple: rust_crate|contains|book
+  triple: rust_crate|contains|gate
+  triple: rust_crate|contains|mod
+  triple: rust_crate|contains|encoder
+  triple: rust_crate|contains|learning
+[Sun Mar 29 11:16:32 AM +07 2026] Studying node architecture...
+  Reading: /home/lupin/GolandProjects/Origin/node1.md
+  observed: 🏠 HomeOS — Kiến trúc Hệ thống Chi tiết
+  observed: > Tài liệu kỹ thuật đầy đủ về kiến trúc Multi-Agent, Silk Web 
+  Reading: /home/lupin/GolandProjects/Origin/node2.md
+  observed: 🏠 HomeOS — Vũ trụ Toán học Tự vận hành
+  observed: > **Hệ điều hành nơi mọi thứ tồn tại dưới dạng công thức.
+  Reading: /home/lupin/GolandProjects/Origin/node3.md
+  observed: 🏠 HomeOS — Vũ trụ Toán học Tự vận hành
+  observed: > **Hệ điều hành nơi mọi thứ tồn tại dưới dạng công thức.
+  Reading: /home/lupin/GolandProjects/Origin/node4.md
+  observed: 📋 HomeOS — Danh sách công việc đầy đủ
+  observed: > Thứ tự ưu tiên: trên xuống dưới. Làm xong mới làm tiếp.
+  Reading: /home/lupin/GolandProjects/Origin/node5.md
+  observed: SILK Symbol Table
+  observed: Source: Unicode 17.0  https://www.unicode.org/charts/
+  observed: Each entry: codepoint | symbol | unicode name | SILK meaning | SILK branch
+  Reading: /home/lupin/GolandProjects/Origin/node6.md
+  observed: 📖 HomeOS SPEC — Bộ nhớ Bất biến
+  observed: > Đây là file quan trọng nhất trong repo.
+  Reading: /home/lupin/GolandProjects/Origin/node7.md
+  observed: SILK — Semantic Isomorphic Language of Knowledge
+  observed: The Universal Knowledge Tree
+[Sun Mar 29 11:16:40 AM +07 2026] Study complete
+  Knowledge files:
+    nox_learning.dat: 13 entries
+    nox_graph.kg: 41 triples
