@@ -206,6 +206,11 @@ fn encode_op(_eo_out, op) {
         return;
     };
     if t == "Swap" { emit_byte(_eo_out, 13); return; };
+    if t == "Add" { emit_byte(_eo_out, 42); return; };
+    if t == "Sub" { emit_byte(_eo_out, 43); return; };
+    if t == "Mul" { emit_byte(_eo_out, 44); return; };
+    if t == "Div" { emit_byte(_eo_out, 45); return; };
+    if t == "Mod" { emit_byte(_eo_out, 46); return; };
     if t == "Closure" {
         // Closure: [0x25][param_count:1][body_len:4]
         emit_byte(_eo_out, 37);

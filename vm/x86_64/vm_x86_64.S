@@ -529,11 +529,11 @@ codegen_table:
     .long op_store_reg    - codegen_table # 0x27 StoreReg(u8 slot)
     .long op_enter_frame  - codegen_table # 0x28 EnterFrame(u8 num_slots)
     .long op_leave_frame  - codegen_table # 0x29 LeaveFrame
-    .long op_nop          - codegen_table # 0x2A (unused)
-    .long op_nop          - codegen_table # 0x2B (unused)
-    .long op_nop          - codegen_table # 0x2C (unused)
-    .long op_nop          - codegen_table # 0x2D (unused)
-    .long op_nop          - codegen_table # 0x2E (unused)
+    .long op_add          - codegen_table # 0x2A Add (native SSE2)
+    .long op_sub          - codegen_table # 0x2B Sub (native SSE2)
+    .long op_mul          - codegen_table # 0x2C Mul (native SSE2)
+    .long op_div          - codegen_table # 0x2D Div (native SSE2)
+    .long op_mod          - codegen_table # 0x2E Mod (native SSE2)
     .long op_nop          - codegen_table # 0x2F (unused)
     .long cg_closure_cap  - codegen_table # 0x30 ClosureCapture
 .section .text

@@ -270,6 +270,11 @@ fn emit_op(state, _op) {
     if _eo_tag == "Pop" { emit_simple(state, 12); return; };
     if _eo_tag == "Dup" { emit_simple(state, 11); return; };
     if _eo_tag == "Swap" { emit_simple(state, 13); return; };
+    if _eo_tag == "Add" { emit_simple(state, 42); return; };
+    if _eo_tag == "Sub" { emit_simple(state, 43); return; };
+    if _eo_tag == "Mul" { emit_simple(state, 44); return; };
+    if _eo_tag == "Div" { emit_simple(state, 45); return; };
+    if _eo_tag == "Mod" { emit_simple(state, 46); return; };
     if _eo_tag == "Push" { emit_push_str(state, _eo_name); return; };
     if _eo_tag == "Load" { emit_load(state, _eo_name); return; };
     if _eo_tag == "Store" { emit_store(state, _eo_name); return; };
@@ -506,10 +511,10 @@ fn compile_expr(state, expr) {
                     compile_expr(state, _bo_rhs);
                     let _binop = pop(_ce_stack);
                     if _binop == "+" { emit_op(state, make_op_name("Call", "__hyp_add")); };
-                    if _binop == "-" { emit_op(state, make_op_name("Call", "__hyp_sub")); };
-                    if _binop == "*" { emit_op(state, make_op_name("Call", "__hyp_mul")); };
-                    if _binop == "/" { emit_op(state, make_op_name("Call", "__hyp_div")); };
-                    if _binop == "%" { emit_op(state, make_op_name("Call", "__hyp_mod")); };
+                    if _binop == "-" { emit_op(state, make_op_simple("Sub")); };
+                    if _binop == "*" { emit_op(state, make_op_simple("Mul")); };
+                    if _binop == "/" { emit_op(state, make_op_simple("Div")); };
+                    if _binop == "%" { emit_op(state, make_op_simple("Mod")); };
                     if _binop == "<<" { emit_op(state, make_op_name("Call", "__bit_shl")); };
                     if _binop == ">>" { emit_op(state, make_op_name("Call", "__bit_shr")); };
                     if _binop == "|" { emit_op(state, make_op_name("Call", "__bit_or")); };
