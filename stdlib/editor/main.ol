@@ -28,6 +28,10 @@ pub fn editor_start(_path) {
     let _term_open = 0;
     let _term_height = 10;
 
+    // Chat panel state
+    let _chat_open = 0;
+    let _chat_height = 12;
+
     // File tree state
     let _ft_open = 0;
     let _ft_focus = 0;
@@ -99,7 +103,8 @@ pub fn editor_start(_path) {
 
         // Render editor lines
         let _ed_rows = _rows - 2;
-        if _term_open == 1 { _ed_rows = _ed_rows - _term_height; };
+        if _term_open == 1 { _ed_rows = _ed_rows - _term_height - 1; };
+        if _chat_open == 1 { _ed_rows = _ed_rows - _chat_height - 1; };
         let _i = 0;
         while _i < _ed_rows {
             term_goto(_i + 2, _ed_off + 1);
@@ -139,6 +144,19 @@ pub fn editor_start(_path) {
             tp_render(_rows - _term_height, _term_height, _cols);
         };
 
+        // Chat panel (if open)
+        if _chat_open == 1 {
+            let _ch_top = _rows - _term_height - _chat_height - 1;
+            if _term_open == 0 { _ch_top = _rows - _chat_height - 1; };
+            // Separator
+            term_goto(_ch_top, 1);
+            term_bg(235); term_color(183);
+            let _csep = 0;
+            while _csep < _cols { __write_raw("─"); _csep = _csep + 1; };
+            term_reset();
+            ch_render(_ch_top + 1, _chat_height, _cols);
+        };
+
         // Status bar
         term_goto(_rows, 1);
         term_bg(235); term_color(252);
@@ -151,15 +169,19 @@ pub fn editor_start(_path) {
         term_reset();
 
         // Cursor positioning
-        if _term_open == 1 {
-            // Cursor on terminal input line
+        if _chat_open == 1 {
+            let _ch_input_row = _rows - 1;
+            if _term_open == 1 { _ch_input_row = _rows - _term_height - 1; };
+            term_goto(_ch_input_row, len(_ch_input) + 3);
+            term_show_cursor();
+        } else { if _term_open == 1 {
             let _tc_prompt_len = len(_tp_cwd) + 2 + len(_tp_input);
             term_goto(_rows - 1, _tc_prompt_len + 1);
             term_show_cursor();
         } else { if _ft_focus == 0 {
             term_goto(_cur_row - _scroll + 2, _ed_off + _cur_col - _scroll_col + 7);
             term_show_cursor();
-        }; };
+        }; }; };
         }; // end if _need_render
 
         // Read key
@@ -169,14 +191,24 @@ pub fn editor_start(_path) {
             _last_key = _key;
 
             if _key == 17 { _running = 0; }   // Ctrl-Q = quit
-            else { if _term_open == 1 {
+            else { if _chat_open == 1 {
+                // Chat panel is open — route keys to chat
+                let _ck = ch_handle_key(_key);
+                if _ck == 0 {
+                    _chat_open = 0;
+                    term_clear();
+                };
+            } else { if _term_open == 1 {
                 // Terminal panel is open — route all keys to terminal
                 let _th = tp_handle_key(_key);
                 if _th == 0 {
-                    // Ctrl-T pressed in terminal — close it
                     _term_open = 0;
                     term_clear();
                 };
+            } else { if _key == 1 {                // Ctrl-A = toggle chat
+                _chat_open = 1;
+                ch_init();
+                term_clear();
             } else { if _key == 20 {              // Ctrl-T = toggle terminal
                 _term_open = 1;
                 tp_init();
@@ -533,7 +565,7 @@ pub fn editor_start(_path) {
                     set_at(_lines, _cur_row, __substr(_line, 0, _cur_col) + __chr(_key) + __substr(_line, _cur_col, len(_line)));
                     _cur_col = _cur_col + 1;
                 }; }; }; };
-            }; }; }; }; }; }; }; }; };
+            }; }; }; }; }; }; }; }; }; }; };
             // Clamp cursor col to line length
             let _line_len = len(_lines[_cur_row]);
             if _cur_col > _line_len { _cur_col = _line_len; };
