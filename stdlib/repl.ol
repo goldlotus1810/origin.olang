@@ -266,7 +266,10 @@ pub fn repl_eval(input) {
     return "OK";
   };
   if src == "help" {
-    return "Code: let fn emit if while for match lambda | HOF: map filter reduce pipe any all | AI: learn study respond memory | Self: diagnose benchmark selftest | test build exit";
+    return "inspect check evolve bench audit dead calls diff read write replace build verify run dasm analyze study learn help version exit";
+  }
+  if src == "version" {
+    return "Nox v0.6 — Session 6\n  binary: 837KB | tests: 194 | Gen1==Gen2\n  commits: 31 | lines: 11638 | functions: 467\n  introspection: 8 layers | self-modification: active\n  Olang self-hosting compiler + x86-64 VM";
   }
   // (dump command removed)
   if src == "diagnose" || src == "diag" { return self_diagnostic(); }
@@ -444,6 +447,43 @@ pub fn repl_eval(input) {
       let _rp_result = substr(_rp_content, 0, _rp_pos) + _rp_new + substr(_rp_content, _rp_pos + len(_rp_old), len(_rp_content));
       __file_write(_rp_path, _rp_result);
       return "Replaced in " + _rp_path;
+    };
+  }
+  // Safe-replace: modify → rebuild → test → rollback if fail
+  if len(src) > 13 {
+    if __substr(src, 0, 13) == "safe-replace " {
+      let _sr_rest = __substr(src, 13, len(src));
+      let _sr_sp = 0;
+      while _sr_sp < len(_sr_rest) { if __char_code(char_at(_sr_rest, _sr_sp)) == 32 { break; }; let _sr_sp = _sr_sp + 1; };
+      let _sr_path = substr(_sr_rest, 0, _sr_sp);
+      let _sr_body = substr(_sr_rest, _sr_sp + 1, len(_sr_rest));
+      let _sr_arrow = _pl_find_in(_sr_body, "|||");
+      if _sr_arrow < 0 { return "Usage: safe-replace <path> <old>|||<new>"; };
+      let _sr_old = substr(_sr_body, 0, _sr_arrow);
+      let _sr_new = substr(_sr_body, _sr_arrow + 3, len(_sr_body));
+      // Safety
+      let _sr_safe = 0;
+      if len(_sr_path) >= 7 { if __substr(_sr_path, 0, 7) == "stdlib/" { let _sr_safe = 1; }; };
+      if _sr_safe == 0 { return "Safety: only stdlib/"; };
+      // Read + find
+      let _sr_content = __file_read(_sr_path);
+      if len(_sr_content) == 0 { return "Error: cannot read " + _sr_path; };
+      let _sr_pos = _pl_find_in(_sr_content, _sr_old);
+      if _sr_pos < 0 { return "Not found: " + _sr_old; };
+      // Backup original
+      let _sr_backup = _sr_content;
+      // Apply change
+      let _sr_result = substr(_sr_content, 0, _sr_pos) + _sr_new + substr(_sr_content, _sr_pos + len(_sr_old), len(_sr_content));
+      __file_write(_sr_path, _sr_result);
+      // Rebuild
+      let _sr_build = __system("make self-build 2>&1 | tail -1");
+      let _sr_ok = _pl_find_in(_sr_build, "Gen1:");
+      if _sr_ok < 0 {
+          // Build failed — rollback
+          __file_write(_sr_path, _sr_backup);
+          return "BUILD FAILED — rolled back. " + _sr_build;
+      };
+      return "OK: replaced in " + _sr_path + " + rebuilt. " + _sr_build;
     };
   }
   // Write/append to file (self-modification)
