@@ -747,7 +747,20 @@ fn parse_expr_prec(p, min_prec) {
             let min_prec = pop(_pep_stack);
             let _pep_op = pop(_pep_stack);
             let _pep_saved = pop(_pep_stack);
-            let _pep_lhs = Expr::BinOp { op: _pep_op, lhs: _pep_saved, rhs: _pep_rhs };
+            // Constant folding: NumLit op NumLit → NumLit
+            let _pep_did_fold = 0;
+            if __match_enum(_pep_saved, "Expr::NumLit") == 1 {
+                if __match_enum(_pep_rhs, "Expr::NumLit") == 1 {
+                    let _pep_a = __enum_field(_pep_saved, 0);
+                    let _pep_b = __enum_field(_pep_rhs, 0);
+                    if _pep_op == "+" { _pep_lhs = Expr::NumLit { value: _pep_a + _pep_b }; _pep_did_fold = 1; };
+                    if _pep_op == "-" { _pep_lhs = Expr::NumLit { value: _pep_a - _pep_b }; _pep_did_fold = 1; };
+                    if _pep_op == "*" { _pep_lhs = Expr::NumLit { value: _pep_a * _pep_b }; _pep_did_fold = 1; };
+                    if _pep_op == "/" { if _pep_b != 0 { _pep_lhs = Expr::NumLit { value: _pep_a / _pep_b }; _pep_did_fold = 1; }; };
+                    if _pep_op == "%" { if _pep_b != 0 { _pep_lhs = Expr::NumLit { value: _pep_a % _pep_b }; _pep_did_fold = 1; }; };
+                };
+            };
+            if _pep_did_fold == 0 { _pep_lhs = Expr::BinOp { op: _pep_op, lhs: _pep_saved, rhs: _pep_rhs }; };
         } else {
             break;
         };
