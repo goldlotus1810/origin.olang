@@ -437,6 +437,46 @@ pub fn repl_eval(input) {
       return "";
     };
   }
+  // Run all .ol test files and report
+  if src == "test-all" {
+    let _ta_files = __readdir("test");
+    let _ta_pass = [0];
+    let _ta_fail = [0];
+    let _ta_skip = [0];
+    let _ta_errors = "";
+    let _ta_fi = 0;
+    while _ta_fi < len(_ta_files) {
+        let _ta_fname = __array_get(_ta_files, _ta_fi);
+        let _ta_flen = len(_ta_fname);
+        if _ta_flen > 3 {
+            if __substr(_ta_fname, _ta_flen - 3, _ta_flen) == ".ol" {
+                let _ta_path = "test/" + _ta_fname;
+                let _ta_src = __file_read(_ta_path);
+                if len(_ta_src) > 5 {
+                    try {
+                        let _ta_tokens = tokenize(_ta_src);
+                        let _ta_ast = parse(_ta_tokens);
+                        if _g_parse_error == 1 { let _g_parse_error = 0; let _ = __set_at(_ta_skip, 0, __array_get(_ta_skip, 0) + 1); } else {
+                            set_at(_g_pos_box, 0, 0);
+                            _prefill_output();
+                            analyze(_ta_ast);
+                            let _ = __set_at(_ta_pass, 0, __array_get(_ta_pass, 0) + 1);
+                        };
+                    } catch {
+                        let _ = __set_at(_ta_fail, 0, __array_get(_ta_fail, 0) + 1);
+                        let _ta_errors = _ta_errors + " " + _ta_fname;
+                    };
+                };
+            };
+        };
+        let _ta_fi = _ta_fi + 1;
+    };
+    let _ta_p = __array_get(_ta_pass, 0);
+    let _ta_f = __array_get(_ta_fail, 0);
+    let _ta_s = __array_get(_ta_skip, 0);
+    let _ta_total = _ta_p + _ta_f + _ta_s;
+    return "Test suite: " + __to_string(_ta_p) + "/" + __to_string(_ta_total) + " compiled (" + __to_string(_ta_f) + " fail, " + __to_string(_ta_s) + " skip)" + _ta_errors;
+  }
   // Self-test: quick inline verification
   if src == "self-test" || src == "check" {
     _boot_learn();
