@@ -212,12 +212,19 @@ fn _mcp_call(_id, _tool, _args) {
             return _ok(_id, _sm_content);
         };
         if _sm_action == "write" {
+            // Security: restrict writes to Origin project directories only
+            let _sm_safe = 0;
+            if len(_sm_path) >= 7 { if __substr(_sm_path, 0, 7) == "stdlib/" { let _sm_safe = 1; }; };
+            if len(_sm_path) >= 5 { if __substr(_sm_path, 0, 5) == "docs/" { let _sm_safe = 1; }; };
+            if len(_sm_path) >= 5 { if __substr(_sm_path, 0, 5) == "test/" { let _sm_safe = 1; }; };
+            if len(_sm_path) >= 3 { if __substr(_sm_path, 0, 3) == "vm/" { let _sm_safe = 1; }; };
+            if _sm_safe == 0 { return _err(_id, "Write restricted to stdlib/ docs/ test/ vm/ only"); };
             let _sm_content = json_get(_args, "content");
             __file_write(_sm_path, _sm_content);
             return _ok(_id, "Written " + __to_string(len(_sm_content)) + " chars to " + _sm_path);
         };
         if _sm_action == "rebuild" {
-            let _sm_out = __system("cd /home/lupin/Origin && as -o /tmp/vm.o vm/x86_64/vm_x86_64.S && ld -o vm/x86_64/vm_x86_64 /tmp/vm.o --entry=_start -static && ./origin_mcp.olang --build 2>&1");
+            let _sm_out = __system("make self-build 2>&1");
             return _ok(_id, "Rebuild output:\\n" + _sm_out);
         };
         return _err(_id, "action must be read, write, or rebuild");
