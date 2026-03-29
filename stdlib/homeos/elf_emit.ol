@@ -105,7 +105,6 @@ pub fn make_origin_header_arch(vm_off, vm_sz, bc_off, bc_sz, kn_off, kn_sz, flag
 }
 
 // Byte helpers: use shared byte_utils.ol (push_bytes, push_u16, push_u32)
-}
 
 fn push_u64(buf, val) {
   push_u32(buf, val % 4294967296);
