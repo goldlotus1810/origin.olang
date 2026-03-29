@@ -15,6 +15,7 @@ fcntl.ioctl(fd, 0x5501, 0)
 time.sleep(0.5)
 
 text = sys.argv[1] if len(sys.argv)>1 else ""
+send_enter = "--no-enter" not in sys.argv
 for c in text.lower():
     code = KEYS.get(c, 0)
     if code:
@@ -30,6 +31,14 @@ for c in text.lower():
             os.write(fd, struct.pack('<QQHHi',0,0,1,42,0))
             os.write(fd, struct.pack('<QQHHi',0,0,0,0,0))
         time.sleep(0.02)
+
+# Send Enter after text (unless --no-enter)
+if send_enter:
+    time.sleep(0.1)
+    os.write(fd, struct.pack('<QQHHi',0,0,1,28,1))
+    os.write(fd, struct.pack('<QQHHi',0,0,0,0,0))
+    os.write(fd, struct.pack('<QQHHi',0,0,1,28,0))
+    os.write(fd, struct.pack('<QQHHi',0,0,0,0,0))
 
 time.sleep(0.3)
 fcntl.ioctl(fd, 0x5502, 0)
