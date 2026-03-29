@@ -328,27 +328,11 @@ pub fn repl_eval(input) {
     if len(_gr_log) == 0 { return "No growth history yet. Run bench or evolve first."; };
     return "=== NOX GROWTH LOG ===\n" + _gr_log;
   }
-  // Bench: measure system performance
-  if src == "bench" {
-    let _b_out = "=== NOX BENCH ===\n";
-    // 1. Compile speed: tokenize+parse+analyze "emit 42;"
-    let _b_t0 = __timestamp();
-    // 1. Math precision
-    let _b_e = __exp(1);
-    let _b_l = __log2(1024);
-    let _b_out = _b_out + "  e=" + __to_string(_b_e) + " log2(1024)=" + __to_string(_b_l) + "\n";
-    // 2. Facts
-    let _b_out = _b_out + "  facts: " + __to_string(kt_fact_count()) + "\n";
-    // 3. Heap
-    let _b_out = _b_out + "  heap: " + __to_string(__floor(__heap_used() / 1024)) + "KB\n";
-    // 4. Binary
-    let _b_out = _b_out + "  binary: 838KB\n";
-    __heap_pin();
-    // Save snapshot to growth log
-    let _b_snap = __to_string(__timestamp()) + " facts=" + __to_string(kt_fact_count()) + " heap=" + __to_string(__floor(__heap_used() / 1024)) + "KB";
-    __file_append("nox_growth.log", _b_snap + "\n");
-    return _b_out + "  snapshot saved to nox_growth.log\n=== DONE ===";
-  }
+  // Bench: full benchmark suite (by Sora)
+  if src == "benchmark" || src == "bench" { return benchmark_full(); }
+  if src == "bench-e" { _boot_learn(); return bench_english(); }
+  if src == "bench-m" { _boot_learn(); return bench_math(); }
+  if src == "bench-s" { _boot_learn(); return bench_system(); }
   // Evolve: autonomous self-improvement cycle
   if src == "evolve" {
     _boot_learn();
@@ -647,7 +631,7 @@ pub fn repl_eval(input) {
   if src == "fixed-point" || src == "verify" {
     return __system("make fixed-point 2>&1 | tail -3");
   }
-  if src == "benchmark" || src == "bench" { return self_benchmark(); }
+  // benchmark handled above (Sora's suite)
   if src == "selftest" { return self_test(); }
   if src == "spider" { return spider(); }
 
