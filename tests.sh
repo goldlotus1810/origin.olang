@@ -976,6 +976,10 @@ sb_test "selfbuild/interp"  'let n="Nox";emit $"Hi {n}";' "Hi Nox"
 sb_test "selfbuild/fact"    'fn f(n){if n<=1{return 1;};return n*f(n-1);};emit f(10);' "3628800"
 sb_test "selfbuild/pipe"    'fn d(x){return x*2;};emit 5 |> d;' "10"
 sb_test "selfbuild/fizz"    'let r="";let i=1;while i<=5{if i%3==0{r=r+"F";}else{r=r+__to_string(i);};let i=i+1;};emit r;' "12F45"
+sb_test "selfbuild/bitwise_or"  'emit 0x0F | 0xF0;'           "255"
+sb_test "selfbuild/bitwise_and" 'emit 0xFF & 0x0F;'            "15"
+sb_test "selfbuild/constfold"   'emit 10 * 20 + 5;'            "205"
+sb_test "selfbuild/block_comment" 'let x = /* skip this */ 42; emit x;' "42"
 echo -e "\n${CYAN}  Self-build: ${SB_PASS}/$((SB_PASS + SB_FAIL)) passed${NC}"
 fi
 
