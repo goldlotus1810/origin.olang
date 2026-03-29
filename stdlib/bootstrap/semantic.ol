@@ -19,6 +19,10 @@ let _continue_patches = [];
 let _g_while_start = [0];     // box: current while-loop start for direct continue emit
 let _g_break_stack = [];      // stack of break-patch arrays for nesting
 let _g_cont_stack = [];       // stack of continue-patch arrays for nesting
+let __g_fl_inc0 = 0; let __g_fl_inc1 = 0; let __g_fl_inc2 = 0; let __g_fl_inc3 = 0;
+let __g_fl_inc4 = 0; let __g_fl_inc5 = 0; let __g_fl_inc6 = 0; let __g_fl_inc7 = 0;
+let __g_fl_jz0 = 0; let __g_fl_jz1 = 0; let __g_fl_jz2 = 0; let __g_fl_jz3 = 0;
+let __g_fl_jz4 = 0; let __g_fl_jz5 = 0; let __g_fl_jz6 = 0; let __g_fl_jz7 = 0;
 let _ce_locals = __array_with_cap(256);
 let _ce_lc = [0];
 let __const_names = [];
@@ -2064,22 +2068,28 @@ fn compile_stmt(state, stmt) {
 
             // Save _fl_inc and _fl_jz to depth-indexed globals
             let _fl_my_depth = _g_for_depth - 1;
-            if _fl_my_depth == 0 { let __g_fl_inc0 = _fl_inc; let __g_fl_jz0 = _fl_jz; };
-            if _fl_my_depth == 1 { let __g_fl_inc1 = _fl_inc; let __g_fl_jz1 = _fl_jz; };
-            if _fl_my_depth == 2 { let __g_fl_inc2 = _fl_inc; let __g_fl_jz2 = _fl_jz; };
-            if _fl_my_depth == 3 { let __g_fl_inc3 = _fl_inc; let __g_fl_jz3 = _fl_jz; };
-            if _fl_my_depth == 4 { let __g_fl_inc4 = _fl_inc; let __g_fl_jz4 = _fl_jz; };
-            if _fl_my_depth == 5 { let __g_fl_inc5 = _fl_inc; let __g_fl_jz5 = _fl_jz; };
-            if _fl_my_depth == 6 { let __g_fl_inc6 = _fl_inc; let __g_fl_jz6 = _fl_jz; };
-            if _fl_my_depth == 7 { let __g_fl_inc7 = _fl_inc; let __g_fl_jz7 = _fl_jz; };
+            if _fl_my_depth == 0 { __g_fl_inc0 = _fl_inc; __g_fl_jz0 = _fl_jz; };
+            if _fl_my_depth == 1 { __g_fl_inc1 = _fl_inc; __g_fl_jz1 = _fl_jz; };
+            if _fl_my_depth == 2 { __g_fl_inc2 = _fl_inc; __g_fl_jz2 = _fl_jz; };
+            if _fl_my_depth == 3 { __g_fl_inc3 = _fl_inc; __g_fl_jz3 = _fl_jz; };
+            if _fl_my_depth == 4 { __g_fl_inc4 = _fl_inc; __g_fl_jz4 = _fl_jz; };
+            if _fl_my_depth == 5 { __g_fl_inc5 = _fl_inc; __g_fl_jz5 = _fl_jz; };
+            if _fl_my_depth == 6 { __g_fl_inc6 = _fl_inc; __g_fl_jz6 = _fl_jz; };
+            if _fl_my_depth == 7 { __g_fl_inc7 = _fl_inc; __g_fl_jz7 = _fl_jz; };
+
+            // Set continue target = increment section (for ContinueStmt)
+            let _fl_saved_ws = _g_while_start[0];
+            set_at(_g_while_start, 0, _fl_inc);
 
             // Compile body (save/restore for nested for loops)
             let _fl_bi = 0;
             while _fl_bi < len(body) {
                 push(_ce_stack, body);
+                push(_ce_stack, _fl_saved_ws);
                 push(_ce_stack, _fl_bi);
                 compile_stmt(state, body[_fl_bi]);
                 _fl_bi = pop(_ce_stack);
+                let _fl_saved_ws = pop(_ce_stack);
                 body = pop(_ce_stack);
                 _fl_bi = _fl_bi + 1;
             };
@@ -2095,13 +2105,6 @@ fn compile_stmt(state, stmt) {
             if _fl_rd == 6 { let _fl_inc = __g_fl_inc6; let _fl_jz = __g_fl_jz6; };
             if _fl_rd == 7 { let _fl_inc = __g_fl_inc7; let _fl_jz = __g_fl_jz7; };
 
-            // Patch continue → increment section
-            let _fl_cp = 0;
-            while _fl_cp < len(_continue_patches) {
-                patch_jump(state, _continue_patches[_fl_cp], _fl_inc);
-                let _fl_cp = _fl_cp + 1;
-            };
-
             // Jump to increment section
             emit_jmp(state, _fl_inc);
 
@@ -2116,6 +2119,8 @@ fn compile_stmt(state, stmt) {
                 let _fl_bp = _fl_bp + 1;
             };
             pop(_g_cont_stack);
+            // Restore outer continue target
+            set_at(_g_while_start, 0, _fl_saved_ws);
         _g_for_depth = _g_for_depth - 1;
     } else { if __match_enum(stmt, "Stmt::BreakStmt") == 1 {
         let _brk_pos = current_pos(state);

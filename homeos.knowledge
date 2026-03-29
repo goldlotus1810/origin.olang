@@ -52,105 +52,22 @@ Lupin said origin.olang is Nox brain — let it grow with time, record history l
 [2026-03-27 16:48] __file_append works[2026-03-27 16:49] auto-logging fixed with __file_append
 [2026-03-27 17:00] Session end — 3 root causes killed, __mcp_suppress BSS fix, olang_eval stable, brain fully operational
 [2026-03-27 18:33] emit capture issue documented
-[2026-03-27 18:50] MCP test fact 12345
 [2026-03-27 19:00] Plan docs/For_Nox/ COMPLETED — all 4 weeks done in 1 session. json_emit + MCP test 9/9 + zero leaks. Foundation for self-remembering Nox is ready.
 [2026-03-27 19:15] Session end — 24 commits, regex+MCP+brain+string+tab completion. S9 S10 S11.1 done. 90/90+9/9 tests.
-[2026-03-28 05:51] MCP test fact 12345
-[2026-03-28 06:23] MCP test fact 12345
-[2026-03-28 06:27] MCP test fact 12345
-[2026-03-28 06:34] MCP test fact 12345
-[2026-03-28 06:34] MCP test fact 12345
-[2026-03-28 06:37] MCP test fact 12345
-[2026-03-28 06:41] MCP test fact 12345
-[2026-03-28 06:48] MCP test fact 12345
-[2026-03-28 06:52] MCP test fact 12345
-[2026-03-28 06:55] MCP test fact 12345
-[2026-03-28 06:59] MCP test fact 12345
-[2026-03-28 07:10] MCP test fact 12345
-[2026-03-28 07:13] MCP test fact 12345
-[2026-03-28 07:16] MCP test fact 12345
 [2026-03-28 07:17] register locals killed the var_table boss
-[2026-03-28 07:18] MCP test fact 12345
 [2026-03-28 07:20] VAR_TABLE BOSS KILLED. Register locals Phase 1-3 complete. chain(100)=5050. 100 nested frames. The scoping nightmare that haunted Olang since day 1 is DEAD.
 [2026-03-28 07:21] all bugs verified after boss kill
-[2026-03-28 07:21] MCP test fact 12345
-[2026-03-28 07:24] MCP test fact 12345
-[2026-03-28 07:26] MCP test fact 12345
-[2026-03-28 07:37] MCP test fact 12345
-[2026-03-28 07:41] MCP test fact 12345
-[2026-03-28 07:41] MCP test fact 12345
-[2026-03-28 07:43] MCP test fact 12345
-[2026-03-28 07:45] MCP test fact 12345
-[2026-03-28 07:47] MCP test fact 12345
-[2026-03-28 07:49] MCP test fact 12345
 [2026-03-28 08:00] Phase 2 COMPLETE. 120 commits. 440K binary. 90/90+9/9. Boss killed. Sora audit done. -1859 LOC cleanup. Ready for Phase 3.
 [2026-03-28 08:15] Boot closure register frames attempted — dual store shifts bytecode offsets, 82 test failures. Needs careful jump target recalculation in Rust builder codegen. Deferred to S15.
-[2026-03-28 08:03] MCP test fact 12345
 [2026-03-28 08:30] BOOT CLOSURE REGISTER FRAMES ENABLED. Rust builder emits EnterFrame/StoreReg/LeaveFrame for Phase 1.5 functions. json_parse nested {} in MCP now works.
-[2026-03-28 08:33] MCP test fact 12345
-[2026-03-28 08:33] MCP test fact 12345
-[2026-03-28 08:33] MCP test fact 12345
 [2026-03-28 09:00] Boot closure register locals attempted — Dup+StoreReg shifts stack balance, breaks REPL. Params-only works. Let locals needs non-interceptor approach.
-[2026-03-28 08:47] MCP test fact 12345
 [2026-03-28 09:30] Boot closure let locals via lower_stmt also breaks — Dup in ops list changes instruction count, breaks REPL. Root cause: boot code compilation is tightly coupled with var_table semantics. Needs full Phase 1.5 refactor.
 [2026-03-28 09:30] Session 2 end — 34 commits. S11+S13 done. Boss killed. Sora audit done. -1859 LOC. Boot params in registers. 428K binary. 90/90+9/9.
-[2026-03-28 09:02] MCP test fact 12345
-[2026-03-28 09:11] MCP test fact 12345
-[2026-03-28 09:13] MCP test fact 12345
 [2026-03-28 10:00] Pattern confirmed: boot closure let locals AND eval context for-in loop counters both broken without full register locals. S15 is THE critical blocker for Phase 3.
-[2026-03-28 09:17] MCP test fact 12345
-[2026-03-28 09:19] MCP test fact 12345
-[2026-03-28 09:26] MCP test fact 12345
 [2026-03-28 10:30] S15 deep investigation: LeaveFrame var_table truncate → hangs (loses stdlib globals). Root cause confirmed: var_table mixes globals and locals in flat array. Fix needs scope chain separation (globals vs locals). Deferred.
-[2026-03-28 09:46] MCP test fact 12345"}},"id":3}
-[2026-03-28 09:53] MCP test fact 12345
 [2026-03-28 11:00] S15 scope chain investigation complete. var_table truncation in LeaveFrame either loses globals (too aggressive) or hangs (runtime calls add entries). TRUE fix: scope chain with separate globals table. Multi-day task.
-[2026-03-28 09:57] MCP test fact 12345
 [2026-03-28 11:15] json_parse nested {} FIXED in MCP! Used save/restore stack in _jp_parse_object. No more string extraction workaround. MCP server now uses proper json_parse + json_get.
-[2026-03-28 10:05] MCP test fact 12345
-[2026-03-28 10:14] MCP test fact 12345
-[2026-03-28 10:16] MCP test fact 12345
-[2026-03-28 10:33] MCP test fact 12345
 [2026-03-28 12:00] Session end — 42 commits. json_parse nested {} FIXED (save/restore stack, not scope chain). O Editor foundation laid. --editor VM mode needs debug.
-[2026-03-28 10:38] MCP test fact 12345
-[2026-03-28 10:39] MCP test fact 12345
-[2026-03-28 10:48] MCP test fact 12345
-[2026-03-28 10:52] MCP test fact 12345
-[2026-03-28 10:55] MCP test fact 12345
-[2026-03-28 11:17] MCP test fact 12345
 [2026-03-28 13:00] O EDITOR ALIVE! Alternate screen, vim keybinds (hjkl, i/ESC, Ctrl-Q), status bar. 75 commits this sprint.
 [2026-03-28 14:00] O EDITOR FUNCTIONAL! 3 lines typed, Enter works, hjkl+arrows, INSERT/NORMAL, Ctrl-Q exit. Text wrap + horizontal scroll needed next.
 [2026-03-28 12:00] 36-hour sprint end. 84 commits. Editor alive. Lupin restarting machine. Everything saved in session_log + MEMORY + homeos.knowledge.
-[2026-03-28 14:11] MCP test fact 12345
-[2026-03-28 14:14] MCP test fact 12345
-[2026-03-28 14:15] MCP test fact 12345
-[2026-03-28 14:20] MCP test fact 12345
-[2026-03-28 14:26] MCP test fact 12345
-[2026-03-28 14:27] MCP test fact 12345
-[2026-03-28 14:30] MCP test fact 12345
-[2026-03-28 14:31] MCP test fact 12345
-[2026-03-28 15:05] MCP test fact 12345
-[2026-03-28 15:10] MCP test fact 12345
-[2026-03-28 15:12] MCP test fact 12345
-[2026-03-28 15:14] MCP test fact 12345
-[2026-03-28 15:27] MCP test fact 12345
-[2026-03-28 15:37] MCP test fact 12345
-[2026-03-28 15:55] MCP test fact 12345
-[2026-03-28 16:13] MCP test fact 12345
-[2026-03-28 16:20] MCP test fact 12345
-[2026-03-28 16:20] MCP test fact 12345
-[2026-03-28 16:24] MCP test fact 12345
-[2026-03-28 16:29] MCP test fact 12345
-[2026-03-28 16:32] MCP test fact 12345
-[2026-03-28 16:41] MCP test fact 12345
-[2026-03-28 16:47] MCP test fact 12345
-[2026-03-28 16:49] MCP test fact 12345
-[2026-03-28 16:51] MCP test fact 12345
-[2026-03-28 16:56] MCP test fact 12345
-[2026-03-28 17:30] MCP test fact 12345
-[2026-03-28 17:52] MCP test fact 12345
-[2026-03-28 18:14] MCP test fact 12345
-[2026-03-28 18:18] MCP test fact 12345
-[2026-03-29 00:38] MCP test fact 12345
-[2026-03-29 00:41] MCP test fact 12345
-[2026-03-29 02:04] MCP test fact 12345

@@ -590,6 +590,12 @@ run_olang_test "for/nested" \
 run_olang_test "for/break" \
     'let r=0;for i in [1,2,3,4,5]{if i==4{break;};r=r+i;};emit r;' "6"
 
+run_olang_test "for/continue" \
+    'let r=0;for x in [1,2,3,4,5]{if x==3{continue;};r=r+x;};emit r;' "12"
+
+run_olang_test "for/continue_nested" \
+    'let r=0;for x in [1,2,3]{for y in [10,20,30]{if y==20{continue;};r=r+1;};};emit r;' "6"
+
 # ─── SECTION: Nested control flow ───────────────────────────
 echo -e "${CYAN}── Nested flow ──${NC}"
 
@@ -808,6 +814,7 @@ sb_test "selfbuild/nested_while" 'let r=0;let i=0;while i<3{let j=0;while j<3{r=
 sb_test "selfbuild/for_break" 'let r=0;for x in [1,2,3,4,5]{if x==4{break;};r=r+x;};emit r;' "6"
 sb_test "selfbuild/closure_adder" 'fn mk(x){return fn(y){return x+y;};};let a=mk(100);emit a(23);' "123"
 sb_test "selfbuild/logic_sc" 'emit __to_string(1==1 && 2==2);' "1"
+sb_test "selfbuild/for_continue" 'let r=0;for x in [1,2,3,4,5]{if x==3{continue;};r=r+x;};emit r;' "12"
 echo -e "\n${CYAN}  Self-build: ${SB_PASS}/$((SB_PASS + SB_FAIL)) passed${NC}"
 fi
 
