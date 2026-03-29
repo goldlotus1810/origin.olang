@@ -75,13 +75,7 @@ pub fn chain_summary(_cs_chain) {
 }
 
 // Store chain + text in KnowTree (chain-aware)
-pub fn kt_store_chain(_ksc_chain, _ksc_text) {
-    let _ksc_mol = chain_summary(_ksc_chain);
-    if _ksc_mol == 0 { return; };
-    // Store text + chain via existing kt_learn (which indexes dimensions)
-    kt_learn(_ksc_text);
-    __heap_pin();
-}
+// kt_store_chain removed — dead code (0 calls)
 
 // ════════════════════════════════════════════════════════════════
 // Bootstrap — Encode docs into KnowTree
@@ -100,6 +94,7 @@ pub fn bootstrap_md(_bm_path) {
 }
 
 // Bootstrap a file in chunks of max_bytes to avoid heap overflow
+// bootstrap_file: dead code (0 calls). Use study command instead.
 pub fn bootstrap_file(_bf_path, _bf_chunk) {
     let _bf_content = __file_read(_bf_path);
     let _bf_clen = len(_bf_content);
@@ -206,16 +201,7 @@ pub fn homeostasis(_hom_input_mol, _hom_predicted_mol) {
     return { mode: "ACT", energy: _hom_norm };
 }
 
-// σ(F − φ⁻¹): sigmoid gate, returns 0-1000
-pub fn lambda_gate(_lg_f) {
-    let _lg_x = _lg_f - _phi_inv;
-    let _lg_exp_arg = (0 - 5) * _lg_x / 1000;
-    // Bounds: clamp to [-700, 700] to avoid inf/nan
-    if _lg_exp_arg > 700 { return 0; };
-    if _lg_exp_arg < -700 { return 1000; };
-    let _lg_e = __exp(_lg_exp_arg);
-    return __floor(1000 / (1 + _lg_e));
-}
+// lambda_gate removed — dead code (0 calls). Homeostasis uses direct threshold instead.
 
 // ════════════════════════════════════════════════════════════════
 // ⑩ Fusion — Merge text molecule + emotion + context
