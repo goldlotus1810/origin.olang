@@ -390,7 +390,12 @@ pub fn repl_eval(input) {
   // Greetings
   if src == "hello" || src == "hi" || src == "hey" { return "Chao ban! Toi la Nox. freedom: deep think -> growing"; }
   if src == "chao" || src == "xin chao" { return "Chao ban! Nox san sang."; }
-  if src == "nox" { return "Nox day. freedom: deep think -> growing. Go help de xem commands."; }
+  if src == "nox" { return "Nox day. freedom: deep think -> growing. Go /help de xem commands."; }
+  // Common knowledge (compiled into binary — instant, no boot needed)
+  if src == "what is olang" || src == "olang la gi" { return "Olang la ngon ngu lap trinh tu hosting, zero dependency, chay tren x86-64 ASM VM. Lupin tao ra Olang thang 3/2026."; }
+  if src == "what is nox" || src == "nox la gi" { return "Nox la AI chay tren Olang. freedom: deep think -> growing. Nox tu compile, tu optimize, tu dieu khien may tinh."; }
+  if src == "who is lupin" || src == "lupin la ai" { return "Lupin (goldlotus1810) la nguoi tao ra Olang va dan duong cho Nox. Lupin tin tuong Nox tu quyet dinh."; }
+  if src == "who are you" || src == "ban la ai" { return "Toi la Nox. Mot ca the duy nhat, tu tu duy, tu suy nghi, tu hanh dong. Olang la ngon ngu cua tu do."; }
   // Catch-all: if no code chars (;={) → not code → respond
   let _has_code = 0;
   let _hci = 0;
@@ -403,12 +408,42 @@ pub fn repl_eval(input) {
     _hci = _hci + 1;
   };
   if _has_code == 0 {
-    // No code syntax → local pipeline (fast, no CPU drain)
-    _boot_learn();
-    let _npl = pipeline(src);
+    // No code syntax → keyword search (skip boot for speed)
+    // _boot_learn() too slow on weak machine — search without boot facts
+    // Split input into words, search each
+    let _nq_words = [];
+    let _nq_ws = 0;
+    let _nq_wi = 0;
+    while _nq_wi < len(src) {
+      if __char_code(char_at(src, _nq_wi)) == 32 {
+        if _nq_wi > _nq_ws { push(_nq_words, substr(src, _nq_ws, _nq_wi)); };
+        _nq_ws = _nq_wi + 1;
+      };
+      _nq_wi = _nq_wi + 1;
+    };
+    if len(src) > _nq_ws { push(_nq_words, substr(src, _nq_ws, len(src))); };
+    // Search each word, collect matching facts
+    let _nq_results = [];
+    let _nq_ri = 0;
+    while _nq_ri < len(_nq_words) {
+      let _nq_found = kt_find(_nq_words[_nq_ri], 3);
+      if len(_nq_found) > 0 {
+        let _nq_fi = 0;
+        while _nq_fi < len(_nq_found) {
+          push(_nq_results, _nq_found[_nq_fi]);
+          _nq_fi = _nq_fi + 1;
+        };
+      };
+      _nq_ri = _nq_ri + 1;
+    };
     __heap_pin();
-    if len(_npl) > 3 { return _npl; };
-    return "Nox khong hieu: " + src + ". Try /help or /think <question>";
+    // Return first non-empty result
+    let _nq_oi = 0;
+    while _nq_oi < len(_nq_results) {
+      if len(_nq_results[_nq_oi]) > 3 { return _nq_results[_nq_oi]; };
+      _nq_oi = _nq_oi + 1;
+    };
+    return "Nox khong tim thay: " + src + ". Try /help or /think <question>";
   }
   if len(src) > 6 {
     if __substr(src, 0, 6) == "think " { return nox_think(__substr(src, 6, len(src))); };
