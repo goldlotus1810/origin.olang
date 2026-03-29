@@ -159,52 +159,7 @@ fn _boot_index_source() {
     __heap_pin();
 }
 
-fn _boot_extract_fns(_bef_content, _bef_file) {
-    let _bef_count = [0];
-    let _bef_i = [0];
-    let _bef_clen = len(_bef_content);
-    while __array_get(_bef_i, 0) < _bef_clen {
-        let _bef_ci = __array_get(_bef_i, 0);
-        // Look for "pub fn " or "fn " at line start
-        if _bef_ci == 0 {
-            let _bef_is_fn = [0];
-        };
-        let _bef_is_fn = [0];
-        if (_bef_ci + 7) < _bef_clen {
-            if substr(_bef_content, _bef_ci, _bef_ci + 7) == "pub fn " {
-                let _ = __set_at(_bef_is_fn, 0, 1);
-            };
-        };
-        if (_bef_ci + 3) < _bef_clen {
-            if __array_get(_bef_is_fn, 0) == 0 {
-                if substr(_bef_content, _bef_ci, _bef_ci + 3) == "fn " {
-                    // Check it's at line start (prev char is newline or start)
-                    if _bef_ci == 0 { let _ = __set_at(_bef_is_fn, 0, 1); };
-                    if _bef_ci > 0 { if __char_code(char_at(_bef_content, _bef_ci - 1)) == 10 { let _ = __set_at(_bef_is_fn, 0, 1); }; };
-                };
-            };
-        };
-        if __array_get(_bef_is_fn, 0) == 1 {
-            // Extract until { or newline
-            let _bef_end = [_bef_ci];
-            while __array_get(_bef_end, 0) < _bef_clen {
-                let _bef_ec = __char_code(char_at(_bef_content, __array_get(_bef_end, 0)));
-                if _bef_ec == 123 { break; };  // {
-                if _bef_ec == 10 { break; };   // newline
-                let _ = __set_at(_bef_end, 0, __array_get(_bef_end, 0) + 1);
-            };
-            let _bef_sig = substr(_bef_content, _bef_ci, __array_get(_bef_end, 0));
-            if len(_bef_sig) > 5 {
-                if len(_bef_sig) < 100 {
-                    kt_learn(_bef_sig + " is defined in " + _bef_file);
-                    let _ = __set_at(_bef_count, 0, __array_get(_bef_count, 0) + 1);
-                };
-            };
-        };
-        let _ = __set_at(_bef_i, 0, __array_get(_bef_i, 0) + 1);
-    };
-    return __array_get(_bef_count, 0);
-}
+// _boot_extract_fns removed — dead code (replaced by grep-based indexing)
 
 // _boot_embedded and _learn_text REMOVED — KnowTree only (Sprint 5)
 
@@ -1220,56 +1175,4 @@ pub fn repl_eval(input) {
 // Input classification (for natural text vs code)
 // ════════════════════════════════════════════════════════
 
-pub fn is_olang_code(input) {
-  let src = __str_trim(input);
-  if len(src) == 0 { return false; }
-
-  // Check first token — if it's a keyword, it's code
-  let tokens = tokenize(src);
-  if len(tokens) == 0 { return false; }
-
-  let first_type = tokens[0].type;
-  if first_type == "Let" { return true; }
-  if first_type == "Fn" { return true; }
-  if first_type == "If" { return true; }
-  if first_type == "While" { return true; }
-  if first_type == "For" { return true; }
-  if first_type == "Match" { return true; }
-  if first_type == "Return" { return true; }
-  if first_type == "Pub" { return true; }
-  if first_type == "Emit" { return true; }
-
-  // Ident followed by ( → function call → code
-  if first_type == "Ident" {
-    let _ioc_i = 0;
-    while _ioc_i < len(src) {
-      let _ioc_c = __char_code(char_at(src, _ioc_i));
-      if _ioc_c == 40 { return true; };
-      if _ioc_c == 32 { let _ioc_i = len(src); };
-      let _ioc_i = _ioc_i + 1;
-    };
-  };
-
-  // Check for ○{...} command syntax
-  if len(src) >= 4 {
-    if char_at(src, 0) == 0xE2 && char_at(src, 1) == 0x97 && char_at(src, 2) == 0x8B {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-// ════════════════════════════════════════════════════════
-// REPL helpers
-// ════════════════════════════════════════════════════════
-
-pub fn repl_format_error(err) {
-  return "\x1b[31m" + err + "\x1b[0m";
-}
-
-pub fn repl_format_output(text) {
-  return text;
-}
-
-// str_trim: now uses ASM builtin __str_trim directly (see call sites above)
+// is_olang_code, repl_format_error, repl_format_output removed — dead code (0 calls)
