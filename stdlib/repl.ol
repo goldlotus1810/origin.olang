@@ -107,6 +107,33 @@ fn _boot_embedded_kt() {
     _boot_index_source();
 }
 
+fn _disasm(_da_bc, _da_len) {
+    let _da_out = "";
+    let _da_pc = [0];
+    let _da_names = "?    PUSH LOAD LCA  EDGE QRY  EMIT CALL RET  JMP  JZ   DUP  POP  SWAP LOOP HALT DRM  STAT NOP  STOR LOC  PNUM FUSE SCB  SCE  PMOL TRY  CTCH UPD  TRC  INS  AST  TYPE WHY  EXPL FFI  CCLS FBgn LPrm SPrm ?40  FEnd";
+    while __array_get(_da_pc, 0) < _da_len {
+        let _da_i = __array_get(_da_pc, 0);
+        let _da_op = __floor(__array_get(_da_bc, _da_i));
+        // Decode opcode name (5 chars per op in _da_names)
+        let _da_npos = _da_op * 5;
+        let _da_name = "???";
+        if _da_npos >= 0 { if (_da_npos + 4) < len(_da_names) { let _da_name = substr(_da_names, _da_npos, _da_npos + 4); }; };
+        let _da_line = __to_string(_da_i) + ":" + _da_name;
+        // Calculate next pc based on opcode size
+        let _da_next = _da_i + 1;
+        if _da_op == 21 { let _da_next = _da_i + 9; };  // PUSHNUM: +8 bytes f64
+        if _da_op == 9 { let _da_next = _da_i + 5; };   // JMP: +4 bytes target
+        if _da_op == 10 { let _da_next = _da_i + 5; };  // JZ: +4 bytes target
+        if _da_op == 26 { let _da_next = _da_i + 5; };  // TRYBEGIN: +4 bytes
+        if _da_op == 37 { let _da_next = _da_i + 3; };  // FN_BEGIN: +2 bytes param count
+        if _da_op == 41 { let _da_next = _da_i + 9; };  // FN_END: +8 bytes
+        if len(_da_out) > 0 { let _da_out = _da_out + " | "; };
+        let _da_out = _da_out + _da_line;
+        let _ = __set_at(_da_pc, 0, _da_next);
+    };
+    return _da_out;
+}
+
 fn _boot_index_source() {
     // No __system at boot — causes double REPL header issue
     // Source indexing available via: study <file> or remember commands
@@ -525,6 +552,20 @@ pub fn repl_eval(input) {
       };
       if _bc_len > 64 { let _bc_out = _bc_out + " ...(" + __to_string(_bc_len - 64) + " more)"; };
       return _bc_out;
+    };
+  }
+  // Disassemble: compile + decode bytecode to readable instructions
+  if len(src) > 5 {
+    if __substr(src, 0, 5) == "dasm " {
+      let _da_code = __substr(src, 5, len(src));
+      let _da_tokens = tokenize(_da_code);
+      let _da_ast = parse(_da_tokens);
+      if _g_parse_error == 1 { let _g_parse_error = 0; return "Parse error"; };
+      set_at(_g_pos_box, 0, 0);
+      _prefill_output();
+      analyze(_da_ast);
+      let _da_len = _g_pos_box[0];
+      return _disasm(_g_output, _da_len);
     };
   }
   // Build command: self-build (compile all .ol → pack binary)
