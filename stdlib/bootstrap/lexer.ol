@@ -98,6 +98,27 @@ pub fn tokenize(source) {
             continue;
         };
 
+        // Skip block comments: /* ... */
+        if ch == "/" && pos + 1 < src_len && char_at(source, pos + 1) == "*" {
+            let pos = pos + 2;
+            let col = col + 2;
+            while pos + 1 < src_len {
+                if char_at(source, pos) == "*" && char_at(source, pos + 1) == "/" {
+                    let pos = pos + 2;
+                    let col = col + 2;
+                    break;
+                };
+                if char_at(source, pos) == "\n" {
+                    let line = line + 1;
+                    let col = 1;
+                } else {
+                    let col = col + 1;
+                };
+                let pos = pos + 1;
+            };
+            continue;
+        };
+
         // Identifiers and keywords
         if is_alpha(ch) {
             let start = pos;
