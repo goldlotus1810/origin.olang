@@ -19,3 +19,16 @@ pub fn screen_region(x, y, w, h) {
 pub fn screen_size() {
     return { width: 1920, height: 1200 };
 }
+
+// ── Nox hacker toolkit ──
+
+// Type text into focused window
+pub fn nox_type(text) {
+    __system("python3 /home/lupin/Origin/nox_type.py '" + text + "'");
+}
+
+// Screenshot and return path
+pub fn nox_see() {
+    __system("grim /tmp/nox_screen.png");
+    return "/tmp/nox_screen.png";
+}

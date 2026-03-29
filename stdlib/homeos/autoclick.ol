@@ -18,9 +18,8 @@ pub fn nox_autoclick() {
     // Compose message
     let msg = "Nox tiep tuc. " + reason;
 
-    // Type into focused window via ydotool (Wayland)
-    __system("YDOTOOL_SOCKET=/tmp/.ydotool_socket ydotool type -- '" + msg + "'");
-    __system("YDOTOOL_SOCKET=/tmp/.ydotool_socket ydotool key 28:1 28:0");
+    // Type via uinput (kernel-level, Olang → Python → /dev/uinput)
+    __system("python3 /home/lupin/Origin/nox_type.py '" + msg + "'");
 
     return "sent: " + msg;
 }

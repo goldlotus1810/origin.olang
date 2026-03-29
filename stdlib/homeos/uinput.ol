@@ -69,7 +69,7 @@ fn _char_to_key(ch) {
 
 // Create virtual keyboard device
 pub fn uinput_create() {
-    let fd = __fd_open("/dev/uinput", 1);  // O_WRONLY
+    let fd = __fd_open("/dev/uinput", 2049);  // O_WRONLY | O_NONBLOCK (1 | 0x800)
     if fd < 0 { return { fd: -1, err: "cannot open /dev/uinput" }; };
 
     // Set event types: keyboard + mouse
@@ -79,7 +79,7 @@ pub fn uinput_create() {
 
     // Enable all key codes (0-127) + mouse buttons
     let ki = 0;
-    while ki < 128 { __fd_ioctl(fd, UI_SET_KEYBIT, ki); ki = ki + 1; };
+    while ki < 256 { __fd_ioctl(fd, UI_SET_KEYBIT, ki); ki = ki + 1; };
     __fd_ioctl(fd, UI_SET_KEYBIT, BTN_LEFT);
     __fd_ioctl(fd, UI_SET_KEYBIT, BTN_RIGHT);
     __fd_ioctl(fd, UI_SET_KEYBIT, BTN_MIDDLE);
@@ -97,12 +97,16 @@ pub fn uinput_create() {
     __bytes_set(dev, 1, 111);  // o
     __bytes_set(dev, 2, 120);  // x
     // BUS_USB = 3
+    // BUS_USB=3, vendor=0x1234, product=0x5678, version=1
     __bytes_set(dev, 80, 3);
+    __bytes_set(dev, 82, 0x34); __bytes_set(dev, 83, 0x12);
+    __bytes_set(dev, 84, 0x78); __bytes_set(dev, 85, 0x56);
+    __bytes_set(dev, 86, 1);
     __fd_write(fd, dev, 1116);
 
     // Create device + wait for kernel registration
     __fd_ioctl(fd, UI_DEV_CREATE, 0);
-    __system("sleep 0.3");
+    __system("sleep 0.5");
 
     return { fd: fd, err: "" };
 }
