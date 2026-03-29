@@ -688,6 +688,52 @@ pub fn repl_eval(input) {
       return _an_path + ":\n  " + __to_string(__array_get(_an_lines, 0)) + " lines, " + __to_string(__array_get(_an_fns, 0)) + " functions (" + __to_string(__array_get(_an_pub, 0)) + " pub)\n  " + __to_string(len(_an_tokens)) + " tokens → " + __to_string(_an_bclen) + " bytes bytecode\n  " + __to_string(__array_get(_an_pushes, 0)) + " pushes, " + __to_string(__array_get(_an_calls, 0)) + " calls, " + __to_string(__array_get(_an_jumps, 0)) + " jumps\n  " + __to_string(__floor(_an_bclen / __array_get(_an_fns, 0))) + " bytes/fn avg";
     };
   }
+  // Audit: self-review all source files
+  if src == "audit" {
+    let _au_dirs = [];
+    push(_au_dirs, "stdlib/homeos");
+    push(_au_dirs, "stdlib/bootstrap");
+    let _au_out = "=== NOX SELF-AUDIT ===";
+    let _au_total_lines = [0];
+    let _au_total_fns = [0];
+    let _au_total_bc = [0];
+    let _au_warnings = [0];
+    let _au_di = 0;
+    while _au_di < len(_au_dirs) {
+        let _au_dir = __array_get(_au_dirs, _au_di);
+        let _au_files = __readdir(_au_dir);
+        let _au_fi = 0;
+        while _au_fi < len(_au_files) {
+            let _au_fname = __array_get(_au_files, _au_fi);
+            if len(_au_fname) > 3 {
+                if __substr(_au_fname, len(_au_fname) - 3, len(_au_fname)) == ".ol" {
+                    let _au_path = _au_dir + "/" + _au_fname;
+                    let _au_src = __file_read(_au_path);
+                    if len(_au_src) > 0 {
+                        // Count lines
+                        let _au_lines = [1];
+                        let _au_li = 0;
+                        while _au_li < len(_au_src) { if __char_code(char_at(_au_src, _au_li)) == 10 { let _ = __set_at(_au_lines, 0, __array_get(_au_lines, 0) + 1); }; let _au_li = _au_li + 1; };
+                        // Count fns
+                        let _au_fns = [0];
+                        let _au_ci = 0;
+                        while _au_ci < (len(_au_src) - 3) { if substr(_au_src, _au_ci, _au_ci + 3) == "fn " { let _ = __set_at(_au_fns, 0, __array_get(_au_fns, 0) + 1); }; let _au_ci = _au_ci + 1; };
+                        let _ = __set_at(_au_total_lines, 0, __array_get(_au_total_lines, 0) + __array_get(_au_lines, 0));
+                        let _ = __set_at(_au_total_fns, 0, __array_get(_au_total_fns, 0) + __array_get(_au_fns, 0));
+                        // Flag: large file (>500 lines)
+                        let _au_flag = "";
+                        if __array_get(_au_lines, 0) > 500 { let _au_flag = " [LARGE]"; let _ = __set_at(_au_warnings, 0, __array_get(_au_warnings, 0) + 1); };
+                        let _au_out = _au_out + "\n  " + _au_fname + ": " + __to_string(__array_get(_au_lines, 0)) + "L " + __to_string(__array_get(_au_fns, 0)) + "fn" + _au_flag;
+                    };
+                };
+            };
+            let _au_fi = _au_fi + 1;
+        };
+        let _au_di = _au_di + 1;
+    };
+    let _au_out = _au_out + "\n--- Total: " + __to_string(__array_get(_au_total_lines, 0)) + " lines, " + __to_string(__array_get(_au_total_fns, 0)) + " functions, " + __to_string(__array_get(_au_warnings, 0)) + " warnings";
+    return _au_out;
+  }
   // Build command: self-build (compile all .ol → pack binary)
   if src == "build" {
     return self_build();
