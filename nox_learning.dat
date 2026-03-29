@@ -8,3 +8,6 @@ QR|2026-03-29 10:53|HomeOS is a self-operating mathematical universe not home au
 QR|2026-03-29 10:53|universe stores formulas not shapes
 QR|2026-03-29 10:53|NCA architecture DENDRITES=DN AXON=QR SOMA=AAM
 QR|2026-03-29 10:53|Hebbian learning co-activation fire>=3 boost edge
+DN|1|2026-03-29 10:56|variable scoping matters
+DN|1|2026-03-29 10:56|fixed-point requires identical bytecodes
+DN|1|2026-03-29 10:56|let creates Store opcode
