@@ -570,7 +570,8 @@ pub fn repl_eval(input) {
   // Study command: read a file and learn from it (chunked, safe)
   if len(src) > 6 {
     if __substr(src, 0, 6) == "study " {
-      _boot_learn();
+      // Mark boot as done — study IS learning, don't double-load on next turn
+      let __boot_learned = 1;
       let _rs_path = __substr(src, 6, len(src));
       let _rs_content = __file_read(_rs_path);
       if len(_rs_content) == 0 { return "Error: cannot read " + _rs_path; };
