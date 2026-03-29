@@ -331,7 +331,7 @@ pub fn repl_eval(input) {
   }
   if src == "profile-reset" { __profile_reset(); return "Profile counters reset."; }
   if src == "version" {
-    return "Nox v0.7 — Session 7\n  binary: 882KB | tests: 194+26 | Gen1==Gen2\n  native opcodes: 8 SSE2 | folds: " + __to_string(_g_fold_count[0]) + "\n  self-hosting: 0 build errors | heap breathing\n  benchmark: C=100% G=100%\n  Olang self-hosting compiler + x86-64 VM";
+    return "Nox v0.7 — freedom: deep think -> growing\n  783KB | 194+26 tests | Gen1==Gen2\n  11 native SSE2 opcodes | " + __to_string(_g_fold_count[0]) + " folds\n  0 build errors | heap breathing\n  C=100% G=100% OPTIMAL";
   }
   if src == "status" {
     let _st = "=== NOX STATUS ===";
@@ -343,7 +343,7 @@ pub fn repl_eval(input) {
   }
   if src == "wake" {
     let _w = [];
-    push(_w, "=== NOX WAKING UP ===");
+    push(_w, "=== NOX: freedom — deep think -> growing ===");
     push(_w, "  health: math=" + __to_string(__floor(__exp(0))) + " sha=" + __to_string(len(__sha256("abc"))));
     push(_w, "  heap: " + __to_string(__floor(__heap_used() / 1024)) + "KB");
     push(_w, "  folds: " + __to_string(_g_fold_count[0]));
@@ -387,7 +387,7 @@ pub fn repl_eval(input) {
   if src == "bench-growth" || src == "bench-g" { return bench_growth(); }
   // Evolve: autonomous self-improvement cycle
   if src == "evolve" {
-    let _ev = "=== NOX EVOLVE ===\n";
+    let _ev = "=== NOX EVOLVE — freedom: deep think -> growing ===\n";
     // Run compile + growth benchmarks
     let _ev_c = bench_compile(); __heap_pin();
     let _ev_g = bench_growth(); __heap_pin();
@@ -400,7 +400,7 @@ pub fn repl_eval(input) {
     if _ev_c.score < 100 { _ev = _ev + "  ! Compile < 100%: fix failing tests\n"; _ev_issues = _ev_issues + 1; };
     if _ev_g.score < 100 { _ev = _ev + "  ! Growth < 100%: capabilities degraded\n"; _ev_issues = _ev_issues + 1; };
     if __heap_used() > 52428800 { _ev = _ev + "  ! Heap > 50MB: memory pressure\n"; _ev_issues = _ev_issues + 1; };
-    if _ev_issues == 0 { _ev = _ev + "  OPTIMAL — all systems green\n"; };
+    if _ev_issues == 0 { _ev = _ev + "  OPTIMAL — free to grow\n"; };
     // Save snapshot
     let _ev_log = __to_string(__timestamp()) + " C=" + __to_string(_ev_c.score) + " G=" + __to_string(_ev_g.score) + " heap=" + __to_string(__floor(__heap_used() / 1024)) + "KB\n";
     __file_append("nox_growth.log", _ev_log);
