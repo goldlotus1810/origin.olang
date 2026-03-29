@@ -10955,6 +10955,8 @@ op_halt:
     jmp     .repl_read_newline
 
 .repl_raw_enter:
+    # Store newline in buffer (raw mode doesn't auto-add it)
+    movb    $0x0A, (%rsi, %rcx)
     # Echo newline
     push    %rcx
     push    %rsi
