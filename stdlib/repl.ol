@@ -265,9 +265,10 @@ pub fn repl_eval(input) {
     emit "[6] bc_len=" + __to_string(_g_pos_box[0]);
     return "OK";
   };
-  if src == "help" {
-    return "inspect check evolve bench audit dead calls diff read write replace build verify run dasm analyze study learn help version exit";
-  }
+  // NOTE: help text below is overridden by BOOT bytecode (see BUG-BOOT-SHADOW)
+  // The first-compiled version of repl_eval wins in function registry.
+  // To update help: need fresh bootstrap (make bootstrap) or fix fn override.
+  if src == "help" { return "NOX COMMANDS: inspect check evolve bench audit dead calls diff | read write replace append ls | build verify run test-all bc dasm analyze | study learn remember | version help exit"; }
   if src == "version" {
     return "Nox v0.6 — Session 6\n  binary: 837KB | tests: 194 | Gen1==Gen2\n  commits: 31 | lines: 11638 | functions: 467\n  introspection: 8 layers | self-modification: active\n  Olang self-hosting compiler + x86-64 VM";
   }
