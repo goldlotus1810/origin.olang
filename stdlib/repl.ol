@@ -504,6 +504,29 @@ pub fn repl_eval(input) {
     };
   }
 
+  // Bytecode command: compile code and show bytecode (self-inspection)
+  if len(src) > 3 {
+    if __substr(src, 0, 3) == "bc " {
+      let _bc_code = __substr(src, 3, len(src));
+      let _bc_tokens = tokenize(_bc_code);
+      let _bc_ast = parse(_bc_tokens);
+      if _g_parse_error == 1 { let _g_parse_error = 0; return "Parse error"; };
+      set_at(_g_pos_box, 0, 0);
+      _prefill_output();
+      analyze(_bc_ast);
+      let _bc_len = _g_pos_box[0];
+      let _bc_out = "Bytecode[" + __to_string(_bc_len) + "]:";
+      let _bc_i = 0;
+      while _bc_i < _bc_len {
+        if _bc_i < 64 {
+          let _bc_out = _bc_out + " " + __to_string(__floor(__array_get(_g_output, _bc_i)));
+        };
+        let _bc_i = _bc_i + 1;
+      };
+      if _bc_len > 64 { let _bc_out = _bc_out + " ...(" + __to_string(_bc_len - 64) + " more)"; };
+      return _bc_out;
+    };
+  }
   // Build command: self-build (compile all .ol → pack binary)
   if src == "build" {
     return self_build();
