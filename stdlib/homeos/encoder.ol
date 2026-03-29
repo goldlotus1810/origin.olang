@@ -976,6 +976,13 @@ fn dream_cycle() {
 
     // Decay: apply φ⁻¹ forgetting
     silk_decay();
+
+    // ĐN→QR consolidation: scan ĐN facts, find patterns
+    let _dc_dn = dn_list();
+    if len(_dc_dn) > 0 {
+        kg_add("dream_cycle", "consolidated", _fmt_ts(__timestamp()));
+        learning_save("nox_learning.dat");
+    };
 }
 
 // ════════════════════════════════════════════════════════════════
