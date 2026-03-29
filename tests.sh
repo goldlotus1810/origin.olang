@@ -980,6 +980,7 @@ sb_test "selfbuild/bitwise_or"  'emit 0x0F | 0xF0;'           "255"
 sb_test "selfbuild/bitwise_and" 'emit 0xFF & 0x0F;'            "15"
 sb_test "selfbuild/constfold"   'emit 10 * 20 + 5;'            "205"
 sb_test "selfbuild/block_comment" 'let x = /* skip this */ 42; emit x;' "42"
+sb_test "selfbuild/strfold"  'emit "hello" + " " + "world";'   "hello world"
 echo -e "\n${CYAN}  Self-build: ${SB_PASS}/$((SB_PASS + SB_FAIL)) passed${NC}"
 fi
 

@@ -747,7 +747,7 @@ fn parse_expr_prec(p, min_prec) {
             let min_prec = pop(_pep_stack);
             let _pep_op = pop(_pep_stack);
             let _pep_saved = pop(_pep_stack);
-            // Constant folding: NumLit op NumLit → NumLit
+            // Constant folding: NumLit op NumLit → NumLit, StrLit + StrLit → StrLit
             let _pep_did_fold = 0;
             if __match_enum(_pep_saved, "Expr::NumLit") == 1 {
                 if __match_enum(_pep_rhs, "Expr::NumLit") == 1 {
@@ -758,6 +758,18 @@ fn parse_expr_prec(p, min_prec) {
                     if _pep_op == "*" { _pep_lhs = Expr::NumLit { value: _pep_a * _pep_b }; _pep_did_fold = 1; };
                     if _pep_op == "/" { if _pep_b != 0 { _pep_lhs = Expr::NumLit { value: _pep_a / _pep_b }; _pep_did_fold = 1; }; };
                     if _pep_op == "%" { if _pep_b != 0 { _pep_lhs = Expr::NumLit { value: _pep_a % _pep_b }; _pep_did_fold = 1; }; };
+                };
+            };
+            if _pep_did_fold == 0 {
+                if _pep_op == "+" {
+                    if __match_enum(_pep_saved, "Expr::StrLit") == 1 {
+                        if __match_enum(_pep_rhs, "Expr::StrLit") == 1 {
+                            let _pep_sa = __enum_field(_pep_saved, 0);
+                            let _pep_sb = __enum_field(_pep_rhs, 0);
+                            _pep_lhs = Expr::StrLit { value: _pep_sa + _pep_sb };
+                            _pep_did_fold = 1;
+                        };
+                    };
                 };
             };
             if _pep_did_fold == 0 { _pep_lhs = Expr::BinOp { op: _pep_op, lhs: _pep_saved, rhs: _pep_rhs }; };
