@@ -83,12 +83,16 @@ pub fn http_get_text(_hgt_url) {
 // HTML → plain text (strip tags)
 // ════════════════════════════════════════════════════════════════
 
-// Strip markdown: remove code blocks, # > * | [ ] ` ~
+// Strip markdown: remove code blocks, keep clean text ranges
+// Uses substr ranges instead of char-by-char concat (O(n) vs O(n²))
 pub fn md_strip(_ms_text) {
-    let _ms_out = "";
-    let _ms_in_code = [0];
-    let _ms_i = [0];
     let _ms_tlen = len(_ms_text);
+    // Pass 1: find code fence ranges to skip
+    // Pass 2: copy clean line ranges using substr
+    let _ms_parts = [];
+    let _ms_in_code = [0];
+    let _ms_line_start = [0];
+    let _ms_i = [0];
     while __array_get(_ms_i, 0) < _ms_tlen {
         let _ms_ci = __array_get(_ms_i, 0);
         let _ms_c = __char_code(char_at(_ms_text, _ms_ci));
@@ -97,33 +101,41 @@ pub fn md_strip(_ms_text) {
             if (_ms_ci + 2) < _ms_tlen {
                 if __char_code(char_at(_ms_text, _ms_ci + 1)) == 96 {
                     if __char_code(char_at(_ms_text, _ms_ci + 2)) == 96 {
-                        // Toggle code mode, skip to end of line
                         let _ = __set_at(_ms_in_code, 0, 1 - __array_get(_ms_in_code, 0));
+                        // Skip to end of fence line
                         let _ = __set_at(_ms_i, 0, _ms_ci + 3);
-                        // Skip rest of fence line
                         while __array_get(_ms_i, 0) < _ms_tlen {
                             if __char_code(char_at(_ms_text, __array_get(_ms_i, 0))) == 10 { break; };
                             let _ = __set_at(_ms_i, 0, __array_get(_ms_i, 0) + 1);
                         };
+                        let _ = __set_at(_ms_line_start, 0, __array_get(_ms_i, 0) + 1);
                     };
                 };
             };
         };
-        if __array_get(_ms_in_code, 0) == 0 {
-            let _ms_skip = [0];
-            if _ms_c == 35 { let _ = __set_at(_ms_skip, 0, 1); };
-            if _ms_c == 62 { let _ = __set_at(_ms_skip, 0, 1); };
-            if _ms_c == 42 { let _ = __set_at(_ms_skip, 0, 1); };
-            if _ms_c == 124 { let _ = __set_at(_ms_skip, 0, 1); };
-            if _ms_c == 91 { let _ = __set_at(_ms_skip, 0, 1); };
-            if _ms_c == 93 { let _ = __set_at(_ms_skip, 0, 1); };
-            if _ms_c == 96 { let _ = __set_at(_ms_skip, 0, 1); };
-            if _ms_c == 126 { let _ = __set_at(_ms_skip, 0, 1); };
-            if __array_get(_ms_skip, 0) == 0 {
-                if _ms_c >= 32 { let _ms_out = _ms_out + char_at(_ms_text, _ms_ci); };
+        // On newline: save clean line as substr (one allocation, not n)
+        if _ms_c == 10 {
+            if __array_get(_ms_in_code, 0) == 0 {
+                let _ms_ls = __array_get(_ms_line_start, 0);
+                if (_ms_ci - _ms_ls) > 2 {
+                    // Skip lines starting with markdown chars
+                    let _ms_fc = __char_code(char_at(_ms_text, _ms_ls));
+                    if _ms_fc != 35 { if _ms_fc != 62 { if _ms_fc != 124 { if _ms_fc != 96 {
+                        push(_ms_parts, substr(_ms_text, _ms_ls, _ms_ci));
+                    }; }; }; };
+                };
             };
+            let _ = __set_at(_ms_line_start, 0, _ms_ci + 1);
         };
         let _ = __set_at(_ms_i, 0, __array_get(_ms_i, 0) + 1);
+    };
+    // Join parts with spaces (one concat per line, not per char)
+    let _ms_out = "";
+    let _ms_pi = 0;
+    while _ms_pi < len(_ms_parts) {
+        if _ms_pi > 0 { let _ms_out = _ms_out + " "; };
+        let _ms_out = _ms_out + __array_get(_ms_parts, _ms_pi);
+        let _ms_pi = _ms_pi + 1;
     };
     return _ms_out;
 }

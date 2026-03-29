@@ -580,8 +580,7 @@ pub fn repl_eval(input) {
       if len(_rs_path) > 3 {
           if __substr(_rs_path, len(_rs_path) - 3, len(_rs_path)) == ".md" { let _ = __set_at(_rs_is_md, 0, 1); };
       };
-      if __array_get(_rs_is_md, 0) == 1 { let _rs_content = md_strip(_rs_content); };
-      // Limit to 8KB per turn (heap safe — multi-turn handles rest)
+      // Limit to 8KB per turn (heap safe)
       if len(_rs_content) > 8000 { let _rs_content = substr(_rs_content, 0, 8000); };
       spider_feed(_rs_content, _rs_path);
       __heap_pin();
