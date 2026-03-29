@@ -362,68 +362,24 @@ pub fn repl_eval(input) {
   if src == "bench-growth" || src == "bench-g" { return bench_growth(); }
   // Evolve: autonomous self-improvement cycle
   if src == "evolve" {
-    _boot_learn();
-    let _ev_out = "=== NOX EVOLVE ===\n";
-    // Phase 1: Health check
-    let _ev_out = _ev_out + "Phase 1: Health\n";
-    if __exp(0) == 1 { let _ev_out = _ev_out + "  math: OK\n"; } else { let _ev_out = _ev_out + "  math: FAIL\n"; };
-    if kt_fact_count() > 50 { let _ev_out = _ev_out + "  facts: " + __to_string(kt_fact_count()) + " OK\n"; } else { let _ev_out = _ev_out + "  facts: LOW\n"; };
-    let _ev_out = _ev_out + "  heap: " + __to_string(__floor(__heap_used() / 1024)) + "KB\n";
-    // Phase 2: Codebase metrics
-    let _ev_out = _ev_out + "Phase 2: Codebase\n";
-    let _ev_files = [];
-    push(_ev_files, "stdlib/homeos/pipeline.ol");
-    push(_ev_files, "stdlib/homeos/knowtree.ol");
-    push(_ev_files, "stdlib/homeos/encoder.ol");
-    push(_ev_files, "stdlib/homeos/instinct.ol");
-    push(_ev_files, "stdlib/homeos/spider.ol");
-    let _ev_total_lines = [0];
-    let _ev_total_fns = [0];
-    let _ev_fi = 0;
-    while _ev_fi < len(_ev_files) {
-        let _ev_path = __array_get(_ev_files, _ev_fi);
-        let _ev_src = __file_read(_ev_path);
-        if len(_ev_src) > 0 {
-            let _ev_lines = [1];
-            let _ev_fns = [0];
-            let _ev_li = 0;
-            while _ev_li < len(_ev_src) {
-                if __char_code(char_at(_ev_src, _ev_li)) == 10 { let _ = __set_at(_ev_lines, 0, __array_get(_ev_lines, 0) + 1); };
-                let _ev_li = _ev_li + 1;
-            };
-            let _ev_ci = 0;
-            while _ev_ci < (len(_ev_src) - 3) {
-                if substr(_ev_src, _ev_ci, _ev_ci + 3) == "fn " { let _ = __set_at(_ev_fns, 0, __array_get(_ev_fns, 0) + 1); };
-                let _ev_ci = _ev_ci + 1;
-            };
-            let _ = __set_at(_ev_total_lines, 0, __array_get(_ev_total_lines, 0) + __array_get(_ev_lines, 0));
-            let _ = __set_at(_ev_total_fns, 0, __array_get(_ev_total_fns, 0) + __array_get(_ev_fns, 0));
-        };
-        let _ev_fi = _ev_fi + 1;
-    };
-    let _ev_out = _ev_out + "  core: " + __to_string(__array_get(_ev_total_lines, 0)) + " lines, " + __to_string(__array_get(_ev_total_fns, 0)) + " functions\n";
-    // Phase 3: Self-test
-    let _ev_out = _ev_out + "Phase 3: Self-test\n";
-    let _ev_tests = [0];
-    let _ev_tfiles = __readdir("test");
-    let _ev_ti = 0;
-    while _ev_ti < len(_ev_tfiles) {
-        let _ev_tf = __array_get(_ev_tfiles, _ev_ti);
-        if len(_ev_tf) > 3 { if __substr(_ev_tf, len(_ev_tf) - 3, len(_ev_tf)) == ".ol" { let _ = __set_at(_ev_tests, 0, __array_get(_ev_tests, 0) + 1); }; };
-        let _ev_ti = _ev_ti + 1;
-    };
-    let _ev_out = _ev_out + "  " + __to_string(__array_get(_ev_tests, 0)) + " test files\n";
-    // Phase 4: Binary info
-    let _ev_out = _ev_out + "Phase 4: Binary\n";
-    let _ev_out = _ev_out + "  size: 896KB\n";
-    let _ev_out = _ev_out + "  fixed-point: Gen1==Gen2\n";
-    // Summary
-    let _ev_out = _ev_out + "=== STATUS: OPERATIONAL ===";
-    // Save evolution snapshot
-    let _ev_snap = __to_string(__timestamp()) + " lines=" + __to_string(__array_get(_ev_total_lines, 0)) + " fns=" + __to_string(__array_get(_ev_total_fns, 0)) + " facts=" + __to_string(kt_fact_count()) + " tests=" + __to_string(__array_get(_ev_tests, 0));
-    __file_append("nox_growth.log", _ev_snap + "\n");
-    __heap_pin();
-    return _ev_out;
+    let _ev = "=== NOX EVOLVE ===\n";
+    // Run compile + growth benchmarks
+    let _ev_c = bench_compile(); __heap_pin();
+    let _ev_g = bench_growth(); __heap_pin();
+    _ev = _ev + "[C] Compile: " + __to_string(_ev_c.score) + "% (" + __to_string(_ev_c.pass) + "/" + __to_string(_ev_c.total) + ")\n";
+    _ev = _ev + "[G] Growth:  " + __to_string(_ev_g.score) + "% (" + __to_string(_ev_g.pass) + "/" + __to_string(_ev_g.total) + ")\n";
+    _ev = _ev + "heap: " + __to_string(__floor(__heap_used() / 1024)) + "KB | folds: " + __to_string(_g_fold_count[0]) + "\n";
+    // Analyze + suggest
+    _ev = _ev + "─── ASSESSMENT ───\n";
+    let _ev_issues = 0;
+    if _ev_c.score < 100 { _ev = _ev + "  ! Compile < 100%: fix failing tests\n"; _ev_issues = _ev_issues + 1; };
+    if _ev_g.score < 100 { _ev = _ev + "  ! Growth < 100%: capabilities degraded\n"; _ev_issues = _ev_issues + 1; };
+    if __heap_used() > 52428800 { _ev = _ev + "  ! Heap > 50MB: memory pressure\n"; _ev_issues = _ev_issues + 1; };
+    if _ev_issues == 0 { _ev = _ev + "  OPTIMAL — all systems green\n"; };
+    // Save snapshot
+    let _ev_log = __to_string(__timestamp()) + " C=" + __to_string(_ev_c.score) + " G=" + __to_string(_ev_g.score) + " heap=" + __to_string(__floor(__heap_used() / 1024)) + "KB\n";
+    __file_append("nox_growth.log", _ev_log);
+    return _ev + "=== DONE ===";
   }
   // Memory sync: ingest Claude CLI session logs
   if src == "remember" || src == "sync" {
