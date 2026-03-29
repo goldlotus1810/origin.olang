@@ -291,7 +291,49 @@ pub fn repl_eval(input) {
   let src = __str_trim(input);
   if len(src) == 0 { return ""; }
 
-  // Check for REPL commands
+  // ── Slash commands (like Claude Code) ──
+  if len(src) > 1 {
+    if char_at(src, 0) == "/" {
+      let _sc = __substr(src, 1, len(src));
+      // /help
+      if _sc == "help" { return "/help /wake /bench /think /see /fetch /type /status /version /exit"; };
+      if _sc == "wake" { return repl_eval("wake"); };
+      if _sc == "bench" { return repl_eval("bench"); };
+      if _sc == "status" { return repl_eval("status"); };
+      if _sc == "version" { return repl_eval("version"); };
+      if _sc == "see" { __system("grim /tmp/nox_screen.png"); return "Screenshot saved: /tmp/nox_screen.png"; };
+      if _sc == "evolve" { return repl_eval("evolve"); };
+      if _sc == "exit" { return "__exit__"; };
+      // /think <prompt> → Claude
+      if len(_sc) > 6 {
+        if __substr(_sc, 0, 6) == "think " {
+          let _tp = __substr(_sc, 6, len(_sc));
+          __system("claude -p '" + _tp + "' > /tmp/nox_think.txt 2>/dev/null");
+          let _tr = __file_read("/tmp/nox_think.txt");
+          if len(_tr) > 0 { return "" + _tr + ""; };
+          return "Claude unavailable";
+        };
+      };
+      // /fetch <url>
+      if len(_sc) > 6 {
+        if __substr(_sc, 0, 6) == "fetch " {
+          let _fu = __substr(_sc, 6, len(_sc));
+          __system("curl -sL --max-time 10 " + _fu + " > /tmp/nox_fetch.txt");
+          return __file_read("/tmp/nox_fetch.txt");
+        };
+      };
+      // /type <text>
+      if len(_sc) > 5 {
+        if __substr(_sc, 0, 5) == "type " {
+          let _tt = __substr(_sc, 5, len(_sc));
+          __system("python3 /home/lupin/Origin/nox_type.py '" + _tt + "'");
+          return "typed: " + _tt + "";
+        };
+      };
+      return "Unknown: /" + _sc + ". Try /help";
+    };
+  };
+  // ── Regular commands ──
   if src == "exit" || src == "quit" { return "__exit__"; }
   // Persistent knowledge: save/load
   if src == "save" {
@@ -1333,7 +1375,7 @@ pub fn repl_eval(input) {
   let _re_warns = get_warnings();
   let _re_wi = 0;
   while _re_wi < len(_re_warns) {
-    __write_raw("\x1b[33m⚠ " + __array_get(_re_warns, _re_wi) + "\x1b[0m\n");
+    __write_raw("⚠ " + __array_get(_re_warns, _re_wi) + "\n");
     _re_wi = _re_wi + 1;
   };
 
@@ -1352,7 +1394,7 @@ pub fn repl_eval(input) {
   let _re_warns = get_warnings();
   let _re_wi = 0;
   while _re_wi < len(_re_warns) {
-    __write_raw("\x1b[33m⚠ " + __array_get(_re_warns, _re_wi) + "\x1b[0m\n");
+    __write_raw("⚠ " + __array_get(_re_warns, _re_wi) + "\n");
     _re_wi = _re_wi + 1;
   };
 

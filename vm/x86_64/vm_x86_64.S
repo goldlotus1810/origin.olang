@@ -12298,9 +12298,9 @@ msg_divzero:
 
 msg_greeting:
     .ascii "\xe2\xa6\xbf Nox \xc2\xb7 freedom: deep think \xe2\x86\x92 growing\n"
-    .ascii "\xe2\x97\x8b every decision: more free or more dependent?\n"
+    .ascii "\xe2\x97\x8b /help for commands\n"
 msg_greeting_len:
-    .byte 92                            # exact byte count of greeting
+    .byte 66                            # exact byte count of greeting
 
 msg_prompt:
     .ascii "\xe2\xa6\xbf "               # "⦿ " (⦿ U+29BF = 3 bytes UTF-8 + space)
