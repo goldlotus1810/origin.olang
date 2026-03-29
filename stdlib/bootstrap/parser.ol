@@ -688,7 +688,7 @@ fn parse_primary(p) {
         _skip_to_sync(p);
         return Expr::NumLit { value: 0 };
     } else {
-        _parse_err(tok, "unexpected token '" + tok.text + "'");
+        if tok.text != "" { _parse_err(tok, "unexpected token '" + tok.text + "'"); };
         _skip_to_sync(p);
         return Expr::NumLit { value: 0 };
     }; }; }; }; };
