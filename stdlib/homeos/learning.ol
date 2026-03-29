@@ -16,7 +16,11 @@ pub fn dn_observe(fact) {
     // Check if already QR (proven) — reinforce, don't duplicate
     let _do_qi = 0;
     while _do_qi < len(_qr_facts) {
-        if _qr_facts[_do_qi] == fact { return "QR (already proven)"; };
+        if _qr_facts[_do_qi] == fact {
+            // Reinforce: add to knowledge graph
+            kg_add(fact, "status", "QR_reinforced");
+            return "QR (already proven, reinforced)";
+        };
         let _do_qi = _do_qi + 1;
     };
     // Check if already ĐN — increment fire count
@@ -30,6 +34,9 @@ pub fn dn_observe(fact) {
                 // Promote to QR!
                 push(_qr_facts, fact);
                 push(_qr_times, _fmt_ts(__timestamp()));
+                // Record promotion in knowledge graph
+                kg_add(fact, "status", "QR");
+                kg_add(fact, "promoted_at", _fmt_ts(__timestamp()));
                 // Remove from ĐN (mark as empty, don't shift)
                 set_at(_dn_facts, _do_di, "");
                 set_at(_dn_fire, _do_di, 0);
