@@ -138,6 +138,22 @@ _start:
     movb    $1, build_flag(%rip)        # flag: run builder after boot
     jmp     .open_self
 .not_build:
+    # Check if argv[1] == "--run" (run .ol source file)
+    mov     16(%rsp), %rdi
+    cmpl    $0x75722d2d, (%rdi)         # "--ru"
+    jne     .not_run
+    movzwl  4(%rdi), %eax
+    cmp     $0x006E, %eax               # "n\0"
+    jne     .not_run
+    # --run mode: read file → eval as source code
+    movb    $1, eval_mode(%rip)
+    movb    $1, run_flag(%rip)
+    cmpq    $3, (%rsp)                  # argc >= 3? (argv[2] = source file)
+    jb      .open_self
+    mov     24(%rsp), %rax
+    mov     %rax, run_path(%rip)        # save source path
+    jmp     .open_self
+.not_run:
     mov     16(%rsp), %rdi              # argv[1] = filename
     jmp     .do_open
 .open_self:
@@ -11230,6 +11246,37 @@ op_halt:
     sub     %rsi, %rax
     jmp     .eval_have_input
 .not_build_inject:
+    # Check run flag — read source file and inject as eval input
+    cmpb    $1, run_flag(%rip)
+    jne     .not_run_inject
+    mov     run_path(%rip), %rdi
+    test    %rdi, %rdi
+    jz      .not_run_inject
+    # Open source file
+    mov     $O_RDONLY, %esi
+    xor     %edx, %edx
+    mov     $SYS_OPEN, %eax
+    syscall
+    test    %rax, %rax
+    js      .not_run_inject             # open failed → fall through
+    # Read file into eval buffer
+    mov     %eax, %edi                  # fd
+    mov     eval_buf(%rip), %rsi        # buf
+    mov     $0x10000, %edx              # max 64KB
+    push    %rdi
+    mov     $SYS_READ, %eax
+    syscall
+    pop     %rdi
+    push    %rax                        # save bytes read
+    # Close file
+    mov     $SYS_CLOSE, %eax
+    syscall
+    pop     %rax                        # restore bytes read
+    test    %rax, %rax
+    jle     .not_run_inject
+    mov     eval_buf(%rip), %rsi
+    jmp     .eval_have_input
+.not_run_inject:
     # Check editor flag — inject editor_start("path") instead of reading stdin
     cmpb    $1, editor_flag(%rip)
     jne     .eval_read_stdin
@@ -12393,6 +12440,10 @@ editor_flag:
     .space 1                            # 1 = launch editor after boot
 build_flag:
     .space 1                            # 1 = run builder after boot
+run_flag:
+    .space 1                            # 1 = run source file after boot
+run_path:
+    .space 8                            # pointer to source file path
 editor_path:
     .space 8                            # pointer to argv[2] filename (or 0)
 tty_fd:
