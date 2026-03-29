@@ -1294,11 +1294,13 @@ pub fn repl_eval(input) {
   // Phase 2: Parse
   let ast = parse(tokens);
 
-  // Parse error → show message
+  // Parse error → not code → ask Claude directly
   if _g_parse_error == 1 {
     _g_parse_error = 0;
-    _boot_learn();
-    return pipeline(src);
+    __system("claude -p 'You are Nox, AI built with Olang. Reply brief, Vietnamese or English matching input. Input: " + src + "' > /tmp/nox_think.txt 2>/dev/null");
+    let _re_claude = __file_read("/tmp/nox_think.txt");
+    if len(_re_claude) > 0 { return _re_claude; };
+    return "Nox chua hieu. Thu: help";
   }
 
   // Phase 3: Semantic analysis
