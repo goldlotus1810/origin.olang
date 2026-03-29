@@ -435,7 +435,7 @@ pub fn repl_eval(input) {
   }
   // Self-build: recompile from source
   if src == "build" || src == "rebuild" {
-    return __system("make self-build 2>&1 | tail -5");
+    return __system("bash scripts/fast-build.sh 2>&1 | tail -5");
   }
   // Run a test file
   if len(src) > 4 {
