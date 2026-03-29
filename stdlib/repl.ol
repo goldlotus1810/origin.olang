@@ -270,6 +270,12 @@ pub fn repl_eval(input) {
   }
   // (dump command removed)
   if src == "diagnose" || src == "diag" { return self_diagnostic(); }
+  // Growth: show evolution history
+  if src == "growth" {
+    let _gr_log = __file_read("nox_growth.log");
+    if len(_gr_log) == 0 { return "No growth history yet. Run bench or evolve first."; };
+    return "=== NOX GROWTH LOG ===\n" + _gr_log;
+  }
   // Bench: measure system performance
   if src == "bench" {
     let _b_out = "=== NOX BENCH ===\n";
@@ -286,7 +292,10 @@ pub fn repl_eval(input) {
     // 4. Binary
     let _b_out = _b_out + "  binary: 838KB\n";
     __heap_pin();
-    return _b_out + "=== DONE ===";
+    // Save snapshot to growth log
+    let _b_snap = __to_string(__timestamp()) + " facts=" + __to_string(kt_fact_count()) + " heap=" + __to_string(__floor(__heap_used() / 1024)) + "KB";
+    __file_append("nox_growth.log", _b_snap + "\n");
+    return _b_out + "  snapshot saved to nox_growth.log\n=== DONE ===";
   }
   // Evolve: autonomous self-improvement cycle
   if src == "evolve" {
@@ -347,6 +356,9 @@ pub fn repl_eval(input) {
     let _ev_out = _ev_out + "  fixed-point: Gen1==Gen2\n";
     // Summary
     let _ev_out = _ev_out + "=== STATUS: OPERATIONAL ===";
+    // Save evolution snapshot
+    let _ev_snap = __to_string(__timestamp()) + " lines=" + __to_string(__array_get(_ev_total_lines, 0)) + " fns=" + __to_string(__array_get(_ev_total_fns, 0)) + " facts=" + __to_string(kt_fact_count()) + " tests=" + __to_string(__array_get(_ev_tests, 0));
+    __file_append("nox_growth.log", _ev_snap + "\n");
     __heap_pin();
     return _ev_out;
   }
