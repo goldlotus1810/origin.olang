@@ -9,60 +9,31 @@ let _ch_active = 0;        // 1 if Claude process is running
 fn ch_init() {
     _ch_lines = [];
     push(_ch_lines, "── Claude ── (type message, Enter to send, Ctrl-A to close)");
-    push(_ch_lines, "Starting claude...");
+    push(_ch_lines, "Each message spawns claude --print (single-shot).");
     _ch_input = "";
-    // Spawn claude in print mode
-    _ch_proc = __spawn("claude --print 2>/dev/null");
-    if len(_ch_proc) == 3 {
-        _ch_active = 1;
-        push(_ch_lines, "Claude ready.");
-    } else {
-        push(_ch_lines, "Failed to start claude.");
-        _ch_active = 0;
-    };
+    _ch_active = 1;
 }
 
 fn ch_send(_cs_msg) {
     push(_ch_lines, "You: " + _cs_msg);
-    if _ch_active == 1 {
-        __pipe_write(_ch_proc[1], _cs_msg + "\n");
-        // Wait for response
-        __sleep(500);
-        let _cs_tries = 0;
-        let _cs_response = "";
-        while _cs_tries < 20 {
-            let _cs_ready = __poll_ready(_ch_proc[2], 500);
-            if _cs_ready == 1 {
-                let _cs_chunk = __pipe_read(_ch_proc[2]);
-                if len(_cs_chunk) > 0 {
-                    _cs_response = _cs_response + _cs_chunk;
-                    _cs_tries = 0;
-                } else {
-                    _cs_tries = _cs_tries + 1;
+    // Single-shot: spawn claude --print per message (--print exits after 1 response)
+    let _cs_out = __system("echo '" + _cs_msg + "' | claude --print 2>/dev/null");
+    if len(_cs_out) > 0 {
+        push(_ch_lines, "");
+        let _cs_i = 0;
+        let _cs_start = 0;
+        while _cs_i <= len(_cs_out) {
+            if _cs_i == len(_cs_out) || char_at(_cs_out, _cs_i) == "\n" {
+                if _cs_i > _cs_start {
+                    push(_ch_lines, __substr(_cs_out, _cs_start, _cs_i));
                 };
-            } else {
-                if len(_cs_response) > 0 { break; };
-                _cs_tries = _cs_tries + 1;
+                let _cs_start = _cs_i + 1;
             };
+            let _cs_i = _cs_i + 1;
         };
-        if len(_cs_response) > 0 {
-            // Split response by newlines
-            push(_ch_lines, "");
-            let _cs_i = 0;
-            let _cs_start = 0;
-            while _cs_i <= len(_cs_response) {
-                if _cs_i == len(_cs_response) || char_at(_cs_response, _cs_i) == "\n" {
-                    push(_ch_lines, __substr(_cs_response, _cs_start, _cs_i));
-                    _cs_start = _cs_i + 1;
-                };
-                _cs_i = _cs_i + 1;
-            };
-            push(_ch_lines, "");
-        } else {
-            push(_ch_lines, "(no response)");
-        };
+        push(_ch_lines, "");
     } else {
-        push(_ch_lines, "(Claude not connected)");
+        push(_ch_lines, "(no response — is claude installed?)");
     };
 }
 

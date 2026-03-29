@@ -154,7 +154,7 @@ fn _mcp_call(_id, _tool, _args) {
             + "  editor: " + __to_string(len(_si_ed)) + " files\\n"
             + "  facts: " + _si_facts + "\\n"
             + "  heap: " + _si_heap + "KB\\n"
-            + "  tools: 10");
+            + "  tools: 12");
     };
     return _err(_id, "Unknown tool: " + _tool);
 }

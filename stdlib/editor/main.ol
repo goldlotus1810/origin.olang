@@ -473,8 +473,25 @@ pub fn editor_start(_path) {
                         __write_raw(__esc()); __write_raw("[?1049h");
                         term_clear();
                     } else {
-                        // Run as shell command
-                        if len(_cmd_buf) > 1 {
+                        // Git commands: :git status, :git add, :git commit msg, :git push, :git log, :git diff
+                        let _cmd_handled = 0;
+                        if len(_cmd_buf) > 4 {
+                            if __substr(_cmd_buf, 0, 4) == "git " {
+                                let _git_cmd = __substr(_cmd_buf, 4, len(_cmd_buf));
+                                __write_raw(__esc()); __write_raw("[?1049l");
+                                __term_cooked();
+                                let _gout = __system("cd " + _tp_cwd + " && git " + _git_cmd + " 2>&1");
+                                __write_raw("\n─── git " + _git_cmd + " ───\n" + _gout + "\n─── Press any key ───\n");
+                                __term_raw();
+                                let _w = __read_byte();
+                                while _w < 0 { __sleep(50); _w = __read_byte(); };
+                                __write_raw(__esc()); __write_raw("[?1049h");
+                                term_clear();
+                                let _cmd_handled = 1;
+                            };
+                        };
+                        // Shell escape: :!command
+                        if _cmd_handled == 0 { if len(_cmd_buf) > 1 {
                             if __substr(_cmd_buf, 0, 1) == "!" {
                                 __write_raw(__esc()); __write_raw("[?1049l");
                                 __term_cooked();
@@ -486,7 +503,7 @@ pub fn editor_start(_path) {
                                 __write_raw(__esc()); __write_raw("[?1049h");
                                 term_clear();
                             };
-                        };
+                        }; };
                     }; }; }; }; }; };
                     _cmd_buf = "";
                 } else { if _key == 127 {
