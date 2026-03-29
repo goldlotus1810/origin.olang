@@ -1,0 +1,4 @@
+[2026-03-29 09:51] semantic.ol |contains| _parse_err
+[2026-03-29 09:51] _parse_err |fixes| cryptic_errors
+[2026-03-29 09:51] semantic.ol |contains| _g_break_stack
+[2026-03-29 09:51] _g_break_stack |fixes| break_scope_collision

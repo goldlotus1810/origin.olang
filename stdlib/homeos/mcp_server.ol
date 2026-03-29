@@ -9,6 +9,7 @@ pub fn mcp_dispatch(_md_line) {
     if __mcp_booted[0] == 0 {
         let _mb = __set_at(__mcp_booted, 0, 1);
         let _mb2 = kt_load("homeos.knowledge");
+        kg_load("nox_graph.kg");
     };
 
     // json_parse now safe with nested {} (save/restore stack in _jp_parse_object)
@@ -44,6 +45,8 @@ fn _mcp_tools(_id) {
     _r = _r + "," + _tool_no_arg("silk_status", "Silk network status");
     _r = _r + "," + _tool_no_arg("dream_cycle", "Run dream consolidation");
     _r = _r + "," + _tool_no_arg("self_inspect", "Nox inspects own binary, files, tests, heap");
+    _r = _r + "," + _tool("kg_add", "Add knowledge triple: subject|relation|object (e.g. semantic.ol|contains|_parse_err)", "triple");
+    _r = _r + "," + _tool("kg_query", "Query knowledge graph for entity — returns all relationships", "entity");
     _r = _r + "]},\"id\":" + to_string(_id) + "}";
     return _r;
 }
@@ -101,6 +104,43 @@ fn _mcp_call(_id, _tool, _args) {
     };
     if _tool == "silk_status" { return _ok(_id, "Silk: " + to_string(silk_count()) + " edges"); };
     if _tool == "dream_cycle" { dream_cycle(); return _ok(_id, "Dream done"); };
+    if _tool == "kg_add" {
+        let _ka_triple = json_get(_args, "triple");
+        // Parse "subject|relation|object"
+        let _ka_p1 = -1;
+        let _ka_p2 = -1;
+        let _ka_i = 0;
+        while _ka_i < len(_ka_triple) {
+            if char_at(_ka_triple, _ka_i) == "|" {
+                if _ka_p1 < 0 { let _ka_p1 = _ka_i; }
+                else { if _ka_p2 < 0 { let _ka_p2 = _ka_i; }; };
+            };
+            let _ka_i = _ka_i + 1;
+        };
+        if _ka_p1 > 0 {
+            if _ka_p2 < 0 { let _ka_p2 = len(_ka_triple); };
+            let _ka_s = __substr(_ka_triple, 0, _ka_p1);
+            let _ka_r = __substr(_ka_triple, _ka_p1 + 1, _ka_p2);
+            let _ka_o = __substr(_ka_triple, _ka_p2 + 1, len(_ka_triple));
+            kg_add(_ka_s, _ka_r, _ka_o);
+            kg_save("nox_graph.kg");
+            return _ok(_id, "Added: " + _ka_s + " --" + _ka_r + "--> " + _ka_o + " (" + __to_string(kg_count()) + " triples)");
+        };
+        return _err(_id, "Format: subject|relation|object");
+    };
+    if _tool == "kg_query" {
+        let _kq_entity = json_get(_args, "entity");
+        let _kq_results = kg_find(_kq_entity);
+        if len(_kq_results) == 0 { return _ok(_id, "No triples for: " + _kq_entity); };
+        let _kq_out = "";
+        let _kq_i = 0;
+        while _kq_i < len(_kq_results) {
+            if _kq_i > 0 { _kq_out = _kq_out + "\\n"; };
+            _kq_out = _kq_out + _kq_results[_kq_i];
+            let _kq_i = _kq_i + 1;
+        };
+        return _ok(_id, _kq_out);
+    };
     if _tool == "self_inspect" {
         let _si_heap = __to_string(__floor(__heap_used() / 1024));
         let _si_facts = __to_string(kt_fact_count());
