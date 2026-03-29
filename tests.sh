@@ -943,7 +943,7 @@ sb_test() {
     local code="$2"
     local expect="$3"
     local actual
-    actual=$(echo "$code" | timeout 10 ./origin_gen1.olang 2>&1 | grep -v "BOOT_OK\|HomeOS\|Type code\|bye" | head -1 | sed 's/^⦿ //')
+    actual=$(echo "$code" | timeout 10 ./origin_gen1.olang 2>&1 | grep -v "BOOT_OK\|HomeOS\|Type code\|bye\|freedom:\|every decision:" | head -1 | sed 's/^⦿ //')
     if echo "$actual" | grep -q "$expect"; then
         echo -e "  ${GREEN}  OK${NC} $name"
         SB_PASS=$((SB_PASS + 1))
