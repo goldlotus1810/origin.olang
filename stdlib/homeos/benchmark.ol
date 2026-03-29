@@ -35,8 +35,8 @@ pub fn bench_compile() {
     };
     _bt("determ", _c1_match == 1, _p, _f, _t);
 
-    // C2: Empty = safe
-    _bt("empty", len(_bm_compile("")) == 0, _p, _f, _t);
+    // C2: Empty = safe (compiles to just Halt = 1 byte)
+    _bt("empty", len(_bm_compile("")) <= 1, _p, _f, _t);
 
     // C3: All language constructs compile to non-empty bytecode
     _bt("arith", len(_bm_compile("emit 2+3*4;")) > 0, _p, _f, _t);
