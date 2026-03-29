@@ -516,7 +516,7 @@ fn compile_expr(state, expr) {
                     let _bo_rhs = pop(_ce_stack);
                     compile_expr(state, _bo_rhs);
                     let _binop = pop(_ce_stack);
-                    if _binop == "+" { emit_op(state, make_op_name("Call", "__hyp_add")); };
+                    if _binop == "+" { emit_op(state, make_op_simple("Add")); };
                     if _binop == "-" { emit_op(state, make_op_simple("Sub")); };
                     if _binop == "*" { emit_op(state, make_op_simple("Mul")); };
                     if _binop == "/" { emit_op(state, make_op_simple("Div")); };
@@ -526,7 +526,7 @@ fn compile_expr(state, expr) {
                     if _binop == "|" { emit_op(state, make_op_name("Call", "__bit_or")); };
                     if _binop == "&" { emit_op(state, make_op_name("Call", "__bit_and")); };
                     if _binop == "^" { emit_op(state, make_op_name("Call", "__bit_xor")); };
-                    if _binop == "==" { emit_op(state, make_op_name("Call", "__eq")); };
+                    if _binop == "==" { emit_op(state, make_op_simple("Eq")); };
                     if _binop == "!=" { emit_op(state, make_op_name("Call", "__cmp_ne")); };
                     if _binop == "<" { emit_op(state, make_op_simple("Lt")); };
                     if _binop == ">" { emit_op(state, make_op_simple("Gt")); };
@@ -581,7 +581,7 @@ fn compile_expr(state, expr) {
                 // i = i + 1
                 emit_op(state, make_op_name("Load", "__mi"));
                 emit_op(state, make_op_num("PushNum", 1));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Store", "__mi"));
                 emit_jmp(state, _mp_loop);
                 patch_jump(state, _mp_jz, current_pos(state));
@@ -624,7 +624,7 @@ fn compile_expr(state, expr) {
                 // i++
                 emit_op(state, make_op_name("Load", "__fi"));
                 emit_op(state, make_op_num("PushNum", 1));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Store", "__fi"));
                 emit_jmp(state, _fp_loop);
                 patch_jump(state, _fp_jz, current_pos(state));
@@ -662,7 +662,7 @@ fn compile_expr(state, expr) {
                 // i++
                 emit_op(state, make_op_name("Load", "__ri"));
                 emit_op(state, make_op_num("PushNum", 1));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Store", "__ri"));
                 emit_jmp(state, _rp_loop);
                 patch_jump(state, _rp_jz, current_pos(state));
@@ -694,7 +694,7 @@ fn compile_expr(state, expr) {
                 emit_op(state, make_op_name("Store", "__rc"));
                 emit_op(state, make_op_name("Load", "__ri"));
                 emit_op(state, make_op_num("PushNum", 1));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Store", "__ri"));
                 emit_jmp(state, _rp3_loop);
                 patch_jump(state, _rp3_jz, current_pos(state));
@@ -750,7 +750,7 @@ fn compile_expr(state, expr) {
                 // i++
                 emit_op(state, make_op_name("Load", "__yi"));
                 emit_op(state, make_op_num("PushNum", 1));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Store", "__yi"));
                 emit_jmp(state, _yp_loop);
                 // not found → return 0
@@ -783,7 +783,7 @@ fn compile_expr(state, expr) {
                 // still true → i++
                 emit_op(state, make_op_name("Load", "__li"));
                 emit_op(state, make_op_num("PushNum", 1));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Store", "__li"));
                 emit_jmp(state, _lp_loop);
                 // found false → return 0
@@ -822,7 +822,7 @@ fn compile_expr(state, expr) {
                 emit_op(state, make_op_num("Jz", 0));
                 emit_op(state, make_op_name("Load", "__jn_r"));
                 emit_op(state, make_op_name("Load", "__jn_sep"));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Store", "__jn_r"));
                 patch_jump(state, _jn_nosep, current_pos(state));
                 // r = r + __to_string(arr[i])
@@ -830,12 +830,12 @@ fn compile_expr(state, expr) {
                 emit_op(state, make_op_name("Load", "__jn_a"));
                 emit_op(state, make_op_name("Load", "__jn_i"));
                 emit_op(state, make_op_name("Call", "__array_get"));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Store", "__jn_r"));
                 // i++
                 emit_op(state, make_op_name("Load", "__jn_i"));
                 emit_op(state, make_op_num("PushNum", 1));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Store", "__jn_i"));
                 emit_jmp(state, _jn_loop);
                 patch_jump(state, _jn_jz, current_pos(state));
@@ -855,9 +855,9 @@ fn compile_expr(state, expr) {
                 emit_op(state, make_op_name("Call", "__array_len"));
                 emit_op(state, make_op_name("Load", "__cn_sub"));
                 emit_op(state, make_op_name("Call", "__array_len"));
-                emit_op(state, make_op_name("Call", "__hyp_sub"));
+                emit_op(state, make_op_simple("Sub"));
                 emit_op(state, make_op_num("PushNum", 1));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Store", "__cn_max"));
                 let _cn_loop = current_pos(state);
                 emit_op(state, make_op_name("Load", "__cn_i"));
@@ -871,10 +871,10 @@ fn compile_expr(state, expr) {
                 emit_op(state, make_op_name("Load", "__cn_i"));
                 emit_op(state, make_op_name("Load", "__cn_sub"));
                 emit_op(state, make_op_name("Call", "__array_len"));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Call", "__str_substr"));
                 emit_op(state, make_op_name("Load", "__cn_sub"));
-                emit_op(state, make_op_name("Call", "__eq"));
+                emit_op(state, make_op_simple("Eq"));
                 let _cn_nomatch = current_pos(state);
                 emit_op(state, make_op_num("Jz", 0));
                 // found!
@@ -885,7 +885,7 @@ fn compile_expr(state, expr) {
                 // i++
                 emit_op(state, make_op_name("Load", "__cn_i"));
                 emit_op(state, make_op_num("PushNum", 1));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Store", "__cn_i"));
                 emit_jmp(state, _cn_loop);
                 // not found
@@ -921,7 +921,7 @@ fn compile_expr(state, expr) {
                 emit_op(state, make_op_name("Store", "__sa"));
                 emit_op(state, make_op_name("Load", "__sa_ci"));
                 emit_op(state, make_op_num("PushNum", 1));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Store", "__sa_ci"));
                 emit_jmp(state, _sa_copy);
                 patch_jump(state, _sa_copy_jz, current_pos(state));
@@ -943,7 +943,7 @@ fn compile_expr(state, expr) {
                 // j = i - 1
                 emit_op(state, make_op_name("Load", "__sa_i"));
                 emit_op(state, make_op_num("PushNum", 1));
-                emit_op(state, make_op_name("Call", "__hyp_sub"));
+                emit_op(state, make_op_simple("Sub"));
                 emit_op(state, make_op_name("Store", "__sa_j"));
                 // inner loop: while j >= 0 && a[j] > key
                 let _sa_inner = current_pos(state);
@@ -963,7 +963,7 @@ fn compile_expr(state, expr) {
                 emit_op(state, make_op_name("Load", "__sa"));
                 emit_op(state, make_op_name("Load", "__sa_j"));
                 emit_op(state, make_op_num("PushNum", 1));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Load", "__sa"));
                 emit_op(state, make_op_name("Load", "__sa_j"));
                 emit_op(state, make_op_name("Call", "__array_get"));
@@ -972,7 +972,7 @@ fn compile_expr(state, expr) {
                 // j--
                 emit_op(state, make_op_name("Load", "__sa_j"));
                 emit_op(state, make_op_num("PushNum", 1));
-                emit_op(state, make_op_name("Call", "__hyp_sub"));
+                emit_op(state, make_op_simple("Sub"));
                 emit_op(state, make_op_name("Store", "__sa_j"));
                 emit_jmp(state, _sa_inner);
                 patch_jump(state, _sa_inner_jz, current_pos(state));
@@ -981,14 +981,14 @@ fn compile_expr(state, expr) {
                 emit_op(state, make_op_name("Load", "__sa"));
                 emit_op(state, make_op_name("Load", "__sa_j"));
                 emit_op(state, make_op_num("PushNum", 1));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Load", "__sa_key"));
                 emit_op(state, make_op_name("Call", "__array_set"));
                 emit_op(state, make_op_simple("Pop"));
                 // i++
                 emit_op(state, make_op_name("Load", "__sa_i"));
                 emit_op(state, make_op_num("PushNum", 1));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Store", "__sa_i"));
                 emit_jmp(state, _sa_outer);
                 patch_jump(state, _sa_outer_jz, current_pos(state));
@@ -1024,7 +1024,7 @@ fn compile_expr(state, expr) {
                 // if ch == sep → push cur, reset
                 emit_op(state, make_op_name("Load", "__sp_ch"));
                 emit_op(state, make_op_name("Load", "__sp_sep"));
-                emit_op(state, make_op_name("Call", "__eq"));
+                emit_op(state, make_op_simple("Eq"));
                 let _sp_nosplit = current_pos(state);
                 emit_op(state, make_op_num("Jz", 0));
                 // split: push cur to result
@@ -1040,13 +1040,13 @@ fn compile_expr(state, expr) {
                 // no split: cur = cur + ch
                 emit_op(state, make_op_name("Load", "__sp_cur"));
                 emit_op(state, make_op_name("Load", "__sp_ch"));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Store", "__sp_cur"));
                 patch_jump(state, _sp_cont, current_pos(state));
                 // i++
                 emit_op(state, make_op_name("Load", "__sp_i"));
                 emit_op(state, make_op_num("PushNum", 1));
-                emit_op(state, make_op_name("Call", "__hyp_add"));
+                emit_op(state, make_op_simple("Add"));
                 emit_op(state, make_op_name("Store", "__sp_i"));
                 emit_jmp(state, _sp_loop);
                 patch_jump(state, _sp_jz, current_pos(state));
@@ -1273,7 +1273,7 @@ fn compile_expr(state, expr) {
             let _cc_inc = current_pos(state);
             emit_op(state, make_op_name("Load", _cc_idx));
             emit_op(state, make_op_num("PushNum", 1));
-            emit_op(state, make_op_name("Call", "__hyp_add"));
+            emit_op(state, make_op_simple("Add"));
             emit_op(state, make_op_name("Store", _cc_idx));
             emit_jmp(state, _cc_loop);
             let _cc_body_start = current_pos(state);
@@ -1337,11 +1337,11 @@ fn compile_expr(state, expr) {
                 // Emit op
                 if __match_enum(_cc_t1.kind, "TokenKind::Symbol") == 1 {
                     let ch = __enum_field(_cc_t1.kind, 0);
-                    if ch == "+" { emit_op(state, make_op_name("Call", "__hyp_add")); };
-                    if ch == "-" { emit_op(state, make_op_name("Call", "__hyp_sub")); };
-                    if ch == "*" { emit_op(state, make_op_name("Call", "__hyp_mul")); };
-                    if ch == "/" { emit_op(state, make_op_name("Call", "__hyp_div")); };
-                    if ch == "%" { emit_op(state, make_op_name("Call", "__hyp_mod")); };
+                    if ch == "+" { emit_op(state, make_op_simple("Add")); };
+                    if ch == "-" { emit_op(state, make_op_simple("Sub")); };
+                    if ch == "*" { emit_op(state, make_op_simple("Mul")); };
+                    if ch == "/" { emit_op(state, make_op_simple("Div")); };
+                    if ch == "%" { emit_op(state, make_op_simple("Mod")); };
                 } else {
                 };
             };
@@ -1475,13 +1475,13 @@ fn compile_expr(state, expr) {
                         // Number pattern: compare subject == number
                         let _mp_numstr = __substr(_mp, 6, len(_mp));
                         emit_op(state, make_op_num("PushNum", __to_number(_mp_numstr)));
-                        emit_op(state, make_op_name("Call", "__eq"));
+                        emit_op(state, make_op_simple("Eq"));
                     } else {
                         if _mp_is_str == 1 {
                             // String pattern: compare subject == string
                             let _mp_strval = __substr(_mp, 6, len(_mp));
                             emit_push_str(state, _mp_strval);
-                            emit_op(state, make_op_name("Call", "__eq"));
+                            emit_op(state, make_op_simple("Eq"));
                         } else {
                             // Enum/struct pattern: compare type tag
                             emit_op(state, make_op_name("Push", _mp));
@@ -2070,7 +2070,7 @@ fn compile_stmt(state, stmt) {
             let _fl_inc = current_pos(state);
             emit_op(state, make_op_name("Load", _fl_idx));
             emit_op(state, make_op_num("PushNum", 1));
-            emit_op(state, make_op_name("Call", "__hyp_add"));
+            emit_op(state, make_op_simple("Add"));
             emit_op(state, make_op_name("Store", _fl_idx));
             emit_jmp(state, _fl_start);     // jump back to condition check
 

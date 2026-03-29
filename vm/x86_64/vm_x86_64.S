@@ -9721,12 +9721,23 @@ op_file_append:
 # Stack layout for f64: [f64_bits:8][F64_MARKER:8]
 
 op_add:
-    movsd   16(%r14), %xmm0            # B (deeper in stack)
-    movsd   (%r14), %xmm1              # A (top)
-    add     $16, %r14                   # pop 1
+    # Smart add: f64+f64 → SSE2, string+any → concat
+    mov     8(%r14), %rdx              # top marker
+    mov     24(%r14), %rax             # second marker
+    cmp     $F64_MARKER, %rdx
+    jne     .op_add_concat
+    cmp     $F64_MARKER, %rax
+    jne     .op_add_concat
+    # Both f64 — fast path
+    movsd   (%r14), %xmm1
+    movsd   16(%r14), %xmm0
+    add     $16, %r14
     addsd   %xmm1, %xmm0
     movsd   %xmm0, (%r14)
     jmp     vm_loop
+.op_add_concat:
+    # String concat — reuse .call_add_concat (already handles conversion)
+    jmp     .call_add_concat
 
 op_sub:
     movsd   16(%r14), %xmm0            # B
@@ -9793,12 +9804,24 @@ op_cmp_ne:
     jmp     .nat_cmp_false
 
 op_cmp_eq:
-    movsd   16(%r14), %xmm0            # B (deeper)
-    movsd   (%r14), %xmm1              # A (top)
-    add     $16, %r14                   # pop 1, result overwrites remaining
+    # Smart eq: f64==f64 → fast, string==string → chain compare
+    mov     8(%r14), %rax
+    mov     24(%r14), %rcx
+    cmp     $F64_MARKER, %rax
+    jne     .op_eq_chain
+    cmp     $F64_MARKER, %rcx
+    jne     .op_eq_chain
+    # Both f64
+    movsd   (%r14), %xmm1
+    movsd   16(%r14), %xmm0
+    add     $16, %r14
     ucomisd %xmm1, %xmm0
     je      .nat_cmp_true
     jmp     .nat_cmp_false
+.op_eq_chain:
+    # Delegate to .call_eq chain comparison (handles strings)
+    xor     %ecx, %ecx
+    jmp     .eq_chain
 
 op_cmp_lt:
     movb    $0, %al                     # op_id = 0 (LT)
