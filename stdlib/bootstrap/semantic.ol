@@ -2193,6 +2193,9 @@ fn compile_stmt(state, stmt) {
             let _tc_ti = _tc_ti + 1;
         };
 
+        // Success path: pop try frame (balance try_depth)
+        _emit_byte(state, 27);      // CatchEnd on success → try_depth--
+
         // Jmp past catch on success
         let _tc_jmp_pos = current_pos(state);
         emit_jmp(state, 0);         // placeholder
@@ -2200,6 +2203,9 @@ fn compile_stmt(state, stmt) {
         // Patch TryBegin → catch_pc
         let _tc_catch_pc = current_pos(state);
         patch_jump(state, _tc_try_pos, _tc_catch_pc);
+
+        // Pop error value pushed by __throw
+        emit_op(state, make_op_simple("Pop"));
 
         // Compile catch block
         let _tc_ci = 0;

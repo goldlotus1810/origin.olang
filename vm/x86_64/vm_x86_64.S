@@ -8862,19 +8862,24 @@ op_try_begin:
     lea     (%rdi, %rdx), %rdi         # try_stack[depth]
     mov     %rax, (%rdi)               # catch_PC
     mov     %r14, 8(%rdi)              # saved VM stack pointer
-    lea     closure_depth(%rip), %rsi
-    mov     (%rsi), %rax
+    lea     closure_depth(%rip), %rcx
+    mov     (%rcx), %rax
     mov     %rax, 16(%rdi)             # saved closure_depth
     mov     %rsp, 24(%rdi)             # saved CPU stack pointer
-    incq    (%rsi)                      # (original: increments closure_depth)
+    lea     try_depth(%rip), %rsi
+    incq    (%rsi)                      # try_depth++
     jmp     vm_loop
 
 op_catch_end:
-    # Pop try_stack (catch block finished)
+    # No-op marker — try_depth managed by TryBegin(+1), success-path CatchEnd(-1), __throw(-1)
+    # Old Rust-compiled bytecodes only have CatchEnd at catch exit.
+    # New self-compiled bytecodes have CatchEnd on BOTH success and catch paths.
+    # With large try_stack (1024 frames), old bytecodes survive bootstrap (depth leaks but doesn't overflow).
+    # After Gen1 self-build, new bytecodes balance properly → depth stays bounded.
     lea     try_depth(%rip), %rsi
     cmpq    $0, (%rsi)
-    je      vm_loop                     # no try frame → skip
-    decq    (%rsi)                      # depth--
+    je      vm_loop
+    decq    (%rsi)
     jmp     vm_loop
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -12343,7 +12348,7 @@ rx_alt_patch:
 fn_registry_count:
     .space 8                            # number of registered functions
 try_stack:
-    .space 512                          # 16 try frames × 32 bytes (catch_PC:8 + r14:8 + closure_depth:8 + rsp:8)
+    .space 2048                         # 64 try frames × 32 bytes
 try_depth:
     .space 8                            # current try nesting depth (0 = no try)
 throw_buf:

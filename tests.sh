@@ -797,9 +797,23 @@ run_olang_test "const/basic" \
 run_olang_test "const/use_in_fn" \
     'const MAX=100;fn check(x){if x>MAX{return "over";};return "ok";};emit check(50)+" "+check(200);' "ok over"
 
-# ─── SECTION: Try/catch (pending VM fix for try_depth) ───────
-# TODO: try/catch tests disabled until TryBegin try_depth fix is complete
-# The VM currently increments closure_depth instead of try_depth in TryBegin
+# ─── SECTION: Try/catch ──────────────────────────────────────
+echo -e "${CYAN}── Try/Catch ──${NC}"
+
+run_olang_test "try/catch_throw" \
+    'try{__throw("err");}catch{emit "caught";};' "caught"
+
+run_olang_test "try/catch_success" \
+    'try{emit "ok";}catch{emit "err";};' "ok"
+
+run_olang_test "try/catch_nested" \
+    'let r="";try{try{__throw("x");}catch{r=r+"inner ";};r=r+"ok";}catch{r=r+"outer";};emit r;' "inner ok"
+
+run_olang_test "try/catch_in_fn" \
+    'fn safe(x){try{if x==0{__throw("z");};return "ok";}catch{return "err";};};emit safe(1)+" "+safe(0);' "ok err"
+
+run_olang_test "try/catch_loop" \
+    'let ok=0;let i=0;while i<50{try{let i=i+1;let ok=ok+1;}catch{};};emit ok;' "50"
 
 # ─── SECTION: Scope & assignment ─────────────────────────────
 echo -e "${CYAN}── Scope ──${NC}"
