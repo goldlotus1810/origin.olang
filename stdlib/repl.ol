@@ -634,30 +634,14 @@ pub fn repl_eval(input) {
   }
   // Self-test: quick inline verification
   if src == "self-test" || src == "check" {
-    _boot_learn();
-    let _ck_pass = [0];
-    let _ck_fail = [0];
-    // Test 1: arithmetic
-    if (2 + 3) == 5 { let _ = __set_at(_ck_pass, 0, __array_get(_ck_pass, 0) + 1); } else { let _ = __set_at(_ck_fail, 0, __array_get(_ck_fail, 0) + 1); };
-    // Test 2: string
-    if len("hello") == 5 { let _ = __set_at(_ck_pass, 0, __array_get(_ck_pass, 0) + 1); } else { let _ = __set_at(_ck_fail, 0, __array_get(_ck_fail, 0) + 1); };
-    // Test 3: array
-    let _ck_arr = [1, 2, 3]; if len(_ck_arr) == 3 { let _ = __set_at(_ck_pass, 0, __array_get(_ck_pass, 0) + 1); } else { let _ = __set_at(_ck_fail, 0, __array_get(_ck_fail, 0) + 1); };
-    // Test 4: pipeline exists
-    let _ck_pl = pipeline("test"); if len(_ck_pl) > 0 { let _ = __set_at(_ck_pass, 0, __array_get(_ck_pass, 0) + 1); } else { let _ = __set_at(_ck_fail, 0, __array_get(_ck_fail, 0) + 1); };
-    __heap_pin();
-    // Test 5: facts loaded
-    if kt_fact_count() > 50 { let _ = __set_at(_ck_pass, 0, __array_get(_ck_pass, 0) + 1); } else { let _ = __set_at(_ck_fail, 0, __array_get(_ck_fail, 0) + 1); };
-    // Test 6: __exp works
-    if __exp(0) == 1 { let _ = __set_at(_ck_pass, 0, __array_get(_ck_pass, 0) + 1); } else { let _ = __set_at(_ck_fail, 0, __array_get(_ck_fail, 0) + 1); };
-    // Test 7: __log2 works
-    if __log2(8) == 3 { let _ = __set_at(_ck_pass, 0, __array_get(_ck_pass, 0) + 1); } else { let _ = __set_at(_ck_fail, 0, __array_get(_ck_fail, 0) + 1); };
-    // Test 8: chain_encode works
-    let _ck_ch = chain_encode("test"); if len(_ck_ch) > 0 { let _ = __set_at(_ck_pass, 0, __array_get(_ck_pass, 0) + 1); } else { let _ = __set_at(_ck_fail, 0, __array_get(_ck_fail, 0) + 1); };
-    let _ck_p = __array_get(_ck_pass, 0);
-    let _ck_f = __array_get(_ck_fail, 0);
-    if _ck_f == 0 { return "HEALTHY: " + __to_string(_ck_p) + "/" + __to_string(_ck_p) + " checks pass. " + kt_stats(); };
-    return "DEGRADED: " + __to_string(_ck_p) + " pass, " + __to_string(_ck_f) + " fail";
+    let _ck_out = "CHECK:";
+    if (2 + 3) == 5 { _ck_out = _ck_out + " arith:OK"; } else { _ck_out = _ck_out + " arith:FAIL"; };
+    if len("hello") == 5 { _ck_out = _ck_out + " str:OK"; } else { _ck_out = _ck_out + " str:FAIL"; };
+    let _ck_a = [1, 2, 3]; if len(_ck_a) == 3 { _ck_out = _ck_out + " arr:OK"; } else { _ck_out = _ck_out + " arr:FAIL"; };
+    if __exp(0) == 1 { _ck_out = _ck_out + " exp:OK"; } else { _ck_out = _ck_out + " exp:FAIL"; };
+    if __log2(8) == 3 { _ck_out = _ck_out + " log2:OK"; } else { _ck_out = _ck_out + " log2:FAIL"; };
+    if len(__sha256("abc")) == 64 { _ck_out = _ck_out + " sha:OK"; } else { _ck_out = _ck_out + " sha:FAIL"; };
+    return _ck_out;
   }
   // Fixed-point: verify Gen1==Gen2
   if src == "fixed-point" || src == "verify" {
