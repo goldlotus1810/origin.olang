@@ -275,6 +275,12 @@ fn emit_op(state, _op) {
     if _eo_tag == "Mul" { emit_simple(state, 44); return; };
     if _eo_tag == "Div" { emit_simple(state, 45); return; };
     if _eo_tag == "Mod" { emit_simple(state, 46); return; };
+    if _eo_tag == "Eq" { emit_simple(state, 49); return; };
+    if _eo_tag == "Ne" { emit_simple(state, 50); return; };
+    if _eo_tag == "Lt" { emit_simple(state, 51); return; };
+    if _eo_tag == "Gt" { emit_simple(state, 52); return; };
+    if _eo_tag == "Le" { emit_simple(state, 53); return; };
+    if _eo_tag == "Ge" { emit_simple(state, 54); return; };
     if _eo_tag == "Push" { emit_push_str(state, _eo_name); return; };
     if _eo_tag == "Load" { emit_load(state, _eo_name); return; };
     if _eo_tag == "Store" { emit_store(state, _eo_name); return; };
@@ -522,10 +528,10 @@ fn compile_expr(state, expr) {
                     if _binop == "^" { emit_op(state, make_op_name("Call", "__bit_xor")); };
                     if _binop == "==" { emit_op(state, make_op_name("Call", "__eq")); };
                     if _binop == "!=" { emit_op(state, make_op_name("Call", "__cmp_ne")); };
-                    if _binop == "<" { emit_op(state, make_op_name("Call", "__cmp_lt")); };
-                    if _binop == ">" { emit_op(state, make_op_name("Call", "__cmp_gt")); };
-                    if _binop == "<=" { emit_op(state, make_op_name("Call", "__cmp_le")); };
-                    if _binop == ">=" { emit_op(state, make_op_name("Call", "__cmp_ge")); };
+                    if _binop == "<" { emit_op(state, make_op_simple("Lt")); };
+                    if _binop == ">" { emit_op(state, make_op_simple("Gt")); };
+                    if _binop == "<=" { emit_op(state, make_op_simple("Le")); };
+                    if _binop == ">=" { emit_op(state, make_op_simple("Ge")); };
                 };
             };
     } else { if __match_enum(expr, "Expr::UnaryNot") == 1 {

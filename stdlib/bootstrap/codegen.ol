@@ -52,6 +52,14 @@ let TAG_EXPLAIN    = 34;  // 0x22
 let TAG_FFI        = 35;  // 0x23
 let TAG_CALLCLOSURE = 36; // 0x24
 
+// Native comparison opcodes (0x31-0x36)
+let TAG_EQ         = 49;  // 0x31
+let TAG_NE         = 50;  // 0x32
+let TAG_LT         = 51;  // 0x33
+let TAG_GT         = 52;  // 0x34
+let TAG_LE         = 53;  // 0x35
+let TAG_GE         = 54;  // 0x36
+
 // ── Byte encoding helpers ──────────────────────────────────────
 
 fn emit_byte(_eb, b) {
@@ -211,6 +219,12 @@ fn encode_op(_eo_out, op) {
     if t == "Mul" { emit_byte(_eo_out, 44); return; };
     if t == "Div" { emit_byte(_eo_out, 45); return; };
     if t == "Mod" { emit_byte(_eo_out, 46); return; };
+    if t == "Eq" { emit_byte(_eo_out, 49); return; };
+    if t == "Ne" { emit_byte(_eo_out, 50); return; };
+    if t == "Lt" { emit_byte(_eo_out, 51); return; };
+    if t == "Gt" { emit_byte(_eo_out, 52); return; };
+    if t == "Le" { emit_byte(_eo_out, 53); return; };
+    if t == "Ge" { emit_byte(_eo_out, 54); return; };
     if t == "Closure" {
         // Closure: [0x25][param_count:1][body_len:4]
         emit_byte(_eo_out, 37);

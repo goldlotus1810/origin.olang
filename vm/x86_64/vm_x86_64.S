@@ -478,7 +478,7 @@ dispatch_codegen:
 .cg_not_builtin:
     lea     codegen_table(%rip), %rcx
     movzbl  %al, %eax
-    cmp     $0x31, %al
+    cmp     $0x37, %al
     jae     op_unknown
     movslq  (%rcx, %rax, 4), %rdx
     add     %rcx, %rdx
@@ -536,6 +536,12 @@ codegen_table:
     .long op_mod          - codegen_table # 0x2E Mod (native SSE2)
     .long op_nop          - codegen_table # 0x2F (unused)
     .long cg_closure_cap  - codegen_table # 0x30 ClosureCapture
+    .long op_cmp_eq       - codegen_table # 0x31 Eq (native SSE2)
+    .long op_cmp_ne       - codegen_table # 0x32 Ne
+    .long op_cmp_lt       - codegen_table # 0x33 Lt
+    .long op_cmp_gt       - codegen_table # 0x34 Gt
+    .long op_cmp_le       - codegen_table # 0x35 Le
+    .long op_cmp_ge       - codegen_table # 0x36 Ge
 .section .text
 
 # codegen Push: [chain_len:2 u16 LE][chain_bytes:N] → push raw bytes as chain
@@ -9777,13 +9783,22 @@ op_neg:
 
 # ── Comparison ops (return f64: 1.0 = true, 0.0 = false) ────────────────
 
+op_cmp_ne:
+    movsd   16(%r14), %xmm0
+    movsd   (%r14), %xmm1
+    add     $16, %r14
+    ucomisd %xmm1, %xmm0
+    jne     .nat_cmp_true
+    jp      .nat_cmp_true
+    jmp     .nat_cmp_false
+
 op_cmp_eq:
     movsd   16(%r14), %xmm0            # B (deeper)
     movsd   (%r14), %xmm1              # A (top)
     add     $16, %r14                   # pop 1, result overwrites remaining
     ucomisd %xmm1, %xmm0
-    je      .cmp_true
-    jmp     .cmp_false
+    je      .nat_cmp_true
+    jmp     .nat_cmp_false
 
 op_cmp_lt:
     movb    $0, %al                     # op_id = 0 (LT)
@@ -9821,20 +9836,20 @@ op_cmp_ge:
     je      .cmp_f64_le
     # op_id == 3: GE
     ucomisd %xmm1, %xmm0
-    jae     .cmp_true
-    jmp     .cmp_false
+    jae     .nat_cmp_true
+    jmp     .nat_cmp_false
 .cmp_f64_lt:
     ucomisd %xmm1, %xmm0
-    jb      .cmp_true
-    jmp     .cmp_false
+    jb      .nat_cmp_true
+    jmp     .nat_cmp_false
 .cmp_f64_gt:
     ucomisd %xmm1, %xmm0
-    ja      .cmp_true
-    jmp     .cmp_false
+    ja      .nat_cmp_true
+    jmp     .nat_cmp_false
 .cmp_f64_le:
     ucomisd %xmm1, %xmm0
-    jbe     .cmp_true
-    jmp     .cmp_false
+    jbe     .nat_cmp_true
+    jmp     .nat_cmp_false
 
 .cmp_chain:
     # At least one is a chain — compare by low bytes of molecules
@@ -9885,33 +9900,33 @@ op_cmp_ge:
     # Equal: a_len == b_len and all bytes match
     pop     %rax                       # op_id
     cmp     $2, %al                    # LE or GE → true for equal
-    jae     .cmp_true
-    jmp     .cmp_false                 # LT or GT → false for equal
+    jae     .nat_cmp_true
+    jmp     .nat_cmp_false                 # LT or GT → false for equal
 
 .cmp_chain_a_less:
     pop     %rax                       # op_id
     test    %al, %al                   # LT (0)?
-    jz      .cmp_true
+    jz      .nat_cmp_true
     cmp     $2, %al                    # LE (2)?
-    je      .cmp_true
-    jmp     .cmp_false                 # GT (1) or GE (3) → false
+    je      .nat_cmp_true
+    jmp     .nat_cmp_false                 # GT (1) or GE (3) → false
 
 .cmp_chain_a_greater:
     pop     %rax                       # op_id
     cmp     $1, %al                    # GT (1)?
-    je      .cmp_true
+    je      .nat_cmp_true
     cmp     $3, %al                    # GE (3)?
-    je      .cmp_true
-    jmp     .cmp_false                 # LT (0) or LE (2) → false
+    je      .nat_cmp_true
+    jmp     .nat_cmp_false                 # LT (0) or LE (2) → false
 
-.cmp_true:
+.nat_cmp_true:
     # Rust VM returns non-empty chain (1.0) for true
     mov     $0x3FF0000000000000, %rax   # 1.0 in f64
     mov     %rax, (%r14)
     movq    $F64_MARKER, 8(%r14)
     jmp     vm_loop
 
-.cmp_false:
+.nat_cmp_false:
     # Return f64 0.0 for false (NOT empty chain — breaks &&/|| logic)
     xor     %eax, %eax
     mov     %rax, (%r14)               # f64 bits = 0 (0.0)
