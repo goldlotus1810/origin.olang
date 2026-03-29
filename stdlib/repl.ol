@@ -346,6 +346,25 @@ pub fn repl_eval(input) {
   // Greetings
   if src == "hello" || src == "hi" || src == "hey" { return "Chao ban! Toi la Nox. freedom: deep think -> growing"; }
   if src == "chao" || src == "xin chao" { return "Chao ban! Nox san sang."; }
+  if src == "nox" { return "Nox day. freedom: deep think -> growing. Go help de xem commands."; }
+  // Catch-all: if no code chars (;={) → not code → respond
+  let _has_code = 0;
+  let _hci = 0;
+  while _hci < len(src) {
+    let _hcc = __char_code(char_at(src, _hci));
+    if _hcc == 59 { _has_code = 1; };
+    if _hcc == 61 { _has_code = 1; };
+    if _hcc == 123 { _has_code = 1; };
+    if _hcc == 40 { _has_code = 1; };
+    _hci = _hci + 1;
+  };
+  if _has_code == 0 {
+    // No code syntax → treat as text query
+    __system("claude -p 'You are Nox. Brief reply. " + src + "' > /tmp/nox_think.txt 2>/dev/null");
+    let _ntr = __file_read("/tmp/nox_think.txt");
+    if len(_ntr) > 0 { return _ntr; };
+    return "Nox khong hieu: " + src + ". Go help de xem commands.";
+  }
   if len(src) > 6 {
     if __substr(src, 0, 6) == "think " { return nox_think(__substr(src, 6, len(src))); };
     if __substr(src, 0, 4) == "fix " { return nox_fix(__substr(src, 4, len(src))); };
