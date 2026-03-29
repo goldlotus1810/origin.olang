@@ -31,6 +31,45 @@ let __kt_dim_t = [];
 let __kt_fact_mol = [];
 let __kt_dim_inited = [0];
 
+// ════════════════════════════════════════════════════════════════
+// Inverted Word Index — O(1) word → fact indices lookup
+// Hash table: 4096 slots, each slot = array of fact indices
+// ════════════════════════════════════════════════════════════════
+let __kt_word_idx = [];
+let __kt_widx_inited = [0];
+
+fn _kt_widx_init() {
+    if __array_get(__kt_widx_inited, 0) == 1 { return; };
+    let _ = __set_at(__kt_widx_inited, 0, 1);
+    let _wi = 0;
+    while _wi < 256 { push(__kt_word_idx, []); let _wi = _wi + 1; };
+}
+
+fn _kt_word_hash(_wh_text) {
+    let _wh_h = [0];
+    let _wh_i = 0;
+    while _wh_i < len(_wh_text) {
+        let _ = __set_at(_wh_h, 0, __bit_and((__array_get(_wh_h, 0) * 31) + __char_code(char_at(_wh_text, _wh_i)), 255));
+        let _wh_i = _wh_i + 1;
+    };
+    return __array_get(_wh_h, 0);
+}
+
+fn _kt_widx_add(_wia_word, _wia_fact_idx) {
+    _kt_widx_init();
+    if len(_wia_word) < 3 { return; };
+    let _wia_h = _kt_word_hash(_wia_word);
+    push(__kt_word_idx[_wia_h], _wia_fact_idx);
+}
+
+// Fast word lookup: returns array of fact indices matching this word
+pub fn kt_word_lookup(_kwl_word) {
+    _kt_widx_init();
+    if len(_kwl_word) < 3 { return []; };
+    let _kwl_h = _kt_word_hash(_kwl_word);
+    return __kt_word_idx[_kwl_h];
+}
+
 fn _kt_ensure_init() {
     if __array_get(__kt_inited, 0) == 1 { return; };
     let _ = __set_at(__kt_inited, 0, 1);
@@ -217,11 +256,11 @@ pub fn kt_learn_to(_klt_text, _klt_branch) {
     let _klt_j = 0;
     while _klt_j < _klt_tlen {
         let _klt_ch = __char_code(char_at(_klt_text, _klt_j));
-        if _klt_ch == 32 { let _klt_ws = __array_get(_klt_st, 0); if _klt_j > _klt_ws { let _klt_w = substr(_klt_text, _klt_ws, _klt_j); _kt_learn_word(_klt_w); }; let _ = __set_at(_klt_st, 0, _klt_j + 1); };
+        if _klt_ch == 32 { let _klt_ws = __array_get(_klt_st, 0); if _klt_j > _klt_ws { let _klt_w = substr(_klt_text, _klt_ws, _klt_j); _kt_learn_word(_klt_w); _kt_widx_add(_klt_w, _klt_fidx); }; let _ = __set_at(_klt_st, 0, _klt_j + 1); };
         let _klt_j = _klt_j + 1;
     };
     let _klt_ws = __array_get(_klt_st, 0);
-    if _klt_tlen > _klt_ws { let _klt_w = substr(_klt_text, _klt_ws, _klt_tlen); _kt_learn_word(_klt_w); };
+    if _klt_tlen > _klt_ws { let _klt_w = substr(_klt_text, _klt_ws, _klt_tlen); _kt_learn_word(_klt_w); _kt_widx_add(_klt_w, _klt_fidx); };
     // Index into 5D dimension tree — lightweight hash (no __text_to_pw allocation)
     let _klt_mol = _kt_fast_mol(_klt_text);
     _kt_dim_index(_klt_fidx, _klt_mol);
@@ -350,6 +389,22 @@ pub fn kt_find(_kf_query, _kf_max) {
         _kf_i = _kf_i + 1;
     };
     return _kf_out;
+}
+
+// Fast word-indexed search: O(1) lookup per word instead of O(n×m) scan
+pub fn kt_find_fast(_kff_word, _kff_max) {
+    let _kff_indices = kt_word_lookup(_kff_word);
+    let _kff_out = [];
+    let _kff_i = 0;
+    while _kff_i < len(_kff_indices) {
+        if len(_kff_out) >= _kff_max { return _kff_out; };
+        let _kff_idx = __array_get(_kff_indices, _kff_i);
+        if _kff_idx < len(__kt_facts_arr) {
+            push(_kff_out, __array_get(__kt_facts_arr, _kff_idx));
+        };
+        let _kff_i = _kff_i + 1;
+    };
+    return _kff_out;
 }
 
 pub fn kt_fact_count() {

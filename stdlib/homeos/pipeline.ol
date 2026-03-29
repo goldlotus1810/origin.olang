@@ -574,7 +574,7 @@ fn _pl_text_search(_pts_input) {
     let _pts_qi = 0;
     while _pts_qi < len(_pts_qwords) {
         let _pts_qw = __array_get(_pts_qwords, _pts_qi);
-        let _pts_found = kt_find(_pts_qw, 10);
+        let _pts_found = kt_find_fast(_pts_qw, 10);
         // IDF weight: fewer matches = higher weight (max 5, min 1)
         let _pts_idf = 1;
         if len(_pts_found) > 0 { let _pts_idf = __floor(10 / len(_pts_found)); };
