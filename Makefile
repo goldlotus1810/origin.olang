@@ -1,91 +1,64 @@
 # HomeOS — origin.olang build system
 # Usage:
-#   make              — build origin.olang
-#   make test         — run all Rust tests
-#   make clean        — remove build artifacts
+#   make              — self-build (no Rust needed)
 #   make vm           — assemble + link VM only
+#   make bootstrap    — initial build with Rust (first time only)
+#   make test         — run 205 tests
+#   make fixed-point  — verify Gen1 == Gen2
+#   make clean        — remove build artifacts
 
 AS       = as
 LD       = ld
-CARGO    = cargo
-
 VM_SRC   = vm/x86_64/vm_x86_64.S
-VM_OBJ   = vm/x86_64/vm_x86_64.o
+VM_OBJ   = /tmp/vm_olang.o
 VM_BIN   = vm/x86_64/vm_x86_64
 STDLIB   = stdlib
-KNOWLEDGE = origin.olang
 OUTPUT   = origin.olang
+GEN1     = origin_gen1.olang
 
-.PHONY: all vm build test intg clean clippy eval smoke smoke-binary verify demo check-all
+.PHONY: all vm build bootstrap test fixed-point clean self-build
 
-all: build
+# Default: self-build (requires working origin.olang)
+all: self-build
 
-# Assemble VM
-$(VM_OBJ): $(VM_SRC)
-	$(AS) --64 -o $@ $<
+# Assemble VM (pure GNU as + ld, no Rust)
+vm:
+	$(AS) --64 -o $(VM_OBJ) $(VM_SRC)
+	$(LD) -static -nostdlib --entry=_start -o $(VM_BIN) $(VM_OBJ)
+	@echo "VM: $(VM_BIN) ($$(stat -c%s $(VM_BIN)) bytes)"
 
-# Link VM (static, no libc)
-$(VM_BIN): $(VM_OBJ)
-	$(LD) -static -nostdlib -o $@ $<
+# Self-build: origin.olang compiles itself → Gen1
+self-build: vm
+	@test -x $(OUTPUT) || (echo "ERROR: $(OUTPUT) not found. Run 'make bootstrap' first."; exit 1)
+	./$(OUTPUT) --build
+	mv origin_new.olang $(GEN1)
+	chmod +x $(GEN1)
+	@echo "Gen1: $(GEN1) ($$(stat -c%s $(GEN1)) bytes)"
 
-vm: $(VM_BIN)
+# Fixed-point: Gen1 compiles itself → Gen2, verify Gen1 == Gen2
+fixed-point: self-build
+	./$(GEN1) --build
+	@if cmp -s $(GEN1) origin_new.olang; then \
+		echo "FIXED-POINT: Gen1 == Gen2 ✓"; \
+	else \
+		echo "DIFFER: Gen1 != Gen2 ✗"; exit 1; \
+	fi
+	@rm -f origin_new.olang
 
-# Build origin.olang
-build: $(VM_BIN)
-	$(CARGO) run -p builder -- \
+# Bootstrap: initial build with Rust compiler (one-time setup)
+bootstrap: vm
+	@test -d ../Origin_project || (echo "ERROR: ../Origin_project not found (Rust compiler)"; exit 1)
+	../Origin_project/target/release/builder \
 		--vm $(VM_BIN) --wrap \
-		--stdlib $(STDLIB) \
-		--knowledge $(KNOWLEDGE) \
-		--codegen \
+		--stdlib $(STDLIB) --codegen \
 		-o $(OUTPUT)
 	chmod +x $(OUTPUT)
-	@echo "Built: $(OUTPUT) ($$(stat -c%s $(OUTPUT)) bytes)"
+	@echo "Bootstrap: $(OUTPUT) ($$(stat -c%s $(OUTPUT)) bytes)"
 
-# Run tests
+# Run all tests
 test:
-	$(CARGO) test --workspace
-
-# Integration tests only
-intg:
-	$(CARGO) test -p intg -- --show-output
-
-# Clippy
-clippy:
-	$(CARGO) clippy --workspace
-
-# Eval mode — pipe input to server
-eval:
-	@$(CARGO) run -p server -- --eval
-
-# Quick smoke test
-smoke:
-	@echo 'hello' | $(CARGO) run -p server -- --eval
-
-# Smoke test: native binary boots and shows prompt
-smoke-binary: build
-	@echo "Testing origin.olang boots..." && \
-	OUTPUT=$$(echo 'exit' | ./$(OUTPUT) 2>&1) && \
-	echo "$$OUTPUT" | grep -q "HomeOS" && \
-	echo "PASS: origin.olang boots OK" || \
-	(echo "FAIL: origin.olang did not boot"; exit 1)
-
-# E2E demo — 10 scenarios (requires tools/demo/scenarios.sh)
-demo:
-	@bash tools/demo/scenarios.sh
-
-# E2E automated verification (Rust tests)
-verify:
-	@$(CARGO) test -p intg --test t16_e2e_demo -- --show-output
-
-# Logic check: v2 spec validation (6 bug patterns + 5 checkpoints + invariants + data)
-check-logic:
-	$(CARGO) run -p check_logic
-
-# Full check: unit + integration + E2E + binary boot + logic
-check-all: test intg verify smoke-binary check-logic
-	@echo "ALL CHECKS PASSED"
+	bash tests.sh
 
 # Clean
 clean:
-	$(CARGO) clean
-	rm -f $(VM_OBJ) $(VM_BIN) $(OUTPUT)
+	rm -f $(VM_OBJ) $(GEN1) origin_new.olang origin_gen2.olang origin_gen3.olang
