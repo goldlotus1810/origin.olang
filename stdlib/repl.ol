@@ -861,6 +861,69 @@ pub fn repl_eval(input) {
       return _df_out + "\n" + __to_string(__array_get(_df_diffs, 0)) + " differences";
     };
   }
+  // Calls: show what functions a file's function calls
+  if len(src) > 6 {
+    if __substr(src, 0, 6) == "calls " {
+      let _cg_rest = __substr(src, 6, len(src));
+      // Parse "file fn_name"
+      let _cg_sp = 0;
+      while _cg_sp < len(_cg_rest) { if __char_code(char_at(_cg_rest, _cg_sp)) == 32 { break; }; let _cg_sp = _cg_sp + 1; };
+      let _cg_path = substr(_cg_rest, 0, _cg_sp);
+      let _cg_fn = substr(_cg_rest, _cg_sp + 1, len(_cg_rest));
+      let _cg_src = __file_read(_cg_path);
+      if len(_cg_src) == 0 { return "Error: cannot read " + _cg_path; };
+      // Find fn start using _pl_find_in (O(n) single pass, not nested)
+      let _cg_pattern = "fn " + _cg_fn + "(";
+      let _cg_start = [_pl_find_in(_cg_src, _cg_pattern)];
+      if __array_get(_cg_start, 0) < 0 { return "Not found: " + _cg_fn; };
+      // End = start + 3000 chars max (one function body, enough for call analysis)
+      let _cg_end = [__array_get(_cg_start, 0) + 3000];
+      if __array_get(_cg_end, 0) > len(_cg_src) { let _ = __set_at(_cg_end, 0, len(_cg_src)); };
+      if __array_get(_cg_start, 0) < 0 { return "Function not found: " + _cg_fn; };
+      let _cg_body = substr(_cg_src, __array_get(_cg_start, 0), __array_get(_cg_end, 0));
+      let _cg_blen = len(_cg_body);
+      // Find function calls: extract "name(" patterns, skip keywords
+      let _cg_calls = [];
+      let _cg_words = _pl_split_words(_cg_body);
+      let _cg_wi = 0;
+      while _cg_wi < len(_cg_words) {
+          let _cg_w = __array_get(_cg_words, _cg_wi);
+          // Check if word contains "(" — it's a call
+          let _cg_ppos = _pl_find_in(_cg_w, "(");
+          if _cg_ppos > 1 {
+              let _cg_fname = substr(_cg_w, 0, _cg_ppos);
+              // Skip keywords and short names
+              let _cg_skip = [0];
+              if _cg_fname == "if" { let _ = __set_at(_cg_skip, 0, 1); };
+              if _cg_fname == "while" { let _ = __set_at(_cg_skip, 0, 1); };
+              if _cg_fname == "for" { let _ = __set_at(_cg_skip, 0, 1); };
+              if _cg_fname == "len" { let _ = __set_at(_cg_skip, 0, 1); };
+              if _cg_fname == "substr" { let _ = __set_at(_cg_skip, 0, 1); };
+              if _cg_fname == _cg_fn { let _ = __set_at(_cg_skip, 0, 1); };
+              if len(_cg_fname) < 2 { let _ = __set_at(_cg_skip, 0, 1); };
+              if __array_get(_cg_skip, 0) == 0 {
+                  // Dedup using hash
+                  let _cg_fh = __bit_and(_kt_word_hash(_cg_fname), 255);
+                  let _cg_dup = [0];
+                  let _cg_di = 0;
+                  while _cg_di < len(_cg_calls) {
+                      if __array_get(_cg_calls, _cg_di) == _cg_fname { let _ = __set_at(_cg_dup, 0, 1); };
+                      let _cg_di = _cg_di + 1;
+                  };
+                  if __array_get(_cg_dup, 0) == 0 { push(_cg_calls, _cg_fname); };
+              };
+          };
+          let _cg_wi = _cg_wi + 1;
+      };
+      let _cg_out = _cg_fn + " calls " + __to_string(len(_cg_calls)) + " functions:";
+      let _cg_ci = 0;
+      while _cg_ci < len(_cg_calls) {
+          let _cg_out = _cg_out + "\n  → " + __array_get(_cg_calls, _cg_ci);
+          let _cg_ci = _cg_ci + 1;
+      };
+      return _cg_out;
+    };
+  }
   // Audit: self-review all source files
   if src == "audit" {
     let _au_dirs = [];
