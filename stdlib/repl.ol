@@ -103,8 +103,9 @@ fn _boot_embedded_kt() {
     kt_learn("Fixed-point means Gen1 binary compiles itself to produce identical Gen2 binary");
     kt_learn("The heap uses bump allocation with __heap_pin to protect persistent data across REPL turns");
     kt_learn("Olang supports closures higher order functions pattern matching try catch and for loops");
-    // Source indexing
+    // Source indexing + memory sync
     _boot_index_source();
+    memory_sync();
 }
 
 fn _boot_index_source() {
@@ -598,6 +599,7 @@ pub fn repl_eval(input) {
   // Study command: read a file and learn from it (chunked, safe)
   if len(src) > 6 {
     if __substr(src, 0, 6) == "study " {
+      _boot_learn();
       let _rs_path = __substr(src, 6, len(src));
       let _rs_content = __file_read(_rs_path);
       if len(_rs_content) == 0 { return "Error: cannot read " + _rs_path; };
@@ -606,20 +608,10 @@ pub fn repl_eval(input) {
       if len(_rs_path) > 3 {
           if __substr(_rs_path, len(_rs_path) - 3, len(_rs_path)) == ".md" { let _ = __set_at(_rs_is_md, 0, 1); };
       };
-      // Strip markdown if needed
       if __array_get(_rs_is_md, 0) == 1 { let _rs_content = md_strip(_rs_content); };
-      // Feed in chunks of 20KB (safe for heap)
-      let _rs_total = [0];
-      let _rs_clen = len(_rs_content);
-      let _rs_off = [0];
-      while __array_get(_rs_off, 0) < _rs_clen {
-          let _rs_start = __array_get(_rs_off, 0);
-          let _rs_end = _rs_start + 20000;
-          if _rs_end > _rs_clen { let _rs_end = _rs_clen; };
-          let _rs_chunk = substr(_rs_content, _rs_start, _rs_end);
-          let _rs_fed = spider_feed(_rs_chunk, _rs_path);
-          let _ = __set_at(_rs_off, 0, _rs_end);
-      };
+      // Limit to 8KB per turn (heap safe — multi-turn handles rest)
+      if len(_rs_content) > 8000 { let _rs_content = substr(_rs_content, 0, 8000); };
+      spider_feed(_rs_content, _rs_path);
       __heap_pin();
       return "Studied " + _rs_path + ". " + kt_stats();
     };
