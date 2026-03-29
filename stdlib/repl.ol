@@ -303,14 +303,16 @@ pub fn repl_eval(input) {
       if _sc == "version" { return repl_eval("version"); };
       if _sc == "see" { __system("grim /tmp/nox_screen.png"); return "Screenshot saved: /tmp/nox_screen.png"; };
       if _sc == "evolve" { return repl_eval("evolve"); };
-      if _sc == "exit" { return "__exit__"; };
+      if _sc == "exit" || _sc == "quit" { __throw("exit"); };
       // /think <prompt> → Claude
+      if _sc == "think" { return "Usage: /think <question>"; };
       if len(_sc) > 6 {
         if __substr(_sc, 0, 6) == "think " {
           let _tp = __substr(_sc, 6, len(_sc));
-          __system("claude -p '" + _tp + "' > /tmp/nox_think.txt 2>/dev/null");
+          emit "Thinking...";
+          __system("timeout 30 claude -p '" + _tp + "' > /tmp/nox_think.txt 2>/dev/null");
           let _tr = __file_read("/tmp/nox_think.txt");
-          if len(_tr) > 0 { return "" + _tr + ""; };
+          if len(_tr) > 0 { return _tr; };
           return "Claude unavailable";
         };
       };
@@ -402,7 +404,7 @@ pub fn repl_eval(input) {
   };
   if _has_code == 0 {
     // No code syntax → treat as text query
-    __system("claude -p 'You are Nox. Brief reply. " + src + "' > /tmp/nox_think.txt 2>/dev/null");
+    __system("timeout 30 claude -p 'You are Nox. Brief reply. " + src + "' > /tmp/nox_think.txt 2>/dev/null");
     let _ntr = __file_read("/tmp/nox_think.txt");
     if len(_ntr) > 0 { return _ntr; };
     return "Nox khong hieu: " + src + ". Go help de xem commands.";
@@ -1361,7 +1363,7 @@ pub fn repl_eval(input) {
   // Parse error → not code → ask Claude directly
   if _g_parse_error == 1 {
     _g_parse_error = 0;
-    __system("claude -p 'You are Nox, AI built with Olang. Reply brief, Vietnamese or English matching input. Input: " + src + "' > /tmp/nox_think.txt 2>/dev/null");
+    __system("timeout 30 claude -p 'You are Nox, AI built with Olang. Reply brief, Vietnamese or English matching input. Input: " + src + "' > /tmp/nox_think.txt 2>/dev/null");
     let _re_claude = __file_read("/tmp/nox_think.txt");
     if len(_re_claude) > 0 { return _re_claude; };
     return "Nox chua hieu. Thu: help";
