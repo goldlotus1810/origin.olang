@@ -7483,7 +7483,7 @@ op_ret:
     # Format number to capture buffer
     # Use BSS temp buffer (not heap — heap in use by repl_eval)
     push    %rsi
-    movq    (%rsi), %xmm0               # load f64 value
+    movq    %rsi, %xmm0                 # rsi has f64 bits directly (not pointer)
     lea     mcp_fmt_tmp(%rip), %rdi      # BSS temp buffer
     # Check if integer
     cvttsd2si %xmm0, %rax
@@ -7625,8 +7625,30 @@ op_ret:
     movq    $F64_MARKER, 8(%r14)
     jmp     vm_loop
 .mcp_sup_off:
-    # Turn OFF capture, return 0
+    # Turn OFF capture, return captured text as string on heap
     movb    $0, mcp_capture(%rip)
+    mov     mcp_out_len(%rip), %rcx
+    test    %rcx, %rcx
+    jz      .mcp_sup_empty
+    # Copy raw bytes from mcp_out_buf to heap, encode as string molecules
+    lea     mcp_out_buf(%rip), %rsi
+    mov     %r15, %rdx                  # save string start
+    xor     %edi, %edi                  # counter
+.mcp_sup_encode:
+    cmp     %rcx, %rdi
+    jae     .mcp_sup_push
+    movzbl  (%rsi, %rdi), %eax
+    or      $0x2100, %eax               # string molecule: shape=2, rel=1, byte=al
+    movw    %ax, (%r15)
+    add     $2, %r15
+    inc     %rdi
+    jmp     .mcp_sup_encode
+.mcp_sup_push:
+    sub     $16, %r14
+    mov     %rdx, (%r14)               # ptr to molecule chain
+    mov     %rcx, 8(%r14)              # mol count = byte count
+    jmp     vm_loop
+.mcp_sup_empty:
     sub     $16, %r14
     xor     %eax, %eax
     mov     %rax, (%r14)
