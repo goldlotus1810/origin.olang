@@ -10,6 +10,7 @@ pub fn mcp_dispatch(_md_line) {
         let _mb = __set_at(__mcp_booted, 0, 1);
         let _mb2 = kt_load("homeos.knowledge");
         kg_load("nox_graph.kg");
+        learning_load("nox_learning.dat");
     };
 
     // json_parse now safe with nested {} (save/restore stack in _jp_parse_object)
@@ -48,6 +49,8 @@ fn _mcp_tools(_id) {
     _r = _r + "," + _tool("kg_add", "Add knowledge triple: subject|relation|object (e.g. semantic.ol|contains|_parse_err)", "triple");
     _r = _r + "," + _tool("kg_query", "Query knowledge graph for entity — returns all relationships", "entity");
     _r = _r + "," + _tool("kg_about", "Deep query: entity + all connected entities (2-hop)", "entity");
+    _r = _r + "," + _tool("dn_observe", "Observe a fact (ĐN→QR learning). Repeated observations promote to QR (fire>=3)", "fact");
+    _r = _r + "," + _tool_no_arg("learning_status", "Show ĐN/QR learning stats and all facts");
     _r = _r + ",{\"name\":\"self_modify\",\"description\":\"Read/write/rebuild Nox source. action: read|write|rebuild. path: file path. content: data (write only)\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"action\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},\"content\":{\"type\":\"string\"}},\"required\":[\"action\"]}}";
     _r = _r + "]},\"id\":" + to_string(_id) + "}";
     return _r;
@@ -169,6 +172,33 @@ fn _mcp_call(_id, _tool, _args) {
         if len(_kab_direct) == 0 { let _kab_out = _kab_out + "\\n  (no data)"; };
         return _ok(_id, _kab_out);
     };
+    if _tool == "dn_observe" {
+        let _dno_fact = json_get(_args, "fact");
+        let _dno_result = dn_observe(_dno_fact);
+        learning_save("nox_learning.dat");
+        return _ok(_id, _dno_result);
+    };
+    if _tool == "learning_status" {
+        let _ls_stats = learning_stats();
+        let _ls_dn = dn_list();
+        let _ls_qr = qr_list();
+        let _ls_out = _ls_stats;
+        if len(_ls_qr) > 0 {
+            let _ls_qi = 0;
+            while _ls_qi < len(_ls_qr) {
+                let _ls_out = _ls_out + "\\n  " + _ls_qr[_ls_qi];
+                let _ls_qi = _ls_qi + 1;
+            };
+        };
+        if len(_ls_dn) > 0 {
+            let _ls_di = 0;
+            while _ls_di < len(_ls_dn) {
+                let _ls_out = _ls_out + "\\n  " + _ls_dn[_ls_di];
+                let _ls_di = _ls_di + 1;
+            };
+        };
+        return _ok(_id, _ls_out);
+    };
     if _tool == "self_modify" {
         let _sm_action = json_get(_args, "action");
         let _sm_path = json_get(_args, "path");
@@ -205,7 +235,7 @@ fn _mcp_call(_id, _tool, _args) {
             + "  editor: " + __to_string(len(_si_ed)) + " files\\n"
             + "  facts: " + _si_facts + "\\n"
             + "  heap: " + _si_heap + "KB\\n"
-            + "  tools: 13");
+            + "  tools: 15");
     };
     return _err(_id, "Unknown tool: " + _tool);
 }
