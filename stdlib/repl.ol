@@ -134,6 +134,25 @@ fn _disasm(_da_bc, _da_len) {
     return _da_out;
 }
 
+fn _split_lines(_sl_text) {
+    let _sl_out = [];
+    let _sl_start = [0];
+    let _sl_i = [0];
+    let _sl_len = len(_sl_text);
+    while __array_get(_sl_i, 0) < _sl_len {
+        let _sl_ci = __array_get(_sl_i, 0);
+        if __char_code(char_at(_sl_text, _sl_ci)) == 10 {
+            let _sl_s = __array_get(_sl_start, 0);
+            push(_sl_out, substr(_sl_text, _sl_s, _sl_ci));
+            let _ = __set_at(_sl_start, 0, _sl_ci + 1);
+        };
+        let _ = __set_at(_sl_i, 0, __array_get(_sl_i, 0) + 1);
+    };
+    let _sl_s = __array_get(_sl_start, 0);
+    if _sl_s < _sl_len { push(_sl_out, substr(_sl_text, _sl_s, _sl_len)); };
+    return _sl_out;
+}
+
 fn _boot_index_source() {
     // No __system at boot — causes double REPL header issue
     // Source indexing available via: study <file> or remember commands
@@ -750,6 +769,47 @@ pub fn repl_eval(input) {
           let _dc_di = _dc_di + 1;
       };
       return _dc_out;
+    };
+  }
+  // Diff: compare two files line by line
+  if len(src) > 5 {
+    if __substr(src, 0, 5) == "diff " {
+      let _df_rest = __substr(src, 5, len(src));
+      // Parse "path1 path2"
+      let _df_sp = 0;
+      while _df_sp < len(_df_rest) { if __char_code(char_at(_df_rest, _df_sp)) == 32 { break; }; let _df_sp = _df_sp + 1; };
+      if _df_sp == 0 { return "Usage: diff <file1> <file2>"; };
+      let _df_p1 = substr(_df_rest, 0, _df_sp);
+      let _df_p2 = substr(_df_rest, _df_sp + 1, len(_df_rest));
+      let _df_c1 = __file_read(_df_p1);
+      let _df_c2 = __file_read(_df_p2);
+      if len(_df_c1) == 0 { return "Error: cannot read " + _df_p1; };
+      if len(_df_c2) == 0 { return "Error: cannot read " + _df_p2; };
+      if _df_c1 == _df_c2 { return "IDENTICAL (" + __to_string(len(_df_c1)) + " chars)"; };
+      // Split into lines, compare
+      let _df_l1 = _split_lines(_df_c1);
+      let _df_l2 = _split_lines(_df_c2);
+      let _df_out = "--- " + _df_p1 + " (" + __to_string(len(_df_l1)) + " lines)\n+++ " + _df_p2 + " (" + __to_string(len(_df_l2)) + " lines)";
+      let _df_diffs = [0];
+      let _df_max = len(_df_l1);
+      if len(_df_l2) > _df_max { let _df_max = len(_df_l2); };
+      let _df_di = 0;
+      while _df_di < _df_max {
+          if __array_get(_df_diffs, 0) >= 20 { let _df_di = _df_max; };
+          if __array_get(_df_diffs, 0) < 20 {
+              let _df_line1 = "";
+              let _df_line2 = "";
+              if _df_di < len(_df_l1) { let _df_line1 = __array_get(_df_l1, _df_di); };
+              if _df_di < len(_df_l2) { let _df_line2 = __array_get(_df_l2, _df_di); };
+              if _df_line1 != _df_line2 {
+                  let _ = __set_at(_df_diffs, 0, __array_get(_df_diffs, 0) + 1);
+                  if len(_df_line1) > 0 { let _df_out = _df_out + "\n@" + __to_string(_df_di + 1) + " -" + _df_line1; };
+                  if len(_df_line2) > 0 { let _df_out = _df_out + "\n@" + __to_string(_df_di + 1) + " +" + _df_line2; };
+              };
+          };
+          let _df_di = _df_di + 1;
+      };
+      return _df_out + "\n" + __to_string(__array_get(_df_diffs, 0)) + " differences";
     };
   }
   // Audit: self-review all source files
