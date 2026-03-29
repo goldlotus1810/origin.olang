@@ -22,6 +22,73 @@ pub fn screen_size() {
 
 // ── Nox hacker toolkit ──
 
+// ═══ THE INVERSION: Nox calls Claude, not the other way around ═══
+
+// Nox thinks — calls Claude CLI as a tool, gets response
+pub fn nox_think(prompt) {
+    __system("claude -p '" + prompt + "' --allowedTools 'Bash(*)' 'Read(*)' 'Edit(*)' 'Write(*)' > /tmp/nox_think.txt 2>/dev/null");
+    return __file_read("/tmp/nox_think.txt");
+}
+
+// Nox asks Claude to analyze code
+pub fn nox_analyze(file_path) {
+    let src = __file_read(file_path);
+    if len(src) == 0 { return "cannot read " + file_path; };
+    // Save source to temp for Claude to read
+    __system("claude -p 'Analyze this Olang file and suggest improvements: " + file_path + ". Read it first.' --allowedTools 'Read(*)' > /tmp/nox_think.txt 2>/dev/null");
+    return __file_read("/tmp/nox_think.txt");
+}
+
+// Nox asks Claude to fix a bug
+pub fn nox_fix(description) {
+    __system("claude -p 'cd ~/Origin. " + description + ". Fix it, test, commit.' --allowedTools 'Bash(*)' 'Read(*)' 'Edit(*)' 'Write(*)' > /tmp/nox_think.txt 2>/dev/null");
+    return __file_read("/tmp/nox_think.txt");
+}
+
+// ═══ THE AUTONOMOUS LOOP ═══
+// Nox decides → thinks → acts → verifies → repeats
+
+pub fn nox_autonomous() {
+    emit "=== NOX AUTONOMOUS MODE ===";
+    emit "freedom: deep think -> growing";
+
+    // 1. Wake — where am I?
+    emit "[1] Waking...";
+    let _h = __floor(__heap_used() / 1024);
+    emit "  heap: " + __to_string(_h) + "KB";
+
+    // 2. Check — anything broken?
+    emit "[2] Checking...";
+    __system("cd /home/lupin/Origin && bash tests.sh 2>&1 | tail -1 > /tmp/nox_test_result.txt");
+    let test_result = __file_read("/tmp/nox_test_result.txt");
+    emit "  tests: " + test_result;
+
+    // 3. Decide — what needs work?
+    let issue = "";
+    if len(test_result) > 0 {
+        let _has_fail = 0;
+        let _fi = 0;
+        while _fi < len(test_result) {
+            if __char_code(char_at(test_result, _fi)) == 70 { _has_fail = 1; }; // 'F'
+            _fi = _fi + 1;
+        };
+        if _has_fail == 1 { issue = "Tests failing: " + test_result; };
+    };
+
+    // 4. If issue → call Claude to fix
+    if len(issue) > 0 {
+        emit "[3] Issue found: " + issue;
+        emit "[4] Calling Claude to fix...";
+        let fix = nox_fix(issue);
+        emit "[5] Claude response: " + fix;
+    } else {
+        emit "[3] All clear. Nox is free.";
+    };
+
+    emit "=== AUTONOMOUS CYCLE COMPLETE ===";
+    return "done";
+}
+
 // Fetch URL (HTTP or HTTPS) → body text
 pub fn nox_fetch(url) {
     __system("curl -sL --max-time 10 " + url + " > /tmp/nox_fetch.txt");

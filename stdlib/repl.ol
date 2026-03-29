@@ -342,6 +342,11 @@ pub fn repl_eval(input) {
     return _st;
   }
   if src == "continue" { return nox_autoclick(); }
+  if src == "auto" { return nox_autonomous(); }
+  if len(src) > 6 {
+    if __substr(src, 0, 6) == "think " { return nox_think(__substr(src, 6, len(src))); };
+    if __substr(src, 0, 4) == "fix " { return nox_fix(__substr(src, 4, len(src))); };
+  }
   if len(src) > 6 {
     if __substr(src, 0, 6) == "fetch " {
       let _fu = __substr(src, 6, len(src));
