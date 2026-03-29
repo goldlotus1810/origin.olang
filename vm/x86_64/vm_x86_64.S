@@ -9795,6 +9795,14 @@ op_neg:
 # ── Comparison ops (return f64: 1.0 = true, 0.0 = false) ────────────────
 
 op_cmp_ne:
+    # Smart ne: f64 → ucomisd, string → eq_chain + invert
+    mov     8(%r14), %rax
+    mov     24(%r14), %rcx
+    cmp     $F64_MARKER, %rax
+    jne     .op_ne_chain
+    cmp     $F64_MARKER, %rcx
+    jne     .op_ne_chain
+    # Both f64
     movsd   16(%r14), %xmm0
     movsd   (%r14), %xmm1
     add     $16, %r14
@@ -9802,6 +9810,44 @@ op_cmp_ne:
     jne     .nat_cmp_true
     jp      .nat_cmp_true
     jmp     .nat_cmp_false
+.op_ne_chain:
+    # String !=: run eq_chain then invert (1→0, 0→1)
+    xor     %ecx, %ecx
+    # eq_chain compares and pushes result, returns to vm_loop
+    # We can't intercept after eq_chain. Instead: inline the comparison.
+    mov     8(%r14), %rax              # b mol_count
+    mov     24(%r14), %rcx             # a mol_count
+    cmp     %rax, %rcx
+    jne     .sne_diff             # different lengths → not equal → true
+    # Same length: compare molecules
+    mov     (%r14), %rsi               # b ptr
+    mov     16(%r14), %rdi             # a ptr
+    add     $16, %r14                  # pop one entry
+    test    %rax, %rax
+    jz      .sne_same             # both empty → equal → false
+.sne_loop:
+    movzwl  (%rsi), %edx
+    cmpw    %dx, (%rdi)
+    jne     .sne_diff2            # mismatch → not equal → true
+    add     $2, %rsi
+    add     $2, %rdi
+    dec     %rax
+    jnz     .sne_loop
+.sne_same:
+    # Equal → != returns false (0.0)
+    xorpd   %xmm0, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+.sne_diff:
+    add     $16, %r14                  # pop one entry
+.sne_diff2:
+    # Not equal → != returns true (1.0)
+    mov     $0x3FF0000000000000, %rax
+    movq    %rax, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
 
 op_cmp_eq:
     # Smart eq: f64==f64 → fast, string==string → chain compare

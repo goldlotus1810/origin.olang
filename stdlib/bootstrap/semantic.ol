@@ -527,7 +527,7 @@ fn compile_expr(state, expr) {
                     if _binop == "&" { emit_op(state, make_op_name("Call", "__bit_and")); };
                     if _binop == "^" { emit_op(state, make_op_name("Call", "__bit_xor")); };
                     if _binop == "==" { emit_op(state, make_op_simple("Eq")); };
-                    if _binop == "!=" { emit_op(state, make_op_name("Call", "__cmp_ne")); };
+                    if _binop == "!=" { emit_op(state, make_op_simple("Ne")); };
                     if _binop == "<" { emit_op(state, make_op_simple("Lt")); };
                     if _binop == ">" { emit_op(state, make_op_simple("Gt")); };
                     if _binop == "<=" { emit_op(state, make_op_simple("Le")); };
