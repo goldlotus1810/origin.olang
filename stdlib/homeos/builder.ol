@@ -15,7 +15,7 @@ pub fn build(config) {
     emit "  Compiling stdlib: " + config.stdlib_path + "";
     bytecode = compile_all(config.stdlib_path);
   };
-  emit "  Bytecode: " + __to_string(len(bytecode)) + " bytes";
+  emit "  Bytecode: " + __to_string(len(bytecode)) + " bytes (" + __to_string(_g_fold_count[0]) + " constants folded)";
 
   // WASM/WASI arch: embed bytecode into WASM binary
   if arch == "wasm" || arch == "wasi" {

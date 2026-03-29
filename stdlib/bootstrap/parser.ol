@@ -719,6 +719,7 @@ fn is_binop(tok) {
 
 // Explicit save stack for recursive parse_expr_prec (ASM VM has no scoping)
 let _pep_stack = __array_with_cap(512);
+let _g_fold_count = [0]; // constant folding counter
 
 // Match arm storage (array-based, supports up to 32 arms)
 let __g_ma_pats = __array_range(32);
@@ -772,6 +773,7 @@ fn parse_expr_prec(p, min_prec) {
                     };
                 };
             };
+            if _pep_did_fold == 1 { set_at(_g_fold_count, 0, _g_fold_count[0] + 1); };
             if _pep_did_fold == 0 { _pep_lhs = Expr::BinOp { op: _pep_op, lhs: _pep_saved, rhs: _pep_rhs }; };
         } else {
             break;
