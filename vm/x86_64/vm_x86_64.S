@@ -10846,6 +10846,9 @@ op_halt:
     xor     %edi, %edi                  # fd = stdin
     mov     $16, %eax                   # SYS_ioctl
     syscall
+    # DISABLED raw mode — causes output suppression on some terminals
+    # TODO: fix raw mode output issue, then re-enable
+    jmp     .repl_no_raw
     test    %rax, %rax
     jnz     .repl_no_raw                # not a terminal → skip raw mode
     # Save old termios, set raw mode
