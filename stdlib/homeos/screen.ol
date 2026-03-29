@@ -22,6 +22,24 @@ pub fn screen_size() {
 
 // ── Nox hacker toolkit ──
 
+// Fetch URL (HTTP or HTTPS) → body text
+pub fn nox_fetch(url) {
+    __system("curl -sL --max-time 10 " + url + " > /tmp/nox_fetch.txt");
+    return __file_read("/tmp/nox_fetch.txt");
+}
+
+// Fetch URL → save to file
+pub fn nox_download(url, path) {
+    __system("curl -sL '" + url + "' -o '" + path + "' 2>/dev/null");
+    return path;
+}
+
+// Search Google (returns raw HTML)
+pub fn nox_search(query) {
+    __system("curl -sL 'https://www.google.com/search?q=" + query + "' -A 'Mozilla/5.0' -o /tmp/nox_search.html 2>/dev/null");
+    return __file_read("/tmp/nox_search.html");
+}
+
 // Type text into focused window
 pub fn nox_type(text) {
     __system("python3 /home/lupin/Origin/nox_type.py '" + text + "'");

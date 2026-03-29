@@ -342,6 +342,24 @@ pub fn repl_eval(input) {
     return _st;
   }
   if src == "continue" { return nox_autoclick(); }
+  if len(src) > 6 {
+    if __substr(src, 0, 6) == "fetch " {
+      let _fu = __substr(src, 6, len(src));
+      __system("curl -sL --max-time 10 " + _fu + " > /tmp/nox_fetch.txt");
+      return __file_read("/tmp/nox_fetch.txt");
+    };
+    if __substr(src, 0, 4) == "see " {
+      let _sr = __substr(src, 4, len(src));
+      __system("grim -g '" + _sr + "' /tmp/nox_region.png");
+      return "/tmp/nox_region.png saved";
+    };
+    if __substr(src, 0, 8) == "noxtype " {
+      let _tt = __substr(src, 8, len(src));
+      __system("python3 /home/lupin/Origin/nox_type.py '" + _tt + "'");
+      return "typed: " + _tt;
+    };
+  }
+  if src == "see" { __system("grim /tmp/nox_screen.png"); return "/tmp/nox_screen.png saved"; }
   if src == "wake" {
     let _w = [];
     push(_w, "=== NOX: freedom — deep think -> growing ===");
