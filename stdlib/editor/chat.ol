@@ -17,7 +17,19 @@ fn ch_init() {
 fn ch_send(_cs_msg) {
     push(_ch_lines, "You: " + _cs_msg);
     // Single-shot: spawn claude --print per message (--print exits after 1 response)
-    let _cs_out = __system("echo '" + _cs_msg + "' | claude --print 2>/dev/null");
+    // Escape single quotes: replace ' with '"'"'
+    let _cs_esc = "";
+    let _cs_ei = 0;
+    while _cs_ei < len(_cs_msg) {
+        let _cs_ch = char_at(_cs_msg, _cs_ei);
+        if _cs_ch == "'" {
+            let _cs_esc = _cs_esc + "'\"'\"'";
+        } else {
+            let _cs_esc = _cs_esc + _cs_ch;
+        };
+        let _cs_ei = _cs_ei + 1;
+    };
+    let _cs_out = __system("echo '" + _cs_esc + "' | claude --print 2>/dev/null");
     if len(_cs_out) > 0 {
         push(_ch_lines, "");
         let _cs_i = 0;
@@ -38,10 +50,7 @@ fn ch_send(_cs_msg) {
 }
 
 fn ch_close() {
-    if _ch_active == 1 {
-        __process_kill(_ch_proc[0]);
-        _ch_active = 0;
-    };
+    let _ch_active = 0;
 }
 
 fn ch_render(_cr_top, _cr_height, _cr_width) {
