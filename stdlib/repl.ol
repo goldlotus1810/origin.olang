@@ -437,6 +437,7 @@ pub fn repl_eval(input) {
   let _re_code = _expand_use(_re_code);
 
   // Phase 1: Tokenize
+  _g_parse_source = _re_code;
   let tokens = tokenize(_re_code);
   if len(tokens) == 0 { return ""; }
 

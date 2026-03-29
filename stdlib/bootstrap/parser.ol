@@ -73,6 +73,44 @@ type MatchArm {
 
 // ── Parse error flag (global, checked by repl.ol) ───────────────
 let _g_parse_error = 0;
+let _g_parse_source = "";   // source string for error context
+
+fn _parse_err(tok, msg) {
+    let _pe_line = __to_string(tok.line);
+    let _pe_col = __to_string(tok.col);
+    emit "error[" + _pe_line + ":" + _pe_col + "] " + msg;
+    // Show source line with caret if source available
+    if len(_g_parse_source) > 0 {
+        // Find the line in source
+        let _pe_src = _g_parse_source;
+        let _pe_ln = 1;
+        let _pe_start = 0;
+        let _pe_i = 0;
+        while _pe_i < len(_pe_src) {
+            if _pe_ln == tok.line { break; };
+            if char_at(_pe_src, _pe_i) == "\n" { let _pe_ln = _pe_ln + 1; let _pe_start = _pe_i + 1; };
+            let _pe_i = _pe_i + 1;
+        };
+        // Find end of line
+        let _pe_end = _pe_start;
+        while _pe_end < len(_pe_src) {
+            if char_at(_pe_src, _pe_end) == "\n" { break; };
+            let _pe_end = _pe_end + 1;
+        };
+        let _pe_srcline = __substr(_pe_src, _pe_start, _pe_end);
+        if len(_pe_srcline) > 80 { _pe_srcline = __substr(_pe_srcline, 0, 80); };
+        emit "  " + _pe_srcline;
+        // Caret
+        let _pe_caret = "  ";
+        let _pe_ci = 1;
+        while _pe_ci < tok.col {
+            _pe_caret = _pe_caret + " ";
+            _pe_ci = _pe_ci + 1;
+        };
+        emit _pe_caret + "^";
+    };
+    let _g_parse_error = 1;
+}
 
 // ── ArrayComp globals (depth-indexed — arrays unsafe due to heap overlap) ──
 let _g_parser_comp_depth = 0;
@@ -125,12 +163,10 @@ fn expect_symbol(p, sym) {
     if __match_enum(tok.kind, "TokenKind::Symbol") == 1 {
         let ch = __enum_field(tok.kind, 0);
         if ch != sym {
-            emit "Parse error at line " + __to_string(tok.line) + ": expected '" + sym + "' got '" + ch + "'";
-            let _g_parse_error = 1;
+            _parse_err(tok, "expected '" + sym + "' got '" + ch + "'");
         };
     } else {
-        emit "Parse error at line " + __to_string(tok.line) + ": expected symbol '" + sym + "'";
-        let _g_parse_error = 1;
+        _parse_err(tok, "expected symbol '" + sym + "'");
     };
     return tok;
 }
@@ -146,8 +182,7 @@ fn expect_ident(p) {
             let name = __enum_field(tok.kind, 0);
             return name;
         } else {};
-        emit "Parse error at line " + __to_string(tok.line) + ": expected identifier, got '" + tok.text + "'";
-        let _g_parse_error = 1;
+        _parse_err(tok, "expected identifier, got '" + tok.text + "'");
         return "";
     };
 }
@@ -649,13 +684,11 @@ fn parse_primary(p) {
             let packed = mol_new(s, r, v, a, t);
             return Expr::MolLiteral { packed: packed };
         };
-        emit "Parse error at line " + __to_string(tok.line) + ": unexpected symbol '" + ch + "'";
-        let _g_parse_error = 1;
+        _parse_err(tok, "unexpected symbol '" + ch + "'");
         _skip_to_sync(p);
         return Expr::NumLit { value: 0 };
     } else {
-        emit "Parse error at line " + __to_string(tok.line) + ": unexpected token '" + tok.text + "'";
-        let _g_parse_error = 1;
+        _parse_err(tok, "unexpected token '" + tok.text + "'");
         _skip_to_sync(p);
         return Expr::NumLit { value: 0 };
     }; }; }; }; };
