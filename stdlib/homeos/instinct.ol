@@ -165,19 +165,7 @@ pub fn instinct_act(_ia_result, _ia_input) {
 // String helpers (simple, no external deps)
 // ════════════════════════════════════════════════════════════════
 
-fn _ir_lower(_s) {
-    let _rl_out = "";
-    let _rl_i = 0;
-    while _rl_i < len(_s) {
-        let _rl_c = __char_code(char_at(_s, _rl_i));
-        if _rl_c >= 65 {
-            if _rl_c <= 90 { let _rl_c = _rl_c + 32; };
-        };
-        let _rl_out = _rl_out + __from_char_code(_rl_c);
-        let _rl_i = _rl_i + 1;
-    };
-    return _rl_out;
-}
+// _ir_lower removed — dead code (uses non-existent __from_char_code)
 
 fn _ir_has_word(_s, _w) {
     let _hw_i = 0;
