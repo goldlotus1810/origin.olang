@@ -306,7 +306,7 @@ fn _is_compose_facts(_icf_facts) {
     let _icf_mols = [];
     let _icf_i = 0;
     while _icf_i < len(_icf_facts) {
-        let _icf_m = _kt_fact_mol_compute(__array_get(_icf_facts, _icf_i));
+        let _icf_m = _kt_fast_mol(__array_get(_icf_facts, _icf_i));
         if _icf_m > 0 { push(_icf_mols, _icf_m); };
         let _icf_i = _icf_i + 1;
     };
@@ -324,7 +324,7 @@ fn _is_fact_entropy(_ife_facts) {
     while _ife_ci < 16 { push(_ife_counts, 0); let _ife_ci = _ife_ci + 1; };
     let _ife_fi = 0;
     while _ife_fi < _ife_n {
-        let _ife_m = _kt_fact_mol_compute(__array_get(_ife_facts, _ife_fi));
+        let _ife_m = _kt_fast_mol(__array_get(_ife_facts, _ife_fi));
         let _ife_s = _kt_mol_s(_ife_m);
         let _ = __set_at(_ife_counts, _ife_s, __array_get(_ife_counts, _ife_s) + 1);
         let _ife_fi = _ife_fi + 1;
@@ -438,7 +438,7 @@ pub fn pipeline(_pl_input) {
     let _pl_chain_mol = chain_summary(_pl_chain);
 
     // ⑩ Fusion: text mol + emotion + ConversationCurve
-    let _pl_text_mol = _kt_fact_mol_compute(_pl_input);
+    let _pl_text_mol = _kt_fast_mol(_pl_input);
     let _pl_emo = text_emotion_v2(_pl_input);
     let _pl_context = 0;
     let _pl_fused = fusion(_pl_text_mol, _pl_emo, _pl_context);
@@ -457,7 +457,7 @@ pub fn pipeline(_pl_input) {
 
     // ⑫ Homeostasis: surprise detection
     let _pl_predicted = 0;
-    if len(_pl_facts) > 0 { let _pl_predicted = _kt_fact_mol_compute(__array_get(_pl_facts, 0)); };
+    if len(_pl_facts) > 0 { let _pl_predicted = _kt_fast_mol(__array_get(_pl_facts, 0)); };
     let _pl_home = homeostasis(_pl_fused, _pl_predicted);
 
     // ──── CHECKPOINT 2: ENCODE ────
@@ -476,7 +476,7 @@ pub fn pipeline(_pl_input) {
     let _pl_fi = 0;
     while _pl_fi < len(_pl_facts) {
         if _pl_fi < 5 {
-            let _pl_fm = _kt_fact_mol_compute(__array_get(_pl_facts, _pl_fi));
+            let _pl_fm = _kt_fast_mol(__array_get(_pl_facts, _pl_fi));
             if _pl_fm > 0 { push(_pl_fact_mols, _pl_fm); };
         };
         let _pl_fi = _pl_fi + 1;

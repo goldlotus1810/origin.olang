@@ -102,54 +102,7 @@ fn _kt_mol_v(_m) { return (__floor(_m / 32)) % 8; }
 fn _kt_mol_a(_m) { return (__floor(_m / 4)) % 8; }
 fn _kt_mol_t(_m) { return _m % 4; }
 
-// Compute composite molecule for a text
-// Stage 1: blend word P_weights from UDC table → S, R, T dimensions
-// Stage 2: overlay emotional V, A from text_emotion_v2() → semantic placement
-fn _kt_fact_mol_compute(_kfm_text) {
-    _kt_ensure_init();
-    // Stage 1: UDC P_weight composite → gives S, R, T
-    let _kfm_pw = __text_to_pw(_kfm_text, __kt_tbl);
-    let _kfm_plen = __array_len(_kfm_pw);
-    if _kfm_plen == 0 { return 0; };
-    let _kfm_mol = [__array_get(_kfm_pw, 0)];
-    let _kfm_i = 2;
-    while _kfm_i < _kfm_plen {
-        let _kfm_cur = __array_get(_kfm_mol, 0);
-        let _kfm_nw = __array_get(_kfm_pw, _kfm_i);
-        if _kfm_nw > 0 {
-            let _cs = (__floor(_kfm_cur / 4096)) % 16;
-            let _cr = (__floor(_kfm_cur / 256)) % 16;
-            let _cv = (__floor(_kfm_cur / 32)) % 8;
-            let _ca = (__floor(_kfm_cur / 4)) % 8;
-            let _ct = _kfm_cur % 4;
-            let _ns = (__floor(_kfm_nw / 4096)) % 16;
-            let _nr = (__floor(_kfm_nw / 256)) % 16;
-            let _nv = (__floor(_kfm_nw / 32)) % 8;
-            let _na = (__floor(_kfm_nw / 4)) % 8;
-            let _nt = _kfm_nw % 4;
-            let _rs = (__floor(((_cs * 2) + _ns) / 3)) % 16;
-            let _rr = (__floor(((_cr * 2) + _nr) / 3)) % 16;
-            let _rv = (__floor(((_cv * 2) + _nv) / 3)) % 8;
-            let _ra = (__floor(((_ca * 2) + _na) / 3)) % 8;
-            let _rt = (__floor(((_ct * 2) + _nt) / 3)) % 4;
-            let _kfm_res = (_rs * 4096) + (_rr * 256) + (_rv * 32) + (_ra * 4) + _rt;
-            let _ = __set_at(_kfm_mol, 0, _kfm_res);
-        };
-        let _kfm_i = _kfm_i + 2;
-    };
-    // Stage 2: Emotional overlay — replace V/A with text_emotion_v2()
-    let _kfm_emo = text_emotion_v2(_kfm_text);
-    let _kfm_base = __array_get(_kfm_mol, 0);
-    let _kfm_s = (__floor(_kfm_base / 4096)) % 16;
-    let _kfm_r = (__floor(_kfm_base / 256)) % 16;
-    let _kfm_t = _kfm_base % 4;
-    // V/A from emotion (0-7 range, matches dimension width)
-    let _kfm_ev = _kfm_emo.v;
-    let _kfm_ea = _kfm_emo.a;
-    if _kfm_ev > 7 { let _kfm_ev = 7; };
-    if _kfm_ea > 7 { let _kfm_ea = 7; };
-    return (_kfm_s * 4096) + (_kfm_r * 256) + (_kfm_ev * 32) + (_kfm_ea * 4) + _kfm_t;
-}
+// _kt_fact_mol_compute removed — replaced by _kt_fast_mol everywhere (no __text_to_pw allocation)
 
 // Fast molecule: hash text chars → u16 mol (NO heap allocation, NO text_emotion_v2)
 fn _kt_fast_mol(_kfm_text) {
@@ -555,7 +508,7 @@ fn _kt_abs(_v) { if _v < 0 { return 0 - _v; }; return _v; }
 pub fn kt_decode(_kd_query) {
     _kt_dim_init();
     // Compute query molecule (same pipeline as encode)
-    let _kd_mol = _kt_fact_mol_compute(_kd_query);
+    let _kd_mol = _kt_fast_mol(_kd_query);
     if _kd_mol == 0 { return { facts: [], mol: 0, dims: "none" }; };
     let _kd_s = _kt_mol_s(_kd_mol);
     let _kd_r = _kt_mol_r(_kd_mol);

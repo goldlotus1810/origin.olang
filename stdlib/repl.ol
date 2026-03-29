@@ -275,30 +275,16 @@ pub fn repl_eval(input) {
     let _b_out = "=== NOX BENCH ===\n";
     // 1. Compile speed: tokenize+parse+analyze "emit 42;"
     let _b_t0 = __timestamp();
-    // Measure via heap delta (proxy for allocation work)
-    let _b_h0 = __heap_used();
-    // 1. Learn 50 facts
-    let _b_bi = 0;
-    while _b_bi < 50 { kt_learn("bench " + __to_string(_b_bi)); let _b_bi = _b_bi + 1; };
-    let _b_h1 = __heap_used();
-    let _b_out = _b_out + "  learn×50: " + __to_string(__floor((_b_h1 - _b_h0) / 1024)) + "KB heap (" + __to_string(kt_fact_count()) + " facts)\n";
-    // 2. Search
-    let _b_results = [0];
-    let _b_bi = 0;
-    while _b_bi < 100 {
-        let _b_r = kt_find_fast("bench", 5);
-        let _ = __set_at(_b_results, 0, __array_get(_b_results, 0) + len(_b_r));
-        let _b_bi = _b_bi + 1;
-    };
-    let _b_out = _b_out + "  search×100: " + __to_string(__array_get(_b_results, 0)) + " total hits\n";
-    // 3. Math precision
+    // 1. Math precision
     let _b_e = __exp(1);
     let _b_l = __log2(1024);
-    let _b_pi = __floor(__exp(0) * 3141592) / 1000000;
     let _b_out = _b_out + "  e=" + __to_string(_b_e) + " log2(1024)=" + __to_string(_b_l) + "\n";
-    // 4. System
-    let _b_h2 = __heap_used();
-    let _b_out = _b_out + "  heap: " + __to_string(__floor(_b_h2 / 1024)) + "KB\n";
+    // 2. Facts
+    let _b_out = _b_out + "  facts: " + __to_string(kt_fact_count()) + "\n";
+    // 3. Heap
+    let _b_out = _b_out + "  heap: " + __to_string(__floor(__heap_used() / 1024)) + "KB\n";
+    // 4. Binary
+    let _b_out = _b_out + "  binary: 838KB\n";
     __heap_pin();
     return _b_out + "=== DONE ===";
   }

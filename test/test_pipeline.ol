@@ -16,8 +16,8 @@ let _tp_l1 = __log2(8);
 if _tp_l1 != 3 { let _ = __set_at(_tp_ok, 0, 0); push(_tp_err, "log2(8) != 3"); };
 
 // Test homeostasis
-let _tp_m1 = _kt_fact_mol_compute("Ha Noi");
-let _tp_m2 = _kt_fact_mol_compute("Ha Noi la thu do");
+let _tp_m1 = _kt_fast_mol("Ha Noi");
+let _tp_m2 = _kt_fast_mol("Ha Noi la thu do");
 let _tp_h = homeostasis(_tp_m1, _tp_m2);
 emit "homeostasis: " + _tp_h.mode + " energy=" + __to_string(_tp_h.energy);
 
