@@ -1655,6 +1655,9 @@ op_call:
     movabs  $0x74AEDE408DC6787F, %rdx
     cmp     %rdx, %rax
     je      .call_substr
+    movabs  $0x43BF88AC199E0F7F, %rdx
+    cmp     %rdx, %rax
+    je      .call_pipe_write
     jmp     .call_not_builtin
 
 .builtin_slot_130:
@@ -1670,6 +1673,12 @@ op_call:
     movabs  $0x9AB0ED8E471CE883, %rdx
     cmp     %rdx, %rax
     je      .call_mol_s
+    jmp     .call_not_builtin
+
+.builtin_slot_132:
+    movabs  $0x8C886912ECD5B384, %rdx
+    cmp     %rdx, %rax
+    je      .call_pipe_read
     jmp     .call_not_builtin
 
 .builtin_slot_134:
@@ -1702,6 +1711,12 @@ op_call:
     je      .call_array_with_cap
     jmp     .call_not_builtin
 
+.builtin_slot_150:
+    movabs  $0xFA0534C1678E4C96, %rdx
+    cmp     %rdx, %rax
+    je      .call_poll_ready
+    jmp     .call_not_builtin
+
 .builtin_slot_151:
     movabs  $0x9FC459281D29BE97, %rdx
     cmp     %rdx, %rax
@@ -1715,6 +1730,9 @@ op_call:
     movabs  $0x07515EC1BC3E1099, %rdx
     cmp     %rdx, %rax
     je      .call_char_code
+    movabs  $0xDD618E16BD8BB399, %rdx
+    cmp     %rdx, %rax
+    je      .call_process_kill
     jmp     .call_not_builtin
 
 .builtin_slot_156:
@@ -1895,6 +1913,15 @@ op_call:
     movabs  $0x33D6385F6238A2E4, %rdx
     cmp     %rdx, %rax
     je      .call_stdout_on
+    jmp     .call_not_builtin
+
+.builtin_slot_230:
+    movabs  $0x439C4F9D5AADD1E6, %rdx
+    cmp     %rdx, %rax
+    je      .call_spawn
+    movabs  $0x8D4B1BD1C28396E6, %rdx
+    cmp     %rdx, %rax
+    je      .call_process_alive
     jmp     .call_not_builtin
 
 .builtin_slot_233:
@@ -8417,6 +8444,377 @@ op_ret:
     mov     $1, %rdi
     syscall
 
+# ═══════════════════════════════════════════════════════════════════════════
+# __spawn(cmd) → [pid, stdin_write_fd, stdout_read_fd]
+# Fork + exec /bin/sh -c cmd, return array with pid and pipe fds
+# ═══════════════════════════════════════════════════════════════════════════
+.call_spawn:
+    add     %rcx, %r13
+    # Pop command string
+    mov     (%r14), %rsi
+    mov     8(%r14), %rdx
+    add     $16, %r14
+
+    # Decode molecules to C string
+    lea     sha_input(%rip), %rdi
+    xor     %ecx, %ecx
+.spawn_dec:
+    cmp     %rdx, %rcx
+    jge     .spawn_dec_done
+    movzbl  (%rsi, %rcx, 2), %eax
+    mov     %al, (%rdi, %rcx)
+    inc     %rcx
+    jmp     .spawn_dec
+.spawn_dec_done:
+    movb    $0, (%rdi, %rcx)
+
+    # Create stdin pipe (parent writes, child reads)
+    sub     $16, %rsp
+    mov     %rsp, %rdi
+    mov     $22, %eax                   # SYS_pipe
+    syscall
+    test    %rax, %rax
+    js      .spawn_fail
+    # stdin_pipe: [0]=read_fd, [4]=write_fd
+
+    # Create stdout pipe (child writes, parent reads)
+    sub     $16, %rsp
+    mov     %rsp, %rdi
+    mov     $22, %eax
+    syscall
+    test    %rax, %rax
+    js      .spawn_fail_close_stdin
+    # stdout_pipe: [0]=read_fd, [4]=write_fd
+    # Stack: [stdout_read, stdout_write, stdin_read, stdin_write]
+
+    # fork
+    mov     $57, %eax
+    syscall
+    test    %rax, %rax
+    js      .spawn_fail_close_both
+    jnz     .spawn_parent
+
+    # ── Child ──
+    # Redirect stdin: dup2(stdin_pipe.read, 0)
+    mov     16(%rsp), %edi              # stdin read fd
+    xor     %esi, %esi                  # fd 0 = stdin
+    mov     $33, %eax
+    syscall
+    # Redirect stdout: dup2(stdout_pipe.write, 1)
+    mov     4(%rsp), %edi               # stdout write fd
+    mov     $1, %esi
+    mov     $33, %eax
+    syscall
+    # Redirect stderr to stdout too
+    mov     4(%rsp), %edi
+    mov     $2, %esi
+    mov     $33, %eax
+    syscall
+    # Close all pipe fds in child
+    mov     (%rsp), %edi
+    mov     $3, %eax
+    syscall
+    mov     4(%rsp), %edi
+    mov     $3, %eax
+    syscall
+    mov     16(%rsp), %edi
+    mov     $3, %eax
+    syscall
+    mov     20(%rsp), %edi
+    mov     $3, %eax
+    syscall
+    # execve /bin/sh -c cmd
+    sub     $32, %rsp
+    lea     bin_sh_path(%rip), %rax
+    mov     %rax, (%rsp)
+    lea     sh_c_arg(%rip), %rax
+    mov     %rax, 8(%rsp)
+    lea     sha_input(%rip), %rax
+    mov     %rax, 16(%rsp)
+    movq    $0, 24(%rsp)
+    lea     bin_sh_path(%rip), %rdi
+    mov     %rsp, %rsi
+    xor     %edx, %edx
+    mov     $59, %eax
+    syscall
+    mov     $60, %eax
+    mov     $127, %edi
+    syscall
+
+.spawn_parent:
+    mov     %eax, %ebx                  # save child pid
+    # Close child ends: stdin read, stdout write
+    mov     16(%rsp), %edi              # stdin read fd
+    mov     $3, %eax
+    syscall
+    mov     4(%rsp), %edi               # stdout write fd
+    mov     $3, %eax
+    syscall
+    # Keep: stdin_write=20(%rsp), stdout_read=(%rsp)
+    movl    20(%rsp), %r8d              # stdin_write_fd
+    movl    (%rsp), %r9d                # stdout_read_fd
+    add     $32, %rsp                   # pop both pipe arrays
+
+    # Build result array [pid, stdin_write_fd, stdout_read_fd] on heap
+    mov     %r15, %rdi                  # array base
+    movq    $3, (%r15)                  # count = 3
+    add     $8, %r15                    # past header
+    # elem 0: pid
+    cvtsi2sd %ebx, %xmm0
+    movsd   %xmm0, (%r15)
+    movq    $F64_MARKER, 8(%r15)
+    add     $16, %r15
+    # elem 1: stdin_write_fd
+    cvtsi2sd %r8d, %xmm0
+    movsd   %xmm0, (%r15)
+    movq    $F64_MARKER, 8(%r15)
+    add     $16, %r15
+    # elem 2: stdout_read_fd
+    cvtsi2sd %r9d, %xmm0
+    movsd   %xmm0, (%r15)
+    movq    $F64_MARKER, 8(%r15)
+    add     $16, %r15
+
+    # Push array on VM stack
+    sub     $16, %r14
+    mov     %rdi, (%r14)
+    movq    $ARRAY_MARKER, 8(%r14)
+    jmp     vm_loop
+
+.spawn_fail_close_both:
+    mov     (%rsp), %edi
+    mov     $3, %eax
+    syscall
+    mov     4(%rsp), %edi
+    mov     $3, %eax
+    syscall
+    add     $16, %rsp
+.spawn_fail_close_stdin:
+    mov     (%rsp), %edi
+    mov     $3, %eax
+    syscall
+    mov     4(%rsp), %edi
+    mov     $3, %eax
+    syscall
+    add     $16, %rsp
+.spawn_fail:
+    # Return empty array on failure
+    mov     %r15, %rdi
+    movq    $0, (%r15)
+    add     $8, %r15
+    sub     $16, %r14
+    mov     %rdi, (%r14)
+    movq    $ARRAY_MARKER, 8(%r14)
+    jmp     vm_loop
+
+# ═══════════════════════════════════════════════════════════════════════════
+# __pipe_read(fd) → string (non-blocking read from fd)
+# ═══════════════════════════════════════════════════════════════════════════
+.call_pipe_read:
+    add     %rcx, %r13
+    movsd   (%r14), %xmm0
+    cvttsd2si %xmm0, %edi              # fd
+    add     $16, %r14
+
+    # poll(fd, POLLIN, 0) — check if data available (non-blocking)
+    sub     $16, %rsp
+    movl    %edi, (%rsp)               # pollfd.fd
+    movw    $1, 4(%rsp)                # pollfd.events = POLLIN
+    movw    $0, 6(%rsp)                # pollfd.revents = 0
+    mov     %rsp, %rdi                 # pfd
+    mov     $1, %esi                   # nfds
+    xor     %edx, %edx                 # timeout = 0 (non-blocking)
+    mov     $7, %eax                   # SYS_poll
+    syscall
+    test    %rax, %rax
+    jle     .pipe_read_empty
+
+    # Data available — read
+    movl    (%rsp), %edi               # fd
+    add     $16, %rsp
+    mov     %r15, %rbp                 # raw output start
+    mov     %r15, %rsi                 # buf
+    mov     $4096, %edx
+    xor     %eax, %eax                 # SYS_read
+    syscall
+    test    %rax, %rax
+    jle     .pipe_read_empty2
+
+    # Convert bytes to molecule string
+    mov     %rax, %r8                  # byte count
+    add     %r8, %r15                  # skip raw bytes
+    mov     %r15, %r9                  # molecule start
+    xor     %ecx, %ecx
+.pipe_read_mol:
+    cmp     %r8, %rcx
+    jge     .pipe_read_done
+    movzbl  (%rbp, %rcx), %eax
+    or      $0x2100, %eax
+    movw    %ax, (%r15)
+    add     $2, %r15
+    inc     %rcx
+    jmp     .pipe_read_mol
+.pipe_read_done:
+    sub     $16, %r14
+    mov     %r9, (%r14)
+    mov     %r8, 8(%r14)
+    jmp     vm_loop
+
+.pipe_read_empty:
+    add     $16, %rsp
+.pipe_read_empty2:
+    sub     $16, %r14
+    xor     %eax, %eax
+    mov     %rax, (%r14)
+    mov     %rax, 8(%r14)
+    jmp     vm_loop
+
+# ═══════════════════════════════════════════════════════════════════════════
+# __pipe_write(fd, data) → bytes_written
+# ═══════════════════════════════════════════════════════════════════════════
+.call_pipe_write:
+    add     %rcx, %r13
+    # Pop data string (arg 2 — on top)
+    mov     (%r14), %rsi               # mol ptr
+    mov     8(%r14), %r8               # mol count
+    add     $16, %r14
+    # Pop fd (arg 1 — below)
+    movsd   (%r14), %xmm0
+    cvttsd2siq %xmm0, %rbx            # fd (use 64-bit convert)
+    add     $16, %r14
+
+    # Decode molecules to bytes in sha_input
+    lea     sha_input(%rip), %rdi
+    xor     %ecx, %ecx
+.pw_dec:
+    cmp     %r8, %rcx
+    jge     .pw_write
+    movzbl  (%rsi, %rcx, 2), %eax
+    mov     %al, (%rdi, %rcx)
+    inc     %rcx
+    jmp     .pw_dec
+.pw_write:
+    # write(fd, buf, len)
+    mov     %ebx, %edi
+    lea     sha_input(%rip), %rsi
+    mov     %r8, %rdx
+    mov     $1, %eax                   # SYS_write
+    syscall
+    # Push bytes written
+    sub     $16, %r14
+    test    %rax, %rax
+    js      .pw_err
+    cvtsi2sd %rax, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+.pw_err:
+    xorpd   %xmm0, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+# ═══════════════════════════════════════════════════════════════════════════
+# __poll_ready(fd, timeout_ms) → 0 or 1
+# ═══════════════════════════════════════════════════════════════════════════
+.call_poll_ready:
+    add     %rcx, %r13
+    # Pop timeout_ms
+    movsd   (%r14), %xmm0
+    cvttsd2si %xmm0, %edx             # timeout
+    add     $16, %r14
+    # Pop fd
+    movsd   (%r14), %xmm0
+    cvttsd2si %xmm0, %edi             # fd
+    add     $16, %r14
+
+    sub     $16, %rsp
+    movl    %edi, (%rsp)
+    movw    $1, 4(%rsp)                # POLLIN
+    movw    $0, 6(%rsp)
+    mov     %rsp, %rdi
+    mov     $1, %esi
+    # edx already has timeout
+    mov     $7, %eax                   # SYS_poll
+    syscall
+    add     $16, %rsp
+
+    # Return 1 if ready, 0 if not
+    sub     $16, %r14
+    test    %rax, %rax
+    jg      .poll_ready_yes
+    xorpd   %xmm0, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+.poll_ready_yes:
+    mov     $1, %rax
+    cvtsi2sd %rax, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+# ═══════════════════════════════════════════════════════════════════════════
+# __process_alive(pid) → 0 or 1
+# ═══════════════════════════════════════════════════════════════════════════
+.call_process_alive:
+    add     %rcx, %r13
+    movsd   (%r14), %xmm0
+    cvttsd2si %xmm0, %edi             # pid
+    add     $16, %r14
+
+    # waitpid(pid, &status, WNOHANG)
+    sub     $16, %rsp
+    mov     %rsp, %rsi                 # &status
+    mov     $1, %edx                   # WNOHANG
+    xor     %r10d, %r10d
+    mov     $61, %eax                  # SYS_wait4
+    syscall
+    add     $16, %rsp
+
+    sub     $16, %r14
+    # If waitpid returned 0, child still running → alive=1
+    # If returned pid or error → not alive → 0
+    test    %rax, %rax
+    jnz     .proc_dead
+    mov     $1, %rax
+    cvtsi2sd %rax, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+.proc_dead:
+    xorpd   %xmm0, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+# ═══════════════════════════════════════════════════════════════════════════
+# __process_kill(pid) → 0 or 1
+# ═══════════════════════════════════════════════════════════════════════════
+.call_process_kill:
+    add     %rcx, %r13
+    movsd   (%r14), %xmm0
+    cvttsd2si %xmm0, %edi             # pid
+    add     $16, %r14
+
+    mov     $15, %esi                  # SIGTERM
+    mov     $62, %eax                  # SYS_kill
+    syscall
+
+    sub     $16, %r14
+    test    %rax, %rax
+    js      .kill_fail
+    mov     $1, %rax
+    cvtsi2sd %rax, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+.kill_fail:
+    xorpd   %xmm0, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
 .section .rodata
 .err_prefix:
     .ascii  "Error: "
@@ -11745,7 +12143,7 @@ builtin_jump_table:
     .quad   .call_not_builtin
     .quad   .builtin_slot_130
     .quad   .builtin_slot_131
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_132
     .quad   .call_not_builtin
     .quad   .builtin_slot_134
     .quad   .call_not_builtin
@@ -11763,7 +12161,7 @@ builtin_jump_table:
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .call_not_builtin
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_150
     .quad   .builtin_slot_151
     .quad   .call_not_builtin
     .quad   .builtin_slot_153
@@ -11843,7 +12241,7 @@ builtin_jump_table:
     .quad   .call_not_builtin
     .quad   .builtin_slot_228
     .quad   .call_not_builtin
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_230
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .builtin_slot_233

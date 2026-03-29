@@ -869,6 +869,24 @@ run_olang_test "system/echo" \
 run_olang_test "system/readdir" \
     'let f=__readdir("stdlib/editor");emit __to_string(len(f)>0);' "1"
 
+# ─── SECTION: Process builtins ──────────────────────────────
+echo -e "${CYAN}── Process ──${NC}"
+
+run_olang_test "proc/spawn" \
+    'let p=__spawn("echo proc_ok");__sleep(200);let o=__pipe_read(p[2]);emit o;' "proc_ok"
+
+run_olang_test "proc/poll_stdin" \
+    'emit __to_string(__poll_ready(0,0));' "1"
+
+run_olang_test "proc/pipe_write_stdout" \
+    '__pipe_write(1,"pw_ok\n");' "pw_ok"
+
+run_olang_test "proc/spawn_kill" \
+    'let p=__spawn("sleep 60");let a=__to_string(__process_alive(p[0]));__process_kill(p[0]);__sleep(100);let b=__to_string(__process_alive(p[0]));emit a+b;' "10"
+
+run_olang_test "proc/spawn_array" \
+    'let p=__spawn("echo x");emit __to_string(len(p));' "3"
+
 echo ""
 
 # ═══════════════════════════════════════════════════════════════
