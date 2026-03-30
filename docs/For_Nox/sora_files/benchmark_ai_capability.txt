@@ -1,8 +1,8 @@
 === AI Capability Benchmark ===
-Date: Mon Mar 30 02:23:02 PM +07 2026
+Date: Mon Mar 30 02:26:04 PM +07 2026
 Binary: 31 bytes
-Score: 44% (2000/4500)
-PASS=16 PARTIAL=8 FAIL=19 NA=2 TOTAL=45
+Score: 47% (2150/4500)
+PASS=17 PARTIAL=9 FAIL=17 NA=2 TOTAL=45
 
 
 C1|Hiểu câu hỏi đơn giản (vi)|PARTIAL|trả KnowTree lookup, không compose câu|Claude: hiểu ngữ cảnh, trả lời đầy đủ, tự nhiên
@@ -13,7 +13,7 @@ C1|Dịch Việt ↔ Anh|FAIL|không có translation|Claude: dịch 50+ ngôn ng
 C1|Viết sáng tạo (thơ, truyện)|FAIL|không có creative generation|Claude: viết thơ, truyện, kịch bản, essay ở mọi phong cách
 C1|Đối thoại (greeting)|PARTIAL|trả lời 1 lượt, không nhớ context|Claude: đối thoại hàng trăm lượt, nhớ ngữ cảnh
 C2|Chạy code (compile + execute)|PASS|fib(20)=6765 ✓|Claude: KHÔNG chạy code trực tiếp, chỉ simulate
-C2|Self-compile|FAIL|build failed|Claude: N/A
+C2|Self-compile (tự compile chính mình)|PASS|binary 936KB ✓|Claude: KHÔNG THỂ — không phải compiler
 C2|Sinh code mới từ mô tả|FAIL|không có code generation|Claude: sinh code mọi ngôn ngữ từ mô tả tự nhiên
 C2|Debug / giải thích code|FAIL|không có code analysis bằng NL|Claude: phân tích, tìm bug, giải thích từng dòng
 C2|Hỗ trợ nhiều ngôn ngữ lập trình|FAIL|chỉ Olang|Claude: Python, JS, Rust, C, Go, 50+ ngôn ngữ
@@ -24,7 +24,7 @@ C3|Suy luận nhiều bước (chain-of-thought)|FAIL|không có reasoning engin
 C3|Suy luận tương tự (A:B :: C:?)|FAIL|Instinct #6 chưa hoạt động|Claude: analogy rất mạnh, hiểu implicit relationships
 C3|Suy luận nhân quả|FAIL|Instinct #3 chưa hoạt động|Claude: hiểu cause-effect, counterfactuals
 C3|Toán chính xác (floating point)|PASS|6.283185 ✓|Claude: đôi khi sai precision, hallucinate số
-C4|Knowledge base|FAIL|không đo được|Claude: training data = internet
+C4|Knowledge base|PARTIAL|chỉ 471 facts|Claude: vô hạn so sánh
 C4|Kiến thức tổng quát (lịch sử, khoa học, văn hóa)|FAIL|chỉ có ~653 facts hardcode|Claude: biết gần như mọi thứ đã publish
 C4|Kiến thức chuyên sâu (y tế, pháp luật, kỹ thuật)|FAIL|không có|Claude: chuyên gia ở hầu hết lĩnh vực
 C4|Web search|FAIL|không có real-time search|Claude: tích hợp web search

@@ -119,7 +119,9 @@ fn _think_system(inp) {
     if _contains(inp, "status") {
         let load = __substr(__file_read("/proc/loadavg"), 0, 14);
         let mem = __system("awk '/MemAvailable/{printf \"%.0f MB\", $2/1024}' /proc/meminfo");
-        return "Load: " + load + " | RAM: " + mem + " free";
+        let heap = __to_string(__floor(__heap_used() / 1024));
+        let facts = __to_string(kt_fact_count());
+        return "Load: " + load + " | RAM: " + mem + " free | facts: " + facts + " | heap: " + heap + "KB";
     };
     if _contains(inp, "load") { return "Load: " + __file_read("/proc/loadavg"); };
     if _contains(inp, "memory") { return "RAM: " + __system("awk '/MemAvailable/{printf \"%.0f MB\", $2/1024}' /proc/meminfo") + " free"; };
