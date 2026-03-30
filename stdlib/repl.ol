@@ -317,16 +317,20 @@ pub fn repl_eval(input) {
       if _sc == "evolve" { nox_evolve(); return "evolution complete"; };
       if _sc == "benchmark" { nox_benchmark(); return "benchmark complete"; };
       if _sc == "exit" || _sc == "quit" { __throw("exit"); };
-      // /think <prompt> → Claude
+      // /think <prompt> → Nox Brain (local first, Claude fallback)
       if _sc == "think" { return "Usage: /think <question>"; };
       if len(_sc) > 6 {
         if __substr(_sc, 0, 6) == "think " {
           let _tp = __substr(_sc, 6, len(_sc));
-          emit "Thinking...";
+          // Try Nox Brain first (local, instant)
+          let _tb = nox_brain(_tp);
+          if len(_tb) > 10 { return _tb; };
+          // Fallback to Claude (cloud)
+          emit "Local brain insufficient. Asking Claude...";
           __system("timeout 30 claude -p '" + _tp + "' > /tmp/nox_think.txt 2>/dev/null");
           let _tr = __file_read("/tmp/nox_think.txt");
           if len(_tr) > 0 { return _tr; };
-          return "Claude unavailable";
+          return "Both local and cloud unavailable";
         };
       };
       // /fetch <url>
