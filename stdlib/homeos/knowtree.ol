@@ -308,23 +308,7 @@ pub fn kt_ingest_book(_kib_path) {
 // Search — query → FH lookup → scored results
 // ════════════════════════════════════════════════════════════════
 
-pub fn kt_search(_ks_query) {
-    _kt_ensure_init();
-    // Use __text_to_pw for query → same P_weight key space as ingested data
-    let _ks_pw = __text_to_pw(_ks_query, __kt_tbl);
-    let _ks_plen = __array_len(_ks_pw);
-    let _ks_hits = [0];
-    let _ks_total_freq = [0];
-    let _ks_i = 0;
-    while _ks_i < _ks_plen {
-        let _ks_p = __array_get(_ks_pw, _ks_i);
-        let _ks_idx = __bit_and(_ks_p * 40503, 65535);
-        let _ks_f = __array_get(__kt_pw_freq, _ks_idx);
-        if _ks_f > 0 { let _ = __set_at(_ks_hits, 0, __array_get(_ks_hits, 0) + 1); let _ = __set_at(_ks_total_freq, 0, __array_get(_ks_total_freq, 0) + _ks_f); };
-        let _ks_i = _ks_i + 2;
-    };
-    return { text: "hits=" + __to_string(__array_get(_ks_hits, 0)) + " freq=" + __to_string(__array_get(_ks_total_freq, 0)), score: __array_get(_ks_hits, 0) };
-}
+// kt_search_pw removed — replaced by word-overlap ranked search below
 
 // ════════════════════════════════════════════════════════════════
 // Stats
@@ -382,6 +366,116 @@ pub fn kt_find_fast(_kff_word, _kff_max) {
 
 pub fn kt_fact_count() {
     return len(__kt_facts_arr);
+}
+
+// RANKED search: score each fact by word overlap with query
+// Returns BEST match, not first match
+pub fn kt_search(query) {
+    let words = _kt_split(query);
+    if len(words) == 0 { return ""; };
+    let best_idx = [-1];
+    let best_score = [0];
+    let fi = 0;
+    while fi < len(__kt_facts_arr) {
+        let fact = __kt_facts_arr[fi];
+        if __type_of(fact) == "string" {
+            let score = _kt_score(words, fact);
+            if score > best_score[0] { set_at(best_idx, 0, fi); set_at(best_score, 0, score); };
+        };
+        fi = fi + 1;
+    };
+    if best_idx[0] >= 0 { return __kt_facts_arr[best_idx[0]]; };
+    return "";
+}
+
+// RANKED search: return top N matches sorted by relevance
+pub fn kt_search_n(query, n) {
+    let words = _kt_split(query);
+    if len(words) == 0 { return []; };
+    // Collect all scored facts
+    let scored = [];
+    let fi = 0;
+    while fi < len(__kt_facts_arr) {
+        let fact = __kt_facts_arr[fi];
+        let score = _kt_score(words, fact);
+        if score > 0 { push(scored, fact); push(scored, score); };
+        fi = fi + 1;
+    };
+    // Find top N by score (simple selection)
+    let results = [];
+    let ri = 0;
+    while ri < n {
+        let best_idx = [-1, 0];
+        let si = 0;
+        while si < len(scored) {
+            if si % 2 == 1 {
+                if scored[si] > best_idx[1] {
+                    set_at(best_idx, 0, si - 1);
+                    set_at(best_idx, 1, scored[si]);
+                };
+            };
+            si = si + 1;
+        };
+        if best_idx[0] >= 0 {
+            push(results, scored[best_idx[0]]);
+            set_at(scored, best_idx[0] + 1, 0);
+        };
+        ri = ri + 1;
+    };
+    return results;
+}
+
+// Score a fact against query words
+fn _kt_score(query_words, fact) {
+    let score = 0;
+    let qi = 0;
+    while qi < len(query_words) {
+        let word = query_words[qi];
+        let wlen = len(word);
+        if wlen >= 2 {
+            // Check if word appears in fact (substring match)
+            let fi = 0;
+            while fi <= len(fact) - wlen {
+                let match = 1;
+                let ci = 0;
+                while ci < wlen {
+                    let fc = __char_code(char_at(fact, fi + ci));
+                    let wc = __char_code(char_at(word, ci));
+                    // Case-insensitive: lowercase both
+                    if fc >= 65 { if fc <= 90 { fc = fc + 32; }; };
+                    if wc >= 65 { if wc <= 90 { wc = wc + 32; }; };
+                    if fc != wc { match = 0; break; };
+                    ci = ci + 1;
+                };
+                if match == 1 { score = score + wlen; fi = len(fact); };
+                fi = fi + 1;
+            };
+        };
+        qi = qi + 1;
+    };
+    return score;
+}
+
+// Split string into words
+fn _kt_split(s) {
+    let words = [];
+    let start = 0;
+    let i = 0;
+    while i <= len(s) {
+        let is_sep = 0;
+        if i == len(s) { is_sep = 1; };
+        if i < len(s) {
+            let c = __char_code(char_at(s, i));
+            if c == 32 { is_sep = 1; };
+            if c == 63 { is_sep = 1; };
+        };
+        if is_sep == 1 {
+            if i > start { push(words, __substr(s, start, i)); };
+            start = i + 1;
+        };
+        i = i + 1;
+    };
+    return words;
 }
 
 // ════════════════════════════════════════════════════════════════
