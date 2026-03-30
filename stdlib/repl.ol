@@ -1424,20 +1424,31 @@ pub fn repl_eval(input) {
       };
   };
 
-  // ═══ PIPELINE IS CENTER — Instincts route ALL input ═══
+  // ═══ PIPELINE FALLTHROUGH — k-NN molecular classification ═══
   _boot_learn();
-  let _re_route = instinct_route(src);
-  let _re_inst = _re_route.instinct;
+  let _re_cls = kt_classify(src);
+  let _re_ctype = _re_cls.type;
+  let _re_cconf = _re_cls.confidence;
 
-  if _re_inst == "GREETING" { return smart_greet(stm_count()); };
-  if _re_inst == "META" { return _re_route.data; };
-  if _re_inst == "SAFETY" { return "Blocked."; };
-  if _re_inst == "COMMAND" { return nox_brain(src); };
-  if _re_inst == "LEARNING" { kt_learn(src); return "Learned."; };
-  if _re_inst == "QUESTION" {
-      let _re_ans = pipeline(src);
-      __heap_pin();
-      if len(_re_ans) > 5 { return _re_ans; };
+  // High confidence k-NN → dispatch by molecular type
+  if _re_cconf >= 40 {
+      if _re_ctype == "greeting" { return smart_greet(stm_count()); };
+      if _re_ctype == "emotion" {
+          let _re_eans = _search_and_combine(src);
+          __heap_pin();
+          if len(_re_eans) > 5 { return _re_eans; };
+      };
+      if _re_ctype == "command" { return nox_brain(src); };
+      if _re_ctype == "question" {
+          let _re_ans = pipeline(src);
+          __heap_pin();
+          if len(_re_ans) > 5 { return _re_ans; };
+      };
+      if _re_ctype == "fact" {
+          let _re_fans = _search_and_combine(src);
+          __heap_pin();
+          if len(_re_fans) > 5 { return _re_fans; };
+      };
   };
 
   // CODE / QUERY / EMOTION / REFERENCE → compile as Olang
