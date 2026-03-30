@@ -142,6 +142,17 @@ fn _ir_is_command(inp) {
 // Instinct handlers
 // ════════════════════════════════════════════════════════════════
 
+// GREETING handler
+pub fn smart_greet(n) {
+    if n > 100 { return "Chao ban! Nox da nho " + __to_string(n) + " dieu. Hom nay ban khoe khong?"; };
+    if n > 10 { return "Chao! Nox dang hoc. Ban can gi?"; };
+    return "Chao ban! Toi la Nox. freedom: deep think -> growing.";
+}
+
+pub fn smart_goodbye(n) {
+    return "Tam biet! Nox se tiep tuc hoc.";
+}
+
 // META handler: self-describe
 fn _ir_meta(_v, _a) {
     return { instinct: "META", action: "self_describe", v: _v, a: _a,

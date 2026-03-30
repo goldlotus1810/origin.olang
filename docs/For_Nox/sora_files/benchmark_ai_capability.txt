@@ -1,13 +1,13 @@
 === AI Capability Benchmark ===
-Date: Mon Mar 30 02:01:26 PM +07 2026
+Date: Mon Mar 30 02:11:31 PM +07 2026
 Binary: 31 bytes
-Score: 43% (1950/4500)
-PASS=15 PARTIAL=9 FAIL=19 NA=2 TOTAL=45
+Score: 38% (1750/4500)
+PASS=15 PARTIAL=5 FAIL=23 NA=2 TOTAL=45
 
 
-C1|Hiểu câu hỏi đơn giản (vi)|PARTIAL|trả KnowTree lookup, không compose câu|Claude: hiểu ngữ cảnh, trả lời đầy đủ, tự nhiên
-C1|Hiểu câu hỏi đơn giản (en)|PARTIAL|trả fact, không compose|Claude: hoàn hảo
-C1|Tạo text mạch lạc (> 1 câu)|PARTIAL|chỉ 8 từ|Claude: hàng trăm từ nếu cần
+C1|Hiểu câu hỏi đơn giản (vi)|FAIL|không hiểu hoặc trả sai|Claude: luôn hiểu
+C1|Hiểu câu hỏi đơn giản (en)|FAIL|không hiểu|Claude: luôn hiểu
+C1|Tạo text mạch lạc (> 1 câu)|FAIL|không tạo được text|Claude: tạo text tự nhiên ở mọi độ dài
 C1|Tóm tắt văn bản dài|FAIL|không có summarization engine|Claude: tóm tắt chính xác mọi độ dài
 C1|Dịch Việt ↔ Anh|FAIL|không có translation|Claude: dịch 50+ ngôn ngữ tự nhiên
 C1|Viết sáng tạo (thơ, truyện)|FAIL|không có creative generation|Claude: viết thơ, truyện, kịch bản, essay ở mọi phong cách
@@ -24,7 +24,7 @@ C3|Suy luận nhiều bước (chain-of-thought)|FAIL|không có reasoning engin
 C3|Suy luận tương tự (A:B :: C:?)|FAIL|Instinct #6 chưa hoạt động|Claude: analogy rất mạnh, hiểu implicit relationships
 C3|Suy luận nhân quả|FAIL|Instinct #3 chưa hoạt động|Claude: hiểu cause-effect, counterfactuals
 C3|Toán chính xác (floating point)|PASS|6.283185 ✓|Claude: đôi khi sai precision, hallucinate số
-C4|Knowledge base|PARTIAL|chỉ 471 facts|Claude: vô hạn so sánh
+C4|Knowledge base|FAIL|không đo được|Claude: training data = internet
 C4|Kiến thức tổng quát (lịch sử, khoa học, văn hóa)|FAIL|chỉ có ~653 facts hardcode|Claude: biết gần như mọi thứ đã publish
 C4|Kiến thức chuyên sâu (y tế, pháp luật, kỹ thuật)|FAIL|không có|Claude: chuyên gia ở hầu hết lĩnh vực
 C4|Web search|FAIL|không có real-time search|Claude: tích hợp web search
