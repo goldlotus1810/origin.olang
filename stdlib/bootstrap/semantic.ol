@@ -703,19 +703,21 @@ fn compile_expr(state, expr) {
             };
             if _ce_fname == "pipe" && len(args) >= 2 {
                 // pipe(x, f1, f2, ..., fn) → fn(...f2(f1(x)))
-                // The Lego operator: chain functions together
-                // First arg = initial value, rest = functions to apply
+                // Compile as nested calls: each fn takes previous result
+                // Use unique temp names to avoid scope collision
                 compile_expr(state, args[0]);
-                emit_op(state, make_op_name("Store", "__pp_val"));
+                emit_op(state, make_op_name("StoreUpdate", "__pp_val"));
                 let _pp_i = 1;
                 while _pp_i < len(args) {
                     push(_ce_stack, _pp_i);
+                    // Use unique name per iteration to avoid scope overwrite
+                    let _pp_fn_name = "__pp_fn" + __to_string(_pp_i);
                     compile_expr(state, args[_pp_i]);
                     let _pp_i = pop(_ce_stack);
-                    emit_op(state, make_op_name("Store", "__pp_fn"));
+                    emit_op(state, make_op_name("StoreUpdate", _pp_fn_name));
                     emit_op(state, make_op_name("Load", "__pp_val"));
-                    emit_op(state, make_op_name("Call", "__pp_fn"));
-                    emit_op(state, make_op_name("Store", "__pp_val"));
+                    emit_op(state, make_op_name("Call", _pp_fn_name));
+                    emit_op(state, make_op_name("StoreUpdate", "__pp_val"));
                     let _pp_i = _pp_i + 1;
                 };
                 emit_op(state, make_op_name("Load", "__pp_val"));
