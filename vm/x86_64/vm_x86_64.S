@@ -3295,6 +3295,9 @@ op_call:
     jae     .array_new_push
     mov     %rax, %r15
 .array_new_push:
+    # Auto-pin: protect array from REPL heap restore
+    lea     repl_heap_checkpoint(%rip), %rax
+    mov     %r15, (%rax)
     # Push array
     sub     $16, %r14
     mov     %rdi, (%r14)               # array base ptr
