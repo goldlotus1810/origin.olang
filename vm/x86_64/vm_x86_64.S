@@ -1991,6 +1991,12 @@ op_call:
     je      .call_process_alive
     jmp     .call_not_builtin
 
+.builtin_slot_231:
+    movabs  $0x71C881465E6F6AE7, %rdx
+    cmp     %rdx, %rax
+    je      .call_bytes_ptr
+    jmp     .call_not_builtin
+
 .builtin_slot_233:
     movabs  $0x9FC9B1482B01D5E9, %rdx
     cmp     %rdx, %rax
@@ -4960,28 +4966,34 @@ op_call:
 # Nox can call ANY of the 300+ Linux syscalls
 .call_raw_syscall:
     add     %rcx, %r13
-    # Pop up to 6 args (right to left on VM stack)
-    # arg5 (6th param)
+    # __syscall(num, a1, a2, a3, a4, a5, a6) → result
+    # Pop 7 values: syscall_num + 6 args
+    # Linux x86-64 syscall ABI: rdi, rsi, rdx, r10, r8, r9
+    # arg6 → r9
     movsd   (%r14), %xmm0
-    cvttsd2si %xmm0, %r9d
+    cvttsd2si %xmm0, %r9
     add     $16, %r14
-    # arg4
+    # arg5 → r8
     movsd   (%r14), %xmm0
-    cvttsd2si %xmm0, %r10d
+    cvttsd2si %xmm0, %r8
     add     $16, %r14
-    # arg3
+    # arg4 → r10
     movsd   (%r14), %xmm0
-    cvttsd2si %xmm0, %edx
+    cvttsd2si %xmm0, %r10
     add     $16, %r14
-    # arg2
+    # arg3 → rdx
     movsd   (%r14), %xmm0
-    cvttsd2si %xmm0, %esi
+    cvttsd2si %xmm0, %rdx
     add     $16, %r14
-    # arg1
+    # arg2 → rsi
     movsd   (%r14), %xmm0
-    cvttsd2si %xmm0, %edi
+    cvttsd2si %xmm0, %rsi
     add     $16, %r14
-    # syscall number
+    # arg1 → rdi
+    movsd   (%r14), %xmm0
+    cvttsd2si %xmm0, %rdi
+    add     $16, %r14
+    # syscall number → eax
     movsd   (%r14), %xmm0
     cvttsd2si %xmm0, %eax
     add     $16, %r14
@@ -8008,6 +8020,18 @@ op_ret:
     sub     $16, %r14
     mov     %rdi, (%r14)            # ptr = buffer base
     movq    $BYTES_MARKER, 8(%r14)  # marker
+    jmp     vm_loop
+
+.call_bytes_ptr:
+    # __bytes_ptr(buf) → raw memory address (f64)
+    # Returns pointer to actual data (past 8-byte size header)
+    # For passing to __syscall as pointer arguments
+    add     %rcx, %r13
+    mov     (%r14), %rax               # buf base pointer
+    add     $8, %rax                    # skip size header → data pointer
+    cvtsi2sd %rax, %xmm0
+    movsd   %xmm0, (%r14)             # replace with f64 pointer
+    movq    $F64_MARKER, 8(%r14)
     jmp     vm_loop
 
 .call_bytes_set:
@@ -12701,7 +12725,7 @@ builtin_jump_table:
     .quad   .builtin_slot_228
     .quad   .builtin_slot_229
     .quad   .builtin_slot_230
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_231
     .quad   .call_not_builtin
     .quad   .builtin_slot_233
     .quad   .call_not_builtin

@@ -16,7 +16,7 @@ let IN_ALL = 898;
 
 // Create a file watcher
 pub fn watch_create() {
-    return __syscall(SYS_INOTIFY_INIT, 0, 0, 0, 0, 0);
+    return __syscall(SYS_INOTIFY_INIT, 0, 0, 0, 0, 0, 0);
 }
 
 // Add directory or file to watch
@@ -64,7 +64,7 @@ pub fn nox_autorebuild() {
         };
     };
 
-    __syscall(SYS_CLOSE, ifd, 0, 0, 0, 0);
+    __syscall(SYS_CLOSE, ifd, 0, 0, 0, 0, 0);
     return rebuilds;
 }
 
@@ -73,7 +73,7 @@ pub fn watch_file(path, callback_cmd) {
     let ifd = watch_create();
     if ifd < 0 { return -1; };
     let wd = watch_add(ifd, path, IN_MODIFY);
-    if wd < 0 { __syscall(SYS_CLOSE, ifd, 0, 0, 0, 0); return -1; };
+    if wd < 0 { __syscall(SYS_CLOSE, ifd, 0, 0, 0, 0, 0); return -1; };
 
     emit "Watching: " + path;
     let events = 0;
@@ -84,6 +84,6 @@ pub fn watch_file(path, callback_cmd) {
             __system(callback_cmd);
         };
     };
-    __syscall(SYS_CLOSE, ifd, 0, 0, 0, 0);
+    __syscall(SYS_CLOSE, ifd, 0, 0, 0, 0, 0);
     return events;
 }

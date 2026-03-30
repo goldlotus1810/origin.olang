@@ -101,7 +101,7 @@ pub fn sys_hostname() {
 
 pub fn sys_user() {
     // Native: read UID via syscall, map from /etc/passwd
-    let uid = __syscall(102, 0, 0, 0, 0, 0);
+    let uid = __syscall(102, 0, 0, 0, 0, 0, 0);
     let passwd = __file_read("/etc/passwd");
     let target = ":" + __to_string(uid) + ":";
     let i = 0;

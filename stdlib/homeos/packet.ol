@@ -23,15 +23,15 @@ let SO_RCVTIMEO = 20;
 // ═══ SOCKET PRIMITIVES ═══
 
 pub fn sock_udp() {
-    return __syscall(SYS_SOCKET, AF_INET, SOCK_DGRAM, 0, 0, 0);
+    return __syscall(SYS_SOCKET, AF_INET, SOCK_DGRAM, 0, 0, 0, 0);
 }
 
 pub fn sock_raw() {
-    return __syscall(SYS_SOCKET, AF_PACKET, SOCK_RAW, ETH_P_ALL, 0, 0);
+    return __syscall(SYS_SOCKET, AF_PACKET, SOCK_RAW, ETH_P_ALL, 0, 0, 0);
 }
 
 pub fn sock_close(fd) {
-    return __syscall(SYS_CLOSE, fd, 0, 0, 0, 0);
+    return __syscall(SYS_CLOSE, fd, 0, 0, 0, 0, 0);
 }
 
 // ═══ UDP ═══
