@@ -9,15 +9,58 @@ pub fn sys_cpu() {
 }
 
 pub fn sys_cores() {
-    let r = __system("nproc");
-    return r;
+    // Native: read /sys/devices/system/cpu/online (e.g., "0-3" = 4 cores)
+    let raw = __file_read("/sys/devices/system/cpu/online");
+    // Parse "0-N" format: N+1 cores
+    let i = 0;
+    while i < len(raw) { if char_at(raw, i) == "-" { break; }; i = i + 1; };
+    if i < len(raw) {
+        let ve = i + 1;
+        while ve < len(raw) {
+            let c = __char_code(char_at(raw, ve));
+            if c < 48 || c > 57 { break; };
+            ve = ve + 1;
+        };
+        return __to_string(__to_number(__substr(raw, i + 1, ve)) + 1);
+    };
+    return "1";
 }
 
 pub fn sys_memory() {
-    let total = __system("awk '/MemTotal/{print $2}' /proc/meminfo");
-    let avail = __system("awk '/MemAvailable/{print $2}' /proc/meminfo");
-    let free = __system("awk '/MemFree/{print $2}' /proc/meminfo");
+    // Native: read /proc/meminfo directly, parse in Olang
+    let raw = __file_read("/proc/meminfo");
+    let total = _proc_extract(raw, "MemTotal:");
+    let avail = _proc_extract(raw, "MemAvailable:");
+    let free = _proc_extract(raw, "MemFree:");
     return { total: total, available: avail, free: free };
+}
+
+// Extract numeric value after a key in /proc files
+fn _proc_extract(text, key) {
+    let ki = 0;
+    let klen = len(key);
+    while ki <= len(text) - klen {
+        let match = 1;
+        let ci = 0;
+        while ci < klen {
+            if char_at(text, ki + ci) != char_at(key, ci) { match = 0; break; };
+            ci = ci + 1;
+        };
+        if match == 1 {
+            // Found key, extract number after it
+            let vi = ki + klen;
+            while vi < len(text) { if __char_code(char_at(text, vi)) != 32 { break; }; vi = vi + 1; };
+            let ve = vi;
+            while ve < len(text) {
+                let c = __char_code(char_at(text, ve));
+                if c < 48 || c > 57 { break; };
+                ve = ve + 1;
+            };
+            if ve > vi { return __substr(text, vi, ve); };
+        };
+        ki = ki + 1;
+    };
+    return "0";
 }
 
 pub fn sys_disk() {
@@ -26,23 +69,62 @@ pub fn sys_disk() {
 }
 
 pub fn sys_uptime() {
-    let r = __system("uptime -p");
-    return r;
+    // Native: read /proc/uptime
+    let raw = __file_read("/proc/uptime");
+    let si = 0;
+    while si < len(raw) { if char_at(raw, si) == " " { break; }; si = si + 1; };
+    let secs = __to_number(__substr(raw, 0, si));
+    let days = __floor(secs / 86400);
+    let hours = __floor((secs % 86400) / 3600);
+    let mins = __floor((secs % 3600) / 60);
+    let out = "up";
+    if days > 0 { out = out + " " + __to_string(days) + "d"; };
+    if hours > 0 { out = out + " " + __to_string(hours) + "h"; };
+    out = out + " " + __to_string(mins) + "m";
+    return out;
 }
 
 pub fn sys_load() {
-    let r = __system("cat /proc/loadavg");
-    return r;
+    // Native: read /proc/loadavg directly
+    return __file_read("/proc/loadavg");
 }
 
 pub fn sys_hostname() {
-    let r = __system("uname -n");
+    // Native: read /etc/hostname or /proc/sys/kernel/hostname
+    let r = __file_read("/proc/sys/kernel/hostname");
+    if len(r) > 0 {
+        // Trim trailing newline
+        if __char_code(char_at(r, len(r) - 1)) == 10 { return __substr(r, 0, len(r) - 1); };
+    };
     return r;
 }
 
 pub fn sys_user() {
-    let r = __system("whoami");
-    return r;
+    // Native: read UID via syscall, map from /etc/passwd
+    let uid = __syscall(102, 0, 0, 0, 0, 0);
+    let passwd = __file_read("/etc/passwd");
+    let target = ":" + __to_string(uid) + ":";
+    let i = 0;
+    while i < len(passwd) {
+        // Find line start
+        let ls = i;
+        // Find first colon (username ends here)
+        while i < len(passwd) { if char_at(passwd, i) == ":" { break; }; i = i + 1; };
+        let username = __substr(passwd, ls, i);
+        // Check if this line contains our UID
+        let le = i;
+        while le < len(passwd) { if __char_code(char_at(passwd, le)) == 10 { break; }; le = le + 1; };
+        let line = __substr(passwd, ls, le);
+        // Search for :uid: in line
+        let fi = 0;
+        let tlen = len(target);
+        while fi <= len(line) - tlen {
+            if __substr(line, fi, fi + tlen) == target { return username; };
+            fi = fi + 1;
+        };
+        i = le + 1;
+    };
+    return __to_string(uid);
 }
 
 pub fn sys_info() {
