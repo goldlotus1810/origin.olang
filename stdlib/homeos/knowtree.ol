@@ -105,16 +105,21 @@ fn _kt_mol_t(_m) { return _m % 4; }
 
 // _kt_fact_mol_compute removed — replaced by _kt_fast_mol everywhere (no __text_to_pw allocation)
 
-// Real molecule: text → per-codepoint P_weight from UDC table → Zipf-weighted 5D average
-// Returns single u16 mol with MEANINGFUL 5D dimensions (S,R,V,A,T)
-// Uses shared accumulator array to minimize heap allocation (1 array, not 7)
-let __kt_mol_acc = [0, 0, 0, 0, 0, 0, 0];
+// Real molecule: text → per-codepoint P_weight from UDC table → biological compose
+// Compose rules (from BLUEPRINT spec):
+//   S = Union  = max(all S values)           — shapes merge, largest wins
+//   R = Compose = Zipf-weighted sum          — relations accumulate
+//   V = Amplify = base + sign*boost          — valence pushes toward dominant (NOT average)
+//   A = Max    = max(all A values)           — arousal takes highest intensity
+//   T = Dominant = most frequent T value     — time takes majority
+// Uses shared accumulator to minimize heap allocation
+let __kt_mol_acc = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
 fn _kt_real_mol(_krm_text) {
     _kt_ensure_init();
     let _krm_tlen = len(_krm_text);
     if _krm_tlen == 0 { return 0; };
-    // Reset shared accumulator: [S, R, V, A, T, totalW, n]
+    // Reset: [S_max, R_sum, R_wsum, V_sum, V_count, A_max, T0, T1, T2, T3, n, _]
     let _ = __set_at(__kt_mol_acc, 0, 0);
     let _ = __set_at(__kt_mol_acc, 1, 0);
     let _ = __set_at(__kt_mol_acc, 2, 0);
@@ -122,6 +127,10 @@ fn _kt_real_mol(_krm_text) {
     let _ = __set_at(__kt_mol_acc, 4, 0);
     let _ = __set_at(__kt_mol_acc, 5, 0);
     let _ = __set_at(__kt_mol_acc, 6, 0);
+    let _ = __set_at(__kt_mol_acc, 7, 0);
+    let _ = __set_at(__kt_mol_acc, 8, 0);
+    let _ = __set_at(__kt_mol_acc, 9, 0);
+    let _ = __set_at(__kt_mol_acc, 10, 0);
     let _krm_i = 0;
     while _krm_i < _krm_tlen {
         let _krm_cp = __char_code(char_at(_krm_text, _krm_i));
@@ -130,25 +139,53 @@ fn _kt_real_mol(_krm_text) {
         let _krm_hi = __bytes_get(__kt_tbl, _krm_off + 1);
         let _krm_pw = __floor(_krm_lo + (_krm_hi * 256));
         if _krm_pw > 0 {
-            let _krm_ni = __array_get(__kt_mol_acc, 6);
+            let _krm_ni = __array_get(__kt_mol_acc, 10);
+            let _krm_s = (__floor(_krm_pw / 4096)) % 16;
+            let _krm_r = (__floor(_krm_pw / 256)) % 16;
+            let _krm_v = (__floor(_krm_pw / 32)) % 8;
+            let _krm_a = (__floor(_krm_pw / 4)) % 8;
+            let _krm_t = _krm_pw % 4;
+            // S = Union (max)
+            if _krm_s > __array_get(__kt_mol_acc, 0) { let _ = __set_at(__kt_mol_acc, 0, _krm_s); };
+            // R = Compose (Zipf-weighted sum)
             let _krm_w = __floor(1000 / (_krm_ni + 1));
-            let _ = __set_at(__kt_mol_acc, 0, __array_get(__kt_mol_acc, 0) + (((__floor(_krm_pw / 4096)) % 16) * _krm_w));
-            let _ = __set_at(__kt_mol_acc, 1, __array_get(__kt_mol_acc, 1) + (((__floor(_krm_pw / 256)) % 16) * _krm_w));
-            let _ = __set_at(__kt_mol_acc, 2, __array_get(__kt_mol_acc, 2) + (((__floor(_krm_pw / 32)) % 8) * _krm_w));
-            let _ = __set_at(__kt_mol_acc, 3, __array_get(__kt_mol_acc, 3) + (((__floor(_krm_pw / 4)) % 8) * _krm_w));
-            let _ = __set_at(__kt_mol_acc, 4, __array_get(__kt_mol_acc, 4) + ((_krm_pw % 4) * _krm_w));
-            let _ = __set_at(__kt_mol_acc, 5, __array_get(__kt_mol_acc, 5) + _krm_w);
-            let _ = __set_at(__kt_mol_acc, 6, _krm_ni + 1);
+            let _ = __set_at(__kt_mol_acc, 1, __array_get(__kt_mol_acc, 1) + (_krm_r * _krm_w));
+            let _ = __set_at(__kt_mol_acc, 2, __array_get(__kt_mol_acc, 2) + _krm_w);
+            // V = accumulate for amplify
+            let _ = __set_at(__kt_mol_acc, 3, __array_get(__kt_mol_acc, 3) + _krm_v);
+            let _ = __set_at(__kt_mol_acc, 4, __array_get(__kt_mol_acc, 4) + 1);
+            // A = Max
+            if _krm_a > __array_get(__kt_mol_acc, 5) { let _ = __set_at(__kt_mol_acc, 5, _krm_a); };
+            // T = vote (count each value)
+            let _ = __set_at(__kt_mol_acc, 6 + _krm_t, __array_get(__kt_mol_acc, 6 + _krm_t) + 1);
+            let _ = __set_at(__kt_mol_acc, 10, _krm_ni + 1);
         };
         let _krm_i = _krm_i + 1;
     };
-    let _krm_total_w = __array_get(__kt_mol_acc, 5);
-    if _krm_total_w == 0 { return 0; };
-    let _krm_rs = (__floor(__array_get(__kt_mol_acc, 0) / _krm_total_w)) % 16;
-    let _krm_rr = (__floor(__array_get(__kt_mol_acc, 1) / _krm_total_w)) % 16;
-    let _krm_rv = (__floor(__array_get(__kt_mol_acc, 2) / _krm_total_w)) % 8;
-    let _krm_ra = (__floor(__array_get(__kt_mol_acc, 3) / _krm_total_w)) % 8;
-    let _krm_rt = (__floor(__array_get(__kt_mol_acc, 4) / _krm_total_w)) % 4;
+    let _krm_n = __array_get(__kt_mol_acc, 10);
+    if _krm_n == 0 { return 0; };
+    // S = max (already computed)
+    let _krm_rs = __array_get(__kt_mol_acc, 0) % 16;
+    // R = weighted average
+    let _krm_rw = __array_get(__kt_mol_acc, 2);
+    let _krm_rr = 0;
+    if _krm_rw > 0 { let _krm_rr = (__floor(__array_get(__kt_mol_acc, 1) / _krm_rw)) % 16; };
+    // V = amplify: base + sign(sum) * boost
+    let _krm_vsum = __array_get(__kt_mol_acc, 3);
+    let _krm_vn = __array_get(__kt_mol_acc, 4);
+    let _krm_vbase = __floor(_krm_vsum / _krm_vn);
+    let _krm_vdiff = _krm_vsum - (_krm_vbase * _krm_vn);
+    let _krm_boost = __floor((_krm_vdiff * 500) / (_krm_vn * 1000));
+    let _krm_rv = (_krm_vbase + _krm_boost) % 8;
+    if _krm_rv < 0 { let _krm_rv = 0; };
+    // A = max (already computed)
+    let _krm_ra = __array_get(__kt_mol_acc, 5) % 8;
+    // T = dominant (most frequent)
+    let _krm_rt = 0;
+    let _krm_tmax = __array_get(__kt_mol_acc, 6);
+    if __array_get(__kt_mol_acc, 7) > _krm_tmax { let _krm_rt = 1; let _krm_tmax = __array_get(__kt_mol_acc, 7); };
+    if __array_get(__kt_mol_acc, 8) > _krm_tmax { let _krm_rt = 2; let _krm_tmax = __array_get(__kt_mol_acc, 8); };
+    if __array_get(__kt_mol_acc, 9) > _krm_tmax { let _krm_rt = 3; };
     return (_krm_rs * 4096) + (_krm_rr * 256) + (_krm_rv * 32) + (_krm_ra * 4) + _krm_rt;
 }
 
