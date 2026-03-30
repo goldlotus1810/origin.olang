@@ -618,3 +618,36 @@ PHẦN 5: TỔNG HỢP — CÁI GÌ ĐƯA VÀO OLANG
 3 Tổng kết: ASM cần thêm
 PHẦN 6: NGUYÊN LÝ CƠ BẢN
 30 syscalls = nền tảng mọi phần mềm trên thế giới
+[2026-03-29 17:50] MCP test fact 12345
+[2026-03-29 17:58] MCP test fact 12345
+[2026-03-29 18:08] MCP test fact 12345
+[2026-03-29 18:12] MCP test fact 12345
+[2026-03-29 18:14] MCP test fact 12345
+[2026-03-29 18:20] MCP test fact 12345
+[2026-03-29 18:24] MCP test fact 12345
+test fact one
+test fact two
+test fact three
+[2026-03-29 18:52] MCP test fact 12345
+stress test fact number 0 about topic 0
+stress test fact number 1 about topic 1
+stress test fact number 2 about topic 2
+stress test fact number 3 about topic 3
+stress test fact number 4 about topic 4
+stress test fact number 5 about topic 0
+stress test fact number 6 about topic 1
+stress test fact number 7 about topic 2
+stress test fact number 8 about topic 3
+stress test fact number 9 about topic 4
+stress test fact number 10 about topic 0
+stress test fact number 11 about topic 1
+stress test fact number 12 about topic 2
+stress test fact number 13 about topic 3
+stress test fact number 14 about topic 4
+stress test fact number 15 about topic 0
+stress test fact number 16 about topic 1
+stress test fact number 17 about topic 2
+stress test fact number 18 about topic 3
+stress test fact number 19 about topic 4
+what does water boil at?
+what is olang
