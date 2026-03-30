@@ -286,6 +286,24 @@ fn _dead_find_unused(_dfu_src, _dfu_fns) {
     return _dfu_dead;
 }
 
+fn _search_and_combine(query) {
+    let results = kt_search_n(query, 3);
+    if len(results) == 0 { return ""; };
+    // Join top results with ". "
+    let out = "";
+    let i = 0;
+    while i < len(results) {
+        if __type_of(results[i]) == "string" {
+            if len(results[i]) > 3 {
+                if len(out) > 0 { out = out + ". "; };
+                out = out + results[i];
+            };
+        };
+        i = i + 1;
+    };
+    return out;
+}
+
 fn _strip_trailing(s) {
     // Strip ? = ! from end. Can't update var in if (scope bug), so use recursion.
     if len(s) == 0 { return s; };
@@ -347,8 +365,7 @@ pub fn repl_eval(input) {
               };
           };
           if _re_inst == "QUESTION" || _re_inst == "QUERY" || _re_inst == "EMOTION" || _re_inst == "REFERENCE" {
-              // Direct KnowTree ranked search
-              let _re_ans = kt_search(src);
+              let _re_ans = _search_and_combine(src);
               __heap_pin();
               if len(_re_ans) > 5 { return _re_ans; };
           };
