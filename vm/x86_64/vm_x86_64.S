@@ -5289,8 +5289,8 @@ op_call:
 
     # Convert raw bytes to molecule string on heap
     # rbp = raw bytes, r8 = byte count
-    mov     %r15, %r9                   # molecule output start
-    add     %r8, %r15                   # skip past raw bytes (temporary)
+    add     %r8, %r15                   # skip past raw bytes
+    mov     %r15, %r9                   # molecule output start (after raw bytes)
     xor     %ecx, %ecx
 .sys_mol:
     cmp     %r8, %rcx
@@ -5302,6 +5302,10 @@ op_call:
     inc     %rcx
     jmp     .sys_mol
 .sys_mol_done:
+    # Auto-pin: move REPL heap checkpoint past this result
+    # so it survives heap restore between REPL turns
+    lea     repl_heap_checkpoint(%rip), %rcx
+    mov     %r15, (%rcx)
     # Push string result: (mol_ptr, mol_count)
     sub     $16, %r14
     mov     %r9, (%r14)                # mol ptr
@@ -12791,6 +12795,8 @@ repl_termios_raw:
     .space 60                           # raw mode terminal settings
 repl_raw_mode:
     .space 1                            # 1 = raw mode active
+repl_is_pipe:
+    .space 1                            # 1 = stdin is piped (no heap restore)
 repl_tab_match:
     .space 8                            # ptr to first matching name
 repl_tab_match_len:

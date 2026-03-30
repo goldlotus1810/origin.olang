@@ -78,37 +78,16 @@ pub fn lan_whois(ip) {
 
 // ═══ PORT SCANNING ═══
 
-// Scan common ports on a target IP using TCP connect
+// Scan common ports on a target IP (parallel, fast, 1s timeout per port)
 pub fn port_scan(ip) {
-    // Common service ports
-    let ports = [21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 993, 995, 3306, 3389, 5432, 5900, 6379, 8080, 8443, 9090];
-    let open = [];
-    let pi = 0;
-    while pi < len(ports) {
-        let p = ports[pi];
-        let fd = __tcp_connect(ip, p);
-        if fd >= 0 {
-            push(open, p);
-            __tcp_close(fd);
-        };
-        pi = pi + 1;
-    };
-    return open;
+    let r = __system("for p in 21 22 23 25 53 80 110 143 443 445 993 995 3306 3389 5432 5900 6379 8080 8443 9090; do (timeout 1 bash -c 'echo >/dev/tcp/" + ip + "/'$p 2>/dev/null && echo $p) & done; wait");
+    return r;
 }
 
-// Scan specific port range
+// Scan specific port range (parallel, fast)
 pub fn port_range(ip, start, end) {
-    let open = [];
-    let p = start;
-    while p <= end {
-        let fd = __tcp_connect(ip, p);
-        if fd >= 0 {
-            push(open, p);
-            __tcp_close(fd);
-        };
-        p = p + 1;
-    };
-    return open;
+    let r = __system("for p in $(seq " + __to_string(start) + " " + __to_string(end) + "); do (timeout 1 bash -c 'echo >/dev/tcp/" + ip + "/'$p 2>/dev/null && echo $p) & done; wait");
+    return r;
 }
 
 // Scan single port — returns 1 (open) or 0 (closed)

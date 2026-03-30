@@ -36,7 +36,7 @@ pub fn sys_load() {
 }
 
 pub fn sys_hostname() {
-    let r = __system("hostname");
+    let r = __system("uname -n");
     return r;
 }
 
