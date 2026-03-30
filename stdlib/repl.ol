@@ -296,7 +296,7 @@ pub fn repl_eval(input) {
     if char_at(src, 0) == "/" {
       let _sc = __substr(src, 1, len(src));
       // /help
-      if _sc == "help" { return "/help /wake /bench /think /see /fetch /type /status /version /exit"; };
+      if _sc == "help" { return "/help /wake /bench /think /see /fetch /type /status /version /exit\n/scan /sys /proc /net /look /win /notify /cam /ssh"; };
       if _sc == "wake" { return repl_eval("wake"); };
       if _sc == "bench" { return repl_eval("bench"); };
       if _sc == "status" { return repl_eval("status"); };
@@ -332,6 +332,24 @@ pub fn repl_eval(input) {
           return "typed: " + _tt + "";
         };
       };
+      // /scan — LAN discovery
+      if _sc == "scan" { emit "Scanning LAN..."; let _sr = __system("for i in $(seq 1 254); do (ping -c1 -W1 192.168.1.$i >/dev/null 2>&1 && echo 192.168.1.$i) & done; wait"); return _sr; };
+      // /sys — system info
+      if _sc == "sys" { let _cpu = __system("lscpu | grep 'Model name' | sed 's/.*: *//'"); let _mem = __system("awk '/MemAvailable/{printf \"%.0f MB\", $2/1024}' /proc/meminfo"); let _disk = __system("df -h / | tail -1 | awk '{print $4 \" free / \" $2}'"); let _up = __system("uptime -p"); let _load = __system("cat /proc/loadavg | awk '{print $1, $2, $3}'"); return "CPU: " + _cpu + "RAM: " + _mem + "\nDisk: " + _disk + "Up: " + _up + "Load: " + _load; };
+      // /proc — top processes
+      if _sc == "proc" { return __system("ps -eo pid,%cpu,%mem,comm --sort=-%cpu | head -10"); };
+      // /net — network status
+      if _sc == "net" { let _ip = __system("ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}'"); let _gw = __system("ip route | awk '/default/{print $3}' | head -1"); let _nb = __system("ip neigh show | grep -v FAILED | wc -l"); return "IP: " + _ip + "GW: " + _gw + "Neighbors: " + _nb; };
+      // /look — screenshot + Claude vision
+      if _sc == "look" { __system("grim /tmp/nox_screen.png"); emit "Looking..."; let _lv = __system("timeout 30 claude -p 'Look at /tmp/nox_screen.png. What do you see? Be concise.' --allowedTools 'Read(*)' 2>/dev/null"); return _lv; };
+      // /win — list windows
+      if _sc == "win" { return __system("ps -eo pid,comm | grep -iE 'cosmic-term|brave|cosmic-edit|cosmic-files|code|firefox|vlc' | grep -v grep"); };
+      // /notify <msg>
+      if len(_sc) > 7 { if __substr(_sc, 0, 7) == "notify " { let _nm = __substr(_sc, 7, len(_sc)); __system("notify-send 'Nox' '" + _nm + "'"); return "notified"; }; };
+      // /cam — camera status
+      if _sc == "cam" { emit "Probing cameras..."; let _c1 = __system("timeout 2 bash -c 'echo >/dev/tcp/192.168.1.96/554' 2>/dev/null && echo 'Cam1 (.96) ONLINE' || echo 'Cam1 (.96) offline'"); let _c2 = __system("timeout 2 bash -c 'echo >/dev/tcp/192.168.1.108/554' 2>/dev/null && echo 'Cam2 (.108) ONLINE' || echo 'Cam2 (.108) offline'"); return _c1 + _c2; };
+      // /ssh <host> <cmd>
+      if len(_sc) > 4 { if __substr(_sc, 0, 4) == "ssh " { let _sa = __substr(_sc, 4, len(_sc)); emit "SSH: " + _sa; let _so = __system("ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no " + _sa + " 2>&1"); return _so; }; };
       return "Unknown: /" + _sc + ". Try /help";
     };
   };
