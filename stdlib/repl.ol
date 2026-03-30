@@ -291,6 +291,9 @@ pub fn repl_eval(input) {
   let src = __str_trim(input);
   if len(src) == 0 { return ""; }
 
+  // Boot knowledge on first real input (lazy — avoids slow startup)
+  _boot_learn();
+
   // ── Slash commands (like Claude Code) ──
   if len(src) > 1 {
     if char_at(src, 0) == "/" {
