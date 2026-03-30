@@ -4382,7 +4382,7 @@ op_call:
     # Set up nested execution
     mov     %r8, %r12                   # new bytecode base
     xor     %r13d, %r13d               # PC = 0
-    mov     $0x100000, %rbx             # 1MB bounds — op_ret accepts boot PCs
+    mov     $0x200000, %rbx             # 2MB bounds — op_ret accepts boot PCs
     add     %rcx, %r15                  # bump heap past bytecode buffer
     # Save eval buffer base for cross-boundary closure calls
     lea     eval_bc_base(%rip), %rax
@@ -11632,7 +11632,7 @@ op_halt:
     # Set rbx to large value so op_ret accepts boot bytecode PCs
     # (trampoline CallClosure jumps into boot bytecode bodies where
     # Ret pops saved PCs that are >> trampoline size)
-    mov     $0x100000, %rbx             # 1MB — larger than any bytecode
+    mov     $0x200000, %rbx             # 2MB — larger than any bytecode
     jmp     vm_loop                     # execute trampoline!
     # Flow: Push input → CallClosure repl_eval → Halt(REPL sentinel)
     #       → restore → jmp .repl_loop
@@ -11873,7 +11873,7 @@ op_halt:
 
     mov     %r8, %r12                   # bytecode base = trampoline
     xor     %r13d, %r13d               # PC = 0
-    mov     $0x100000, %rbx             # 1MB bounds — op_ret accepts boot PCs
+    mov     $0x200000, %rbx             # 2MB bounds — op_ret accepts boot PCs
     jmp     vm_loop
     # Flow: trampoline → Halt(nested) → .halt_nested → restore r12/r13/rbx
     #       → vm_loop → boot bytecode Halt → op_halt → not nested
@@ -12016,7 +12016,7 @@ op_halt:
 
     mov     %rdi, %r12                  # bytecode base = trampoline
     xor     %r13d, %r13d               # PC = 0
-    mov     $0x100000, %rbx
+    mov     $0x200000, %rbx             # 2MB bounds
     jmp     vm_loop
     # Flow: trampoline → Halt → .halt_mcp → .mcp_read_line (loop)
 
