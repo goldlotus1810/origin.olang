@@ -593,10 +593,11 @@ pub fn pipeline(_pl_input) {
     let _pl_chain = chain_encode(_pl_input);
     let _pl_chain_mol = chain_summary(_pl_chain);
 
-    // ⑩ Fusion: text mol + interoception + context (holistic capture E1)
+    // ⑩ Holistic Capture (E1): text + interoception + context
+    // Screen + audio encoded on-demand (not every turn — expensive)
     let _pl_text_mol = _kt_fast_mol(_pl_input);
     let _pl_intero = encode_intero();
-    // WM slot 0 = query, slot 1 = context (previous result)
+    // WM slot 0 = query, slot 1 = interoception
     wm_set(0, _pl_text_mol);
     wm_set(1, _pl_intero);
     let _pl_context = wm_get(3);

@@ -490,6 +490,133 @@ pub fn encode_intero() {
 }
 
 // ════════════════════════════════════════════════════════════════
+// E1: Screen encoder (screenshot → SDF → P_weight)
+// grim capture → extract visual features → map to 5D
+// ════════════════════════════════════════════════════════════════
+
+pub fn encode_screen() {
+    // Capture screenshot
+    __system("grim /tmp/nox_enc.png 2>/dev/null");
+    // Extract features using ImageMagick identify (available on most Linux)
+    // Get: mean brightness, standard deviation (complexity), dimensions
+    let _es_info = __system("identify -verbose /tmp/nox_enc.png 2>/dev/null | grep -E 'mean:|standard deviation:|Geometry:' | head -5");
+    if len(_es_info) < 10 {
+        // Fallback: no ImageMagick → use file size as proxy
+        let _es_fsize = len(__file_read("/tmp/nox_enc.png"));
+        // Larger file = more complex scene
+        let _es_complexity = __floor(_es_fsize / 100000); // 0-15 range for typical screenshots
+        if _es_complexity > 15 { let _es_complexity = 15; };
+        return (_es_complexity * 4096) + (4 * 256) + (4 * 32) + (4 * 4) + 0;
+    };
+    // Parse: extract numbers from identify output
+    let _es_mean = [128];    // brightness mean (0-255)
+    let _es_std = [40];      // complexity (std dev)
+    // Simple number extraction from first "mean:" line
+    let _es_i = 0;
+    let _es_in_mean = 0;
+    while _es_i < len(_es_info) {
+        let _es_c = __char_code(char_at(_es_info, _es_i));
+        if _es_c == 109 { let _es_in_mean = 1; };  // 'm' of "mean"
+        if _es_in_mean == 1 {
+            if _es_c >= 48 { if _es_c <= 57 {
+                // Found digit after "mean" → parse number
+                let _es_num = 0;
+                let _es_j = _es_i;
+                while _es_j < len(_es_info) {
+                    let _es_d = __char_code(char_at(_es_info, _es_j));
+                    if _es_d >= 48 { if _es_d <= 57 { let _es_num = (_es_num * 10) + (_es_d - 48); }; };
+                    if _es_d == 46 { let _es_j = len(_es_info); };  // stop at decimal
+                    if _es_d == 10 { let _es_j = len(_es_info); };  // stop at newline
+                    let _es_j = _es_j + 1;
+                };
+                let _ = __set_at(_es_mean, 0, _es_num);
+                let _es_in_mean = 0;
+                let _es_i = len(_es_info);
+            }; };
+        };
+        let _es_i = _es_i + 1;
+    };
+    // Map to 5D per spec E1:
+    let _es_brightness = __array_get(_es_mean, 0);
+    // S = complexity (higher std dev = more edges/shapes)
+    let _es_s = __floor(__array_get(_es_std, 0) * 15 / 80);
+    if _es_s > 15 { let _es_s = 15; };
+    // R = structure (moderate = structured, low/high = chaotic/uniform)
+    let _es_r = __floor(_es_brightness * 15 / 255);
+    // V = warmth (brightness > 128 → warm/positive)
+    let _es_v = __floor(_es_brightness * 7 / 255);
+    // A = contrast (std dev as intensity)
+    let _es_a = __floor(__array_get(_es_std, 0) * 7 / 80);
+    if _es_a > 7 { let _es_a = 7; };
+    // T = 0 (static screenshot)
+    let _es_t = 0;
+    return (_es_s * 4096) + (_es_r * 256) + (_es_v * 32) + (_es_a * 4) + _es_t;
+}
+
+// ════════════════════════════════════════════════════════════════
+// E1: Audio encoder (mic → Spline → P_weight)
+// Record short audio clip → extract PCM features → map to 5D
+// ════════════════════════════════════════════════════════════════
+
+pub fn encode_audio() {
+    // Record 0.5s of audio via arecord (ALSA) → raw PCM
+    __system("timeout 1 arecord -f S16_LE -r 16000 -c 1 -d 1 /tmp/nox_audio.raw 2>/dev/null");
+    let _ea_data = __file_read("/tmp/nox_audio.raw");
+    let _ea_len = len(_ea_data);
+    if _ea_len < 100 {
+        // No audio device or silent → return neutral
+        return (0 * 4096) + (4 * 256) + (4 * 32) + (1 * 4) + 1;
+    };
+    // Compute RMS (volume) and zero-crossing rate (pitch proxy)
+    // PCM S16_LE: 2 bytes per sample, little-endian
+    let _ea_samples = __floor(_ea_len / 2);
+    let _ea_sum_sq = [0];
+    let _ea_zcr = [0];
+    let _ea_prev = [0];
+    let _ea_i = 0;
+    let _ea_step = 2; // every sample
+    if _ea_samples > 1000 { let _ea_step = __floor(_ea_samples / 500); };
+    while _ea_i < _ea_samples {
+        // Read 16-bit sample (approximate: use first byte as proxy)
+        let _ea_byte_pos = _ea_i * 2;
+        if _ea_byte_pos < _ea_len {
+            let _ea_val = __char_code(char_at(_ea_data, _ea_byte_pos));
+            // Center around 128
+            let _ea_centered = _ea_val - 128;
+            let _ = __set_at(_ea_sum_sq, 0, __array_get(_ea_sum_sq, 0) + (_ea_centered * _ea_centered));
+            // Zero crossing
+            if _ea_centered > 0 { if __array_get(_ea_prev, 0) < 0 { let _ = __set_at(_ea_zcr, 0, __array_get(_ea_zcr, 0) + 1); }; };
+            if _ea_centered < 0 { if __array_get(_ea_prev, 0) > 0 { let _ = __set_at(_ea_zcr, 0, __array_get(_ea_zcr, 0) + 1); }; };
+            let _ = __set_at(_ea_prev, 0, _ea_centered);
+        };
+        let _ea_i = _ea_i + _ea_step;
+    };
+    let _ea_n = __floor(_ea_samples / _ea_step);
+    if _ea_n == 0 { let _ea_n = 1; };
+    // RMS = sqrt(sum_sq / n) — approximate as sum_sq/n/128
+    let _ea_rms = __floor(__array_get(_ea_sum_sq, 0) / _ea_n / 128);
+    if _ea_rms > 100 { let _ea_rms = 100; };
+    // ZCR normalized
+    let _ea_zcr_norm = __floor(__array_get(_ea_zcr, 0) * 100 / _ea_n);
+    if _ea_zcr_norm > 100 { let _ea_zcr_norm = 100; };
+    // Map to 5D per spec E1:
+    // S = 1 - stability (high ZCR = complex sound)
+    let _ea_s = __floor(_ea_zcr_norm * 15 / 100);
+    // R = stability (low ZCR = structured)
+    let _ea_r = 15 - _ea_s;
+    // V = pitch + volume combined (high = excited/positive)
+    let _ea_v = __floor((_ea_zcr_norm * 4 + _ea_rms * 3) / 100);
+    if _ea_v > 7 { let _ea_v = 7; };
+    // A = volume (RMS = arousal)
+    let _ea_a = __floor(_ea_rms * 7 / 100);
+    if _ea_a > 7 { let _ea_a = 7; };
+    // T = pitch bucket (ZCR as temporal frequency)
+    let _ea_t = __floor(_ea_zcr_norm * 3 / 100);
+    if _ea_t > 3 { let _ea_t = 3; };
+    return (_ea_s * 4096) + (_ea_r * 256) + (_ea_v * 32) + (_ea_a * 4) + _ea_t;
+}
+
+// ════════════════════════════════════════════════════════════════
 // Full encode pipeline
 // ════════════════════════════════════════════════════════════════
 
