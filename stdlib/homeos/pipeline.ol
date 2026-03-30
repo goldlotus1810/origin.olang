@@ -221,7 +221,7 @@ pub fn homeostasis(_hom_input_mol, _hom_predicted_mol) {
 
 // ① Honesty: confidence from evidence (silk weight + fire count + sources)
 // Returns 0-1000 scale. <400=silent, 400-700=hypothesis, 700-900=opinion, >=900=fact
-pub fn instinct_honesty(_ih_mol, _ih_facts) {
+pub fn instinct_honesty(_ih_mol, _ih_facts, _ih_query) {
     let _ih_nfacts = len(_ih_facts);
     // silk_weight: best silk connection to any fact
     let _ih_sw = [0];
@@ -247,9 +247,10 @@ pub fn instinct_honesty(_ih_mol, _ih_facts) {
         let _ih_cons = 200 - __floor(_ih_d * 200 / 47);
         if _ih_cons < 0 { let _ih_cons = 0; };
     };
-    // fire_count: best fire from KnowTree silk → 0-300
-    let _ih_fire = 0;
-    return _ih_silk + _ih_src + _ih_cons + _ih_fire;
+    // Domain confidence from self-model → 0-300
+    let _ih_domain = __floor(kt_domain_confidence(_ih_query) * 300 / 1000);
+    if _ih_domain > 300 { let _ih_domain = 300; };
+    return _ih_silk + _ih_src + _ih_cons + _ih_domain;
 }
 
 // ② Contradiction: V distance high + R distance low = contradict
@@ -592,12 +593,19 @@ pub fn pipeline(_pl_input) {
     let _pl_chain = chain_encode(_pl_input);
     let _pl_chain_mol = chain_summary(_pl_chain);
 
-    // ⑩ Fusion: text mol + context (V/A from P_weight, not keyword lists)
+    // ⑩ Fusion: text mol + interoception + context (holistic capture E1)
     let _pl_text_mol = _kt_fast_mol(_pl_input);
+    let _pl_intero = encode_intero();
     // WM slot 0 = query, slot 1 = context (previous result)
     wm_set(0, _pl_text_mol);
+    wm_set(1, _pl_intero);
     let _pl_context = wm_get(3);
     let _pl_fused = fusion(_pl_text_mol, 0, _pl_context);
+    // Compose interoception into fused signal (system health affects processing)
+    if _pl_intero > 0 {
+        let _pl_fuse_mols = [_pl_fused, _pl_intero];
+        let _pl_fused = compose(_pl_fuse_mols);
+    };
     // Apply conversation momentum
     let _pl_fused = _conv_shift(_pl_fused);
 
@@ -705,7 +713,7 @@ pub fn pipeline(_pl_input) {
     // ACT mode: no learning, just respond confidently
 
     // ① Honesty instinct: confidence from evidence → prefix response
-    let _pl_conf = instinct_honesty(_pl_fused, _pl_facts);
+    let _pl_conf = instinct_honesty(_pl_fused, _pl_facts, _pl_input);
     if _pl_conf < 400 {
         let _pl_response = "Toi khong chac: " + _pl_response;
     };

@@ -110,13 +110,16 @@ PHASE 2 — BRAIN HEALTH ✅ (2026-03-30 Session 10)
   ✅ Checkpoints CP2-4 (encode+infer+promote gates)                [THIẾU #12]
   ✅ Instinct formulas: Honesty, Contradiction, Curiosity           [THIẾU #13]
 
-PHASE 3 — EXPAND (mở rộng)
-  ■ Camera/Audio/Interoception encoders              [THIẾU #14-16]
-  ■ Self-model                                       [THIẾU #17]
-  ■ Negative knowledge + recovery                    [THIẾU #18-19]
+PHASE 3 — EXPAND ✅ (2026-03-30 Session 10)
+  ✅ Interoception encoder (/proc → P_weight)                     [THIẾU #16]
+  ✅ Self-model knowledge map (per-domain confidence)              [THIẾU #17]
+  ✅ NAC.mb negative knowledge + recovery                          [THIẾU #18-19]
+  — Camera/Audio: hardware-dependent, needs kernel access          [THIẾU #14-15]
 
-PHASE 4 — AGENT (hành động)
-  ■ AAM gate + scheduler + verify loop               [THIẾU #20-22]
+PHASE 4 — AGENT ✅ (2026-03-30 Session 10)
+  ✅ AAM auto-approve gate (contradiction + NAC check)             [THIẾU #20]
+  ✅ Heartbeat + dream scheduler (interoception + idle)            [THIẾU #21]
+  ✅ Agent cycle: perceive → think → act → verify                  [THIẾU #22]
 ```
 
 ---
@@ -130,11 +133,12 @@ Code thiếu done:    13 items  ✅ (Phase 1+2)
 Code thiếu:          9 items  ⬜ (Phase 3-4)
 Total LOC estimate: ~300 lines remaining
 
-Hiện tại:  ~80% spec implemented
+Hiện tại:  ~95% spec implemented
 Phase 0:   ✅ done
 Phase 1:   ✅ done
 Phase 2:   ✅ done
-Phase 3-4: expand + agent → ~95%
+Phase 3:   ✅ done (camera/audio deferred — needs hardware)
+Phase 4:   ✅ done
 ```
 
 ---

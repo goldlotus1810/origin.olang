@@ -458,10 +458,36 @@ pub fn word_affect(_wa_word) {
 // text_emotion removed — dead code (replaced by text_emotion_v2, 0 calls)
 
 // ════════════════════════════════════════════════════════════════
-// Sensor + System event encoding
+// E1: Interoception — /proc data → P_weight (system health signal)
 // ════════════════════════════════════════════════════════════════
 
-
+pub fn encode_intero() {
+    // Read system state
+    let _ei_load_raw = __file_read("/proc/loadavg");
+    let _ei_load = 0;
+    if len(_ei_load_raw) >= 4 {
+        let _ei_load = __to_number(__substr(_ei_load_raw, 0, 4));
+    };
+    // Heap usage
+    let _ei_heap = __heap_used();
+    let _ei_heap_pct = __floor((_ei_heap * 100) / (1024 * 1024)); // % of 1MB
+    if _ei_heap_pct > 100 { let _ei_heap_pct = 100; };
+    // Map to 5D per spec E1:
+    // S = 0 (no shape — internal signal)
+    let _ei_s = 0;
+    // R = process complexity (load normalized to 0-15)
+    let _ei_r = __floor(_ei_load);
+    if _ei_r > 15 { let _ei_r = 15; };
+    // V = health = 1 - error_rate (heap stress inverted)
+    let _ei_v = 7 - __floor(_ei_heap_pct * 7 / 100);
+    if _ei_v < 0 { let _ei_v = 0; };
+    // A = cpu_load (stress = arousal)
+    let _ei_a = __floor(_ei_load * 2);
+    if _ei_a > 7 { let _ei_a = 7; };
+    // T = 0 (static snapshot)
+    let _ei_t = 0;
+    return (_ei_s * 4096) + (_ei_r * 256) + (_ei_v * 32) + (_ei_a * 4) + _ei_t;
+}
 
 // ════════════════════════════════════════════════════════════════
 // Full encode pipeline
