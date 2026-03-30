@@ -499,7 +499,17 @@ let __sense_audio_last = [0];  // last audio mol (for change detection)
 let __sense_screen_last = [0]; // last screen mol
 
 // Quick audio probe: just check if there's sound (no full encode)
+let __audio_available = [-1];  // -1=unchecked, 0=no, 1=yes
+
 fn _audio_probe() {
+    // Check if audio capture is available (once)
+    if __array_get(__audio_available, 0) == -1 {
+        __system("which arecord >/dev/null 2>&1 && arecord -l 2>/dev/null | grep -q card && echo 1 > /tmp/nox_audio_ok || echo 0 > /tmp/nox_audio_ok");
+        let _aa_check = __file_read("/tmp/nox_audio_ok");
+        if len(_aa_check) > 0 { if __char_code(char_at(_aa_check, 0)) == 49 { let _ = __set_at(__audio_available, 0, 1); }; };
+        if __array_get(__audio_available, 0) == -1 { let _ = __set_at(__audio_available, 0, 0); };
+    };
+    if __array_get(__audio_available, 0) == 0 { return 0; };
     // Record 0.1s, check if file has data > silence threshold
     __system("timeout 0.2 arecord -f S16_LE -r 8000 -c 1 -d 0 -q /tmp/nox_probe.raw 2>/dev/null");
     let _ap_data = __file_read("/tmp/nox_probe.raw");
@@ -580,8 +590,9 @@ let __vis_h = 21;   // Fib(8)
 pub fn encode_screen() {
     // 1. Capture + resize to Fibonacci grid as raw PPM (P6)
     __system("grim /tmp/nox_enc.png 2>/dev/null && convert /tmp/nox_enc.png -resize 34x21! -depth 8 /tmp/nox_vis.ppm 2>/dev/null");
-    let _es_raw = __file_read("/tmp/nox_vis.ppm");
-    if len(_es_raw) < 100 {
+    let _es_raw = __file_read_bytes("/tmp/nox_vis.ppm");
+    let _es_rawlen = __bytes_len(_es_raw);
+    if _es_rawlen < 100 {
         // Fallback: no ImageMagick → file size proxy
         let _es_fsize = len(__file_read("/tmp/nox_enc.png"));
         let _es_c = __floor(_es_fsize / 100000);
@@ -592,12 +603,12 @@ pub fn encode_screen() {
     let _es_hdr_end = [0];
     let _es_nl_count = [0];
     let _es_hi = 0;
-    while _es_hi < len(_es_raw) {
-        if __char_code(char_at(_es_raw, _es_hi)) == 10 {
+    while _es_hi < _es_rawlen {
+        if __bytes_get(_es_raw, _es_hi) == 10 {
             let _ = __set_at(_es_nl_count, 0, __array_get(_es_nl_count, 0) + 1);
             if __array_get(_es_nl_count, 0) >= 3 {
                 let _ = __set_at(_es_hdr_end, 0, _es_hi + 1);
-                let _es_hi = len(_es_raw);
+                let _es_hi = _es_rawlen;
             };
         };
         let _es_hi = _es_hi + 1;
@@ -614,10 +625,10 @@ pub fn encode_screen() {
     let _es_pi = 0;
     while _es_pi < 714 {
         let _es_byte_off = _es_data_start + (_es_pi * 3);
-        if (_es_byte_off + 2) < len(_es_raw) {
-            let _es_r = __char_code(char_at(_es_raw, _es_byte_off));
-            let _es_g = __char_code(char_at(_es_raw, _es_byte_off + 1));
-            let _es_b = __char_code(char_at(_es_raw, _es_byte_off + 2));
+        if (_es_byte_off + 2) < _es_rawlen {
+            let _es_r = __bytes_get(_es_raw, _es_byte_off);
+            let _es_g = __bytes_get(_es_raw, _es_byte_off + 1);
+            let _es_b = __bytes_get(_es_raw, _es_byte_off + 2);
             let _ = __set_at(_es_grid, _es_pi, __floor((_es_r + _es_g + _es_b) / 3));
         };
         let _es_pi = _es_pi + 1;
@@ -1246,11 +1257,11 @@ fn dream_cycle() {
     let _dc_i = 0;
     let _dc_slen = len(__stm);
     while _dc_i < _dc_slen {
-        let _dc_mol_i = _kt_real_mol(__stm[_dc_i].input);
+        let _dc_mol_i = _kt_fast_mol(__stm[_dc_i].input);
         if _dc_mol_i > 0 {
             let _dc_j = _dc_i + 1;
             while _dc_j < _dc_slen {
-                let _dc_mol_j = _kt_real_mol(__stm[_dc_j].input);
+                let _dc_mol_j = _kt_fast_mol(__stm[_dc_j].input);
                 if _dc_mol_j > 0 {
                     // Same intent = strongly co-activated
                     if __stm[_dc_i].intent == __stm[_dc_j].intent {

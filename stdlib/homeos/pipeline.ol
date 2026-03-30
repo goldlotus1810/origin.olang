@@ -221,7 +221,7 @@ pub fn homeostasis(_hom_input_mol, _hom_predicted_mol) {
 
 // ① Honesty: confidence from evidence (silk weight + fire count + sources)
 // Returns 0-1000 scale. <400=silent, 400-700=hypothesis, 700-900=opinion, >=900=fact
-pub fn instinct_honesty(_ih_mol, _ih_facts, _ih_query) {
+pub fn instinct_honesty(_ih_mol, _ih_facts) {
     let _ih_nfacts = len(_ih_facts);
     // silk_weight: best silk connection to any fact
     let _ih_sw = [0];
@@ -247,10 +247,14 @@ pub fn instinct_honesty(_ih_mol, _ih_facts, _ih_query) {
         let _ih_cons = 200 - __floor(_ih_d * 200 / 47);
         if _ih_cons < 0 { let _ih_cons = 0; };
     };
-    // Domain confidence from self-model → 0-300
-    let _ih_domain = __floor(kt_domain_confidence(_ih_query) * 300 / 1000);
-    if _ih_domain > 300 { let _ih_domain = 300; };
-    return _ih_silk + _ih_src + _ih_cons + _ih_domain;
+    // Silk connectivity → 0-300 (fast: single lookup, no self_model scan)
+    let _ih_silk2 = 0;
+    if _ih_nfacts >= 2 {
+        let _ih_fm0 = _kt_fast_mol(__array_get(_ih_facts, 0));
+        let _ih_fm1 = _kt_fast_mol(__array_get(_ih_facts, 1));
+        let _ih_silk2 = __floor(kt_silk_weight(_ih_fm0, _ih_fm1) * 300 / 1000);
+    };
+    return _ih_silk + _ih_src + _ih_cons + _ih_silk2;
 }
 
 // ② Contradiction: V distance high + R distance low = contradict
@@ -337,12 +341,26 @@ pub fn compose(_co_mols) {
     let _co_rw = __array_get(_co_r_wsum, 0);
     let _co_rr = 0;
     if _co_rw > 0 { let _co_rr = (__floor(__array_get(_co_r_sum, 0) / _co_rw)) % 16; };
-    // V = amplify: base + sign(sum) × boost
+    // V = amplify: base + sign × |spread| × 0.5 (spec A4)
+    // "Cortisol + adrenaline → stress STRONGER than each alone"
     let _co_vsum = __array_get(_co_v_sum, 0);
     let _co_vbase = __floor(_co_vsum / _co_n);
-    let _co_vdiff = _co_vsum - (_co_vbase * _co_n);
-    let _co_vboost = __floor(_co_vdiff / _co_n);
-    let _co_rv = _co_vbase + _co_vboost;
+    // Spread = max deviation from base across all inputs
+    let _co_vspread = [0];
+    let _co_vi = 0;
+    while _co_vi < _co_n {
+        let _co_vm = __array_get(_co_mols, _co_vi);
+        let _co_vdev = _kt_mol_v(_co_vm) - _co_vbase;
+        if _co_vdev < 0 { let _co_vdev = 0 - _co_vdev; };
+        if _co_vdev > __array_get(_co_vspread, 0) { let _ = __set_at(_co_vspread, 0, _co_vdev); };
+        let _co_vi = _co_vi + 1;
+    };
+    // Boost = spread / 2 (amplify, not average)
+    let _co_vboost = __floor(__array_get(_co_vspread, 0) / 2);
+    // Sign: if sum > neutral (4*n), positive boost; else negative
+    let _co_rv = _co_vbase;
+    if _co_vsum > (_co_n * 4) { let _co_rv = _co_vbase + _co_vboost; };
+    if _co_vsum < (_co_n * 4) { let _co_rv = _co_vbase - _co_vboost; };
     if _co_rv > 7 { let _co_rv = 7; };
     if _co_rv < 0 { let _co_rv = 0; };
     // A = max
@@ -689,6 +707,10 @@ pub fn pipeline(_pl_input) {
     };
     // DNA repair: improve composed mol quality (max 3 iterations)
     let _pl_repaired = dna_repair(_pl_composed, _pl_fused, 3);
+    // Use repaired mol for response selection (closer to input = better match)
+    if _pl_repaired != _pl_composed {
+        let _pl_composed = _pl_repaired;
+    };
 
     // Track topic for follow-up questions
     let _pl_topic_words = _pl_split_words(_pl_resolved);
@@ -727,7 +749,7 @@ pub fn pipeline(_pl_input) {
     // ACT mode: no learning, just respond confidently
 
     // ① Honesty instinct: confidence from evidence → prefix response
-    let _pl_conf = instinct_honesty(_pl_fused, _pl_facts, _pl_input);
+    let _pl_conf = instinct_honesty(_pl_fused, _pl_facts);
     if _pl_conf < 400 {
         let _pl_response = "Toi khong chac: " + _pl_response;
     };
