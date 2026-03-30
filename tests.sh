@@ -981,6 +981,11 @@ sb_test "selfbuild/bitwise_and" 'emit 0xFF & 0x0F;'            "15"
 sb_test "selfbuild/constfold"   'emit 10 * 20 + 5;'            "205"
 sb_test "selfbuild/block_comment" 'let x = /* skip this */ 42; emit x;' "42"
 sb_test "selfbuild/strfold"  'emit "hello" + " " + "world";'   "hello world"
+sb_test "selfbuild/md5"      'emit md5("abc");'                 "900150983cd24fb0d6963f7d28e17f72"
+sb_test "selfbuild/base64"   'emit base64_encode("Nox");'       "Tm94"
+sb_test "selfbuild/shl"      'emit 1 << 10;'                    "1024"
+sb_test "selfbuild/pipe_chain" 'fn d(x){return x*2;};fn i(x){return x+1;};emit pipe(5,d,i);' "11"
+sb_test "selfbuild/syscall"  'emit __syscall(39,0,0,0,0,0,0) > 0;' "1"
 echo -e "\n${CYAN}  Self-build: ${SB_PASS}/$((SB_PASS + SB_FAIL)) passed${NC}"
 fi
 
