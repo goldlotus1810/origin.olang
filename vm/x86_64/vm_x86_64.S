@@ -10832,25 +10832,25 @@ op_halt:
     cmpb    $2, eval_mode(%rip)
     je      .mcp_stdin
 
-    # Print greeting
+    # Check if stdin is a terminal (isatty via ioctl TCGETS)
+    lea     repl_termios_old(%rip), %rdx
+    mov     $0x5401, %esi               # TCGETS
+    xor     %edi, %edi                  # fd = stdin
+    mov     $16, %eax                   # SYS_ioctl
+    syscall
+    test    %rax, %rax
+    jnz     .repl_no_raw                # not a terminal → skip greeting + raw mode
+
+    # Print greeting (only when interactive TTY)
     lea     msg_greeting(%rip), %rsi
     movzbl  msg_greeting_len(%rip), %edx
     mov     $1, %edi                    # stdout
     mov     $SYS_WRITE, %eax
     syscall
 
-    # Check if stdin is a terminal (for raw mode)
-    # isatty(0) via ioctl(0, TCGETS, &termios)
-    lea     repl_termios_old(%rip), %rdx
-    mov     $0x5401, %esi               # TCGETS
-    xor     %edi, %edi                  # fd = stdin
-    mov     $16, %eax                   # SYS_ioctl
-    syscall
     # DISABLED raw mode — causes output suppression on some terminals
     # TODO: fix raw mode output issue, then re-enable
     jmp     .repl_no_raw
-    test    %rax, %rax
-    jnz     .repl_no_raw                # not a terminal → skip raw mode
     # Save old termios, set raw mode
     lea     repl_termios_old(%rip), %rsi
     lea     repl_termios_raw(%rip), %rdi

@@ -15,8 +15,23 @@ pub fn screen_region(x, y, w, h) {
     return "/tmp/nox_region.png";
 }
 
-// Get screen dimensions
+// Get screen dimensions (auto-detect via cosmic-randr / xrandr)
 pub fn screen_size() {
+    let r = __system("cosmic-randr list 2>/dev/null | grep -oP '\\d+x\\d+.*current' | head -1 | grep -oP '\\d+x\\d+'");
+    if len(r) < 3 {
+        r = __system("xrandr 2>/dev/null | grep '\\*' | head -1 | awk '{print $1}'");
+    };
+    if len(r) < 3 { return { width: 1920, height: 1200 }; };
+    // Parse "1920x1200"
+    let xi = 0;
+    while xi < len(r) {
+        if char_at(r, xi) == "x" {
+            let w = slice(r, 0, xi);
+            let h = slice(r, xi + 1, len(r));
+            return { width: __parse_num(w), height: __parse_num(h) };
+        };
+        xi = xi + 1;
+    };
     return { width: 1920, height: 1200 };
 }
 
