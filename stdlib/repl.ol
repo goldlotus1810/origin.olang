@@ -296,7 +296,7 @@ pub fn repl_eval(input) {
     if char_at(src, 0) == "/" {
       let _sc = __substr(src, 1, len(src));
       // /help
-      if _sc == "help" { return "/help /wake /bench /think /see /fetch /type /status /version /exit\n/scan /sys /proc /net /look /win /notify /cam /ssh /serve"; };
+      if _sc == "help" { return "/help /wake /bench /think /see /fetch /type /status /version /exit\n/scan /sys /proc /net /look /win /notify /cam /ssh /serve /bg /evolve /daemon"; };
       if _sc == "wake" { return repl_eval("wake"); };
       if _sc == "bench" { return repl_eval("bench"); };
       if _sc == "status" { return repl_eval("status"); };
@@ -361,6 +361,8 @@ pub fn repl_eval(input) {
       if len(_sc) > 6 { if __substr(_sc, 0, 6) == "serve " { let _sp = __to_number(__substr(_sc, 6, len(_sc))); nox_serve(_sp); return "Server stopped"; }; };
       // /bg <cmd> — run command in background
       if len(_sc) > 3 { if __substr(_sc, 0, 3) == "bg " { let _bc = __substr(_sc, 3, len(_sc)); let _bp = __spawn(_bc); return "BG PID=" + __to_string(_bp[0]); }; };
+      // /daemon — start system monitoring daemon
+      if _sc == "daemon" { nox_daemon(30); return "daemon stopped"; };
       return "Unknown: /" + _sc + ". Try /help";
     };
   };
