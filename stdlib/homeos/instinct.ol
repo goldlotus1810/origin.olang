@@ -46,6 +46,11 @@ pub fn instinct_route(_ir_input) {
     if _ir_has_word(_ir_low, "fact:") == 1 { return { instinct: "LEARNING", action: "observe", v: _ir_v, a: _ir_a, data: _ir_input }; };
     if _ir_has_word(_ir_low, "hoc:") == 1 { return { instinct: "LEARNING", action: "observe", v: _ir_v, a: _ir_a, data: _ir_input }; };
 
+    // 8. CODE: check BEFORE question (math "1+1=?" is code, not question)
+    if _ir_is_code(_ir_input) == 1 {
+        return { instinct: "CODE", action: "compile", v: _ir_v, a: _ir_a, data: _ir_input };
+    };
+
     // 3. QUESTION: contains "?" or question words
     if _ir_has_word(_ir_input, "?") == 1 { return { instinct: "QUESTION", action: "search", v: _ir_v, a: _ir_a, data: _ir_input }; };
     if _ir_is_question(_ir_low) == 1 { return { instinct: "QUESTION", action: "search", v: _ir_v, a: _ir_a, data: _ir_input }; };
@@ -69,10 +74,7 @@ pub fn instinct_route(_ir_input) {
         return { instinct: "EMOTION", action: "empathize", v: _ir_v, a: _ir_a, data: _ir_input };
     };
 
-    // 8. CODE: contains Olang syntax → compile & execute
-    if _ir_is_code(_ir_input) == 1 {
-        return { instinct: "CODE", action: "compile", v: _ir_v, a: _ir_a, data: _ir_input };
-    };
+    // CODE already checked above (before QUESTION)
 
     // 9. COMMAND: starts with action verb → dispatch to brain
     if _ir_is_command(_ir_input) == 1 {
@@ -116,6 +118,26 @@ fn _ir_is_code(inp) {
     if has_paren == 1 { return 1; };
     // Starts with __ → builtin
     if len(inp) >= 2 { if __substr(inp, 0, 2) == "__" { return 1; }; };
+    // Math expression: digits and operators (+−*/%), strip ?=! first
+    let is_math = 1;
+    let has_digit = 0;
+    let has_op = 0;
+    i = 0;
+    while i < len(inp) {
+        let c = __char_code(char_at(inp, i));
+        if c >= 48 { if c <= 57 { has_digit = 1; }; };
+        if c == 43 { has_op = 1; };
+        if c == 45 { has_op = 1; };
+        if c == 42 { has_op = 1; };
+        if c == 47 { has_op = 1; };
+        // Allow: digits, operators, spaces, . , ? = !
+        if c != 32 { if c != 46 { if c != 63 { if c != 61 { if c != 33 {
+            if c < 42 { if c > 57 { is_math = 0; }; };
+            if c > 57 { is_math = 0; };
+        }; }; }; }; };
+        i = i + 1;
+    };
+    if is_math == 1 { if has_digit == 1 { if has_op == 1 { return 1; }; }; };
     return 0;
 }
 

@@ -286,6 +286,16 @@ fn _dead_find_unused(_dfu_src, _dfu_fns) {
     return _dfu_dead;
 }
 
+fn _strip_trailing(s) {
+    // Strip ? = ! from end. Can't update var in if (scope bug), so use recursion.
+    if len(s) == 0 { return s; };
+    let c = __char_code(char_at(s, len(s) - 1));
+    if c == 63 { return _strip_trailing(__substr(s, 0, len(s) - 1)); };
+    if c == 61 { return _strip_trailing(__substr(s, 0, len(s) - 1)); };
+    if c == 33 { return _strip_trailing(__substr(s, 0, len(s) - 1)); };
+    return s;
+}
+
 fn _repl_maybe_semi(s) {
     let c = __char_code(char_at(s, len(s) - 1));
     if c == 59 { return ""; };
@@ -313,7 +323,16 @@ pub fn repl_eval(input) {
           if _re_inst == "COMMAND" { return nox_brain(src); };
           if _re_inst == "LEARNING" { kt_learn(src); return "Learned."; };
           if _re_inst == "CODE" {
-              let _re_code = src + _repl_maybe_semi(src);
+              // Strip trailing ? = ! (math: "1+1=?" → "1+1")
+              let _re_csrc = _strip_trailing(src);
+              // Wrap bare expressions with emit (math: "1+1" → "emit 1+1")
+              if len(_re_csrc) > 0 {
+                  let _fc = char_at(_re_csrc, 0);
+                  let _is_expr = 0;
+                  if __char_code(_fc) >= 48 { if __char_code(_fc) <= 57 { _is_expr = 1; }; };
+                  if _is_expr == 1 { let _re_csrc = "emit " + _re_csrc; };
+              };
+              let _re_code = _re_csrc + _repl_maybe_semi(_re_csrc);
               _g_parse_source = _re_code;
               let _re_tokens = tokenize(_re_code);
               if len(_re_tokens) > 0 {
