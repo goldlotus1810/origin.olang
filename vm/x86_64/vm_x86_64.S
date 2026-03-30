@@ -3470,6 +3470,9 @@ op_call:
     mov     %rax, %r11
 .push_reloc_bump:
     mov     %r11, %r15
+    # Auto-pin: protect relocated array from REPL heap restore
+    lea     repl_heap_checkpoint(%rip), %rax
+    mov     %r15, (%rax)
     # Write FORWARD POINTER at old location
     movq    $ARRAY_FORWARD_MARKER, (%rdi)   # mark old as forwarded
     mov     %rsi, 8(%rdi)                    # pointer to new location
@@ -8016,6 +8019,9 @@ op_ret:
     pop     %rax                    # restore size
     pop     %rdi                    # restore buf base
     add     %rax, %r15              # bump heap past buffer
+    # Auto-pin: protect buffer from REPL heap restore
+    lea     repl_heap_checkpoint(%rip), %rcx
+    mov     %r15, (%rcx)
     # Push result
     sub     $16, %r14
     mov     %rdi, (%r14)            # ptr = buffer base
