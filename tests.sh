@@ -68,10 +68,10 @@ run_test() {
 }
 
 strip_repl() {
-    # Strip REPL header (first 2 lines) + "⦿ " prefix + "bye" footer
-    # Input:  ⦿ HomeOS v0.05\n○ Type...\n⦿ result\n⦿ bye
-    # Output: result
-    sed '1,2d' | sed 's/^⦿ //; /^bye$/d' | sed '/^$/d'
+    # Strip REPL noise by pattern (works with or without greeting)
+    # Removes: greeting line, help line, prompt prefix, bye footer
+    grep -v "^⦿ Nox\|^○ /help\|^⦿ bye$\|^⦿ freedom:\|^⦿ every decision:" | \
+    sed 's/^⦿ //' | sed '/^$/d'
 }
 
 run_olang_test() {
