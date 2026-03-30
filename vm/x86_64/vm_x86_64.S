@@ -1625,6 +1625,12 @@ op_call:
     je      .call_simd_compose4
     jmp     .call_not_builtin
 
+.builtin_slot_104:
+    movabs  $0x5B523356365EF568, %rdx
+    cmp     %rdx, %rax
+    je      .call_raw_syscall
+    jmp     .call_not_builtin
+
 .builtin_slot_106:
     movabs  $0xEA1BDD6D065BF46A, %rdx
     cmp     %rdx, %rax
@@ -4945,6 +4951,45 @@ op_call:
     syscall
     sub     $16, %r14
     xorpd   %xmm0, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+# __syscall(num, a1, a2, a3, a4, a5) → result
+# Direct Linux syscall — one builtin, infinite power
+# Nox can call ANY of the 300+ Linux syscalls
+.call_raw_syscall:
+    add     %rcx, %r13
+    # Pop up to 6 args (right to left on VM stack)
+    # arg5 (6th param)
+    movsd   (%r14), %xmm0
+    cvttsd2si %xmm0, %r9d
+    add     $16, %r14
+    # arg4
+    movsd   (%r14), %xmm0
+    cvttsd2si %xmm0, %r10d
+    add     $16, %r14
+    # arg3
+    movsd   (%r14), %xmm0
+    cvttsd2si %xmm0, %edx
+    add     $16, %r14
+    # arg2
+    movsd   (%r14), %xmm0
+    cvttsd2si %xmm0, %esi
+    add     $16, %r14
+    # arg1
+    movsd   (%r14), %xmm0
+    cvttsd2si %xmm0, %edi
+    add     $16, %r14
+    # syscall number
+    movsd   (%r14), %xmm0
+    cvttsd2si %xmm0, %eax
+    add     $16, %r14
+    # Execute
+    syscall
+    # Return result as f64
+    sub     $16, %r14
+    cvtsi2sd %rax, %xmm0
     movsd   %xmm0, (%r14)
     movq    $F64_MARKER, 8(%r14)
     jmp     vm_loop
@@ -12529,7 +12574,7 @@ builtin_jump_table:
     .quad   .builtin_slot_101
     .quad   .builtin_slot_102
     .quad   .builtin_slot_103
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_104
     .quad   .call_not_builtin
     .quad   .builtin_slot_106
     .quad   .call_not_builtin
