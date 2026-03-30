@@ -1,3 +1,42 @@
+tag:code emit 42
+tag:code let x = 1 + 2
+tag:code fn fib(n) { return n; }
+tag:code emit md5("test")
+tag:code nox_benchmark()
+tag:code emit 1 + 2
+tag:code while i < 10 { i = i + 1; }
+tag:code for x in [1,2,3] { emit x; }
+tag:code emit __syscall(39,0,0,0,0,0,0)
+tag:code let a = [1,2,3]; emit len(a)
+tag:greeting hello
+tag:greeting hi
+tag:greeting hey
+tag:greeting chao
+tag:greeting xin chao
+tag:greeting good morning
+tag:greeting ban khoe khong
+tag:question olang la gi
+tag:question nox la ai
+tag:question 1+1 bang bao nhieu
+tag:question what is olang
+tag:question how does the compiler work
+tag:command status
+tag:command scan
+tag:command check camera
+tag:command build
+tag:command test
+tag:command evolve
+tag:command heal
+tag:action:sys_info system info
+tag:action:sys_info thong tin he thong
+tag:action:net_interfaces network status
+tag:action:net_interfaces trang thai mang
+tag:action:cam_status check camera
+tag:action:cam_status kiem tra camera
+tag:action:proc_top process list
+tag:action:proc_top danh sach tien trinh
+tag:action:sys_uptime uptime
+tag:action:sys_uptime thoi gian hoat dong
 config camera1 ip 192.168.1.96
 config camera2 ip 192.168.1.108
 config camera1 name front
@@ -680,42 +719,3 @@ config test_key test_val
 config test_key test_val
 config test_key test_val
 config test_key test_val
-tag:code emit 42
-tag:code let x = 1 + 2
-tag:code fn fib(n) { return n; }
-tag:code emit md5("test")
-tag:code nox_benchmark()
-tag:code emit 1 + 2
-tag:code while i < 10 { i = i + 1; }
-tag:code for x in [1,2,3] { emit x; }
-tag:code emit __syscall(39,0,0,0,0,0,0)
-tag:code let a = [1,2,3]; emit len(a)
-tag:greeting hello
-tag:greeting hi
-tag:greeting hey
-tag:greeting chao
-tag:greeting xin chao
-tag:greeting good morning
-tag:greeting ban khoe khong
-tag:question olang la gi
-tag:question nox la ai
-tag:question 1+1 bang bao nhieu
-tag:question what is olang
-tag:question how does the compiler work
-tag:command status
-tag:command scan
-tag:command check camera
-tag:command build
-tag:command test
-tag:command evolve
-tag:command heal
-tag:action:sys_info system info
-tag:action:sys_info thong tin he thong
-tag:action:net_interfaces network status
-tag:action:net_interfaces trang thai mang
-tag:action:cam_status check camera
-tag:action:cam_status kiem tra camera
-tag:action:proc_top process list
-tag:action:proc_top danh sach tien trinh
-tag:action:sys_uptime uptime
-tag:action:sys_uptime thoi gian hoat dong

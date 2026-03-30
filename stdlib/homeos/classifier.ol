@@ -6,48 +6,67 @@
 // Classify input by finding nearest tagged example
 pub fn classify(input) {
     let raw = __file_read("/home/lupin/Origin/homeos.knowledge");
-    let best_tag = "";
-    let best_score = 0;
     let inp_words = _split_words(input);
+    // Collect all tagged lines
+    let tags = _extract_tagged_lines(raw);
+    // Find best match (use arrays to avoid scope bug with let inside if)
+    let best = ["", 0];
+    let ti = 0;
+    while ti < len(tags) {
+        let entry = tags[ti];
+        let ex_words = _split_words(entry.text);
+        let score = _word_overlap(inp_words, ex_words);
+        if _str_contains(entry.text, input) == 1 { score = score + 5; };
+        if _str_contains(input, entry.text) == 1 { score = score + 3; };
+        if score > best[1] { set_at(best, 0, entry.tag); set_at(best, 1, score); };
+        ti = ti + 1;
+    };
+    return best[0];
+}
 
-    // Scan tagged facts
+// Extract all "tag:xxx text" lines from raw knowledge
+fn _extract_tagged_lines(raw) {
+    let results = [];
     let i = 0;
-    while i < len(raw) {
-        // Find lines starting with "tag:"
-        let is_line_start = 0;
-        if i == 0 { is_line_start = 1; };
-        if i > 0 { if __char_code(char_at(raw, i - 1)) == 10 { is_line_start = 1; }; };
-
-        if is_line_start == 1 {
-            if i + 4 < len(raw) {
-                if __substr(raw, i, i + 4) == "tag:" {
-                    // Extract tag and example text
-                    let le = i;
-                    while le < len(raw) { if __char_code(char_at(raw, le)) == 10 { break; }; le = le + 1; };
-                    let line = __substr(raw, i + 4, le);
-
-                    // Parse: "code emit 42" → tag="code", example="emit 42"
-                    let si = 0;
-                    while si < len(line) { if char_at(line, si) == " " { break; }; si = si + 1; };
-                    let tag = __substr(line, 0, si);
-                    let example = "";
-                    if si + 1 < len(line) { let example = __substr(line, si + 1, len(line)); };
-
-                    // Score: count matching words between input and example
-                    let ex_words = _split_words(example);
-                    let score = _word_overlap(inp_words, ex_words);
-
-                    if score > best_score {
-                        let best_score = score;
-                        let best_tag = tag;
-                    };
-                };
+    while i < len(raw) - 4 {
+        let at_start = 0;
+        if i == 0 { at_start = 1; };
+        if i > 0 { if __char_code(char_at(raw, i - 1)) == 10 { at_start = 1; }; };
+        if at_start == 1 {
+            if __substr(raw, i, i + 4) == "tag:" {
+                let le = i;
+                while le < len(raw) { if __char_code(char_at(raw, le)) == 10 { break; }; le = le + 1; };
+                let line = __substr(raw, i + 4, le);
+                let parsed = _parse_tag_line(line);
+                push(results, parsed);
             };
         };
         i = i + 1;
     };
+    return results;
+}
 
-    return best_tag;
+fn _parse_tag_line(line) {
+    let si = 0;
+    while si < len(line) { if char_at(line, si) == " " { break; }; si = si + 1; };
+    let tag = __substr(line, 0, si);
+    let text = __substr(line, si + 1, len(line));
+    if si >= len(line) { let text = tag; };
+    return { tag: tag, text: text };
+}
+
+fn _str_contains(haystack, needle) {
+    if len(needle) == 0 { return 0; };
+    if len(haystack) < len(needle) { return 0; };
+    let i = 0;
+    while i <= len(haystack) - len(needle) {
+        let match = 1;
+        let j = 0;
+        while j < len(needle) { if char_at(haystack, i + j) != char_at(needle, j) { match = 0; break; }; j = j + 1; };
+        if match == 1 { return 1; };
+        i = i + 1;
+    };
+    return 0;
 }
 
 // Classify and return both tag and action (for tag:action:fn patterns)
