@@ -346,8 +346,9 @@ pub fn repl_eval(input) {
                   _g_parse_error = 0;
               };
           };
-          if _re_inst == "QUESTION" {
-              let _re_ans = pipeline(src);
+          if _re_inst == "QUESTION" || _re_inst == "QUERY" || _re_inst == "EMOTION" || _re_inst == "REFERENCE" {
+              // Direct KnowTree ranked search
+              let _re_ans = kt_search(src);
               __heap_pin();
               if len(_re_ans) > 5 { return _re_ans; };
           };

@@ -1,13 +1,13 @@
 === AI Capability Benchmark ===
-Date: Mon Mar 30 02:17:35 PM +07 2026
+Date: Mon Mar 30 02:23:02 PM +07 2026
 Binary: 31 bytes
-Score: 41% (1850/4500)
-PASS=16 PARTIAL=5 FAIL=22 NA=2 TOTAL=45
+Score: 44% (2000/4500)
+PASS=16 PARTIAL=8 FAIL=19 NA=2 TOTAL=45
 
 
-C1|Hiểu câu hỏi đơn giản (vi)|FAIL|không hiểu hoặc trả sai|Claude: luôn hiểu
-C1|Hiểu câu hỏi đơn giản (en)|FAIL|không hiểu|Claude: luôn hiểu
-C1|Tạo text mạch lạc (> 1 câu)|FAIL|không tạo được text|Claude: tạo text tự nhiên ở mọi độ dài
+C1|Hiểu câu hỏi đơn giản (vi)|PARTIAL|trả KnowTree lookup, không compose câu|Claude: hiểu ngữ cảnh, trả lời đầy đủ, tự nhiên
+C1|Hiểu câu hỏi đơn giản (en)|PARTIAL|trả fact, không compose|Claude: hoàn hảo
+C1|Tạo text mạch lạc (> 1 câu)|PARTIAL|chỉ 9 từ|Claude: hàng trăm từ nếu cần
 C1|Tóm tắt văn bản dài|FAIL|không có summarization engine|Claude: tóm tắt chính xác mọi độ dài
 C1|Dịch Việt ↔ Anh|FAIL|không có translation|Claude: dịch 50+ ngôn ngữ tự nhiên
 C1|Viết sáng tạo (thơ, truyện)|FAIL|không có creative generation|Claude: viết thơ, truyện, kịch bản, essay ở mọi phong cách
