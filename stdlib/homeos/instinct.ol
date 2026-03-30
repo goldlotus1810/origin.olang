@@ -16,56 +16,48 @@
 // ════════════════════════════════════════════════════════════════
 
 pub fn instinct_route(_ir_input) {
-    let _ir_emo = text_emotion_v2(_ir_input);
-    let _ir_v = _ir_emo.v;
-    let _ir_a = _ir_emo.a;
-    let _ir_low = _ir_input;
+    // Get V/A from P_weight chain (not keyword lists)
+    let _ir_mol = _kt_real_mol(_ir_input);
+    let _ir_v = _kt_mol_v(_ir_mol);
+    let _ir_a = _kt_mol_a(_ir_mol);
 
-    // 1. SAFETY: high arousal + low valence = danger/anger
+    // 1. SAFETY: SecurityGate — high A + low V in 5D space
     if _ir_a >= 6 {
         if _ir_v <= 2 {
-            if _ir_has_safety_words(_ir_low) == 1 {
+            if _ir_has_safety_words(_ir_input) == 1 {
                 return { instinct: "SAFETY", action: "block", v: _ir_v, a: _ir_a };
             };
         };
     };
 
-    // 7. META: "ban la ai", "you are", "ban ten gi" (before question check)
-    if _ir_has_word(_ir_low, "ban la ai") == 1 { return _ir_meta(_ir_v, _ir_a); };
-    if _ir_has_word(_ir_low, "ban ten gi") == 1 { return _ir_meta(_ir_v, _ir_a); };
-    if _ir_has_word(_ir_low, "who are you") == 1 { return _ir_meta(_ir_v, _ir_a); };
-    if _ir_has_word(_ir_low, "what are you") == 1 { return _ir_meta(_ir_v, _ir_a); };
+    // 2. META: identity queries (specific, keep keyword — these are exact phrases)
+    if _ir_has_word(_ir_input, "ban la ai") == 1 { return _ir_meta(_ir_v, _ir_a); };
+    if _ir_has_word(_ir_input, "ban ten gi") == 1 { return _ir_meta(_ir_v, _ir_a); };
+    if _ir_has_word(_ir_input, "who are you") == 1 { return _ir_meta(_ir_v, _ir_a); };
+    if _ir_has_word(_ir_input, "what are you") == 1 { return _ir_meta(_ir_v, _ir_a); };
 
-    // 6. REFERENCE: "nho lai", "biet gi ve", "recall", "remember"
-    if _ir_has_word(_ir_low, "nho lai") == 1 { return _ir_reference(_ir_input, _ir_v, _ir_a); };
-    if _ir_has_word(_ir_low, "biet gi ve") == 1 { return _ir_reference(_ir_input, _ir_v, _ir_a); };
-    if _ir_has_word(_ir_low, "recall") == 1 { return _ir_reference(_ir_input, _ir_v, _ir_a); };
-    if _ir_has_word(_ir_low, "remember") == 1 { return _ir_reference(_ir_input, _ir_v, _ir_a); };
-
-    // 4. LEARNING: "fact:", "hoc:", starts with factual keyword
-    if _ir_has_word(_ir_low, "fact:") == 1 { return { instinct: "LEARNING", action: "observe", v: _ir_v, a: _ir_a, data: _ir_input }; };
-    if _ir_has_word(_ir_low, "hoc:") == 1 { return { instinct: "LEARNING", action: "observe", v: _ir_v, a: _ir_a, data: _ir_input }; };
-
-    // 8. CODE: check BEFORE question (math "1+1=?" is code, not question)
+    // 3. CODE: structural detection (semicolons, braces, keywords — syntactic, not 5D)
     if _ir_is_code(_ir_input) == 1 {
         return { instinct: "CODE", action: "compile", v: _ir_v, a: _ir_a, data: _ir_input };
     };
 
-    // 3. QUESTION: contains "?" or question words
-    if _ir_has_word(_ir_input, "?") == 1 { return { instinct: "QUESTION", action: "search", v: _ir_v, a: _ir_a, data: _ir_input }; };
-    if _ir_is_question(_ir_low) == 1 { return { instinct: "QUESTION", action: "search", v: _ir_v, a: _ir_a, data: _ir_input }; };
+    // 4. kt_classify: route by 5D P_weight distance to exemplars
+    let _ir_cls = kt_classify(_ir_input);
+    let _ir_type = _ir_cls.type;
+    let _ir_conf = _ir_cls.confidence;
 
-    // 2. GREETING: high valence + low arousal, or greeting words
-    if _ir_v >= 5 {
-        if _ir_a <= 3 {
-            if _ir_is_greeting(_ir_low) == 1 {
-                return { instinct: "GREETING", action: "greet", v: _ir_v, a: _ir_a };
-            };
-        };
+    // High confidence → trust classifier (60 = 3/5 majority vote)
+    if _ir_conf >= 60 {
+        if _ir_type == "greeting" { return { instinct: "GREETING", action: "greet", v: _ir_v, a: _ir_a }; };
+        if _ir_type == "question" { return { instinct: "QUESTION", action: "search", v: _ir_v, a: _ir_a, data: _ir_input }; };
+        if _ir_type == "emotion" { return { instinct: "EMOTION", action: "empathize", v: _ir_v, a: _ir_a, data: _ir_input }; };
+        if _ir_type == "command" { return { instinct: "COMMAND", action: "execute", v: _ir_v, a: _ir_a, data: _ir_input }; };
+        if _ir_type == "fact" { return { instinct: "LEARNING", action: "observe", v: _ir_v, a: _ir_a, data: _ir_input }; };
+        if _ir_type == "code" { return { instinct: "CODE", action: "compile", v: _ir_v, a: _ir_a, data: _ir_input }; };
     };
-    if _ir_is_greeting(_ir_low) == 1 { return { instinct: "GREETING", action: "greet", v: _ir_v, a: _ir_a }; };
 
-    // 5. EMOTION: strong emotional signal (far from neutral 4,4)
+    // 5. Fallback: "?" = question, strong V/A = emotion
+    if _ir_has_word(_ir_input, "?") == 1 { return { instinct: "QUESTION", action: "search", v: _ir_v, a: _ir_a, data: _ir_input }; };
     let _ir_vdist = _ir_v - 4;
     if _ir_vdist < 0 { let _ir_vdist = 0 - _ir_vdist; };
     let _ir_adist = _ir_a - 4;
@@ -74,14 +66,7 @@ pub fn instinct_route(_ir_input) {
         return { instinct: "EMOTION", action: "empathize", v: _ir_v, a: _ir_a, data: _ir_input };
     };
 
-    // CODE already checked above (before QUESTION)
-
-    // 9. COMMAND: starts with action verb → dispatch to brain
-    if _ir_is_command(_ir_input) == 1 {
-        return { instinct: "COMMAND", action: "execute", v: _ir_v, a: _ir_a, data: _ir_input };
-    };
-
-    // Default: QUERY (general knowledge search)
+    // Default: QUERY
     return { instinct: "QUERY", action: "general", v: _ir_v, a: _ir_a, data: _ir_input };
 }
 

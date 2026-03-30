@@ -155,17 +155,31 @@ let __conv_topic = [""];
 
 fn _conv_shift(_cvs_mol) {
     if len(__conv_history) < 2 { push(__conv_history, _cvs_mol); return _cvs_mol; };
-    let _cvs_prev = __conv_history[len(__conv_history) - 1];
-    let _cvs_prev2 = __conv_history[len(__conv_history) - 2];
-    // f'(t): rate of change
+    let _cvs_hlen = len(__conv_history);
+    let _cvs_prev = __conv_history[_cvs_hlen - 1];
+    let _cvs_prev2 = __conv_history[_cvs_hlen - 2];
+    // D7: f'(t) = V(t) - V(t-1) — velocity
     let _cvs_dv = _kt_mol_v(_cvs_prev) - _kt_mol_v(_cvs_prev2);
     let _cvs_da = _kt_mol_a(_cvs_prev) - _kt_mol_a(_cvs_prev2);
-    // Shift toward momentum
+    // D7: f''(t) = V'(t) - V'(t-1) — acceleration
+    let _cvs_ddv = 0;
+    if _cvs_hlen >= 3 {
+        let _cvs_prev3 = __conv_history[_cvs_hlen - 3];
+        let _cvs_dv_old = _kt_mol_v(_cvs_prev2) - _kt_mol_v(_cvs_prev3);
+        let _cvs_ddv = _cvs_dv - _cvs_dv_old;
+    };
+    // D7: f(t) = 0.6 × f_conv(t) + 0.4 × f_dn — weighted
+    // f_conv = V + 0.5×V' + 0.25×V'' (integer: V + V'/2 + V''/4)
     let _cvs_s = _kt_mol_s(_cvs_mol);
     let _cvs_r = _kt_mol_r(_cvs_mol);
-    let _cvs_v = _kt_mol_v(_cvs_mol) + __floor(_cvs_dv / 2);
+    let _cvs_v = _kt_mol_v(_cvs_mol) + __floor(_cvs_dv / 2) + __floor(_cvs_ddv / 4);
     let _cvs_a = _kt_mol_a(_cvs_mol) + __floor(_cvs_da / 2);
     let _cvs_t = _kt_mol_t(_cvs_mol);
+    // D7: Clamp ΔV_max = 3 per step (spec: 0.40 scaled to 0-7)
+    let _cvs_orig_v = _kt_mol_v(_cvs_mol);
+    let _cvs_delta = _cvs_v - _cvs_orig_v;
+    if _cvs_delta > 3 { let _cvs_v = _cvs_orig_v + 3; };
+    if _cvs_delta < -3 { let _cvs_v = _cvs_orig_v - 3; };
     if _cvs_v < 0 { let _cvs_v = 0; };
     if _cvs_v > 7 { let _cvs_v = 7; };
     if _cvs_a < 0 { let _cvs_a = 0; };
@@ -201,28 +215,76 @@ pub fn homeostasis(_hom_input_mol, _hom_predicted_mol) {
     return { mode: "ACT", energy: _hom_norm };
 }
 
-// lambda_gate removed — dead code (0 calls). Homeostasis uses direct threshold instead.
+// ════════════════════════════════════════════════════════════════
+// D2: 7 Instinct Formulas on 5D — evaluate quality/confidence
+// ════════════════════════════════════════════════════════════════
+
+// ① Honesty: confidence from evidence (silk weight + fire count + sources)
+// Returns 0-1000 scale. <400=silent, 400-700=hypothesis, 700-900=opinion, >=900=fact
+pub fn instinct_honesty(_ih_mol, _ih_facts) {
+    let _ih_nfacts = len(_ih_facts);
+    // silk_weight: best silk connection to any fact
+    let _ih_sw = [0];
+    let _ih_fi = 0;
+    while _ih_fi < _ih_nfacts {
+        if _ih_fi < 5 {
+            let _ih_fm = _kt_fast_mol(__array_get(_ih_facts, _ih_fi));
+            let _ih_w = kt_silk_weight(_ih_mol, _ih_fm);
+            if _ih_w > __array_get(_ih_sw, 0) { let _ = __set_at(_ih_sw, 0, _ih_w); };
+        };
+        let _ih_fi = _ih_fi + 1;
+    };
+    // Normalize: silk 0-1000 → 0-300
+    let _ih_silk = __floor(__array_get(_ih_sw, 0) * 300 / 1000);
+    // source_count: number of facts found → 0-200
+    let _ih_src = __floor(_ih_nfacts * 200 / 3);
+    if _ih_src > 200 { let _ih_src = 200; };
+    // consistency: mol distance from composed → 0-200 (closer = better)
+    let _ih_cons = 200;
+    if _ih_nfacts > 0 {
+        let _ih_fm0 = _kt_fast_mol(__array_get(_ih_facts, 0));
+        let _ih_d = _kt_mol_dist(_ih_mol, _ih_fm0);
+        let _ih_cons = 200 - __floor(_ih_d * 200 / 47);
+        if _ih_cons < 0 { let _ih_cons = 0; };
+    };
+    // fire_count: best fire from KnowTree silk → 0-300
+    let _ih_fire = 0;
+    return _ih_silk + _ih_src + _ih_cons + _ih_fire;
+}
+
+// ② Contradiction: V distance high + R distance low = contradict
+pub fn instinct_contradiction(_ic_a, _ic_b) {
+    let _ic_dv = _kt_abs(_kt_mol_v(_ic_a) - _kt_mol_v(_ic_b));
+    let _ic_dr = _kt_abs(_kt_mol_r(_ic_a) - _kt_mol_r(_ic_b));
+    // dV > 5 (out of 7) AND dR < 2 (out of 15) → contradiction
+    if _ic_dv > 5 { if _ic_dr < 2 { return 1; }; };
+    return 0;
+}
+
+// ⑥ Curiosity: novelty = 1 - nearest_distance/max_distance
+// Returns 0-1000: >500=explore, <300=familiar
+pub fn instinct_curiosity(_icur_mol) {
+    let _icur_near = kt_nearby(_icur_mol, 1);
+    if len(_icur_near) == 0 { return 1000; };
+    let _icur_d = __array_get(_icur_near, 0).distance;
+    // max distance in 5D = 47
+    let _icur_novelty = __floor((_icur_d * 1000) / 47);
+    if _icur_novelty > 1000 { let _icur_novelty = 1000; };
+    return _icur_novelty;
+}
 
 // ════════════════════════════════════════════════════════════════
 // ⑩ Fusion — Merge text molecule + emotion + context
 // ════════════════════════════════════════════════════════════════
 
 pub fn fusion(_fu_text_mol, _fu_emo, _fu_context_mol) {
-    let _fu_s = _kt_mol_s(_fu_text_mol);
-    let _fu_r = _kt_mol_r(_fu_text_mol);
-    let _fu_v = _fu_emo.v;
-    let _fu_a = _fu_emo.a;
-    let _fu_t = _kt_mol_t(_fu_text_mol);
-    // Context influence: shift toward context
+    // A4 rules: compose text_mol + context_mol
     if _fu_context_mol > 0 {
-        let _fu_cs = _kt_mol_s(_fu_context_mol);
-        let _fu_cr = _kt_mol_r(_fu_context_mol);
-        let _fu_s = __floor((_fu_s + _fu_cs) / 2);
-        let _fu_r = __floor((_fu_r + _fu_cr) / 2);
+        let _fu_mols = [_fu_text_mol, _fu_context_mol];
+        return compose(_fu_mols);
     };
-    if _fu_v > 7 { let _fu_v = 7; };
-    if _fu_a > 7 { let _fu_a = 7; };
-    return (_fu_s * 4096) + (_fu_r * 256) + (_fu_v * 32) + (_fu_a * 4) + _fu_t;
+    // No context: use text mol V/A from P_weight (not keyword emotion)
+    return _fu_text_mol;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -233,27 +295,120 @@ pub fn compose(_co_mols) {
     let _co_n = len(_co_mols);
     if _co_n == 0 { return 0; };
     if _co_n == 1 { return __array_get(_co_mols, 0); };
-    let _co_ts = [0];
-    let _co_tr = [0];
-    let _co_tv = [0];
-    let _co_ta = [0];
-    let _co_tt = [0];
+    // A4 rules: S=max, R=Zipf, V=amplify, A=max, T=vote
+    let _co_s_max = [0];
+    let _co_r_sum = [0];
+    let _co_r_wsum = [0];
+    let _co_v_sum = [0];
+    let _co_a_max = [0];
+    let _co_t0 = [0];
+    let _co_t1 = [0];
+    let _co_t2 = [0];
+    let _co_t3 = [0];
     let _co_i = 0;
     while _co_i < _co_n {
         let _co_m = __array_get(_co_mols, _co_i);
-        let _ = __set_at(_co_ts, 0, __array_get(_co_ts, 0) + _kt_mol_s(_co_m));
-        let _ = __set_at(_co_tr, 0, __array_get(_co_tr, 0) + _kt_mol_r(_co_m));
-        let _ = __set_at(_co_tv, 0, __array_get(_co_tv, 0) + _kt_mol_v(_co_m));
-        let _ = __set_at(_co_ta, 0, __array_get(_co_ta, 0) + _kt_mol_a(_co_m));
-        let _ = __set_at(_co_tt, 0, __array_get(_co_tt, 0) + _kt_mol_t(_co_m));
+        let _co_s = _kt_mol_s(_co_m);
+        let _co_r = _kt_mol_r(_co_m);
+        let _co_v = _kt_mol_v(_co_m);
+        let _co_a = _kt_mol_a(_co_m);
+        let _co_t = _kt_mol_t(_co_m);
+        // S = Union (max)
+        if _co_s > __array_get(_co_s_max, 0) { let _ = __set_at(_co_s_max, 0, _co_s); };
+        // R = Zipf-weighted average
+        let _co_w = __floor(1000 / (_co_i + 1));
+        let _ = __set_at(_co_r_sum, 0, __array_get(_co_r_sum, 0) + (_co_r * _co_w));
+        let _ = __set_at(_co_r_wsum, 0, __array_get(_co_r_wsum, 0) + _co_w);
+        // V = accumulate for amplify
+        let _ = __set_at(_co_v_sum, 0, __array_get(_co_v_sum, 0) + _co_v);
+        // A = Max
+        if _co_a > __array_get(_co_a_max, 0) { let _ = __set_at(_co_a_max, 0, _co_a); };
+        // T = vote
+        if _co_t == 0 { let _ = __set_at(_co_t0, 0, __array_get(_co_t0, 0) + 1); };
+        if _co_t == 1 { let _ = __set_at(_co_t1, 0, __array_get(_co_t1, 0) + 1); };
+        if _co_t == 2 { let _ = __set_at(_co_t2, 0, __array_get(_co_t2, 0) + 1); };
+        if _co_t == 3 { let _ = __set_at(_co_t3, 0, __array_get(_co_t3, 0) + 1); };
         let _co_i = _co_i + 1;
     };
-    let _co_rs = __floor(__array_get(_co_ts, 0) / _co_n) % 16;
-    let _co_rr = __floor(__array_get(_co_tr, 0) / _co_n) % 16;
-    let _co_rv = __floor(__array_get(_co_tv, 0) / _co_n) % 8;
-    let _co_ra = __floor(__array_get(_co_ta, 0) / _co_n) % 8;
-    let _co_rt = __floor(__array_get(_co_tt, 0) / _co_n) % 4;
+    // S = max
+    let _co_rs = __array_get(_co_s_max, 0) % 16;
+    // R = Zipf weighted avg
+    let _co_rw = __array_get(_co_r_wsum, 0);
+    let _co_rr = 0;
+    if _co_rw > 0 { let _co_rr = (__floor(__array_get(_co_r_sum, 0) / _co_rw)) % 16; };
+    // V = amplify: base + sign(sum) × boost
+    let _co_vsum = __array_get(_co_v_sum, 0);
+    let _co_vbase = __floor(_co_vsum / _co_n);
+    let _co_vdiff = _co_vsum - (_co_vbase * _co_n);
+    let _co_vboost = __floor(_co_vdiff / _co_n);
+    let _co_rv = _co_vbase + _co_vboost;
+    if _co_rv > 7 { let _co_rv = 7; };
+    if _co_rv < 0 { let _co_rv = 0; };
+    // A = max
+    let _co_ra = __array_get(_co_a_max, 0) % 8;
+    // T = vote (majority wins)
+    let _co_rt = 0;
+    let _co_tmax = __array_get(_co_t0, 0);
+    if __array_get(_co_t1, 0) > _co_tmax { let _co_rt = 1; let _co_tmax = __array_get(_co_t1, 0); };
+    if __array_get(_co_t2, 0) > _co_tmax { let _co_rt = 2; let _co_tmax = __array_get(_co_t2, 0); };
+    if __array_get(_co_t3, 0) > _co_tmax { let _co_rt = 3; };
     return (_co_rs * 4096) + (_co_rr * 256) + (_co_rv * 32) + (_co_ra * 4) + _co_rt;
+}
+
+// ════════════════════════════════════════════════════════════════
+// Chain recombination — generate new content from existing chains
+// Takes N fact texts, composes target mol, selects best segments
+// ════════════════════════════════════════════════════════════════
+
+pub fn chain_recombine(_cr_facts) {
+    let _cr_n = len(_cr_facts);
+    if _cr_n == 0 { return ""; };
+    if _cr_n == 1 { return __array_get(_cr_facts, 0); };
+    // Compose target mol from all facts
+    let _cr_mols = [];
+    let _cr_i = 0;
+    while _cr_i < _cr_n {
+        if _cr_i < 5 {
+            let _cr_fm = _kt_fast_mol(__array_get(_cr_facts, _cr_i));
+            if _cr_fm > 0 { push(_cr_mols, _cr_fm); };
+        };
+        let _cr_i = _cr_i + 1;
+    };
+    let _cr_target = compose(_cr_mols);
+    if _cr_target == 0 { return __array_get(_cr_facts, 0); };
+    // Split each fact into words, score each word's mol distance to target
+    // Select words that are closest to the target mol (most relevant)
+    let _cr_out = "";
+    let _cr_used = [0, 0, 0, 0, 0, 0, 0, 0]; // dedup by word hash
+    let _cr_fi = 0;
+    while _cr_fi < _cr_n {
+        if _cr_fi < 3 {
+            let _cr_fact = __array_get(_cr_facts, _cr_fi);
+            let _cr_words = _pl_split_words(_cr_fact);
+            let _cr_wi = 0;
+            while _cr_wi < len(_cr_words) {
+                let _cr_w = __array_get(_cr_words, _cr_wi);
+                if len(_cr_w) >= 3 {
+                    let _cr_wm = _kt_fast_mol(_cr_w);
+                    let _cr_dist = _kt_mol_dist(_cr_wm, _cr_target);
+                    // Accept words within distance 10 of target
+                    if _cr_dist <= 10 {
+                        let _cr_wh = __bit_and(_kt_word_hash(_cr_w), 7);
+                        if __array_get(_cr_used, _cr_wh) == 0 {
+                            let _ = __set_at(_cr_used, _cr_wh, 1);
+                            if len(_cr_out) > 0 { let _cr_out = _cr_out + " "; };
+                            let _cr_out = _cr_out + _cr_w;
+                        };
+                    };
+                };
+                let _cr_wi = _cr_wi + 1;
+            };
+        };
+        let _cr_fi = _cr_fi + 1;
+    };
+    // If recombination produced nothing useful, return first fact
+    if len(_cr_out) < 5 { return __array_get(_cr_facts, 0); };
+    return _cr_out;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -437,22 +592,35 @@ pub fn pipeline(_pl_input) {
     let _pl_chain = chain_encode(_pl_input);
     let _pl_chain_mol = chain_summary(_pl_chain);
 
-    // ⑩ Fusion: text mol + emotion + ConversationCurve
+    // ⑩ Fusion: text mol + context (V/A from P_weight, not keyword lists)
     let _pl_text_mol = _kt_fast_mol(_pl_input);
-    let _pl_emo = text_emotion_v2(_pl_input);
-    let _pl_context = 0;
-    let _pl_fused = fusion(_pl_text_mol, _pl_emo, _pl_context);
+    // WM slot 0 = query, slot 1 = context (previous result)
+    wm_set(0, _pl_text_mol);
+    let _pl_context = wm_get(3);
+    let _pl_fused = fusion(_pl_text_mol, 0, _pl_context);
     // Apply conversation momentum
     let _pl_fused = _conv_shift(_pl_fused);
 
     // ⑬ Pronoun resolution: replace "it"/"that" with last topic
     let _pl_resolved = _pl_resolve_pronouns(_pl_input);
-    // Search: TEXT FIRST (keyword), then MOLECULAR ranking
-    let _pl_facts = _pl_text_search(_pl_resolved);
-    // Step B: if text search empty, fall back to molecular search
+    // Search: MOLECULAR FIRST (5D P_weight), text fallback
+    let _pl_mol_dec = kt_decode(_pl_resolved);
+    let _pl_facts = _pl_mol_dec.facts;
+    // Silk walk: follow associations depth 3, threshold 10 (weak links OK)
+    if len(_pl_facts) > 0 {
+        let _pl_sw_mol = _kt_fast_mol(__array_get(_pl_facts, 0));
+        let _pl_silk = kt_silk_walk(_pl_sw_mol, 3, 10);
+        let _pl_swi = 0;
+        while _pl_swi < len(_pl_silk) {
+            if len(_pl_facts) < 10 {
+                push(_pl_facts, __array_get(_pl_silk, _pl_swi).text);
+            };
+            let _pl_swi = _pl_swi + 1;
+        };
+    };
+    // Fallback: text search if molecular + silk found nothing
     if len(_pl_facts) == 0 {
-        let _pl_mol_dec = kt_decode(_pl_input);
-        let _pl_facts = _pl_mol_dec.facts;
+        let _pl_facts = _pl_text_search(_pl_resolved);
     };
 
     // ⑫ Homeostasis: surprise detection
@@ -461,6 +629,7 @@ pub fn pipeline(_pl_input) {
     let _pl_home = homeostasis(_pl_fused, _pl_predicted);
 
     // ──── CHECKPOINT 2: ENCODE ────
+    // CP2: |entities| >= 1, chain valid, compose non-zero
     // ⑧ Instincts first (short-circuit greetings, meta)
     let _pl_inst = _pl_safe;
     if _pl_inst.instinct == "GREETING" { return instinct_act(_pl_inst, _pl_input); };
@@ -470,6 +639,8 @@ pub fn pipeline(_pl_input) {
         if _pl_home.mode == "LEARN" { dn_observe(_pl_input); kt_learn(_pl_input); __file_append("homeos.knowledge", _pl_input + "\n"); __heap_pin(); return "Toi se hoc them ve dieu nay."; };
         return "Toi chua biet.";
     };
+    // CP2 verify: chain_mol valid
+    if _pl_chain_mol == 0 { return "Loi ma hoa."; };
 
     // ⑤ Compose: recombine found knowledge
     let _pl_fact_mols = [];
@@ -482,6 +653,20 @@ pub fn pipeline(_pl_input) {
         let _pl_fi = _pl_fi + 1;
     };
     let _pl_composed = compose(_pl_fact_mols);
+
+    // ──── CHECKPOINT 3: INFER ────
+    // CP3: composed mol non-zero, at least 1 fact valid
+    if _pl_composed == 0 { let _pl_composed = _pl_fused; };
+    // Apply immune selection: 3 branches, pick lowest entropy
+    let _pl_immune = immune_select(_pl_composed);
+    // Use immune-selected facts if better than original
+    if len(_pl_immune.facts) > 0 {
+        if _pl_immune.entropy < _is_fact_entropy(_pl_facts) {
+            let _pl_facts = _pl_immune.facts;
+        };
+    };
+    // DNA repair: improve composed mol quality (max 3 iterations)
+    let _pl_repaired = dna_repair(_pl_composed, _pl_fused, 3);
 
     // Track topic for follow-up questions
     let _pl_topic_words = _pl_split_words(_pl_resolved);
@@ -496,39 +681,47 @@ pub fn pipeline(_pl_input) {
         let _pl_ti = _pl_ti + 1;
     };
 
-    // ⑪ Compose response: combine top 2 facts if both relevant to query
+    // ⑪ Chain recombination: generate response from multiple facts
     let _pl_response = _pl_strip_ts(__array_get(_pl_facts, 0));
     if len(_pl_facts) >= 2 {
-        let _pl_f2 = _pl_strip_ts(__array_get(_pl_facts, 1));
-        if len(_pl_f2) > 20 {
-            // Only combine if 2nd fact shares a key query word with 1st
-            let _pl_qw = _pl_split_words(_pl_input);
-            let _pl_shared = [0];
-            let _pl_qi = 0;
-            while _pl_qi < len(_pl_qw) {
-                let _pl_w = __array_get(_pl_qw, _pl_qi);
-                if len(_pl_w) >= 3 {
-                    if _pl_find_in(_pl_f2, _pl_w) >= 0 {
-                        if _pl_find_in(_pl_response, _pl_w) >= 0 {
-                            let _ = __set_at(_pl_shared, 0, 1);
-                        };
-                    };
-                };
-                let _pl_qi = _pl_qi + 1;
-            };
-            if __array_get(_pl_shared, 0) == 1 {
-                let _pl_response = _pl_response + ". " + _pl_f2;
-            };
+        let _pl_recomb = chain_recombine(_pl_facts);
+        if len(_pl_recomb) >= 5 {
+            let _pl_response = _pl_recomb;
         };
     };
 
-    // ⑥ Hebbian + ⑦ Dream
-    if _pl_home.mode == "LEARN" { dn_observe(_pl_input); kt_learn(_pl_input); __file_append("homeos.knowledge", _pl_input + "\n"); };
+    // ──── CHECKPOINT 4: PROMOTE ────
+    // CP4: only learn/promote if quality sufficient
+    // ⑥ Hebbian + ⑦ Dream — mode-dependent behavior
+    if _pl_home.mode == "LEARN" {
+        // LEARN: surprise high → learn aggressively + silk fire + dream
+        dn_observe(_pl_input);
+        kt_learn(_pl_input);
+        __file_append("homeos.knowledge", _pl_input + "\n");
+        // Silk: fire query↔response for future association
+        let _pl_resp_mol = _kt_fast_mol(_pl_response);
+        if _pl_resp_mol > 0 { kt_silk_fire(_pl_text_mol, _pl_resp_mol); };
+    };
+    // ACT mode: no learning, just respond confidently
+
+    // ① Honesty instinct: confidence from evidence → prefix response
+    let _pl_conf = instinct_honesty(_pl_fused, _pl_facts);
+    if _pl_conf < 400 {
+        let _pl_response = "Toi khong chac: " + _pl_response;
+    };
+    if _pl_conf >= 400 { if _pl_conf < 700 {
+        let _pl_response = "Toi nghi: " + _pl_response;
+    }; };
+    // 700-900: "Co le:" (opinion) — skip prefix for cleaner output
+    // >= 900: confident, no prefix needed
 
     // ──── CHECKPOINT 5: RESPONSE ────
     let _pl_out_safe = instinct_route(_pl_response);
     if _pl_out_safe.instinct == "SAFETY" { return "Da loc noi dung."; };
 
+    // WM slot 2 = candidate (composed mol), slot 3 = result (response mol)
+    wm_set(2, _pl_composed);
+    wm_set(3, _kt_fast_mol(_pl_response));
     return _pl_response;
 }
 

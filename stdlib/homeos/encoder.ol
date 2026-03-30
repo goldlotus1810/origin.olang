@@ -469,7 +469,7 @@ pub fn word_affect(_wa_word) {
 
 pub fn encode(text) {
     let molecule = encode_text(text);
-    let emotion = text_emotion_v2(text);
+    let emotion = { v: _kt_mol_v(molecule), a: _kt_mol_a(molecule) };
     return { molecule: molecule, emotion: emotion, source: "text" };
 }
 
@@ -506,7 +506,9 @@ fn _a_has(_ah_text, _ah_word) {
 
 pub fn analyze_input(text) {
     let molecule = encode_text(text);
-    let emo = text_emotion_v2(text);
+    // Emotion from P_weight (not keyword lists)
+    let _ai_v = _kt_mol_v(molecule);
+    let _ai_a = _kt_mol_a(molecule);
 
     // Context
     let role = "observer";
@@ -515,26 +517,26 @@ pub fn analyze_input(text) {
     if _a_has(text, " I ") == 1 { role = "first"; };
     if _a_has(text, "my ") == 1 { role = "first"; };
 
-    // Intent
+    // Intent from kt_classify (5D routing)
+    let _ai_cls = kt_classify(text);
     let intent = "chat";
-    if _a_has(text, "buon") == 1 { intent = "heal"; };
-    if _a_has(text, "sad") == 1 { intent = "heal"; };
-    if _a_has(text, "tired") == 1 { intent = "heal"; };
-    if _a_has(text, "la gi") == 1 { intent = "learn"; };
-    if _a_has(text, "how to") == 1 { intent = "learn"; };
-    if _a_has(text, "?") == 1 { intent = "learn"; };
-    if _a_has(text, "code") == 1 { intent = "technical"; };
-    if _a_has(text, "bug") == 1 { intent = "technical"; };
-    if _a_has(text, "turn on") == 1 { intent = "command"; };
-    if _a_has(text, "bat den") == 1 { intent = "command"; };
+    if _ai_cls.confidence >= 60 {
+        if _ai_cls.type == "question" { let intent = "learn"; };
+        if _ai_cls.type == "emotion" { let intent = "heal"; };
+        if _ai_cls.type == "code" { let intent = "technical"; };
+        if _ai_cls.type == "command" { let intent = "command"; };
+        if _ai_cls.type == "fact" { let intent = "learn"; };
+    };
+    // Fallback: "?" = learn
+    if _a_has(text, "?") == 1 { let intent = "learn"; };
 
-    // Tone
+    // Tone from P_weight V/A
     let tone = "neutral";
-    if intent == "heal" { tone = "empathetic"; };
-    if intent == "learn" { tone = "explanatory"; };
-    if intent == "technical" { tone = "precise"; };
-    if intent == "command" { tone = "confirmatory"; };
-    if emo.v < 3 { tone = "gentle"; };
+    if intent == "heal" { let tone = "empathetic"; };
+    if intent == "learn" { let tone = "explanatory"; };
+    if intent == "technical" { let tone = "precise"; };
+    if intent == "command" { let tone = "confirmatory"; };
+    if _ai_v < 3 { let tone = "gentle"; };
 
     // Store globals
     let __g_analysis_intent = intent;
@@ -634,6 +636,8 @@ pub fn compose_reply(intent, tone, text) {
 
 let __stm = [];
 let __stm_max = 32;
+// Working Memory: 4 slots [query, context, candidate, result]
+let __wm = [0, 0, 0, 0];
 
 // ── Emotion carry-over state ──
 // Running emotion: exponential moving average across turns
@@ -683,16 +687,21 @@ pub fn emo_state() {
     return { v: __emo_v, a: __emo_a, streak: __emo_streak };
 }
 
-// Emotion-aware tone override: when streak strong, bias the tone
+// D7: ConversationCurve tone selection from derivatives
+// V' = velocity, V'' = acceleration, quantized to integer scale 0-7
+// Thresholds: V' ±1 ≈ spec's ±0.15 (scaled to 0-7 range)
 fn _emo_bias_tone(tone) {
-    // CC.3: Tone from DERIVATIVES, not just current V
-    // f' < -1 → dropping fast → "supportive" (catch them)
-    if __emo_deriv <= -1 { return "empathetic"; };
-    // f' > 1 → improving → "reinforcing" (encourage)
-    if __emo_deriv >= 1 { return "gentle"; };
-    // f'' < -1 → accelerating negative → URGENT
+    // V'' < -1 → falling fast → Pause (urgent, stop and listen)
     if __emo_accel <= -1 { return "empathetic"; };
-    // High variance → emotionally unstable → gentle
+    // V' < -1 → dropping → Supportive (catch them)
+    if __emo_deriv <= -1 { return "empathetic"; };
+    // V'' > 1 AND V > 4 → positive acceleration → Celebratory
+    if __emo_accel >= 1 { if __emo_v > 4 { return "reinforcing"; }; };
+    // V' > 1 → improving → Reinforcing (encourage)
+    if __emo_deriv >= 1 { return "reinforcing"; };
+    // V < 3 AND stable (variance low) → sustained sadness → Gentle
+    if __emo_v < 3 { if __emo_variance <= 1 { return "gentle"; }; };
+    // High variance → emotionally unstable → Gentle
     if __emo_variance >= 2 { return "gentle"; };
     // 3+ negative streak → empathetic
     if __emo_streak <= -3 { return "empathetic"; };
@@ -705,18 +714,53 @@ fn _emo_bias_tone(tone) {
 
 pub fn stm_push(_sp_text, _sp_intent, _sp_tone) {
     // GD.2 NR.1: STM entries link to KnowTree word nodes
-    let _sp_mol = 0;
     let _sp_kt_result = kt_search(_sp_text);
-    push(__stm, { input: _sp_text, intent: _sp_intent, tone: _sp_tone, turn: len(__stm), kt_score: _sp_kt_result.score });
+    let _sp_mol = _kt_real_mol(_sp_text);
+    let _sp_v = _kt_mol_v(_sp_mol);
+    let _sp_a = _kt_mol_a(_sp_mol);
+    // Emotional weight: distance from neutral (4,4)
+    let _sp_ew = _kt_abs(_sp_v - 4) + _kt_abs(_sp_a - 4);
+    push(__stm, { input: _sp_text, intent: _sp_intent, tone: _sp_tone, turn: len(__stm), kt_score: _sp_kt_result.score, emo_weight: _sp_ew });
+    // WM slot 0 = query (latest input)
+    let _ = __set_at(__wm, 0, _sp_mol);
+    // Evict by score when full: keep high emo_weight + high kt_score
     if len(__stm) > __stm_max {
+        // Find entry with LOWEST retention score (evict it)
+        let _sp_worst = [0];
+        let _sp_wscore = [9999];
+        let _sp_ei = 0;
+        while _sp_ei < len(__stm) {
+            let _sp_entry = __stm[_sp_ei];
+            // Retention = recency + emotional weight + knowledge score
+            let _sp_recency = _sp_entry.turn;
+            let _sp_ret = _sp_recency + (_sp_entry.emo_weight * 3) + _sp_entry.kt_score;
+            if _sp_ret < __array_get(_sp_wscore, 0) {
+                let _ = __set_at(_sp_worst, 0, _sp_ei);
+                let _ = __set_at(_sp_wscore, 0, _sp_ret);
+            };
+            let _sp_ei = _sp_ei + 1;
+        };
+        // Remove the lowest-scored entry
         let _sp_new = [];
-        let _sp_i = 1;
-        while _sp_i < len(__stm) {
-            push(_sp_new, __stm[_sp_i]);
-            let _sp_i = _sp_i + 1;
+        let _sp_ri = 0;
+        while _sp_ri < len(__stm) {
+            if _sp_ri != __array_get(_sp_worst, 0) {
+                push(_sp_new, __stm[_sp_ri]);
+            };
+            let _sp_ri = _sp_ri + 1;
         };
         let __stm = _sp_new;
     };
+}
+
+// WM access: 0=query, 1=context, 2=candidate, 3=result
+pub fn wm_set(_wm_slot, _wm_val) {
+    if _wm_slot >= 0 { if _wm_slot <= 3 { let _ = __set_at(__wm, _wm_slot, _wm_val); }; };
+}
+
+pub fn wm_get(_wm_slot) {
+    if _wm_slot >= 0 { if _wm_slot <= 3 { return __array_get(__wm, _wm_slot); }; };
+    return 0;
 }
 
 
@@ -901,49 +945,57 @@ fn dream_cycle() {
     let __dream_count = __dream_count + 1;
     if __hyp_mod(__dream_count, 5) != 0 { return; };
 
-    // Count intent frequencies in STM
-    let _dc_heal = 0;
-    let _dc_learn = 0;
-    let _dc_tech = 0;
+    // ── Cross-group resonance: find STM pairs with similar molecules ──
+    // Co-activated concepts in short-term memory → Silk fire (Hebbian)
     let _dc_i = 0;
-    while _dc_i < len(__stm) {
-        if __stm[_dc_i].intent == "heal" { _dc_heal = _dc_heal + 1; };
-        if __stm[_dc_i].intent == "learn" { _dc_learn = _dc_learn + 1; };
-        if __stm[_dc_i].intent == "technical" { _dc_tech = _dc_tech + 1; };
+    let _dc_slen = len(__stm);
+    while _dc_i < _dc_slen {
+        let _dc_mol_i = _kt_real_mol(__stm[_dc_i].input);
+        if _dc_mol_i > 0 {
+            let _dc_j = _dc_i + 1;
+            while _dc_j < _dc_slen {
+                let _dc_mol_j = _kt_real_mol(__stm[_dc_j].input);
+                if _dc_mol_j > 0 {
+                    // Same intent = strongly co-activated
+                    if __stm[_dc_i].intent == __stm[_dc_j].intent {
+                        kt_silk_fire(_dc_mol_i, _dc_mol_j);
+                    };
+                    // Close in 5D = weakly co-activated
+                    let _dc_dist = _kt_mol_dist(_dc_mol_i, _dc_mol_j);
+                    if _dc_dist <= 5 {
+                        kt_silk_fire(_dc_mol_i, _dc_mol_j);
+                    };
+                };
+                let _dc_j = _dc_j + 1;
+            };
+        };
         let _dc_i = _dc_i + 1;
     };
 
-    // Dominant theme → strengthen related Silk edges (consolidation)
-    let _dc_dominant = "chat";
-    if _dc_heal >= 3 { _dc_dominant = "heal"; };
-    if _dc_learn >= 3 { _dc_dominant = "learn"; };
-    if _dc_tech >= 3 { _dc_dominant = "technical"; };
-
-    // GD.2 NR.3: Dream consolidation — boost high-fire edges (not emotion field)
-    if _dc_dominant != "chat" {
-        let _dc_j = 0;
-        while _dc_j < len(__silk) {
-            let _dc_e = __silk[_dc_j];
-            // Boost edges with fires >= 2 (well-connected survive)
-            if _dc_e.fires >= 2 {
-                let _dc_new_w = _dc_e.weight + 0.05;
-                if _dc_new_w > 1 { _dc_new_w = 1; };
-                set_at(__silk, _dc_j, {
-                    from: _dc_e.from, to: _dc_e.to,
-                    weight: _dc_new_w, fires: _dc_e.fires
-                });
-            };
-            let _dc_j = _dc_j + 1;
+    // ── Boost high-fire silk edges (well-connected survive) ──
+    let _dc_k = 0;
+    while _dc_k < len(__silk) {
+        let _dc_e = __silk[_dc_k];
+        if _dc_e.fires >= 2 {
+            let _dc_new_w = _dc_e.weight + 0.05;
+            if _dc_new_w > 1 { _dc_new_w = 1; };
+            set_at(__silk, _dc_k, {
+                from: _dc_e.from, to: _dc_e.to,
+                weight: _dc_new_w, fires: _dc_e.fires
+            });
         };
+        let _dc_k = _dc_k + 1;
     };
 
-    // Decay: apply φ⁻¹ forgetting
+    // Decay: apply φ⁻¹ forgetting (both silk systems)
     silk_decay();
+    kt_silk_decay();
 
-    // ĐN→QR consolidation: scan ĐN facts, find patterns
+    // ── ĐN→QR promotion: Dream scans ĐN, promotes high-fire facts ──
+    // dn_observe already promotes at threshold. Dream adds extra consolidation:
+    // re-observe high-fire facts to boost them toward QR
     let _dc_dn = dn_list();
     if len(_dc_dn) > 0 {
-        kg_add("dream_cycle", "consolidated", _fmt_ts(__timestamp()));
         learning_save("nox_learning.dat");
     };
 }
@@ -1044,9 +1096,11 @@ pub fn agent_respond(text) {
     // Verify encoding produced valid molecule
     if mol == 0 { mol = 146; };  // fallback neutral if encode failed
 
-    // ── EMOTION CARRY-OVER ──
-    let _ar_emo = text_emotion_v2(_ar_norm);
-    _emo_update(_ar_emo.v, _ar_emo.a);
+    // ── EMOTION FROM P_WEIGHT (not keyword lists) ──
+    let _ar_emo_v = _kt_mol_v(mol);
+    let _ar_emo_a = _kt_mol_a(mol);
+    let _ar_emo = { v: _ar_emo_v, a: _ar_emo_a };
+    _emo_update(_ar_emo_v, _ar_emo_a);
     tone = _emo_bias_tone(tone);
 
     // ── SC.16 CHECKPOINT 3: Infer ──
@@ -1057,7 +1111,7 @@ pub fn agent_respond(text) {
     // Surprise = intent change + emotion delta
     let _ar_fe = 0;
     if intent != __prev_intent { _ar_fe = _ar_fe + 3; };  // intent shift = surprise
-    let _ar_vdelta = _ar_emo.v - __emo_v;
+    let _ar_vdelta = _ar_emo_v - __emo_v;
     if _ar_vdelta < 0 { _ar_vdelta = 0 - _ar_vdelta; };
     _ar_fe = _ar_fe + _ar_vdelta;  // emotion delta = surprise
     // EMA: 70% old + 30% new

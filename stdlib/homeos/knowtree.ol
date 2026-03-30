@@ -799,37 +799,61 @@ fn _kt_abs(_v) { if _v < 0 { return 0 - _v; }; return _v; }
 
 pub fn kt_decode(_kd_query) {
     _kt_dim_init();
-    // Compute query molecule (same pipeline as encode)
-    let _kd_mol = _kt_fast_mol(_kd_query);
-    if _kd_mol == 0 { return { facts: [], mol: 0, dims: "none" }; };
-    let _kd_s = _kt_mol_s(_kd_mol);
-    let _kd_r = _kt_mol_r(_kd_mol);
-    let _kd_v = _kt_mol_v(_kd_mol);
-    let _kd_a = _kt_mol_a(_kd_mol);
-    // Step 1: Exact match — S AND V (most discriminating pair)
-    let _kd_exact = kt_get_path([0, _kd_s, 2, _kd_v]);
-    if len(_kd_exact) > 0 {
-        return { facts: _kd_exact, mol: _kd_mol, dims: "S=" + __to_string(_kd_s) + " V=" + __to_string(_kd_v), match: "exact" };
-    };
-    // Step 2: Relax — try S only
-    let _kd_s_only = kt_get_dim(0, _kd_s);
-    if len(_kd_s_only) > 0 {
-        return { facts: _kd_s_only, mol: _kd_mol, dims: "S=" + __to_string(_kd_s), match: "partial" };
-    };
-    // Step 3: Nearest neighbor — expand radius
-    let _kd_near = kt_nearby(_kd_mol, 2);
-    let _kd_texts = [];
-    let _kd_ni = 0;
-    let _kd_max = 10;
-    while _kd_ni < len(_kd_near) {
-        if _kd_ni < _kd_max {
-            let _kd_entry = __array_get(_kd_near, _kd_ni);
-            push(_kd_texts, _kd_entry.text);
+    // ∂ Step 1: Encode query → real molecule (5D)
+    let _kd_mol = _kt_real_mol(_kd_query);
+    if _kd_mol == 0 { return { facts: [], mol: 0, dims: "none", match: "none" }; };
+    // ∂ Step 2: Rank ALL facts by 5D distance to query mol (true decode)
+    let _kd_top_d = [999, 999, 999, 999, 999, 999, 999, 999];
+    let _kd_top_i = [0, 0, 0, 0, 0, 0, 0, 0];
+    let _kd_k = 8;
+    let _kd_fi = 0;
+    let _kd_flen = len(__kt_facts_arr);
+    while _kd_fi < _kd_flen {
+        let _kd_fmol = 0;
+        if _kd_fi < len(__kt_fact_mol) { let _kd_fmol = __array_get(__kt_fact_mol, _kd_fi); };
+        if _kd_fmol == 0 { let _kd_fmol = _kt_fast_mol(__array_get(__kt_facts_arr, _kd_fi)); };
+        if _kd_fmol > 0 {
+            let _kd_dist = _kt_mol_dist(_kd_mol, _kd_fmol);
+            // Insert into top-k if closer
+            let _kd_worst = _kd_k - 1;
+            if _kd_dist < __array_get(_kd_top_d, _kd_worst) {
+                let _ = __set_at(_kd_top_d, _kd_worst, _kd_dist);
+                let _ = __set_at(_kd_top_i, _kd_worst, _kd_fi);
+                // Bubble sort
+                let _kd_j = _kd_worst;
+                while _kd_j > 0 {
+                    let _kd_jm = _kd_j - 1;
+                    if __array_get(_kd_top_d, _kd_j) < __array_get(_kd_top_d, _kd_jm) {
+                        let _kd_td = __array_get(_kd_top_d, _kd_jm);
+                        let _kd_ti = __array_get(_kd_top_i, _kd_jm);
+                        let _ = __set_at(_kd_top_d, _kd_jm, __array_get(_kd_top_d, _kd_j));
+                        let _ = __set_at(_kd_top_i, _kd_jm, __array_get(_kd_top_i, _kd_j));
+                        let _ = __set_at(_kd_top_d, _kd_j, _kd_td);
+                        let _ = __set_at(_kd_top_i, _kd_j, _kd_ti);
+                    };
+                    let _kd_j = _kd_j - 1;
+                };
+            };
         };
-        let _kd_ni = _kd_ni + 1;
+        let _kd_fi = _kd_fi + 1;
     };
-    if len(_kd_texts) > 0 {
-        return { facts: _kd_texts, mol: _kd_mol, dims: "nearby(r=2)", match: "nearby" };
+    // ∂ Step 3: Collect results, boost silk-connected facts
+    let _kd_results = [];
+    let _kd_ri = 0;
+    while _kd_ri < _kd_k {
+        let _kd_d = __array_get(_kd_top_d, _kd_ri);
+        if _kd_d < 999 {
+            let _kd_idx = __array_get(_kd_top_i, _kd_ri);
+            push(_kd_results, __array_get(__kt_facts_arr, _kd_idx));
+        };
+        let _kd_ri = _kd_ri + 1;
+    };
+    if len(_kd_results) > 0 {
+        let _kd_best_d = __array_get(_kd_top_d, 0);
+        let _kd_match = "nearby";
+        if _kd_best_d == 0 { let _kd_match = "exact"; };
+        if _kd_best_d <= 3 { let _kd_match = "close"; };
+        return { facts: _kd_results, mol: _kd_mol, dims: "5D(d=" + __to_string(_kd_best_d) + ")", match: _kd_match };
     };
     return { facts: [], mol: _kd_mol, dims: "empty", match: "none" };
 }
@@ -1004,6 +1028,97 @@ fn _kt_silk_text(_kst_text) {
             let _ = __set_at(_kst_start, 0, _kst_i + 1);
         };
         let _kst_i = _kst_i + 1;
+    };
+}
+
+// Silk weight lookup: returns weight (0-1000) between two molecules
+pub fn kt_silk_weight(_ksw_a, _ksw_b) {
+    _ksi_init();
+    if _ksw_a == 0 { return 0; };
+    if _ksw_b == 0 { return 0; };
+    let _ksw_min = _ksw_a;
+    let _ksw_max = _ksw_b;
+    if _ksw_a > _ksw_b { let _ksw_min = _ksw_b; let _ksw_max = _ksw_a; };
+    let _ksw_eh = __bit_and((__bit_and(_ksw_min, 65535) * 40503) + __bit_and(_ksw_max, 65535), 65535);
+    let _ksw_eidx = __bit_and(_ksw_eh * 40503, 65535);
+    return __array_get(__ksi_weight, _ksw_eidx);
+}
+
+// Silk walk: multi-hop traversal through KnowTree facts via Silk edges
+// Returns array of {text, mol, depth, weight} for each hop
+// depth = max hops (spec: >= 3), threshold = min silk weight to follow
+pub fn kt_silk_walk(_ksw_start_mol, _ksw_depth, _ksw_threshold) {
+    _ksi_init();
+    _kt_ensure_init();
+    let _sw_results = [];
+    let _sw_visited = [_ksw_start_mol, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    let _sw_vcount = [1];
+    // Current frontier: mols to expand from
+    let _sw_frontier = [_ksw_start_mol];
+    let _sw_d = 0;
+    while _sw_d < _ksw_depth {
+        let _sw_next = [];
+        let _sw_fi = 0;
+        while _sw_fi < len(_sw_frontier) {
+            let _sw_from = __array_get(_sw_frontier, _sw_fi);
+            // Scan all facts for silk connections to _sw_from
+            let _sw_ki = 0;
+            while _sw_ki < len(__kt_facts_arr) {
+                let _sw_fact = __array_get(__kt_facts_arr, _sw_ki);
+                let _sw_fmol = _kt_fast_mol(_sw_fact);
+                if _sw_fmol > 0 {
+                    if _sw_fmol != _sw_from {
+                        let _sw_w = kt_silk_weight(_sw_from, _sw_fmol);
+                        if _sw_w >= _ksw_threshold {
+                            // Check not already visited
+                            let _sw_seen = [0];
+                            let _sw_vi = 0;
+                            while _sw_vi < __array_get(_sw_vcount, 0) {
+                                if __array_get(_sw_visited, _sw_vi) == _sw_fmol {
+                                    let _ = __set_at(_sw_seen, 0, 1);
+                                };
+                                let _sw_vi = _sw_vi + 1;
+                            };
+                            if __array_get(_sw_seen, 0) == 0 {
+                                push(_sw_results, { text: _sw_fact, mol: _sw_fmol, depth: _sw_d + 1, weight: _sw_w });
+                                push(_sw_next, _sw_fmol);
+                                // Add to visited
+                                let _sw_vc = __array_get(_sw_vcount, 0);
+                                if _sw_vc < 16 {
+                                    let _ = __set_at(_sw_visited, _sw_vc, _sw_fmol);
+                                    let _ = __set_at(_sw_vcount, 0, _sw_vc + 1);
+                                };
+                            };
+                        };
+                    };
+                };
+                let _sw_ki = _sw_ki + 1;
+            };
+            let _sw_fi = _sw_fi + 1;
+        };
+        let _sw_frontier = _sw_next;
+        if len(_sw_frontier) == 0 { let _sw_d = _ksw_depth; };
+        let _sw_d = _sw_d + 1;
+    };
+    return _sw_results;
+}
+
+// Silk decay: multiply all weights by φ⁻¹ (618/1000)
+// Call once per dream cycle. Spec: φ⁻¹ per 24h ≈ every ~288 turns at 5min/turn
+// In practice: call from dream_cycle (every 5 turns), scale accordingly
+pub fn kt_silk_decay() {
+    _ksi_init();
+    // Decay factor: 618/1000 per 24h. Dream runs every 5 turns.
+    // If ~100 turns/day: 20 dream cycles. Decay per cycle ≈ 980/1000
+    let _ksd_i = 0;
+    while _ksd_i < 65536 {
+        let _ksd_w = __array_get(__ksi_weight, _ksd_i);
+        if _ksd_w > 0 {
+            let _ksd_nw = __floor((_ksd_w * 980) / 1000);
+            if _ksd_nw <= 0 { let _ksd_nw = 0; };
+            let _ = __set_at(__ksi_weight, _ksd_i, _ksd_nw);
+        };
+        let _ksd_i = _ksd_i + 1;
     };
 }
 

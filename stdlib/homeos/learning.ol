@@ -101,6 +101,33 @@ pub fn dn_list() {
     return _dl_result;
 }
 
+// Get fire count for a ĐN fact (for dream consolidation)
+pub fn dn_fire_count(_dfc_fact) {
+    let _dfc_i = 0;
+    while _dfc_i < len(_dn_facts) {
+        if _dn_facts[_dfc_i] == _dfc_fact { return _dn_fire[_dfc_i]; };
+        let _dfc_i = _dfc_i + 1;
+    };
+    return 0;
+}
+
+// Promote ĐN → QR (called by dream consolidation)
+pub fn dn_promote(_dp_fact) {
+    let _dp_i = 0;
+    while _dp_i < len(_dn_facts) {
+        if _dn_facts[_dp_i] == _dp_fact {
+            push(_qr_facts, _dp_fact);
+            push(_qr_times, _fmt_ts(__timestamp()));
+            kg_add(_dp_fact, "status", "QR");
+            kg_add(_dp_fact, "promoted_by", "dream");
+            set_at(_dn_facts, _dp_i, "");
+            set_at(_dn_fire, _dp_i, 0);
+            return;
+        };
+        let _dp_i = _dp_i + 1;
+    };
+}
+
 pub fn qr_list() {
     let _ql_result = [];
     let _ql_i = 0;
