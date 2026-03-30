@@ -14,6 +14,7 @@
 let __kt_pw_freq = [];
 let __kt_pw_text = [];
 let __kt_facts_arr = [];
+let __kt_fact_tags = [];
 let __kt_fact_count = [0];
 let __kt_word_count = [0];
 let __kt_inited = [0];
@@ -104,7 +105,55 @@ fn _kt_mol_t(_m) { return _m % 4; }
 
 // _kt_fact_mol_compute removed — replaced by _kt_fast_mol everywhere (no __text_to_pw allocation)
 
-// Fast molecule: hash text chars → u16 mol (NO heap allocation, NO text_emotion_v2)
+// Real molecule: text → per-codepoint P_weight from UDC table → Zipf-weighted 5D average
+// Returns single u16 mol with MEANINGFUL 5D dimensions (S,R,V,A,T)
+// Uses shared accumulator array to minimize heap allocation (1 array, not 7)
+let __kt_mol_acc = [0, 0, 0, 0, 0, 0, 0];
+
+fn _kt_real_mol(_krm_text) {
+    _kt_ensure_init();
+    let _krm_tlen = len(_krm_text);
+    if _krm_tlen == 0 { return 0; };
+    // Reset shared accumulator: [S, R, V, A, T, totalW, n]
+    let _ = __set_at(__kt_mol_acc, 0, 0);
+    let _ = __set_at(__kt_mol_acc, 1, 0);
+    let _ = __set_at(__kt_mol_acc, 2, 0);
+    let _ = __set_at(__kt_mol_acc, 3, 0);
+    let _ = __set_at(__kt_mol_acc, 4, 0);
+    let _ = __set_at(__kt_mol_acc, 5, 0);
+    let _ = __set_at(__kt_mol_acc, 6, 0);
+    let _krm_i = 0;
+    while _krm_i < _krm_tlen {
+        let _krm_cp = __char_code(char_at(_krm_text, _krm_i));
+        let _krm_off = _krm_cp * 2;
+        let _krm_lo = __bytes_get(__kt_tbl, _krm_off);
+        let _krm_hi = __bytes_get(__kt_tbl, _krm_off + 1);
+        let _krm_pw = __floor(_krm_lo + (_krm_hi * 256));
+        if _krm_pw > 0 {
+            let _krm_ni = __array_get(__kt_mol_acc, 6);
+            let _krm_w = __floor(1000 / (_krm_ni + 1));
+            let _ = __set_at(__kt_mol_acc, 0, __array_get(__kt_mol_acc, 0) + (((__floor(_krm_pw / 4096)) % 16) * _krm_w));
+            let _ = __set_at(__kt_mol_acc, 1, __array_get(__kt_mol_acc, 1) + (((__floor(_krm_pw / 256)) % 16) * _krm_w));
+            let _ = __set_at(__kt_mol_acc, 2, __array_get(__kt_mol_acc, 2) + (((__floor(_krm_pw / 32)) % 8) * _krm_w));
+            let _ = __set_at(__kt_mol_acc, 3, __array_get(__kt_mol_acc, 3) + (((__floor(_krm_pw / 4)) % 8) * _krm_w));
+            let _ = __set_at(__kt_mol_acc, 4, __array_get(__kt_mol_acc, 4) + ((_krm_pw % 4) * _krm_w));
+            let _ = __set_at(__kt_mol_acc, 5, __array_get(__kt_mol_acc, 5) + _krm_w);
+            let _ = __set_at(__kt_mol_acc, 6, _krm_ni + 1);
+        };
+        let _krm_i = _krm_i + 1;
+    };
+    let _krm_total_w = __array_get(__kt_mol_acc, 5);
+    if _krm_total_w == 0 { return 0; };
+    let _krm_rs = (__floor(__array_get(__kt_mol_acc, 0) / _krm_total_w)) % 16;
+    let _krm_rr = (__floor(__array_get(__kt_mol_acc, 1) / _krm_total_w)) % 16;
+    let _krm_rv = (__floor(__array_get(__kt_mol_acc, 2) / _krm_total_w)) % 8;
+    let _krm_ra = (__floor(__array_get(__kt_mol_acc, 3) / _krm_total_w)) % 8;
+    let _krm_rt = (__floor(__array_get(__kt_mol_acc, 4) / _krm_total_w)) % 4;
+    return (_krm_rs * 4096) + (_krm_rr * 256) + (_krm_rv * 32) + (_krm_ra * 4) + _krm_rt;
+}
+
+// Fast hash mol for 5D indexing (boot speed)
+// classify() uses _kt_real_mol separately for accurate P_weight distances
 fn _kt_fast_mol(_kfm_text) {
     let _kfm_h = [0];
     let _kfm_i = 0;
@@ -218,11 +267,37 @@ pub fn kt_learn(_kl_text) {
     return kt_learn_to(_kl_text, "facts");
 }
 
+// Learn with explicit tag for k-NN classification
+pub fn kt_learn_tagged(_kltg_tag, _kltg_text) {
+    _kt_ensure_init();
+    let _kltg_fidx = __array_get(__kt_fact_count, 0);
+    let _ = __set_at(__kt_fact_count, 0, _kltg_fidx + 1);
+    push(__kt_facts_arr, _kltg_text);
+    push(__kt_fact_tags, _kltg_tag);
+    // Word index
+    let _kltg_tlen = len(_kltg_text);
+    let _kltg_st = [0];
+    let _kltg_j = 0;
+    while _kltg_j < _kltg_tlen {
+        let _kltg_ch = __char_code(char_at(_kltg_text, _kltg_j));
+        if _kltg_ch == 32 { let _kltg_ws = __array_get(_kltg_st, 0); if _kltg_j > _kltg_ws { let _kltg_w = substr(_kltg_text, _kltg_ws, _kltg_j); _kt_learn_word(_kltg_w); _kt_widx_add(_kltg_w, _kltg_fidx); }; let _ = __set_at(_kltg_st, 0, _kltg_j + 1); };
+        let _kltg_j = _kltg_j + 1;
+    };
+    let _kltg_ws = __array_get(_kltg_st, 0);
+    if _kltg_tlen > _kltg_ws { let _kltg_w = substr(_kltg_text, _kltg_ws, _kltg_tlen); _kt_learn_word(_kltg_w); _kt_widx_add(_kltg_w, _kltg_fidx); };
+    let _kltg_mol = _kt_fast_mol(_kltg_text);
+    _kt_dim_index(_kltg_fidx, _kltg_mol);
+    if __array_get(__ksi_inited, 0) == 1 { _kt_silk_text(_kltg_text); };
+    if (_kltg_fidx % 50) == 0 { __heap_pin(); };
+    return _kltg_fidx + 1;
+}
+
 pub fn kt_learn_to(_klt_text, _klt_branch) {
     _kt_ensure_init();
     let _klt_fidx = __array_get(__kt_fact_count, 0);
     let _ = __set_at(__kt_fact_count, 0, _klt_fidx + 1);
     push(__kt_facts_arr, _klt_text);
+    push(__kt_fact_tags, 0);
     // Split into words using substr, store each word's P_weight
     let _klt_tlen = len(_klt_text);
     let _klt_st = [0];
@@ -234,9 +309,11 @@ pub fn kt_learn_to(_klt_text, _klt_branch) {
     };
     let _klt_ws = __array_get(_klt_st, 0);
     if _klt_tlen > _klt_ws { let _klt_w = substr(_klt_text, _klt_ws, _klt_tlen); _kt_learn_word(_klt_w); _kt_widx_add(_klt_w, _klt_fidx); };
-    // Index into 5D dimension tree — lightweight hash (no __text_to_pw allocation)
+    // Index into 5D dimension tree
     let _klt_mol = _kt_fast_mol(_klt_text);
     _kt_dim_index(_klt_fidx, _klt_mol);
+    // Silk: co-activate consecutive words (only after boot, avoids 196K alloc during boot)
+    if __array_get(__ksi_inited, 0) == 1 { _kt_silk_text(_klt_text); };
     // Pin heap every 50 facts (batch-friendly, protects persistent data)
     if (_klt_fidx % 50) == 0 { __heap_pin(); };
     return _klt_fidx + 1;
@@ -476,6 +553,90 @@ fn _kt_split(s) {
         i = i + 1;
     };
     return words;
+}
+
+// ════════════════════════════════════════════════════════════════
+// k-NN Classification — input → mol → find k nearest tagged facts → vote
+// Replaces if/else instinct routing with P_weight space matching
+// ════════════════════════════════════════════════════════════════
+
+pub fn kt_classify(_kcl_text) {
+    _boot_exemplars();
+    // Compute real P_weight mol for input
+    let _kcl_mol = _kt_real_mol(_kcl_text);
+    if _kcl_mol == 0 { return { type: "unknown", confidence: 0 }; };
+    // Find k=5 nearest TAGGED facts by Manhattan distance in 5D
+    let _kcl_k = 5;
+    // best_d[i] = distance, best_t[i] = tag index
+    let _kcl_bd = [9999, 9999, 9999, 9999, 9999];
+    let _kcl_bt = [0, 0, 0, 0, 0];
+    let _kcl_fi = 0;
+    let _kcl_flen = len(__kt_facts_arr);
+    while _kcl_fi < _kcl_flen {
+        let _kcl_tag = __array_get(__kt_fact_tags, _kcl_fi);
+        if __type_of(_kcl_tag) == "string" {
+            if len(_kcl_tag) > 0 {
+                // Tagged fact — compute real mol and distance
+                let _kcl_fmol = _kt_real_mol(__array_get(__kt_facts_arr, _kcl_fi));
+                let _kcl_dist = _kt_mol_dist(_kcl_mol, _kcl_fmol);
+                // Insert into top-k if closer than worst
+                let _kcl_worst = 4;
+                if _kcl_dist < __array_get(_kcl_bd, _kcl_worst) {
+                    let _ = __set_at(_kcl_bd, _kcl_worst, _kcl_dist);
+                    let _ = __set_at(_kcl_bt, _kcl_worst, _kcl_tag);
+                    // Bubble sort to keep sorted
+                    let _kcl_j = _kcl_worst;
+                    while _kcl_j > 0 {
+                        let _kcl_jm = _kcl_j - 1;
+                        if __array_get(_kcl_bd, _kcl_j) < __array_get(_kcl_bd, _kcl_jm) {
+                            let _kcl_td = __array_get(_kcl_bd, _kcl_jm);
+                            let _kcl_tt = __array_get(_kcl_bt, _kcl_jm);
+                            let _ = __set_at(_kcl_bd, _kcl_jm, __array_get(_kcl_bd, _kcl_j));
+                            let _ = __set_at(_kcl_bt, _kcl_jm, __array_get(_kcl_bt, _kcl_j));
+                            let _ = __set_at(_kcl_bd, _kcl_j, _kcl_td);
+                            let _ = __set_at(_kcl_bt, _kcl_j, _kcl_tt);
+                        };
+                        let _kcl_j = _kcl_j - 1;
+                    };
+                };
+            };
+        };
+        let _kcl_fi = _kcl_fi + 1;
+    };
+    // Vote: count tags among k nearest
+    let _kcl_tags = [];
+    let _kcl_counts = [];
+    let _kcl_vi = 0;
+    while _kcl_vi < _kcl_k {
+        let _kcl_t = __array_get(_kcl_bt, _kcl_vi);
+        if __type_of(_kcl_t) == "string" {
+            // Find tag in counts
+            let _kcl_found = [0];
+            let _kcl_ci = 0;
+            while _kcl_ci < len(_kcl_tags) {
+                if __array_get(_kcl_tags, _kcl_ci) == _kcl_t {
+                    let _ = __set_at(_kcl_counts, _kcl_ci, __array_get(_kcl_counts, _kcl_ci) + 1);
+                    let _ = __set_at(_kcl_found, 0, 1);
+                };
+                let _kcl_ci = _kcl_ci + 1;
+            };
+            if __array_get(_kcl_found, 0) == 0 { push(_kcl_tags, _kcl_t); push(_kcl_counts, 1); };
+        };
+        let _kcl_vi = _kcl_vi + 1;
+    };
+    // Find winner
+    let _kcl_best_tag = "unknown";
+    let _kcl_best_count = [0];
+    let _kcl_wi = 0;
+    while _kcl_wi < len(_kcl_tags) {
+        if __array_get(_kcl_counts, _kcl_wi) > __array_get(_kcl_best_count, 0) {
+            let _ = __set_at(_kcl_best_count, 0, __array_get(_kcl_counts, _kcl_wi));
+            let _kcl_best_tag = __array_get(_kcl_tags, _kcl_wi);
+        };
+        let _kcl_wi = _kcl_wi + 1;
+    };
+    let _kcl_conf = __floor((__array_get(_kcl_best_count, 0) * 100) / _kcl_k);
+    return { type: _kcl_best_tag, confidence: _kcl_conf };
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -762,6 +923,51 @@ fn _ksi_init() {
     __ksi_weight = __array_range(65536);
     __ksi_fire = __array_range(65536);
     __ksi_stm_fire = __array_range(65536);
+}
+
+// Initialize Silk (call post-boot to enable Hebbian co-activation on kt_learn)
+pub fn kt_silk_init() { _ksi_init(); }
+
+// Silk co-activate: strengthen edge between two P_weights that appear together
+pub fn kt_silk_fire(_ksf_a, _ksf_b) {
+    _ksi_init();
+    if _ksf_a == 0 { return; };
+    if _ksf_b == 0 { return; };
+    let _ksf_min = _ksf_a;
+    let _ksf_max = _ksf_b;
+    if _ksf_a > _ksf_b { let _ksf_min = _ksf_b; let _ksf_max = _ksf_a; };
+    let _ksf_eh = __bit_and((__bit_and(_ksf_min, 65535) * 40503) + __bit_and(_ksf_max, 65535), 65535);
+    let _ksf_eidx = __bit_and(_ksf_eh * 40503, 65535);
+    let _ksf_w = __array_get(__ksi_weight, _ksf_eidx);
+    let _ksf_nw = _ksf_w + 10;
+    if _ksf_nw > 1000 { let _ksf_nw = 1000; };
+    let _ = __set_at(__ksi_weight, _ksf_eidx, _ksf_nw);
+    let _ = __set_at(__ksi_fire, _ksf_eidx, __array_get(__ksi_fire, _ksf_eidx) + 1);
+}
+
+// Silk co-activate consecutive words in text (Hebbian: fire together → wire together)
+fn _kt_silk_text(_kst_text) {
+    let _kst_prev = [0];
+    let _kst_tlen = len(_kst_text);
+    let _kst_start = [0];
+    let _kst_i = 0;
+    while _kst_i <= _kst_tlen {
+        let _kst_sep = 0;
+        if _kst_i == _kst_tlen { let _kst_sep = 1; };
+        if _kst_i < _kst_tlen { if __char_code(char_at(_kst_text, _kst_i)) == 32 { let _kst_sep = 1; }; };
+        if _kst_sep == 1 {
+            let _kst_s = __array_get(_kst_start, 0);
+            if _kst_i > _kst_s {
+                let _kst_word = substr(_kst_text, _kst_s, _kst_i);
+                let _kst_mol = _kt_fast_mol(_kst_word);
+                let _kst_p = __array_get(_kst_prev, 0);
+                if _kst_p > 0 { kt_silk_fire(_kst_p, _kst_mol); };
+                let _ = __set_at(_kst_prev, 0, _kst_mol);
+            };
+            let _ = __set_at(_kst_start, 0, _kst_i + 1);
+        };
+        let _kst_i = _kst_i + 1;
+    };
 }
 
 pub fn kt_ingest_full(_kif_path) {

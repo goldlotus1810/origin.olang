@@ -103,8 +103,55 @@ fn _boot_embedded_kt() {
     kt_learn("Fixed-point means Gen1 binary compiles itself to produce identical Gen2 binary");
     kt_learn("The heap uses bump allocation with __heap_pin to protect persistent data across REPL turns");
     kt_learn("Olang supports closures higher order functions pattern matching try catch and for loops");
+    // Tagged exemplars loaded lazily at first classify() call
     // Source indexing (grep-based, one syscall)
     _boot_index_source();
+}
+
+let __exemplars_loaded = [0];
+fn _boot_exemplars() {
+    if __array_get(__exemplars_loaded, 0) == 1 { return; };
+    let _ = __set_at(__exemplars_loaded, 0, 1);
+    kt_learn_tagged("code", "emit 42");
+    kt_learn_tagged("code", "let x = 1 + 2");
+    kt_learn_tagged("code", "fn add(a, b) { return a + b; }");
+    kt_learn_tagged("code", "if x > 0 { emit x; }");
+    kt_learn_tagged("code", "for i in [1,2,3] { emit i; }");
+    kt_learn_tagged("code", "while i < 10 { let i = i + 1; }");
+    kt_learn_tagged("code", "let arr = []; push(arr, 42);");
+    kt_learn_tagged("code", "try { emit 1/0; } catch e { emit e; }");
+    kt_learn_tagged("code", "match x { 1 => \"one\"; _ => \"other\"; }");
+    kt_learn_tagged("question", "1+1 bang bao nhieu");
+    kt_learn_tagged("question", "ai la tong thong My");
+    kt_learn_tagged("question", "nuoc soi o bao nhieu do");
+    kt_learn_tagged("question", "Olang la gi");
+    kt_learn_tagged("question", "HomeOS la gi");
+    kt_learn_tagged("question", "Trai Dat cach Mat Troi bao xa");
+    kt_learn_tagged("question", "the gioi co bao nhieu nuoc");
+    kt_learn_tagged("greeting", "hello");
+    kt_learn_tagged("greeting", "xin chao");
+    kt_learn_tagged("greeting", "chao buoi sang");
+    kt_learn_tagged("greeting", "hi");
+    kt_learn_tagged("greeting", "hey");
+    kt_learn_tagged("greeting", "chao ban");
+    kt_learn_tagged("greeting", "good morning");
+    kt_learn_tagged("greeting", "bye");
+    kt_learn_tagged("greeting", "tam biet");
+    kt_learn_tagged("emotion", "toi buon qua");
+    kt_learn_tagged("emotion", "vui qua di");
+    kt_learn_tagged("emotion", "toi so");
+    kt_learn_tagged("emotion", "toi gian");
+    kt_learn_tagged("emotion", "toi met qua");
+    kt_learn_tagged("command", "kiem tra mang");
+    kt_learn_tagged("command", "xem tinh trang he thong");
+    kt_learn_tagged("command", "scan mang lan");
+    kt_learn_tagged("command", "xem process dang chay");
+    kt_learn_tagged("command", "bat server");
+    kt_learn_tagged("fact", "Trai Dat quay quanh Mat Troi");
+    kt_learn_tagged("fact", "Nuoc soi o 100 do C");
+    kt_learn_tagged("fact", "Viet Nam co 54 dan toc");
+    kt_learn_tagged("fact", "Pi xap xi 3.14159");
+    __heap_pin();
 }
 
 fn _disasm(_da_bc, _da_len) {
