@@ -1306,16 +1306,23 @@ pub fn repl_eval(input) {
       };
   };
 
-  // Greetings only — short, known patterns
-  if len(src) <= 15 {
-      if src == "hi" || src == "Hi" || src == "hello" || src == "Hello" { return smart_greet(stm_count()); };
-      if src == "hey" || src == "Hey" || src == "yo" || src == "Yo" { return smart_greet(stm_count()); };
-      if src == "chao" || src == "Chao" || src == "xin chao" || src == "Xin chao" { return smart_greet(stm_count()); };
-      if src == "bye" || src == "Bye" || src == "tam biet" { return smart_goodbye(stm_count()); };
+  // ═══ PIPELINE IS CENTER — Instincts route ALL input ═══
+  _boot_learn();
+  let _re_route = instinct_route(src);
+  let _re_inst = _re_route.instinct;
+
+  if _re_inst == "GREETING" { return smart_greet(stm_count()); };
+  if _re_inst == "META" { return _re_route.data; };
+  if _re_inst == "SAFETY" { return "Blocked."; };
+  if _re_inst == "COMMAND" { return nox_brain(src); };
+  if _re_inst == "LEARNING" { kt_learn(src); return "Learned."; };
+  if _re_inst == "QUESTION" {
+      let _re_ans = pipeline(src);
+      __heap_pin();
+      if len(_re_ans) > 5 { return _re_ans; };
   };
 
-  // ALWAYS try to compile. Pipeline is FALLBACK on parse error, not default.
-  // Add semicolon if needed (use helper to avoid scope issue)
+  // CODE / QUERY / EMOTION / REFERENCE → compile as Olang
   let _re_code = src + _repl_maybe_semi(src);
   let _re_strip = 1;
   while _re_strip == 1 {

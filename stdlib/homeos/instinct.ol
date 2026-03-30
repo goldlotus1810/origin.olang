@@ -69,8 +69,73 @@ pub fn instinct_route(_ir_input) {
         return { instinct: "EMOTION", action: "empathize", v: _ir_v, a: _ir_a, data: _ir_input };
     };
 
-    // Default: QUERY (general)
+    // 8. CODE: contains Olang syntax → compile & execute
+    if _ir_is_code(_ir_input) == 1 {
+        return { instinct: "CODE", action: "compile", v: _ir_v, a: _ir_a, data: _ir_input };
+    };
+
+    // 9. COMMAND: starts with action verb → dispatch to brain
+    if _ir_is_command(_ir_input) == 1 {
+        return { instinct: "COMMAND", action: "execute", v: _ir_v, a: _ir_a, data: _ir_input };
+    };
+
+    // Default: QUERY (general knowledge search)
     return { instinct: "QUERY", action: "general", v: _ir_v, a: _ir_a, data: _ir_input };
+}
+
+// CODE detection: is this Olang source code?
+fn _ir_is_code(inp) {
+    // Has semicolon → definitely code
+    let i = 0;
+    while i < len(inp) {
+        let c = __char_code(char_at(inp, i));
+        if c == 59 { return 1; };
+        if c == 123 { return 1; };
+        i = i + 1;
+    };
+    // Starts with keyword → code
+    if len(inp) >= 3 {
+        let w = __substr(inp, 0, 3);
+        if w == "let" { return 1; };
+        if w == "emi" { return 1; };
+        if w == "fn " { return 1; };
+        if w == "if " { return 1; };
+        if w == "for" { return 1; };
+        if w == "whi" { return 1; };
+        if w == "mat" { return 1; };
+        if w == "try" { return 1; };
+        if w == "typ" { return 1; };
+        if w == "pub" { return 1; };
+        if w == "ret" { return 1; };
+        if w == "use" { return 1; };
+    };
+    // Contains () → likely function call
+    let has_paren = 0;
+    i = 0;
+    while i < len(inp) { if __char_code(char_at(inp, i)) == 40 { has_paren = 1; }; i = i + 1; };
+    if has_paren == 1 { return 1; };
+    // Starts with __ → builtin
+    if len(inp) >= 2 { if __substr(inp, 0, 2) == "__" { return 1; }; };
+    return 0;
+}
+
+// COMMAND detection: starts with action verb
+fn _ir_is_command(inp) {
+    let i = 0;
+    while i < len(inp) { if char_at(inp, i) == " " { break; }; i = i + 1; };
+    let word = __substr(inp, 0, i);
+    if word == "scan" { return 1; };
+    if word == "check" { return 1; };
+    if word == "build" { return 1; };
+    if word == "test" { return 1; };
+    if word == "fix" { return 1; };
+    if word == "evolve" { return 1; };
+    if word == "heal" { return 1; };
+    if word == "kill" { return 1; };
+    if word == "start" { return 1; };
+    if word == "stop" { return 1; };
+    if word == "status" { return 1; };
+    return 0;
 }
 
 // ════════════════════════════════════════════════════════════════
