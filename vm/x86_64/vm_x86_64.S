@@ -4882,6 +4882,27 @@ op_call:
     jbe     .tr_ok
     mov     $65536, %edx
 .tr_ok:
+    # Poll with 3s timeout before blocking recv
+    # struct pollfd { int fd; short events; short revents; } = 8 bytes
+    push    %rdx                        # save max_bytes
+    sub     $8, %rsp
+    movl    %edi, (%rsp)               # pollfd.fd
+    movw    $1, 4(%rsp)                # pollfd.events = POLLIN (1)
+    movw    $0, 6(%rsp)                # pollfd.revents = 0
+    mov     %rsp, %rdi                 # fds ptr
+    mov     $1, %esi                   # nfds = 1
+    mov     $3000, %edx                # timeout = 3000ms
+    mov     $7, %eax                   # SYS_poll
+    syscall
+    movzwl  6(%rsp), %ecx             # read revents
+    movl    (%rsp), %edi              # restore fd
+    add     $8, %rsp
+    pop     %rdx                       # restore max_bytes
+    test    %eax, %eax
+    jle     .tr_empty                  # timeout or error → return empty
+    test    $1, %ecx                   # POLLIN?
+    jz      .tr_empty                  # no data ready → return empty
+    # Data available — do the recv
     lea     net_recv_buf(%rip), %rsi
     xor     %r10d, %r10d
     xor     %r8d, %r8d
