@@ -46,6 +46,7 @@ fn _classify(inp) {
     if first_word == "test" { return "action"; };
     if first_word == "evolve" { return "action"; };
     if first_word == "deploy" { return "action"; };
+    if first_word == "heal" { return "action"; };
 
     // System queries
     if first_word == "status" { return "system"; };
@@ -88,6 +89,13 @@ fn _think_action(inp) {
     if action == "build" { return __system("cd /home/lupin/Origin && make self-build 2>&1 | tail -3"); };
     if action == "test" { return __system("cd /home/lupin/Origin && bash tests.sh 2>&1 | grep -E 'passed|FAIL'"); };
     if action == "evolve" { nox_evolve(); return "evolved"; };
+    if action == "heal" {
+        let _heal_result = __system("cd /home/lupin/Origin && bash tests.sh 2>&1 | grep -c 'ALL PASS'");
+        if __to_number(_heal_result) > 0 { return "HEAL: all tests pass. System healthy."; };
+        let _heal_fails = __system("cd /home/lupin/Origin && bash tests.sh 2>&1 | grep FAIL | head -5");
+        __file_append("/home/lupin/Origin/nox_heal.log", time_now() + " FAILING: " + _heal_fails + "\n");
+        return "HEAL: tests failing — " + _heal_fails;
+    };
     if action == "fix" { return "describe the bug: fix <description>"; };
     if action == "kill" { if len(target) > 0 { return __system("pkill " + target + " 2>&1 || echo not found"); }; return "kill what?"; };
 
