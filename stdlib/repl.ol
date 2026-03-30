@@ -306,6 +306,7 @@ pub fn repl_eval(input) {
       if _sc == "version" { return repl_eval("version"); };
       if _sc == "see" { __system("grim /tmp/nox_screen.png"); return "Screenshot saved: /tmp/nox_screen.png"; };
       if _sc == "evolve" { nox_evolve(); return "evolution complete"; };
+      if _sc == "benchmark" { nox_benchmark(); return "benchmark complete"; };
       if _sc == "exit" || _sc == "quit" { __throw("exit"); };
       // /think <prompt> → Claude
       if _sc == "think" { return "Usage: /think <question>"; };
@@ -1387,6 +1388,30 @@ pub fn repl_eval(input) {
     if _re_2 == "se" { _re_is_code = 1; };  // set_at
     if _re_2 == "fi" { _re_is_code = 1; };  // filter
     if _re_2 == "pi" { _re_is_code = 1; };  // pipe
+    if _re_2 == "no" { _re_is_code = 1; };  // nox_*, notify
+    if _re_2 == "ca" { _re_is_code = 1; };  // cam_*, config_*
+    if _re_2 == "ru" { _re_is_code = 1; };  // rule_*, rules_*
+    if _re_2 == "on" { _re_is_code = 1; };  // onvif_*
+    if _re_2 == "so" { _re_is_code = 1; };  // sock_*, sort
+    if _re_2 == "la" { _re_is_code = 1; };  // lan_*, launcher_*
+    if _re_2 == "ss" { _re_is_code = 1; };  // ssh_*
+    if _re_2 == "di" { _re_is_code = 1; };  // dir_*, digest_*
+    if _re_2 == "ba" { _re_is_code = 1; };  // base64_*
+    if _re_2 == "he" { _re_is_code = 1; };  // hex_*
+    if _re_2 == "md" { _re_is_code = 1; };  // md5
+    if _re_2 == "ud" { _re_is_code = 1; };  // udp_*
+    // Generic: if input contains () and ; → likely code
+    if _re_is_code == 0 {
+        let _has_paren = 0;
+        let _has_semi = 0;
+        let _ci = 0;
+        while _ci < len(src) {
+            if char_at(src, _ci) == "(" { _has_paren = 1; };
+            if char_at(src, _ci) == ";" { _has_semi = 1; };
+            _ci = _ci + 1;
+        };
+        if _has_paren == 1 { if _has_semi == 1 { _re_is_code = 1; }; };
+    };
   };
 
   // Not code → classify: greeting / question / chat
