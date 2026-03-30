@@ -67,59 +67,7 @@ let KEY_RIGHTALT = 100;
 let KEY_SUPER = 125;
 
 // ASCII to keycode mapping
-fn _char_to_key(ch) {
-    let c = __char_code(ch);
-    if c >= 97 && c <= 122 {
-        let map = [30,48,46,32,18,33,34,35,23,36,37,38,50,49,24,25,16,19,31,20,22,47,17,45,21,44];
-        return { code: map[c - 97], shift: 0 };
-    };
-    if c >= 65 && c <= 90 {
-        let map = [30,48,46,32,18,33,34,35,23,36,37,38,50,49,24,25,16,19,31,20,22,47,17,45,21,44];
-        return { code: map[c - 65], shift: 1 };
-    };
-    if c >= 48 && c <= 57 {
-        if c == 48 { return { code: 11, shift: 0 }; };
-        return { code: c - 47, shift: 0 };
-    };
-    if c == 32 { return { code: 57, shift: 0 }; };  // space
-    if c == 46 { return { code: 52, shift: 0 }; };  // .
-    if c == 44 { return { code: 51, shift: 0 }; };  // ,
-    if c == 45 { return { code: 12, shift: 0 }; };  // -
-    if c == 10 { return { code: 28, shift: 0 }; };  // newline
-    if c == 9  { return { code: 15, shift: 0 }; };  // tab
-    // Shifted number row: !@#$%^&*()
-    if c == 33 { return { code: 2, shift: 1 }; };   // !
-    if c == 64 { return { code: 3, shift: 1 }; };   // @
-    if c == 35 { return { code: 4, shift: 1 }; };   // #
-    if c == 36 { return { code: 5, shift: 1 }; };   // $
-    if c == 37 { return { code: 6, shift: 1 }; };   // %
-    if c == 94 { return { code: 7, shift: 1 }; };   // ^
-    if c == 38 { return { code: 8, shift: 1 }; };   // &
-    if c == 42 { return { code: 9, shift: 1 }; };   // *
-    if c == 40 { return { code: 10, shift: 1 }; };  // (
-    if c == 41 { return { code: 11, shift: 1 }; };  // )
-    // Punctuation
-    if c == 59 { return { code: 39, shift: 0 }; };  // ;
-    if c == 58 { return { code: 39, shift: 1 }; };  // :
-    if c == 39 { return { code: 40, shift: 0 }; };  // '
-    if c == 34 { return { code: 40, shift: 1 }; };  // "
-    if c == 96 { return { code: 41, shift: 0 }; };  // `
-    if c == 126 { return { code: 41, shift: 1 }; }; // ~
-    if c == 91 { return { code: 26, shift: 0 }; };  // [
-    if c == 93 { return { code: 27, shift: 0 }; };  // ]
-    if c == 123 { return { code: 26, shift: 1 }; }; // {
-    if c == 125 { return { code: 27, shift: 1 }; }; // }
-    if c == 92 { return { code: 43, shift: 0 }; };  // backslash
-    if c == 124 { return { code: 43, shift: 1 }; }; // |
-    if c == 47 { return { code: 53, shift: 0 }; };  // /
-    if c == 63 { return { code: 53, shift: 1 }; };  // ?
-    if c == 61 { return { code: 13, shift: 0 }; };  // =
-    if c == 43 { return { code: 13, shift: 1 }; };  // +
-    if c == 95 { return { code: 12, shift: 1 }; };  // _
-    if c == 60 { return { code: 51, shift: 1 }; };  // <
-    if c == 62 { return { code: 52, shift: 1 }; };  // >
-    return { code: 0, shift: 0 };
-}
+// _char_to_key removed — dead code (0 calls)
 
 // Create virtual keyboard device
 pub fn uinput_create() {
@@ -216,69 +164,7 @@ while _kmi < 190 { push(_km, 0); _kmi = _kmi + 1; };
 // ASCII 32 (space) at index 0: code=57, shift=0
 // Index = (ascii - 32) * 2
 // 32=space 33=! 34=" ... 48=0 ... 65=A ... 97=a
-fn _km_init() {
-    // space(32)=57
-    set_at(_km, 0, 57);
-    // !(33)=2+shift  "(34)=40+shift  #(35)=4+shift  $(36)=5+shift
-    set_at(_km, 2, 2); set_at(_km, 3, 1);    // !
-    set_at(_km, 4, 40); set_at(_km, 5, 1);   // "
-    set_at(_km, 6, 4); set_at(_km, 7, 1);    // #
-    set_at(_km, 8, 5); set_at(_km, 9, 1);    // $
-    // %(37)=6+shift  &(38)=8+shift  '(39)=40  ((40)=10+shift
-    set_at(_km, 10, 6); set_at(_km, 11, 1);  // %
-    set_at(_km, 12, 8); set_at(_km, 13, 1);  // &
-    set_at(_km, 14, 40);                       // '
-    set_at(_km, 16, 10); set_at(_km, 17, 1); // (
-    // )(41)=11+shift  *(42)=9+shift  +(43)=13+shift  ,(44)=51
-    set_at(_km, 18, 11); set_at(_km, 19, 1); // )
-    set_at(_km, 20, 9); set_at(_km, 21, 1);  // *
-    set_at(_km, 22, 13); set_at(_km, 23, 1); // +
-    set_at(_km, 24, 51);                      // ,
-    // -(45)=12  .(46)=52  /(47)=53
-    set_at(_km, 26, 12);                      // -
-    set_at(_km, 28, 52);                      // .
-    set_at(_km, 30, 53);                      // /
-    // 0-9 (48-57): codes 11,2,3,4,5,6,7,8,9,10
-    set_at(_km, 32, 11); set_at(_km, 34, 2); set_at(_km, 36, 3);
-    set_at(_km, 38, 4); set_at(_km, 40, 5); set_at(_km, 42, 6);
-    set_at(_km, 44, 7); set_at(_km, 46, 8); set_at(_km, 48, 9);
-    set_at(_km, 50, 10);
-    // :(58)=39+shift  ;(59)=39  <(60)=51+shift  =(61)=13
-    set_at(_km, 52, 39); set_at(_km, 53, 1); // :
-    set_at(_km, 54, 39);                      // ;
-    set_at(_km, 56, 51); set_at(_km, 57, 1); // <
-    set_at(_km, 58, 13);                      // =
-    // >(62)=52+shift  ?(63)=53+shift  @(64)=3+shift
-    set_at(_km, 60, 52); set_at(_km, 61, 1); // >
-    set_at(_km, 62, 53); set_at(_km, 63, 1); // ?
-    set_at(_km, 64, 3); set_at(_km, 65, 1);  // @
-    // A-Z (65-90): same codes + shift
-    let _codes = [30,48,46,32,18,33,34,35,23,36,37,38,50,49,24,25,16,19,31,20,22,47,17,45,21,44];
-    let _ci = 0;
-    while _ci < 26 {
-        set_at(_km, (65 - 32) * 2 + _ci * 2, _codes[_ci]);
-        set_at(_km, (65 - 32) * 2 + _ci * 2 + 1, 1);
-        _ci = _ci + 1;
-    };
-    // [(91)=26  \(92)=43  ](93)=27  ^(94)=7+shift  _(95)=12+shift  `(96)=41
-    set_at(_km, 118, 26);                      // [
-    set_at(_km, 120, 43);                      // backslash
-    set_at(_km, 122, 27);                      // ]
-    set_at(_km, 124, 7); set_at(_km, 125, 1); // ^
-    set_at(_km, 126, 12); set_at(_km, 127, 1); // _
-    set_at(_km, 128, 41);                      // `
-    // a-z (97-122): codes from map
-    _ci = 0;
-    while _ci < 26 {
-        set_at(_km, (97 - 32) * 2 + _ci * 2, _codes[_ci]);
-        _ci = _ci + 1;
-    };
-    // {(123)=26+shift  |(124)=43+shift  }(125)=27+shift  ~(126)=41+shift
-    set_at(_km, (123 - 32) * 2, 26); set_at(_km, (123 - 32) * 2 + 1, 1);  // {
-    set_at(_km, (124 - 32) * 2, 43); set_at(_km, (124 - 32) * 2 + 1, 1);  // |
-    set_at(_km, (125 - 32) * 2, 27); set_at(_km, (125 - 32) * 2 + 1, 1);  // }
-    set_at(_km, (126 - 32) * 2, 41); set_at(_km, (126 - 32) * 2 + 1, 1);  // ~
-}
+// _km_init removed — dead code (0 calls)
 
 // Type a string — fully inline, no nested function calls
 pub fn uinput_type(fd, text) {
