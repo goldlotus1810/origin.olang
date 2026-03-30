@@ -529,19 +529,29 @@ pub fn dna_repair(_dr_response_mol, _dr_input_mol, _dr_max_iter) {
 // Quality critique: 0-1000 score
 // 0.30×valid + 0.30×(1−H/2320) + 0.20×distance + 0.20×silk
 fn _critique(_cq_mol, _cq_input_mol) {
-    // Valid: is this mol non-zero and in a populated bucket?
+    // D5: 0.30×valid + 0.30×(1−H/2.32) + 0.20×consistency + 0.20×silk
+    // ── Term 1: valid (0-300) ──
     let _cq_valid = 0;
     if _cq_mol > 0 {
         let _cq_s = _kt_mol_s(_cq_mol);
         let _cq_bucket = kt_get_dim(0, _cq_s);
-        if len(_cq_bucket) > 0 { let _cq_valid = 1000; };
+        if len(_cq_bucket) > 0 { let _cq_valid = 300; };
     };
-    // Distance to input (closer = better, invert)
+    // ── Term 2: 1 - H/2.32 (0-300) — low entropy = confident ──
+    let _cq_s_val = _kt_mol_s(_cq_mol);
+    let _cq_facts = kt_get_dim(0, _cq_s_val);
+    let _cq_h = _is_fact_entropy(_cq_facts);
+    // H scaled ×1000, max useful H ≈ 2320 (log2(5) × 1000)
+    let _cq_h_norm = 300 - __floor(_cq_h * 300 / 2320);
+    if _cq_h_norm < 0 { let _cq_h_norm = 0; };
+    // ── Term 3: consistency = distance to input (0-200) ──
     let _cq_dist = _kt_mol_dist(_cq_mol, _cq_input_mol);
-    let _cq_dist_score = 1000 - (__floor(_cq_dist * 1000 / 47));
-    if _cq_dist_score < 0 { let _cq_dist_score = 0; };
-    // Simple quality: 50% valid + 50% distance
-    return __floor((_cq_valid * 500 + _cq_dist_score * 500) / 1000);
+    let _cq_cons = 200 - __floor(_cq_dist * 200 / 47);
+    if _cq_cons < 0 { let _cq_cons = 0; };
+    // ── Term 4: silk weight to input (0-200) ──
+    let _cq_silk = __floor(kt_silk_weight(_cq_mol, _cq_input_mol) * 200 / 1000);
+    if _cq_silk > 200 { let _cq_silk = 200; };
+    return _cq_valid + _cq_h_norm + _cq_cons + _cq_silk;
 }
 
 // Fix the weakest (most distant) dimension

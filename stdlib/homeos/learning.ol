@@ -35,12 +35,12 @@ fn _aam_approve(_aa_fact, _aa_fire) {
     while _aa_qi < len(_qr_facts) {
         if len(_qr_facts[_aa_qi]) > 0 {
             let _aa_qmol = _kt_real_mol(_qr_facts[_aa_qi]);
-            // V opposite + same R = contradiction
+            // D2②: d_V > 0.8 normalized (5.6/7 → >= 6), d_R < 0.2 (3/15 → < 3)
             let _aa_dv = _kt_mol_v(_aa_mol) - _kt_mol_v(_aa_qmol);
             if _aa_dv < 0 { let _aa_dv = 0 - _aa_dv; };
             let _aa_dr = _kt_mol_r(_aa_mol) - _kt_mol_r(_aa_qmol);
             if _aa_dr < 0 { let _aa_dr = 0 - _aa_dr; };
-            if _aa_dv > 5 { if _aa_dr < 2 { return 0; }; };
+            if _aa_dv >= 6 { if _aa_dr < 3 { return 0; }; };
         };
         let _aa_qi = _aa_qi + 1;
     };
