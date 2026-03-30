@@ -15,10 +15,49 @@ pub fn net_local_ip() {
     return r;
 }
 
-// Get gateway IP
+// Get gateway IP (native /proc — no shell fork)
 pub fn net_gateway() {
-    let r = __system("ip route | awk '/default/{print $3}' | head -1");
-    return r;
+    let raw = __file_read("/proc/net/route");
+    let lines = [];
+    let start = 0;
+    let i = 0;
+    while i < len(raw) { if __char_code(char_at(raw, i)) == 10 { push(lines, __substr(raw, start, i)); start = i + 1; }; i = i + 1; };
+    let li = 1;
+    while li < len(lines) {
+        let line = lines[li];
+        let ti = 0;
+        while ti < len(line) { if __char_code(char_at(line, ti)) == 9 { break; }; ti = ti + 1; };
+        ti = ti + 1;
+        if ti + 8 <= len(line) {
+            let dest = __substr(line, ti, ti + 8);
+            if dest == "00000000" {
+                while ti < len(line) { if __char_code(char_at(line, ti)) == 9 { break; }; ti = ti + 1; };
+                ti = ti + 1;
+                if ti + 8 <= len(line) {
+                    let gw = __substr(line, ti, ti + 8);
+                    let b0 = _hex_byte_net(char_at(gw, 6), char_at(gw, 7));
+                    let b1 = _hex_byte_net(char_at(gw, 4), char_at(gw, 5));
+                    let b2 = _hex_byte_net(char_at(gw, 2), char_at(gw, 3));
+                    let b3 = _hex_byte_net(char_at(gw, 0), char_at(gw, 1));
+                    return __to_string(b0) + "." + __to_string(b1) + "." + __to_string(b2) + "." + __to_string(b3);
+                };
+            };
+        };
+        li = li + 1;
+    };
+    return "";
+}
+
+fn _hex_byte_net(h, l) {
+    return _hex_nib(h) * 16 + _hex_nib(l);
+}
+
+fn _hex_nib(ch) {
+    let c = __char_code(ch);
+    if c >= 48 { if c <= 57 { return c - 48; }; };
+    if c >= 65 { if c <= 70 { return c - 55; }; };
+    if c >= 97 { if c <= 102 { return c - 87; }; };
+    return 0;
 }
 
 // Get subnet (e.g., "192.168.1.0/24")
