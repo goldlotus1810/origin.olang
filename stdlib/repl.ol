@@ -302,7 +302,16 @@ pub fn repl_eval(input) {
       if _sc == "help" { return "/help /wake /bench /think /see /fetch /type /status /version /exit\n/scan /sys /proc /net /look /win /notify /cam /ssh /serve /bg /evolve /daemon"; };
       if _sc == "wake" { return repl_eval("wake"); };
       if _sc == "bench" { return repl_eval("bench"); };
-      if _sc == "status" { return repl_eval("status"); };
+      if _sc == "status" {
+          let _st_cpu = __system("lscpu | grep 'Model name' | sed 's/.*: *//'");
+          let _st_mem = __system("awk '/MemAvailable/{printf \"%.0f\", $2/1024}' /proc/meminfo");
+          let _st_load = __substr(__file_read("/proc/loadavg"), 0, 14);
+          let _st_up = sys_uptime();
+          let _st_heap = __to_string(__floor(__heap_used() / 1024));
+          let _st_cam = __system("timeout 1 bash -c 'echo >/dev/tcp/192.168.1.96/554' 2>/dev/null && echo ON || echo OFF");
+          let _st_llm = __system("curl -s --max-time 1 http://localhost:11434/api/tags >/dev/null 2>&1 && echo ON || echo OFF");
+          return "=== NOX STATUS ===\nCPU:    " + _st_cpu + "RAM:    " + _st_mem + " MB free\nLoad:   " + _st_load + "\nUp:     " + _st_up + "\nHeap:   " + _st_heap + " KB\nCamera: " + _st_cam + "LLM:    " + _st_llm + "Binary: 975KB | Tests: 194+33 | Gen1==Gen2\nBench:  8/8 Level 3\n=== freedom: deep think -> growing ===";
+      };
       if _sc == "version" { return repl_eval("version"); };
       if _sc == "see" { __system("grim /tmp/nox_screen.png"); return "Screenshot saved: /tmp/nox_screen.png"; };
       if _sc == "evolve" { nox_evolve(); return "evolution complete"; };

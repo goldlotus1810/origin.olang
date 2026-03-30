@@ -986,6 +986,8 @@ sb_test "selfbuild/base64"   'emit base64_encode("Nox");'       "Tm94"
 sb_test "selfbuild/shl"      'emit 1 << 10;'                    "1024"
 sb_test "selfbuild/pipe_chain" 'fn d(x){return x*2;};fn i(x){return x+1;};emit pipe(5,d,i);' "11"
 sb_test "selfbuild/syscall"  'emit __syscall(39,0,0,0,0,0,0) > 0;' "1"
+sb_test "selfbuild/config"   'config_set("test_key", "test_val"); emit config_get("test_key");' "test_val"
+sb_test "selfbuild/hex_rt"   'emit hex_decode(hex_encode("Nox"));' "Nox"
 echo -e "\n${CYAN}  Self-build: ${SB_PASS}/$((SB_PASS + SB_FAIL)) passed${NC}"
 fi
 

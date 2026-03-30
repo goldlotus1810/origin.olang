@@ -16,9 +16,7 @@ fn _soap_with_auth(method, user, pass) {
     return _soap_wrap("<s:Header><Security xmlns=\"http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd\"><UsernameToken><Username>" + user + "</Username><Password>" + pass + "</Password></UsernameToken></Security></s:Header><s:Body><" + method + "/></s:Body>");
 }
 
-fn _soap_body(method, body_content) {
-    return _soap_wrap("<s:Body><" + method + ">" + body_content + "</" + method + "></s:Body>");
-}
+// _soap_body removed — dead code
 
 // ═══ HTTP POST to camera ═══
 
