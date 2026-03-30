@@ -559,65 +559,139 @@ pub fn sense_listen() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// E1: Screen encoder (screenshot → SDF → P_weight)
-// grim capture → extract visual features → map to 5D
+// E1: Screen encoder — Fibonacci SDF Vision
+//
+// Algorithm (Lupin design):
+// 1. Screenshot → resize to Fibonacci grid (34×21)
+// 2. Start from center (foveal attention)
+// 3. For each cell: get dominant color (R+G+B → grayscale)
+// 4. Large uniform regions → skip (background)
+// 5. Small regions / color boundaries → edges → SDF
+// 6. Compose edge map → shape complexity → P_weight
+//
+// Fibonacci grid: 34×21 = 714 cells. Each cell = ~56×57px at 1920×1200
+// PPM format: raw RGB bytes, easy to parse in Olang
 // ════════════════════════════════════════════════════════════════
 
+// Grid: Fibonacci dimensions
+let __vis_w = 34;   // Fib(9)
+let __vis_h = 21;   // Fib(8)
+
 pub fn encode_screen() {
-    // Capture screenshot
-    __system("grim /tmp/nox_enc.png 2>/dev/null");
-    // Extract features using ImageMagick identify (available on most Linux)
-    // Get: mean brightness, standard deviation (complexity), dimensions
-    let _es_info = __system("identify -verbose /tmp/nox_enc.png 2>/dev/null | grep -E 'mean:|standard deviation:|Geometry:' | head -5");
-    if len(_es_info) < 10 {
-        // Fallback: no ImageMagick → use file size as proxy
+    // 1. Capture + resize to Fibonacci grid as raw PPM (P6)
+    __system("grim /tmp/nox_enc.png 2>/dev/null && convert /tmp/nox_enc.png -resize 34x21! -depth 8 /tmp/nox_vis.ppm 2>/dev/null");
+    let _es_raw = __file_read("/tmp/nox_vis.ppm");
+    if len(_es_raw) < 100 {
+        // Fallback: no ImageMagick → file size proxy
         let _es_fsize = len(__file_read("/tmp/nox_enc.png"));
-        // Larger file = more complex scene
-        let _es_complexity = __floor(_es_fsize / 100000); // 0-15 range for typical screenshots
-        if _es_complexity > 15 { let _es_complexity = 15; };
-        return (_es_complexity * 4096) + (4 * 256) + (4 * 32) + (4 * 4) + 0;
+        let _es_c = __floor(_es_fsize / 100000);
+        if _es_c > 15 { let _es_c = 15; };
+        return (_es_c * 4096) + (4 * 256) + (4 * 32) + (4 * 4) + 0;
     };
-    // Parse: extract numbers from identify output
-    let _es_mean = [128];    // brightness mean (0-255)
-    let _es_std = [40];      // complexity (std dev)
-    // Simple number extraction from first "mean:" line
-    let _es_i = 0;
-    let _es_in_mean = 0;
-    while _es_i < len(_es_info) {
-        let _es_c = __char_code(char_at(_es_info, _es_i));
-        if _es_c == 109 { let _es_in_mean = 1; };  // 'm' of "mean"
-        if _es_in_mean == 1 {
-            if _es_c >= 48 { if _es_c <= 57 {
-                // Found digit after "mean" → parse number
-                let _es_num = 0;
-                let _es_j = _es_i;
-                while _es_j < len(_es_info) {
-                    let _es_d = __char_code(char_at(_es_info, _es_j));
-                    if _es_d >= 48 { if _es_d <= 57 { let _es_num = (_es_num * 10) + (_es_d - 48); }; };
-                    if _es_d == 46 { let _es_j = len(_es_info); };  // stop at decimal
-                    if _es_d == 10 { let _es_j = len(_es_info); };  // stop at newline
-                    let _es_j = _es_j + 1;
-                };
-                let _ = __set_at(_es_mean, 0, _es_num);
-                let _es_in_mean = 0;
-                let _es_i = len(_es_info);
-            }; };
+    // 2. Parse PPM P6: skip header (find 3rd newline), then raw RGB
+    let _es_hdr_end = [0];
+    let _es_nl_count = [0];
+    let _es_hi = 0;
+    while _es_hi < len(_es_raw) {
+        if __char_code(char_at(_es_raw, _es_hi)) == 10 {
+            let _ = __set_at(_es_nl_count, 0, __array_get(_es_nl_count, 0) + 1);
+            if __array_get(_es_nl_count, 0) >= 3 {
+                let _ = __set_at(_es_hdr_end, 0, _es_hi + 1);
+                let _es_hi = len(_es_raw);
+            };
         };
-        let _es_i = _es_i + 1;
+        let _es_hi = _es_hi + 1;
     };
-    // Map to 5D per spec E1:
-    let _es_brightness = __array_get(_es_mean, 0);
-    // S = complexity (higher std dev = more edges/shapes)
-    let _es_s = __floor(__array_get(_es_std, 0) * 15 / 80);
+    let _es_data_start = __array_get(_es_hdr_end, 0);
+    // 3. Read grayscale grid (R+G+B)/3 per cell
+    // Grid stored as flat array [y*34 + x] = grayscale 0-255
+    let _es_grid = __array_range(714); // 34*21
+    let _es_gi = 0;
+    while _es_gi < 714 {
+        let _ = __set_at(_es_grid, _es_gi, 128); // default mid-gray
+        let _es_gi = _es_gi + 1;
+    };
+    let _es_pi = 0;
+    while _es_pi < 714 {
+        let _es_byte_off = _es_data_start + (_es_pi * 3);
+        if (_es_byte_off + 2) < len(_es_raw) {
+            let _es_r = __char_code(char_at(_es_raw, _es_byte_off));
+            let _es_g = __char_code(char_at(_es_raw, _es_byte_off + 1));
+            let _es_b = __char_code(char_at(_es_raw, _es_byte_off + 2));
+            let _ = __set_at(_es_grid, _es_pi, __floor((_es_r + _es_g + _es_b) / 3));
+        };
+        let _es_pi = _es_pi + 1;
+    };
+    // 4. Fibonacci spiral from center: detect edges (color boundaries)
+    // Center = (17, 10). Spiral outward.
+    // Edge = adjacent cells with grayscale diff > 30
+    let _es_edges = [0];      // edge count
+    let _es_warm = [0];       // warm pixel count (R > B proxy: brightness > 140)
+    let _es_total_bright = [0];
+    let _es_cx = 17;  // center x
+    let _es_cy = 10;  // center y
+    // Scan in Fibonacci rings: r=1,1,2,3,5,8,13
+    let _es_rings = [1, 1, 2, 3, 5, 8, 13];
+    let _es_ri = 0;
+    while _es_ri < 7 {
+        let _es_radius = __array_get(_es_rings, _es_ri);
+        // Scan perimeter of square at radius from center
+        let _es_x = _es_cx - _es_radius;
+        while _es_x <= (_es_cx + _es_radius) {
+            let _es_y = _es_cy - _es_radius;
+            while _es_y <= (_es_cy + _es_radius) {
+                // Only perimeter (skip interior — already scanned in smaller ring)
+                let _es_on_edge_of_ring = 0;
+                if _es_x == (_es_cx - _es_radius) { let _es_on_edge_of_ring = 1; };
+                if _es_x == (_es_cx + _es_radius) { let _es_on_edge_of_ring = 1; };
+                if _es_y == (_es_cy - _es_radius) { let _es_on_edge_of_ring = 1; };
+                if _es_y == (_es_cy + _es_radius) { let _es_on_edge_of_ring = 1; };
+                if _es_on_edge_of_ring == 1 {
+                    if _es_x >= 0 { if _es_x < 34 { if _es_y >= 0 { if _es_y < 21 {
+                        let _es_idx = (_es_y * 34) + _es_x;
+                        let _es_val = __array_get(_es_grid, _es_idx);
+                        let _ = __set_at(_es_total_bright, 0, __array_get(_es_total_bright, 0) + _es_val);
+                        if _es_val > 140 { let _ = __set_at(_es_warm, 0, __array_get(_es_warm, 0) + 1); };
+                        // Check RIGHT neighbor: color boundary?
+                        if (_es_x + 1) < 34 {
+                            let _es_right = __array_get(_es_grid, _es_idx + 1);
+                            let _es_diff = _es_val - _es_right;
+                            if _es_diff < 0 { let _es_diff = 0 - _es_diff; };
+                            if _es_diff > 30 { let _ = __set_at(_es_edges, 0, __array_get(_es_edges, 0) + 1); };
+                        };
+                        // Check BELOW neighbor
+                        if (_es_y + 1) < 21 {
+                            let _es_below = __array_get(_es_grid, _es_idx + 34);
+                            let _es_diff2 = _es_val - _es_below;
+                            if _es_diff2 < 0 { let _es_diff2 = 0 - _es_diff2; };
+                            if _es_diff2 > 30 { let _ = __set_at(_es_edges, 0, __array_get(_es_edges, 0) + 1); };
+                        };
+                    }; }; }; };
+                };
+                let _es_y = _es_y + 1;
+            };
+            let _es_x = _es_x + 1;
+        };
+        let _es_ri = _es_ri + 1;
+    };
+    // 5. Map to 5D from SDF features
+    let _es_edge_count = __array_get(_es_edges, 0);
+    let _es_warm_count = __array_get(_es_warm, 0);
+    let _es_scanned = 200; // approximate cells scanned in rings
+    let _es_avg_bright = __floor(__array_get(_es_total_bright, 0) / _es_scanned);
+    // S = shape complexity (edge count → more edges = more shapes)
+    let _es_s = __floor(_es_edge_count * 15 / 100);
     if _es_s > 15 { let _es_s = 15; };
-    // R = structure (moderate = structured, low/high = chaotic/uniform)
-    let _es_r = __floor(_es_brightness * 15 / 255);
-    // V = warmth (brightness > 128 → warm/positive)
-    let _es_v = __floor(_es_brightness * 7 / 255);
-    // A = contrast (std dev as intensity)
-    let _es_a = __floor(__array_get(_es_std, 0) * 7 / 80);
+    // R = structure (ratio of edges to scanned — high = structured, low = uniform)
+    let _es_r = __floor(_es_edge_count * 15 / _es_scanned);
+    if _es_r > 15 { let _es_r = 15; };
+    // V = warmth (warm pixels / total — bright/warm = positive valence)
+    let _es_v = __floor(_es_warm_count * 7 / _es_scanned);
+    if _es_v > 7 { let _es_v = 7; };
+    // A = contrast (edge density = visual intensity/arousal)
+    let _es_a = __floor(_es_edge_count * 7 / 60);
     if _es_a > 7 { let _es_a = 7; };
-    // T = 0 (static screenshot)
+    // T = 0 (static frame — would be >0 if comparing with previous frame)
     let _es_t = 0;
     return (_es_s * 4096) + (_es_r * 256) + (_es_v * 32) + (_es_a * 4) + _es_t;
 }
