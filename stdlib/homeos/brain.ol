@@ -91,6 +91,18 @@ fn _think_action(inp) {
     if action == "fix" { return "describe the bug: fix <description>"; };
     if action == "kill" { if len(target) > 0 { return __system("pkill " + target + " 2>&1 || echo not found"); }; return "kill what?"; };
 
+    if action == "fix" {
+        if len(target) > 0 {
+            // Pattern match on error descriptions
+            if _contains(target, "test") { return __system("cd /home/lupin/Origin && bash tests.sh 2>&1 | grep FAIL"); };
+            if _contains(target, "build") { return __system("cd /home/lupin/Origin && make self-build 2>&1 | grep -i error | head -5"); };
+            if _contains(target, "heap") { return "Heap issue: use __heap_pin() after allocations, or put code in a function (one REPL turn)"; };
+            if _contains(target, "scope") { return "Scope issue: use let for new vars, bare assignment for updates. While loop vars need careful scoping."; };
+            if _contains(target, "crash") { return "Crash debug: check __to_string on arrays (use movq not mov), check __tcp_recv timeout, check __syscall 64-bit regs"; };
+            return "Describe the error more. fix test/build/heap/scope/crash";
+        };
+        return "fix what? Example: fix tests, fix build, fix heap crash";
+    };
     return "unknown action: " + action;
 }
 

@@ -4,8 +4,26 @@
 // ═══ SYSTEM INFO ═══
 
 pub fn sys_cpu() {
-    let r = __system("lscpu | grep 'Model name' | sed 's/.*: *//'");
-    return r;
+    // Native: parse /proc/cpuinfo for model name
+    let raw = __file_read("/proc/cpuinfo");
+    let key = "model name";
+    let i = 0;
+    while i < len(raw) - 10 {
+        if __char_code(char_at(raw, i)) == 109 {
+            if __substr(raw, i, i + 10) == "model name" {
+                // Find : then skip spaces
+                let ci = i + 10;
+                while ci < len(raw) { if char_at(raw, ci) == ":" { break; }; ci = ci + 1; };
+                ci = ci + 1;
+                while ci < len(raw) { if __char_code(char_at(raw, ci)) != 32 { break; }; ci = ci + 1; };
+                let ei = ci;
+                while ei < len(raw) { if __char_code(char_at(raw, ei)) == 10 { break; }; ei = ei + 1; };
+                return __substr(raw, ci, ei);
+            };
+        };
+        i = i + 1;
+    };
+    return "unknown";
 }
 
 pub fn sys_cores() {
@@ -64,7 +82,9 @@ fn _proc_extract(text, key) {
 }
 
 pub fn sys_disk() {
-    let r = __system("df -h / | tail -1 | awk '{print $2, $3, $4, $5}'");
+    // Native: read /proc/mounts + statvfs via __system (df needs parsing)
+    // Keep __system for now — statvfs needs new syscall wrapper
+    let r = __system("df -h / | tail -1 | awk '{print $4 \" free / \" $2}'");
     return r;
 }
 
@@ -162,10 +182,11 @@ pub fn proc_alive(name) {
     return r;
 }
 
-// Kill process by PID
+// Kill process by PID (native syscall — no shell fork)
 pub fn proc_kill(pid) {
-    let r = __system("kill " + __to_string(pid) + " 2>&1");
-    return r;
+    let r = __syscall(62, pid, 15, 0, 0, 0, 0);
+    if r == 0 { return "killed"; };
+    return "failed (" + __to_string(r) + ")";
 }
 
 // Kill process by name
