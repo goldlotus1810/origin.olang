@@ -621,23 +621,12 @@ pub fn pipeline(_pl_input) {
     let _pl_chain = chain_encode(_pl_input);
     let _pl_chain_mol = chain_summary(_pl_chain);
 
-    // ⑩ Holistic Capture (E1): text + senses + context
-    // sense_capture gates expensive sensors (screen/audio only when needed)
+    // ⑩ Encode: text → molecule + context
+    // sense_capture NOT in hot path (causes gen1 hang). Call via /sense command.
     let _pl_text_mol = _kt_fast_mol(_pl_input);
-    let _pl_senses = sense_capture();
-    // WM slot 0 = query, slot 1 = interoception
     wm_set(0, _pl_text_mol);
-    wm_set(1, _pl_senses.intero);
     let _pl_context = wm_get(3);
     let _pl_fused = fusion(_pl_text_mol, 0, _pl_context);
-    // Compose ALL active senses into fused signal (holistic capture D1)
-    let _pl_sense_mols = [_pl_fused];
-    if _pl_senses.intero > 0 { push(_pl_sense_mols, _pl_senses.intero); };
-    if _pl_senses.screen > 0 { push(_pl_sense_mols, _pl_senses.screen); };
-    if _pl_senses.audio > 0 { push(_pl_sense_mols, _pl_senses.audio); };
-    if len(_pl_sense_mols) > 1 {
-        let _pl_fused = compose(_pl_sense_mols);
-    };
     // Apply conversation momentum
     let _pl_fused = _conv_shift(_pl_fused);
 
