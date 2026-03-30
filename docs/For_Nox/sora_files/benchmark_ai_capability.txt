@@ -1,8 +1,8 @@
 === AI Capability Benchmark ===
-Date: Mon Mar 30 02:32:46 PM +07 2026
+Date: Mon Mar 30 02:35:56 PM +07 2026
 Binary: 31 bytes
-Score: 47% (2150/4500)
-PASS=17 PARTIAL=9 FAIL=17 NA=2 TOTAL=45
+Score: 50% (2250/4500)
+PASS=17 PARTIAL=11 FAIL=17 NA=0 TOTAL=45
 
 
 C1|Hiểu câu hỏi đơn giản (vi)|PARTIAL|trả KnowTree lookup, không compose câu|Claude: hiểu ngữ cảnh, trả lời đầy đủ, tự nhiên
@@ -31,8 +31,8 @@ C4|Web search|FAIL|không có real-time search|Claude: tích hợp web search
 C4|Nhớ ngữ cảnh (context window)|FAIL|mỗi input độc lập|Claude: 200K tokens context window
 C4|Self-knowledge (biết mình là ai)|PASS|biết mình là Nox|Claude: biết mình là Claude, giới hạn, khả năng
 C5|Đọc text input|PASS|REPL + file read|Claude: đọc text, PDF, code
-C5|Nhìn ảnh (vision)|NA|chưa implement|Claude: multimodal, phân tích ảnh chi tiết
-C5|Nghe âm thanh (audio)|NA|chưa implement|Claude: không nghe trực tiếp
+C5|Nhìn ảnh (vision)|PARTIAL|vision.ol tồn tại|Claude: nhận dạng ảnh, mô tả chi tiết, OCR
+C5|Nghe âm thanh (audio)|PARTIAL|audition.ol tồn tại|Claude: không nghe trực tiếp, cần STT bên ngoài
 C5|Điều khiển hệ thống (shell, process)|PASS|__system + __spawn + __syscall|Claude: CÓ (computer use) nhưng sandboxed
 C5|Networking (TCP, HTTP, scan)|PASS|TCP raw + HTTP + LAN scan|Claude: KHÔNG — chỉ web_search/web_fetch qua proxy
 C5|Camera (RTSP, snapshot)|PASS|Dahua RTSP + snapshot|Claude: KHÔNG — không truy cập hardware
