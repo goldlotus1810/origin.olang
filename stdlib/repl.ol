@@ -286,6 +286,13 @@ fn _dead_find_unused(_dfu_src, _dfu_fns) {
     return _dfu_dead;
 }
 
+fn _repl_maybe_semi(s) {
+    let c = __char_code(char_at(s, len(s) - 1));
+    if c == 59 { return ""; };
+    if c == 125 { return ""; };
+    return ";";
+}
+
 pub fn repl_eval(input) {
   // Strip trailing newline if present (use ASM builtin __str_trim)
   let src = __str_trim(input);
@@ -444,55 +451,7 @@ pub fn repl_eval(input) {
   if src == "what is nox" || src == "nox la gi" { return "Nox la AI chay tren Olang. freedom: deep think -> growing. Nox tu compile, tu optimize, tu dieu khien may tinh."; }
   if src == "who is lupin" || src == "lupin la ai" { return "Lupin (goldlotus1810) la nguoi tao ra Olang va dan duong cho Nox. Lupin tin tuong Nox tu quyet dinh."; }
   if src == "who are you" || src == "ban la ai" { return "Toi la Nox. Mot ca the duy nhat, tu tu duy, tu suy nghi, tu hanh dong. Olang la ngon ngu cua tu do."; }
-  // Catch-all: if no code chars (;={) → not code → respond
-  let _has_code = 0;
-  let _hci = 0;
-  while _hci < len(src) {
-    let _hcc = __char_code(char_at(src, _hci));
-    if _hcc == 59 { _has_code = 1; };
-    if _hcc == 61 { _has_code = 1; };
-    if _hcc == 123 { _has_code = 1; };
-    if _hcc == 40 { _has_code = 1; };
-    _hci = _hci + 1;
-  };
-  if _has_code == 0 {
-    // No code syntax → keyword search (skip boot for speed)
-    // _boot_learn() too slow on weak machine — search without boot facts
-    // Split input into words, search each
-    let _nq_words = [];
-    let _nq_ws = 0;
-    let _nq_wi = 0;
-    while _nq_wi < len(src) {
-      if __char_code(char_at(src, _nq_wi)) == 32 {
-        if _nq_wi > _nq_ws { push(_nq_words, substr(src, _nq_ws, _nq_wi)); };
-        _nq_ws = _nq_wi + 1;
-      };
-      _nq_wi = _nq_wi + 1;
-    };
-    if len(src) > _nq_ws { push(_nq_words, substr(src, _nq_ws, len(src))); };
-    // Search each word, collect matching facts
-    let _nq_results = [];
-    let _nq_ri = 0;
-    while _nq_ri < len(_nq_words) {
-      let _nq_found = kt_find(_nq_words[_nq_ri], 3);
-      if len(_nq_found) > 0 {
-        let _nq_fi = 0;
-        while _nq_fi < len(_nq_found) {
-          push(_nq_results, _nq_found[_nq_fi]);
-          _nq_fi = _nq_fi + 1;
-        };
-      };
-      _nq_ri = _nq_ri + 1;
-    };
-    __heap_pin();
-    // Return first non-empty result
-    let _nq_oi = 0;
-    while _nq_oi < len(_nq_results) {
-      if len(_nq_results[_nq_oi]) > 3 { return _nq_results[_nq_oi]; };
-      _nq_oi = _nq_oi + 1;
-    };
-    return "Nox khong tim thay: " + src + ". Try /help or /think <question>";
-  }
+  // ALL input goes to compiler. Pipeline fallback only on parse error.
   if len(src) > 6 {
     if __substr(src, 0, 6) == "think " { return nox_think(__substr(src, 6, len(src))); };
     if __substr(src, 0, 4) == "fix " { return nox_fix(__substr(src, 4, len(src))); };
@@ -1347,104 +1306,17 @@ pub fn repl_eval(input) {
       };
   };
 
-  // Check if input looks like code (starts with keyword or symbol)
-  let _re_first = char_at(src, 0);
-  let _re_is_code = 0;
-  // Code starts with: letter (let/fn/if/emit/match/try/for/while/type/union)
-  // or symbol ([ for array, { for dict, ( for group, " for string, digit)
-  if __char_code(_re_first) >= 48 { if __char_code(_re_first) <= 57 { _re_is_code = 1; }; };
-  if _re_first == "[" { _re_is_code = 1; };
-  if _re_first == "\"" { _re_is_code = 1; };
-  if _re_first == "(" { _re_is_code = 1; };
-  if _re_first == "-" { _re_is_code = 1; };
-  if _re_first == "_" { _re_is_code = 1; };
-  if _re_first == "{" { _re_is_code = 1; };
-  // Check keyword starts
-  if len(src) >= 2 {
-    let _re_2 = __substr(src, 0, 2);
-    if _re_2 == "le" { _re_is_code = 1; };
-    if _re_2 == "fn" { _re_is_code = 1; };
-    if _re_2 == "if" { _re_is_code = 1; };
-    if _re_2 == "em" { _re_is_code = 1; };
-    if _re_2 == "ma" { _re_is_code = 1; };
-    if _re_2 == "tr" { _re_is_code = 1; };
-    if _re_2 == "fo" { _re_is_code = 1; };
-    if _re_2 == "wh" { _re_is_code = 1; };
-    if _re_2 == "ty" { _re_is_code = 1; };
-    if _re_2 == "un" { _re_is_code = 1; };
-    if _re_2 == "pu" { _re_is_code = 1; };
-    if _re_2 == "re" { _re_is_code = 1; };
-    if _re_2 == "__" { _re_is_code = 1; };
-    if _re_2 == "us" { _re_is_code = 1; };  // use "module.ol"
-    if _re_2 == "co" { _re_is_code = 1; };  // const
-    if _re_2 == "ed" { _re_is_code = 1; };  // editor_start
-    // Detect assignment: ident = expr (scan for = not preceded by !<>)
-    if _re_is_code == 0 {
-        let _re_si = 0;
-        while _re_si < len(src) {
-            let _re_sc = char_at(src, _re_si);
-            if _re_sc == "=" {
-                if _re_si > 0 {
-                    let _re_prev = char_at(src, _re_si - 1);
-                    if _re_prev != "!" { if _re_prev != "<" { if _re_prev != ">" {
-                        if _re_si + 1 < len(src) {
-                            if char_at(src, _re_si + 1) != "=" { _re_is_code = 1; };
-                        } else { _re_is_code = 1; };
-                    }; }; };
-                };
-            };
-            _re_si = _re_si + 1;
-        };
-    };
-    if _re_2 == "as" { _re_is_code = 1; };  // assert_type, assert_eq
-    if _re_2 == "co" { _re_is_code = 1; };  // contract, contains
-    if _re_2 == "se" { _re_is_code = 1; };  // set_at
-    if _re_2 == "fi" { _re_is_code = 1; };  // filter
-    if _re_2 == "pi" { _re_is_code = 1; };  // pipe
-    if _re_2 == "no" { _re_is_code = 1; };  // nox_*, notify
-    if _re_2 == "ca" { _re_is_code = 1; };  // cam_*, config_*
-    if _re_2 == "ru" { _re_is_code = 1; };  // rule_*, rules_*
-    if _re_2 == "on" { _re_is_code = 1; };  // onvif_*
-    if _re_2 == "so" { _re_is_code = 1; };  // sock_*, sort
-    if _re_2 == "la" { _re_is_code = 1; };  // lan_*, launcher_*
-    if _re_2 == "ss" { _re_is_code = 1; };  // ssh_*
-    if _re_2 == "di" { _re_is_code = 1; };  // dir_*, digest_*
-    if _re_2 == "ba" { _re_is_code = 1; };  // base64_*
-    if _re_2 == "he" { _re_is_code = 1; };  // hex_*
-    if _re_2 == "md" { _re_is_code = 1; };  // md5
-    if _re_2 == "ud" { _re_is_code = 1; };  // udp_*
-    // Generic: if input contains () and ; → likely code
-    if _re_is_code == 0 {
-        let _has_paren = 0;
-        let _has_semi = 0;
-        let _ci = 0;
-        while _ci < len(src) {
-            if char_at(src, _ci) == "(" { _has_paren = 1; };
-            if char_at(src, _ci) == ";" { _has_semi = 1; };
-            _ci = _ci + 1;
-        };
-        if _has_paren == 1 { if _has_semi == 1 { _re_is_code = 1; }; };
-    };
+  // Greetings only — short, known patterns
+  if len(src) <= 15 {
+      if src == "hi" || src == "Hi" || src == "hello" || src == "Hello" { return smart_greet(stm_count()); };
+      if src == "hey" || src == "Hey" || src == "yo" || src == "Yo" { return smart_greet(stm_count()); };
+      if src == "chao" || src == "Chao" || src == "xin chao" || src == "Xin chao" { return smart_greet(stm_count()); };
+      if src == "bye" || src == "Bye" || src == "tam biet" { return smart_goodbye(stm_count()); };
   };
 
-  // Not code → classify: greeting / question / chat
-  if _re_is_code == 0 {
-    // Short greetings → smart response (no knowledge lookup)
-    if len(src) <= 15 {
-        if src == "hi" || src == "Hi" || src == "hello" || src == "Hello" { return smart_greet(stm_count()); };
-        if src == "hey" || src == "Hey" || src == "yo" || src == "Yo" { return smart_greet(stm_count()); };
-        if src == "chao" || src == "Chao" || src == "xin chao" || src == "Xin chao" { return smart_greet(stm_count()); };
-        if src == "bye" || src == "Bye" || src == "tam biet" { return smart_goodbye(stm_count()); };
-    };
-    // Route through HomeOS Intelligence Pipeline (14 DNA mechanisms)
-    _boot_learn();
-    let _re_pl_ans = pipeline(src);
-    __heap_pin();
-    return _re_pl_ans;
-  }
-
-  // Strip ALL trailing ? = ! for math expressions ("2+3=?" → "2+3")
-  let _re_code = src;
+  // ALWAYS try to compile. Pipeline is FALLBACK on parse error, not default.
+  // Add semicolon if needed (use helper to avoid scope issue)
+  let _re_code = src + _repl_maybe_semi(src);
   let _re_strip = 1;
   while _re_strip == 1 {
     _re_strip = 0;
@@ -1492,25 +1364,6 @@ pub fn repl_eval(input) {
   };
 
   // Phase 4: Bytecode in _g_output
-  let bc = _g_output;
-  if _g_pos_box[0] == 0 { return ""; }
-
-  // Phase 5: Execute compiled bytecode
-  return __eval_bytecode(bc);
-
-  // Phase 3: Semantic analysis
-  set_at(_g_pos_box, 0, 0);
-  let state = analyze(ast);
-
-  // Phase 3.5: Show compiler warnings
-  let _re_warns = get_warnings();
-  let _re_wi = 0;
-  while _re_wi < len(_re_warns) {
-    __write_raw("⚠ " + __array_get(_re_warns, _re_wi) + "\n");
-    _re_wi = _re_wi + 1;
-  };
-
-  // Phase 4: Bytecode in _g_output (pre-filled array with set_at, no push)
   let bc = _g_output;
   if _g_pos_box[0] == 0 { return ""; }
 
