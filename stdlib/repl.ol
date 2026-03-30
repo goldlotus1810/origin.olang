@@ -296,7 +296,7 @@ pub fn repl_eval(input) {
     if char_at(src, 0) == "/" {
       let _sc = __substr(src, 1, len(src));
       // /help
-      if _sc == "help" { return "/help /wake /bench /think /see /fetch /type /status /version /exit\n/scan /sys /proc /net /look /win /notify /cam /ssh"; };
+      if _sc == "help" { return "/help /wake /bench /think /see /fetch /type /status /version /exit\n/scan /sys /proc /net /look /win /notify /cam /ssh /serve"; };
       if _sc == "wake" { return repl_eval("wake"); };
       if _sc == "bench" { return repl_eval("bench"); };
       if _sc == "status" { return repl_eval("status"); };
@@ -356,6 +356,9 @@ pub fn repl_eval(input) {
       if _sc == "cam live" { return cam_live(1); };
       // /ssh <host> <cmd>
       if len(_sc) > 4 { if __substr(_sc, 0, 4) == "ssh " { let _sa = __substr(_sc, 4, len(_sc)); emit "SSH: " + _sa; let _so = __system("ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no " + _sa + " 2>&1"); return _so; }; };
+      // /serve [port] — start HTTP server
+      if _sc == "serve" { nox_serve(9000); return "Server stopped"; };
+      if len(_sc) > 6 { if __substr(_sc, 0, 6) == "serve " { let _sp = __to_number(__substr(_sc, 6, len(_sc))); nox_serve(_sp); return "Server stopped"; }; };
       return "Unknown: /" + _sc + ". Try /help";
     };
   };
