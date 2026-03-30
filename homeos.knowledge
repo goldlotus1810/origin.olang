@@ -1,3 +1,20 @@
+config camera1 ip 192.168.1.96
+config camera2 ip 192.168.1.108
+config camera1 name front
+config camera2 name back
+config camera1 port_rtsp 554
+config camera1 port_onvif 80
+config camera1 serial 75416094931BA250
+config camera1 type dahua
+config alert load_threshold 4
+config alert mem_threshold_kb 500000
+config server port 9000
+config daemon interval_sec 30
+config network gateway 192.168.1.1
+config network subnet 192.168.1.0/24
+config machine hostname lupin-pc
+config machine cpu i3-4150
+config machine ram_kb 7989800
 Olang is a self-hosting language with x86-64 ASM VM
 Lupin created Olang on March 2026
 Lupin is the creator of Olang language
