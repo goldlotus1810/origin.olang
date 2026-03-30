@@ -643,24 +643,38 @@ pub fn pipeline(_pl_input) {
 
     // ⑬ Pronoun resolution: replace "it"/"that" with last topic
     let _pl_resolved = _pl_resolve_pronouns(_pl_input);
-    // Search: MOLECULAR FIRST (5D P_weight), text fallback
-    let _pl_mol_dec = kt_decode(_pl_resolved);
-    let _pl_facts = _pl_mol_dec.facts;
-    // Silk walk: follow associations depth 3, threshold 10 (weak links OK)
-    if len(_pl_facts) > 0 {
-        let _pl_sw_mol = _kt_fast_mol(__array_get(_pl_facts, 0));
-        let _pl_silk = kt_silk_walk(_pl_sw_mol, 3, 10);
-        let _pl_swi = 0;
-        while _pl_swi < len(_pl_silk) {
-            if len(_pl_facts) < 10 {
-                push(_pl_facts, __array_get(_pl_silk, _pl_swi).text);
-            };
-            let _pl_swi = _pl_swi + 1;
+    // Search strategy depends on instinct:
+    // QUESTION → text search first (keywords matter), molecular fallback
+    // Everything else → molecular first (5D meaning), text fallback
+    // NOTE: use _pl_facts_box[0] pattern to survive Olang block scoping
+    let _pl_facts_box = [[]];
+    if _pl_safe.instinct == "QUESTION" {
+        let _ = __set_at(_pl_facts_box, 0, _pl_text_search(_pl_resolved));
+        if len(__array_get(_pl_facts_box, 0)) == 0 {
+            let _pl_mol_dec = kt_decode(_pl_resolved);
+            let _ = __set_at(_pl_facts_box, 0, _pl_mol_dec.facts);
+        };
+    } else {
+        let _pl_mol_dec = kt_decode(_pl_resolved);
+        let _ = __set_at(_pl_facts_box, 0, _pl_mol_dec.facts);
+        if len(__array_get(_pl_facts_box, 0)) == 0 {
+            let _ = __set_at(_pl_facts_box, 0, _pl_text_search(_pl_resolved));
         };
     };
-    // Fallback: text search if molecular + silk found nothing
-    if len(_pl_facts) == 0 {
-        let _pl_facts = _pl_text_search(_pl_resolved);
+    let _pl_facts = __array_get(_pl_facts_box, 0);
+    // Silk walk: enrich with associated knowledge (skip for exact text matches)
+    if len(_pl_facts) > 0 {
+        if len(_pl_facts) < 3 {
+            let _pl_sw_mol = _kt_fast_mol(__array_get(_pl_facts, 0));
+            let _pl_silk = kt_silk_walk(_pl_sw_mol, 3, 10);
+            let _pl_swi = 0;
+            while _pl_swi < len(_pl_silk) {
+                if len(_pl_facts) < 10 {
+                    push(_pl_facts, __array_get(_pl_silk, _pl_swi).text);
+                };
+                let _pl_swi = _pl_swi + 1;
+            };
+        };
     };
 
     // ⑫ Homeostasis: surprise detection
@@ -674,6 +688,8 @@ pub fn pipeline(_pl_input) {
     let _pl_inst = _pl_safe;
     if _pl_inst.instinct == "GREETING" { return instinct_act(_pl_inst, _pl_input); };
     if _pl_inst.instinct == "META" { return instinct_act(_pl_inst, _pl_input); };
+    if _pl_inst.instinct == "EMOTION" { return instinct_act(_pl_inst, _pl_input); };
+    if _pl_inst.instinct == "REFERENCE" { return instinct_act(_pl_inst, _pl_input); };
 
     if len(_pl_facts) == 0 {
         if _pl_home.mode == "LEARN" { dn_observe(_pl_input); kt_learn(_pl_input); __file_append("homeos.knowledge", _pl_input + "\n"); __heap_pin(); return "Toi se hoc them ve dieu nay."; };
