@@ -3102,9 +3102,9 @@ op_call:
     jmp     vm_loop
 
 .to_string_other:
-    # Non-convertible types: return empty string
-    mov     $0, (%r14)
-    mov     $0, 8(%r14)
+    # Non-convertible types: return empty string (zero both 64-bit words)
+    movq    $0, (%r14)
+    movq    $0, 8(%r14)
     jmp     vm_loop
 
 # ── Char-code builtin: string → f64 byte value (NO heap allocation) ────
