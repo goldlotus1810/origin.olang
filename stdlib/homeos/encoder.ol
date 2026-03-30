@@ -490,6 +490,75 @@ pub fn encode_intero() {
 }
 
 // ════════════════════════════════════════════════════════════════
+// Sensory gate: decides WHEN to capture expensive sensors
+// Biology: eyes/ears always open, brain only RECORDS when noteworthy
+// ════════════════════════════════════════════════════════════════
+
+let __sense_turn = [0];        // turn counter
+let __sense_audio_last = [0];  // last audio mol (for change detection)
+let __sense_screen_last = [0]; // last screen mol
+
+// Quick audio probe: just check if there's sound (no full encode)
+fn _audio_probe() {
+    // Record 0.1s, check if file has data > silence threshold
+    __system("timeout 0.2 arecord -f S16_LE -r 8000 -c 1 -d 0 -q /tmp/nox_probe.raw 2>/dev/null");
+    let _ap_data = __file_read("/tmp/nox_probe.raw");
+    if len(_ap_data) < 50 { return 0; };
+    // Check RMS of first 50 bytes — any loud sample?
+    let _ap_max = [0];
+    let _ap_i = 0;
+    while _ap_i < 50 {
+        let _ap_v = __char_code(char_at(_ap_data, _ap_i));
+        let _ap_d = _ap_v - 128;
+        if _ap_d < 0 { let _ap_d = 0 - _ap_d; };
+        if _ap_d > __array_get(_ap_max, 0) { let _ = __set_at(_ap_max, 0, _ap_d); };
+        let _ap_i = _ap_i + 1;
+    };
+    return __array_get(_ap_max, 0);
+}
+
+// Sensory capture: called every turn, decides what to sense
+// Returns { intero, screen, audio } — each is 0 or P_weight mol
+pub fn sense_capture() {
+    let _ = __set_at(__sense_turn, 0, __array_get(__sense_turn, 0) + 1);
+    let _sc_turn = __array_get(__sense_turn, 0);
+    // Always: interoception (cheap, ~1ms)
+    let _sc_intero = encode_intero();
+    let _sc_screen = 0;
+    let _sc_audio = 0;
+    // Every 10 turns: audio probe (cheap, ~50ms)
+    if __floor(_sc_turn / 10) * 10 == _sc_turn {
+        let _sc_level = _audio_probe();
+        // Sound detected (level > 20 = above silence) → full encode
+        if _sc_level > 20 {
+            let _sc_audio = encode_audio();
+            let _ = __set_at(__sense_audio_last, 0, _sc_audio);
+        };
+    };
+    // Screen: only on command or high system stress (A >= 5 in intero)
+    // Auto-look: when interoception says stressed → something is happening
+    if _kt_mol_a(_sc_intero) >= 5 {
+        let _sc_screen = encode_screen();
+        let _ = __set_at(__sense_screen_last, 0, _sc_screen);
+    };
+    return { intero: _sc_intero, screen: _sc_screen, audio: _sc_audio };
+}
+
+// Force screen capture (called by commands like /look)
+pub fn sense_look() {
+    let _sl = encode_screen();
+    let _ = __set_at(__sense_screen_last, 0, _sl);
+    return _sl;
+}
+
+// Force audio capture (called by commands like /listen)
+pub fn sense_listen() {
+    let _sl = encode_audio();
+    let _ = __set_at(__sense_audio_last, 0, _sl);
+    return _sl;
+}
+
+// ════════════════════════════════════════════════════════════════
 // E1: Screen encoder (screenshot → SDF → P_weight)
 // grim capture → extract visual features → map to 5D
 // ════════════════════════════════════════════════════════════════
