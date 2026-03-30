@@ -346,8 +346,14 @@ pub fn repl_eval(input) {
       if _sc == "win" { return __system("ps -eo pid,comm | grep -iE 'cosmic-term|brave|cosmic-edit|cosmic-files|code|firefox|vlc' | grep -v grep"); };
       // /notify <msg>
       if len(_sc) > 7 { if __substr(_sc, 0, 7) == "notify " { let _nm = __substr(_sc, 7, len(_sc)); __system("notify-send 'Nox' '" + _nm + "'"); return "notified"; }; };
-      // /cam — camera status
-      if _sc == "cam" { emit "Probing cameras..."; let _c1 = __system("timeout 2 bash -c 'echo >/dev/tcp/192.168.1.96/554' 2>/dev/null && echo 'Cam1 (.96) ONLINE' || echo 'Cam1 (.96) offline'"); let _c2 = __system("timeout 2 bash -c 'echo >/dev/tcp/192.168.1.108/554' 2>/dev/null && echo 'Cam2 (.108) ONLINE' || echo 'Cam2 (.108) offline'"); return _c1 + _c2; };
+      // /cam — camera commands
+      if _sc == "cam" { emit "Probing cameras..."; let _c1 = __system("timeout 2 bash -c 'echo >/dev/tcp/192.168.1.96/554' 2>/dev/null && echo 'Cam1 (.96) ONLINE' || echo 'Cam1 (.96) offline'"); let _c2 = __system("timeout 2 bash -c 'echo >/dev/tcp/192.168.1.108/554' 2>/dev/null && echo 'Cam2 (.108) ONLINE' || echo 'Cam2 (.108) offline'"); return _c1 + _c2 + "Use: /cam pass <pw> | /cam see | /cam live"; };
+      // /cam pass <password> — set camera password
+      if len(_sc) > 9 { if __substr(_sc, 0, 9) == "cam pass " { let _cp = __substr(_sc, 9, len(_sc)); cam_auth(_cp); return "Camera password set. Try /cam see"; }; };
+      // /cam see — take snapshot
+      if _sc == "cam see" { emit "Capturing..."; return cam_see(); };
+      // /cam live — open live stream
+      if _sc == "cam live" { return cam_live(1); };
       // /ssh <host> <cmd>
       if len(_sc) > 4 { if __substr(_sc, 0, 4) == "ssh " { let _sa = __substr(_sc, 4, len(_sc)); emit "SSH: " + _sa; let _so = __system("ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no " + _sa + " 2>&1"); return _so; }; };
       return "Unknown: /" + _sc + ". Try /help";
