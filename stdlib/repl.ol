@@ -302,7 +302,7 @@ pub fn repl_eval(input) {
       if _sc == "status" { return repl_eval("status"); };
       if _sc == "version" { return repl_eval("version"); };
       if _sc == "see" { __system("grim /tmp/nox_screen.png"); return "Screenshot saved: /tmp/nox_screen.png"; };
-      if _sc == "evolve" { return repl_eval("evolve"); };
+      if _sc == "evolve" { nox_evolve(); return "evolution complete"; };
       if _sc == "exit" || _sc == "quit" { __throw("exit"); };
       // /think <prompt> → Claude
       if _sc == "think" { return "Usage: /think <question>"; };
