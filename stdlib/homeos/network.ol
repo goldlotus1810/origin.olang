@@ -17,7 +17,7 @@ pub fn net_local_ip() {
 
 // Get gateway IP
 pub fn net_gateway() {
-    let r = __system("ip route | awk '/default/{print $3}'");
+    let r = __system("ip route | awk '/default/{print $3}' | head -1");
     return r;
 }
 
@@ -41,10 +41,10 @@ pub fn net_public_ip() {
 
 // ═══ LAN DISCOVERY ═══
 
-// ARP table — devices already seen on LAN
+// ARP table — devices already seen on LAN (native /proc/net/arp)
 pub fn lan_neighbors() {
-    let r = __system("ip neigh show 2>/dev/null");
-    return r;
+    let raw = __file_read("/proc/net/arp");
+    return raw;
 }
 
 // Ping sweep — discover active devices on local subnet
