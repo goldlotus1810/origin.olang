@@ -132,22 +132,60 @@ pub fn notify_urgent(title, body) {
 
 // ═══ FILESYSTEM ═══
 
-// List directory contents
+// List directory contents (native — no fork, no shell)
 pub fn dir_list(path) {
-    let r = __system("ls -la " + path + " 2>&1");
-    return r;
+    let entries = __readdir(path);
+    if len(entries) == 0 { return ""; };
+    let out = "";
+    let i = 0;
+    while i < len(entries) {
+        out = out + entries[i] + "\n";
+        i = i + 1;
+    };
+    return out;
 }
 
-// List only files
+// List only files (native)
 pub fn dir_files(path) {
-    let r = __system("ls -1p " + path + " | grep -v /");
-    return r;
+    let entries = __readdir(path);
+    let out = "";
+    let i = 0;
+    while i < len(entries) {
+        let e = entries[i];
+        if len(e) > 0 {
+            // Skip . and .. and dirs (check if file exists as regular file)
+            if e != "." { if e != ".." {
+                let full = path + "/" + e;
+                let is_dir = __system("test -d '" + full + "' && echo 1 || echo 0");
+                if len(is_dir) > 0 { if __char_code(char_at(is_dir, 0)) == 48 {
+                    out = out + e + "\n";
+                }; };
+            }; };
+        };
+        i = i + 1;
+    };
+    return out;
 }
 
-// List only directories
+// List only directories (native)
 pub fn dir_dirs(path) {
-    let r = __system("ls -1p " + path + " | grep /");
-    return r;
+    let entries = __readdir(path);
+    let out = "";
+    let i = 0;
+    while i < len(entries) {
+        let e = entries[i];
+        if len(e) > 0 {
+            if e != "." { if e != ".." {
+                let full = path + "/" + e;
+                let is_dir = __system("test -d '" + full + "' && echo 1 || echo 0");
+                if len(is_dir) > 0 { if __char_code(char_at(is_dir, 0)) == 49 {
+                    out = out + e + "\n";
+                }; };
+            }; };
+        };
+        i = i + 1;
+    };
+    return out;
 }
 
 // File exists?
