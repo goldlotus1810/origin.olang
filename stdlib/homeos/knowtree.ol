@@ -99,8 +99,48 @@ pub fn chain_encode(_text) {
 
 pub fn chain_summary(_ch) { return compose(_ch); }
 
-// Real mol from text
-pub fn _kt_real_mol(_text) { return compose(chain_encode(_text)); }
+// Real mol from text — word-level compose for better differentiation
+pub fn _kt_real_mol(_text) {
+    _kt_ensure_init();
+    let _tlen = len(_text);
+    if _tlen == 0 { return 0; };
+    // Split into words, compose each, then compose words
+    let _word_mols = [];
+    let _ws = [0];
+    let _i = 0;
+    while _i <= _tlen {
+        let _is_sep = 0;
+        if _i == _tlen { let _is_sep = 1; } else {
+            let _ch = __char_code(char_at(_text, _i));
+            if _ch == 32 { let _is_sep = 1; };
+            if _ch == 10 { let _is_sep = 1; };
+        };
+        if _is_sep == 1 {
+            let _wstart = __array_get(_ws, 0);
+            if _i > _wstart {
+                // Compose this word's characters
+                let _wmol = 0;
+                let _wi = _wstart;
+                let _wchain = [];
+                while _wi < _i {
+                    let _cp = __char_code(char_at(_text, _wi));
+                    let _pw = p_weight(_cp);
+                    if _pw > 0 { push(_wchain, _pw); };
+                    let _wi = _wi + 1;
+                };
+                if len(_wchain) > 0 {
+                    let _wmol = compose(_wchain);
+                    push(_word_mols, _wmol);
+                };
+            };
+            let _ = __set_at(_ws, 0, _i + 1);
+        };
+        let _i = _i + 1;
+    };
+    if len(_word_mols) == 0 { return 0; };
+    // Compose words (Zipf: first word heaviest)
+    return compose(_word_mols);
+}
 
 // ═══ NRC-VAD: word → emotion lookup ═══
 let __nrc_vad = [];
@@ -268,12 +308,21 @@ fn _bkt_init() {
 }
 
 pub fn kt_learn(_text) {
-    _kt_ensure_init(); _bkt_init();
+    _kt_ensure_init(); _bkt_init(); _silk_init();
     let _mol = _kt_real_mol(_text);
     let _idx = len(__kt_facts);
     push(__kt_facts, _text);
     push(__kt_facts_mol, _mol);
     push(__kt_buckets[(_kt_mol_s(_mol) * 16) + _kt_mol_r(_mol)], _idx);
+    // Auto-silk: fire with last 3 facts (consecutive = co-activated context)
+    let _si = 1;
+    while _si <= 3 {
+        if _idx >= _si {
+            let _prev_mol = __array_get(__kt_facts_mol, _idx - _si);
+            if _prev_mol > 0 { kt_silk_fire(_mol, _prev_mol); };
+        };
+        let _si = _si + 1;
+    };
     // G20: Index words for O(1) lookup
     _widx_init();
     let _wi = 0; let _ws = [0];
@@ -378,6 +427,106 @@ pub fn kt_find(_q, _max) {
 
 pub fn kt_fact_count() { return len(__kt_facts); }
 pub fn kt_stats() { return "KT: " + __to_string(len(__kt_facts)) + " facts"; }
+
+// ═══ DIAGNOSTICS — see what's inside KnowTree ═══
+
+// Full map: how many nodes per (S,R) bucket
+pub fn kt_map() {
+    _bkt_init();
+    let _out = "KnowTree Map (S×R buckets with nodes):\n";
+    let _nonempty = [0];
+    let _s = 0;
+    while _s < 16 {
+        let _r = 0;
+        while _r < 16 {
+            let _n = len(__kt_buckets[(_s * 16) + _r]);
+            if _n > 0 {
+                let _out = _out + "  S=" + __to_string(_s) + " R=" + __to_string(_r) + ": " + __to_string(_n) + " nodes\n";
+                let _ = __set_at(_nonempty, 0, __array_get(_nonempty, 0) + 1);
+            };
+            let _r = _r + 1;
+        };
+        let _s = _s + 1;
+    };
+    let _out = _out + "Active buckets: " + __to_string(__array_get(_nonempty, 0)) + "/256\n";
+    let _out = _out + "Total nodes: " + __to_string(len(__kt_facts));
+    return _out;
+}
+
+// Silk stats: how many edges, average weight
+pub fn kt_silk_stats() {
+    _silk_init();
+    let _total_edges = [0];
+    let _total_weight = [0];
+    let _active_buckets = [0];
+    let _hi = 0;
+    while _hi < 256 {
+        let _edges = __kt_silk[_hi];
+        let _n = __floor(len(_edges) / 6);
+        if _n > 0 {
+            let _ = __set_at(_active_buckets, 0, __array_get(_active_buckets, 0) + 1);
+            let _ = __set_at(_total_edges, 0, __array_get(_total_edges, 0) + _n);
+            let _ei = 0;
+            while _ei < len(_edges) {
+                let _max_w = 0;
+                let _j = 1;
+                while _j <= 5 {
+                    let _w = __array_get(_edges, _ei + _j);
+                    if _w > _max_w { let _max_w = _w; };
+                    let _j = _j + 1;
+                };
+                let _ = __set_at(_total_weight, 0, __array_get(_total_weight, 0) + _max_w);
+                let _ei = _ei + 6;
+            };
+        };
+        let _hi = _hi + 1;
+    };
+    let _te = __array_get(_total_edges, 0);
+    let _avg = 0;
+    if _te > 0 { let _avg = __floor(__array_get(_total_weight, 0) / _te); };
+    return "Silk: " + __to_string(_te) + " edges, "
+         + __to_string(__array_get(_active_buckets, 0)) + " active buckets, "
+         + "avg_w=" + __to_string(_avg);
+}
+
+// Show sample facts from each bucket
+pub fn kt_sample(_max_per_bucket) {
+    _bkt_init();
+    let _out = "";
+    let _s = 0;
+    while _s < 16 {
+        let _r = 0;
+        while _r < 16 {
+            let _bkt = __kt_buckets[(_s * 16) + _r];
+            if len(_bkt) > 0 {
+                let _out = _out + "[S=" + __to_string(_s) + " R=" + __to_string(_r) + "] ";
+                let _j = 0;
+                while _j < len(_bkt) {
+                    if _j >= _max_per_bucket { break; };
+                    let _fi = __array_get(_bkt, _j);
+                    let _text = __array_get(__kt_facts, _fi);
+                    if len(_text) > 60 { let _text = substr(_text, 0, 60) + "..."; };
+                    let _out = _out + _text;
+                    if _j < len(_bkt) - 1 { if _j < _max_per_bucket - 1 { let _out = _out + " | "; }; };
+                    let _j = _j + 1;
+                };
+                let _out = _out + "\n";
+            };
+            let _r = _r + 1;
+        };
+        let _s = _s + 1;
+    };
+    return _out;
+}
+
+// Full diagnostic
+pub fn kt_diagnostic() {
+    let _out = "═══ KnowTree Diagnostic ═══\n";
+    let _out = _out + "Nodes: " + __to_string(len(__kt_facts)) + "\n";
+    let _out = _out + kt_silk_stats() + "\n";
+    let _out = _out + kt_map();
+    return _out;
+}
 pub fn kt_search(q) { return kt_nearest(_kt_real_mol(q)); }
 pub fn kt_search_n(q, n) { return kt_find(q, n); }
 pub fn kt_classify(_t) { return "unknown"; }
