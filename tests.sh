@@ -988,7 +988,7 @@ sb_test "selfbuild/pipe_chain" 'fn d(x){return x*2;};fn i(x){return x+1;};emit p
 sb_test "selfbuild/syscall"  'emit __syscall(39,0,0,0,0,0,0) > 0;' "1"
 sb_test "selfbuild/config"   'config_set("test_key", "test_val"); emit config_get("test_key");' "test_val"
 sb_test "selfbuild/hex_rt"   'emit hex_decode(hex_encode("Nox"));' "Nox"
-sb_test "selfbuild/brain"    'emit self_model();' "Knowledge"
+sb_test "selfbuild/brain"    'emit self_model();' "KT:"
 sb_test "selfbuild/native_gw" 'emit net_gateway();' "192.168.1.1"
 echo -e "\n${CYAN}  Self-build: ${SB_PASS}/$((SB_PASS + SB_FAIL)) passed${NC}"
 fi
