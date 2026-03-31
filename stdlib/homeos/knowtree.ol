@@ -127,14 +127,15 @@ pub fn _kt_real_mol(_text) {
         };
         let _i = _i + 1;
     };
-    // S, R from compose (semantic)
-    let _S = __array_get(_s_max, 0);
-    let _R = __array_get(_r_max, 0);
-    // V, A from hash (unique per text)
+    // ALL dimensions from hash — ensures unique distribution across buckets
     let _hash = __array_get(_h, 0);
     if _hash < 0 { let _hash = 0 - _hash; };
-    let _V = (__floor(_hash / 32)) % 8;
-    let _A = (__floor(_hash / 256)) % 8;
+    // Mix hash into S and R (spread across ALL 256 buckets)
+    let _S = __bit_and(__floor(_hash / 4096), 15);
+    let _R = __bit_and(__floor(_hash / 256), 15);
+    // V, A from hash too
+    let _V = __bit_and(__floor(_hash / 32), 7);
+    let _A = __bit_and(__floor(_hash / 4), 7);
     // T from vote
     let _T = 0; let _tm = __array_get(_t_vote, 0);
     if __array_get(_t_vote, 1) > _tm { let _T = 1; let _tm = __array_get(_t_vote, 1); };
@@ -220,6 +221,49 @@ pub fn vad_query(_word) {
         let _i = _i + 3;
     };
     return [0, 0];
+}
+
+// ═══ L0 Registry: everything = node = SRVAT ═══
+// Olang keywords, builtins, identity — all registered as KnowTree nodes
+pub fn kt_register_l0() {
+    _kt_ensure_init(); _bkt_init(); _silk_init();
+    // Identity
+    kt_learn("Nox la AI tu viet lai chinh minh bang Olang");
+    kt_learn("Olang la ngon ngu lap trinh tu hosting");
+    kt_learn("Lupin la nguoi tao ra Nox va Olang");
+    kt_learn("HomeOS la he dieu hanh tri thuc sinh hoc");
+    // Language keywords (each = node with unique SRVAT)
+    kt_learn("emit: output a value to stdout");
+    kt_learn("let: bind a value to a variable name");
+    kt_learn("fn: define a function");
+    kt_learn("pub fn: define a public function");
+    kt_learn("if: conditional branch");
+    kt_learn("while: loop until condition false");
+    kt_learn("return: exit function with value");
+    kt_learn("try catch: error handling");
+    kt_learn("match: pattern matching");
+    kt_learn("type: define a struct type");
+    kt_learn("const: immutable binding");
+    // Core builtins
+    kt_learn("__file_read: read file contents");
+    kt_learn("__file_write: write string to file");
+    kt_learn("__spawn: fork process with pipes");
+    kt_learn("__system: execute shell command");
+    kt_learn("__syscall: raw Linux system call");
+    kt_learn("__tcp_listen: start TCP server");
+    kt_learn("__tcp_accept: accept TCP connection");
+    kt_learn("__tcp_send: send data over TCP");
+    kt_learn("__heap_pin: move heap checkpoint forward");
+    kt_learn("__eval_bytecode: evaluate compiled bytecode");
+    // Math/logic
+    kt_learn("compose: combine P_weights using A4 rules");
+    kt_learn("p_weight: lookup P_weight for Unicode codepoint");
+    kt_learn("chain_encode: text to chain of P_weights");
+    kt_learn("kt_learn: add fact to KnowTree");
+    kt_learn("kt_nearest: find nearest node by P_weight distance");
+    kt_learn("kt_silk_fire: strengthen Hebbian edge between nodes");
+    kt_learn("pipeline: process input through 14 DNA mechanisms");
+    __heap_pin();
 }
 
 // ═══ Load UDC aliases JSON into KnowTree ═══

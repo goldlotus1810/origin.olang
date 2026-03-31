@@ -20,9 +20,10 @@ pub fn nox_brain(input) {
 pub fn nox_bootstrap() {
     let _stats = "";
 
-    // Boot facts already in binary (71 from homeos.knowledge)
+    // Register L0: identity, keywords, builtins as nodes
+    kt_register_l0();
     let _boot = kt_fact_count();
-    let _stats = _stats + "Boot:" + __to_string(_boot);
+    let _stats = _stats + "L0:" + __to_string(_boot);
 
     // Load NRC-VAD top words as KnowTree facts (simple TSV, safe)
     // Load top 200 emotion words (VM heap limit per turn ~200-500 learns)
