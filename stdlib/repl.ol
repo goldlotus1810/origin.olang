@@ -1420,7 +1420,12 @@ pub fn repl_eval(input) {
   if _g_pos_box[0] == 0 { return ""; }
 
   // Phase 5: Execute compiled bytecode
-  return __eval_bytecode(bc);
+  let _eval_result = __eval_bytecode(bc);
+  // If code produced no output AND pipeline found something → return pipeline answer
+  if len(_eval_result) == 0 {
+      if len(_pipeline_result) > 3 { return _pipeline_result; };
+  };
+  return _eval_result;
 }
 
 // ════════════════════════════════════════════════════════

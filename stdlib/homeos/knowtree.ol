@@ -231,6 +231,9 @@ pub fn kt_register_l0() {
     kt_learn("Olang la ngon ngu lap trinh tu hosting");
     kt_learn("Lupin la nguoi tao ra Nox va Olang");
     kt_learn("HomeOS la he dieu hanh tri thuc sinh hoc");
+    // Greetings (English + Vietnamese aliases)
+    kt_learn("hello is a greeting. chao = hello. xin chao = hello");
+    kt_learn("who are you? I am Nox, an AI that rewrites itself using Olang. ban la ai = who are you");
     // Language keywords (each = node with unique SRVAT)
     kt_learn("emit: output a value to stdout");
     kt_learn("let: bind a value to a variable name");

@@ -65,7 +65,7 @@ pub fn pipeline(input) {
         };
         if _is_sp == 1 {
             let _word = substr(input, __array_get(_sw, 0), _si);
-            if len(_word) >= 4 {
+            if len(_word) >= 3 {
                 let _wresults = kt_find(_word, 3);
                 let _wi = 0;
                 while _wi < len(_wresults) {
