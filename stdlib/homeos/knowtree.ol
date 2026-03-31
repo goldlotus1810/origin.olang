@@ -308,6 +308,30 @@ fn _bkt_init() {
     let _i = 0; while _i < 256 { push(__kt_buckets, []); let _i = _i + 1; };
 }
 
+let __kt_learn_count = [0];
+
+// Fast learn: skip word-level compose, use simple hash (10x faster)
+pub fn kt_learn_fast(_text) {
+    _kt_ensure_init(); _bkt_init(); _silk_init();
+    // Fast mol: hash only (no per-char P_weight lookup)
+    let _h = [2166136261];
+    let _i = 0;
+    while _i < len(_text) {
+        let _ = __set_at(_h, 0, __bit_xor(__array_get(_h, 0), __char_code(char_at(_text, _i))));
+        let _ = __set_at(_h, 0, __bit_and(__array_get(_h, 0) * 16777619, 65535));
+        let _i = _i + 1;
+    };
+    let _mol = __array_get(_h, 0);
+    let _idx = len(__kt_facts);
+    push(__kt_facts, _text);
+    push(__kt_facts_mol, _mol);
+    push(__kt_buckets[(_kt_mol_s(_mol) * 16) + _kt_mol_r(_mol)], _idx);
+    if _idx > 0 { kt_silk_fire(_mol, __array_get(__kt_facts_mol, _idx - 1)); };
+    let _ = __set_at(__kt_learn_count, 0, __array_get(__kt_learn_count, 0) + 1);
+    if (__array_get(__kt_learn_count, 0) % 20) == 0 { __heap_pin(); };
+    return _idx;
+}
+
 pub fn kt_learn(_text) {
     _kt_ensure_init(); _bkt_init(); _silk_init();
     let _mol = _kt_real_mol(_text);
@@ -315,15 +339,11 @@ pub fn kt_learn(_text) {
     push(__kt_facts, _text);
     push(__kt_facts_mol, _mol);
     push(__kt_buckets[(_kt_mol_s(_mol) * 16) + _kt_mol_r(_mol)], _idx);
-    // Auto-silk: fire with last 3 facts (consecutive = co-activated context)
-    let _si = 1;
-    while _si <= 3 {
-        if _idx >= _si {
-            let _prev_mol = __array_get(__kt_facts_mol, _idx - _si);
-            if _prev_mol > 0 { kt_silk_fire(_mol, _prev_mol); };
-        };
-        let _si = _si + 1;
-    };
+    // Auto-silk with previous
+    if _idx > 0 { kt_silk_fire(_mol, __array_get(__kt_facts_mol, _idx - 1)); };
+    // Auto-pin every 100 learns
+    let _ = __set_at(__kt_learn_count, 0, __array_get(__kt_learn_count, 0) + 1);
+    if (__array_get(__kt_learn_count, 0) % 100) == 0 { __heap_pin(); };
     // G20: Index words for O(1) lookup
     _widx_init();
     let _wi = 0; let _ws = [0];
