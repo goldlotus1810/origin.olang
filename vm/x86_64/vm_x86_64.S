@@ -12512,7 +12512,7 @@ builtin_jump_table:
     .quad   .builtin_slot_6
     .quad   .call_not_builtin
     .quad   .call_not_builtin
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_10_u16
     .quad   .builtin_slot_10
     .quad   .call_not_builtin
     .quad   .builtin_slot_12
@@ -12580,11 +12580,11 @@ builtin_jump_table:
     .quad   .builtin_slot_74
     .quad   .call_not_builtin
     .quad   .call_not_builtin
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_78_u16
     .quad   .call_not_builtin
     .quad   .builtin_slot_79
     .quad   .call_not_builtin
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_82_u16
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .call_not_builtin
@@ -12593,7 +12593,7 @@ builtin_jump_table:
     .quad   .builtin_slot_87
     .quad   .call_not_builtin
     .quad   .builtin_slot_89
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_91_u16
     .quad   .builtin_slot_91
     .quad   .call_not_builtin
     .quad   .call_not_builtin
@@ -12759,6 +12759,135 @@ builtin_jump_table:
     .quad   .builtin_slot_253
     .quad   .call_not_builtin
     .quad   .builtin_slot_255
+
+# ═══ Dual-Width u16 builtins (Phase 0.5) ═══════════════════════════════
+
+.builtin_slot_91_u16:
+    movabs  $0x169FC5E6777396DB, %rdx
+    cmp     %rdx, %rax
+    jne     .call_not_builtin
+    add     %rcx, %r13
+    movsd   (%r14), %xmm0
+    cvttsd2siq %xmm0, %rcx
+    add     $16, %r14
+    mov     %r15, %rdi
+    movw    %cx, (%r15)
+    lea     2(%r15, %rcx, 2), %r15
+    sub     $16, %r14
+    cvtsi2sdq %rdi, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+.builtin_slot_78_u16:
+    movabs  $0x5278D1C30D8892CE, %rdx
+    cmp     %rdx, %rax
+    jne     .call_not_builtin
+    add     %rcx, %r13
+    movsd   (%r14), %xmm2
+    movsd   16(%r14), %xmm1
+    movsd   32(%r14), %xmm0
+    add     $48, %r14
+    cvttsd2siq %xmm0, %rdi
+    cvttsd2siq %xmm1, %rsi
+    cvttsd2siq %xmm2, %rax
+    movw    %ax, 2(%rdi, %rsi, 2)
+    sub     $16, %r14
+    movsd   %xmm2, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+.builtin_slot_82_u16:
+    movabs  $0xBA85ADC3487F7352, %rdx
+    cmp     %rdx, %rax
+    jne     .call_not_builtin
+    add     %rcx, %r13
+    movsd   (%r14), %xmm1
+    movsd   16(%r14), %xmm0
+    add     $32, %r14
+    cvttsd2siq %xmm0, %rdi
+    cvttsd2siq %xmm1, %rsi
+    movzwl  2(%rdi, %rsi, 2), %eax
+    sub     $16, %r14
+    cvtsi2sdq %rax, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+.builtin_slot_10_u16:
+    movabs  $0x19B784DB69D2118A, %rdx
+    cmp     %rdx, %rax
+    jne     .call_not_builtin
+    add     %rcx, %r13
+    movsd   (%r14), %xmm1
+    movsd   16(%r14), %xmm0
+    add     $32, %r14
+    cvttsd2siq %xmm0, %rax
+    cvttsd2siq %xmm1, %r9              # use r9 instead of rcx
+    xor     %edx, %edx
+    mov     %eax, %esi
+    shr     $12, %esi
+    and     $0xF, %esi
+    mov     %r9d, %edi
+    shr     $12, %edi
+    and     $0xF, %edi
+    sub     %edi, %esi
+    mov     %esi, %r8d
+    sar     $31, %r8d
+    xor     %r8d, %esi
+    sub     %r8d, %esi
+    add     %esi, %edx
+    mov     %eax, %esi
+    shr     $8, %esi
+    and     $0xF, %esi
+    mov     %r9d, %edi
+    shr     $8, %edi
+    and     $0xF, %edi
+    sub     %edi, %esi
+    mov     %esi, %r8d
+    sar     $31, %r8d
+    xor     %r8d, %esi
+    sub     %r8d, %esi
+    add     %esi, %edx
+    mov     %eax, %esi
+    shr     $5, %esi
+    and     $0x7, %esi
+    mov     %r9d, %edi
+    shr     $5, %edi
+    and     $0x7, %edi
+    sub     %edi, %esi
+    mov     %esi, %r8d
+    sar     $31, %r8d
+    xor     %r8d, %esi
+    sub     %r8d, %esi
+    add     %esi, %edx
+    mov     %eax, %esi
+    shr     $2, %esi
+    and     $0x7, %esi
+    mov     %r9d, %edi
+    shr     $2, %edi
+    and     $0x7, %edi
+    sub     %edi, %esi
+    mov     %esi, %r8d
+    sar     $31, %r8d
+    xor     %r8d, %esi
+    sub     %r8d, %esi
+    add     %esi, %edx
+    mov     %eax, %esi
+    and     $0x3, %esi
+    mov     %r9d, %edi
+    and     $0x3, %edi
+    sub     %edi, %esi
+    mov     %esi, %r8d
+    sar     $31, %r8d
+    xor     %r8d, %esi
+    sub     %r8d, %esi
+    add     %esi, %edx
+    sub     $16, %r14
+    cvtsi2sdq %rdx, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
 
 # ── BSS (writable, zero-initialized) ────────────────────────────────────
 .section .bss
