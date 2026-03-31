@@ -106,21 +106,34 @@ pub fn pipeline(input) {
         let _near = kt_nearest(_mol);
         if len(_near) > 0 { push(_text_results, _near); };
     };
-    // Silk walk: follow strongest edges, using detected query dimension
+    // ═══ G12: Immune Selection — 3 branches, pick best ═══
+    // Branch 0: primary dim, from text results
+    // Branch 1: secondary dim silk walk
+    // Branch 2: dominant dim silk walk
     let _walk_dim = __array_get(_query_dim, 0);
     if _walk_dim < 0 { let _walk_dim = mol_dominant_dim(_mol); };
-    let _walk = kt_silk_walk_dim(_mol, _walk_dim, 3, 10);
-    if len(_walk) > 1 {
-        let _wi = 1;
-        while _wi < len(_walk) {
-            let _wmol = __array_get(_walk, _wi);
-            let _wdist = _kt_mol_dist(_mol, _wmol);
-            if _wdist < 8 {  // close in 5D = semantically related
-                let _wfact = kt_nearest(_wmol);
-                if len(_wfact) > 0 { push(_text_results, _wfact); };
-            };
-            let _wi = _wi + 1;
+    // Branch 1: secondary dimension
+    let _dim2 = (_walk_dim + 1) % 5;
+    let _walk1 = kt_silk_walk_dim(_mol, _walk_dim, 3, 10);
+    let _walk2 = kt_silk_walk_dim(_mol, _dim2, 2, 10);
+    // Collect silk walk results (filter by distance)
+    let _wi = 1;
+    while _wi < len(_walk1) {
+        let _wmol = __array_get(_walk1, _wi);
+        if _kt_mol_dist(_mol, _wmol) < 8 {
+            let _wf = kt_nearest(_wmol);
+            if len(_wf) > 0 { push(_text_results, _wf); };
         };
+        let _wi = _wi + 1;
+    };
+    let _wi = 1;
+    while _wi < len(_walk2) {
+        let _wmol = __array_get(_walk2, _wi);
+        if _kt_mol_dist(_mol, _wmol) < 6 {
+            let _wf = kt_nearest(_wmol);
+            if len(_wf) > 0 { push(_text_results, _wf); };
+        };
+        let _wi = _wi + 1;
     };
 
     // ═══ STEP 4: Homeostasis (D4) + WM context ═══

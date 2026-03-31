@@ -235,13 +235,31 @@ Emoji = V/A encoding tự nhiên
 
 > Data có, VM ổn, mol đúng → implement đủ G
 
-### 3.1 Working Memory 4 slots (~30 LOC)
+### 3.1 Working Memory 4 slots ✅ DONE (Session 13)
 ### 3.2 STM eviction scoring (~50 LOC)
 ### 3.3 Immune Selection 3 branches (~100 LOC)
 ### 3.4 DNA Repair bounded 3 iterations (~80 LOC)
-### 3.5 Homeostasis F(t) + λ switching (~40 LOC)
-### 3.6 ConversationCurve V'(t), V''(t) (~60 LOC)
+### 3.5 Homeostasis F(t) + λ switching ✅ DONE (basic, in pipeline)
+### 3.6 ConversationCurve V'(t), V''(t) ✅ DONE (in pipeline)
 ### 3.7 Pipeline checkpoints CP2-CP4 (~50 LOC)
+### 3.8 SecurityGate Bloom filter (~100 LOC)
+### 3.9 Query type detection + dimension routing ✅ DONE (Session 13)
+```
+"la gi"→R(definition), "o dau"→S(location), "tai sao"→R(cause), "khi nao"→T(time)
+Auto-learn: "X la Y" → kt_learn. Pattern file: json/linguistic_patterns.dat
+```
+### 3.10 Confidence calibration ✅ DONE (result-count based)
+### 3.11 Multi-fact response composition ✅ DONE (up to 3 facts, dedup)
+### 3.12 Auto-capture observations ✅ DONE (nox_observations.dat, load at boot)
+
+### NOTE: Nhận thức (Lupin insight, 2026-03-31)
+```
+Current: linguistic patterns = hardcoded if/else on keywords (bánh xe tập đi)
+Goal: P_weight tự encode syntax → silk walk tự route → Hebbian = nhận thức
+Path: patterns (now) → Hebbian accumulation (ongoing) → 42 formulas (Phase 6)
+Mỗi lần Nox thấy "la gi" + tìm definition + đúng → silk fire
+→ đủ lần → silk walk tự follow R → không cần patterns → nhận thức thật
+```
 ### 3.8 SecurityGate Bloom filter (~100 LOC)
 
 ### Phase 3 kết quả:

@@ -277,17 +277,57 @@ pub fn vad_query(_word) {
     return [0, 0];
 }
 
-// ═══ STM — moved to knowtree.ol for global scope compatibility ═══
+// ═══ G7: STM with eviction scoring (capacity 32) ═══
 let __kt_stm_text = __array_with_cap(64);
 let __kt_stm_mol = __array_with_cap(64);
+let __kt_stm_access = __array_with_cap(64);  // access count per entry
+let __kt_stm_turn = [0];  // current turn number
 
 pub fn kt_stm_push(_text) {
     let _mol = _kt_real_mol(_text);
-    push(__kt_stm_text, _text);
-    push(__kt_stm_mol, _mol);
+    let _ = __set_at(__kt_stm_turn, 0, __array_get(__kt_stm_turn, 0) + 1);
+    // G7: Evict if full (capacity=32). Remove entry with LOWEST score.
+    if len(__kt_stm_text) >= 32 {
+        let _min_score = [999999]; let _min_idx = [0];
+        let _turn = __array_get(__kt_stm_turn, 0);
+        let _i = 0;
+        while _i < len(__kt_stm_text) {
+            let _m = __array_get(__kt_stm_mol, _i);
+            let _v = mol_get_dim(_m, 2);  // V dimension
+            let _a = mol_get_dim(_m, 3);  // A dimension
+            let _ac = __array_get(__kt_stm_access, _i);
+            let _age = _turn - _i;  // older = higher age
+            // Score = access×300 + |V-4|×A×400/28 + recency×300
+            let _emo = (_kt_abs(_v - 4) * _a * 400) / 28;
+            let _rec = 0;
+            if _age < 32 { let _rec = (32 - _age) * 10; };
+            let _score = (_ac * 300) + _emo + _rec;
+            if _score < __array_get(_min_score, 0) {
+                let _ = __set_at(_min_score, 0, _score);
+                let _ = __set_at(_min_idx, 0, _i);
+            };
+            let _i = _i + 1;
+        };
+        // Overwrite lowest-score entry instead of removing (arrays can't shrink)
+        let _evict = __array_get(_min_idx, 0);
+        let _ = __set_at(__kt_stm_text, _evict, _text);
+        let _ = __set_at(__kt_stm_mol, _evict, _mol);
+        let _ = __set_at(__kt_stm_access, _evict, 1);
+    } else {
+        push(__kt_stm_text, _text);
+        push(__kt_stm_mol, _mol);
+        push(__kt_stm_access, 1);
+    };
     // Auto-silk with previous
     let _n = len(__kt_stm_mol);
     if _n >= 2 { kt_silk_fire(_mol, __array_get(__kt_stm_mol, _n - 2)); };
+}
+
+// Boost access count when STM entry is retrieved
+pub fn kt_stm_access(_i) {
+    if _i >= 0 { if _i < len(__kt_stm_access) {
+        let _ = __set_at(__kt_stm_access, _i, __array_get(__kt_stm_access, _i) + 1);
+    }; };
 }
 
 pub fn kt_stm_count() { return len(__kt_stm_text); }
