@@ -184,6 +184,26 @@ pub fn nox_metrics() {
          + " " + learning_status();
 }
 
+// ═══ MEM: silk_save — persist silk edges to file ═══
+pub fn nox_save_silk(_path) {
+    kt_silk_init();
+    let _out = "";
+    let _hi = 0;
+    while _hi < 256 {
+        let _e = __kt_silk[_hi];
+        let _ei = 0;
+        while _ei < len(_e) {
+            let _t = __to_string(__array_get(_e, _ei));
+            let _w = __to_string(__array_get(_e, _ei + 1));
+            let _out = _out + __to_string(_hi) + "\t" + _t + "\t" + _w + "\t" + __to_string(__array_get(_e, _ei + 2)) + "\t" + __to_string(__array_get(_e, _ei + 3)) + "\t" + __to_string(__array_get(_e, _ei + 4)) + "\t" + __to_string(__array_get(_e, _ei + 5)) + "\n";
+            let _ei = _ei + 6;
+        };
+        let _hi = _hi + 1;
+    };
+    __file_write(_path, _out);
+    return "saved";
+}
+
 // G25: Failure recovery
 let __fail_count = [0];
 pub fn nox_fail(_input, _reason) {
