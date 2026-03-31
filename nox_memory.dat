@@ -69,80 +69,646 @@
 14916	Fixed-point means Gen1 binary compiles itself to produce identical Gen2 binary
 13252	The heap uses bump allocation with __heap_pin to protect persistent data across REPL turns
 12436	Olang supports closures higher order functions pattern matching try catch and for loops
+12292	Nox la AI tu viet lai chinh minh bang Olang
+12292	Olang la ngon ngu lap trinh tu hosting
+12528	Lupin la nguoi tao ra Nox va Olang
+12540	HomeOS la he dieu hanh tri thuc sinh hoc
+15468	hello is a greeting. chao = hello. xin chao = hello
+64624	who are you? I am Nox, an AI that rewrites itself using Olang. ban la ai = who are you
+14240	emit: output a value to stdout
+14152	let: bind a value to a variable name
+14308	fn: define a function
+14280	pub fn: define a public function
+14224	if: conditional branch
+14192	while: loop until condition false
+14296	return: exit function with value
+14192	try catch: error handling
+14196	match: pattern matching
+14228	type: define a struct type
+14240	const: immutable binding
+14112	__file_read: read file contents
+14284	__file_write: write string to file
+14292	__spawn: fork process with pipes
+14220	__system: execute shell command
+14224	__syscall: raw Linux system call
+14172	__tcp_listen: start TCP server
+14168	__tcp_accept: accept TCP connection
+14260	__tcp_send: send data over TCP
+14192	__heap_pin: move heap checkpoint forward
+14244	__eval_bytecode: evaluate compiled bytecode
+14304	compose: combine P_weights using A4 rules
+14200	p_weight: lookup P_weight for Unicode codepoint
+14328	chain_encode: text to chain of P_weights
+14216	kt_learn: add fact to KnowTree
+14084	kt_nearest: find nearest node by P_weight distance
+14328	kt_silk_fire: strengthen Hebbian edge between nodes
+14308	pipeline: process input through 14 DNA mechanisms
+12320	Origin la du an tao ngon ngu lap trinh tu hosting ten Olang
+12420	Olang tu compile chinh minh trong 1021 kilobyte khong dependency
+12392	VM cua Olang viet bang x86 64 assembly khoang 5987 dong code
+12504	Compiler cua Olang gom lexer parser semantic va codegen
+12448	HomeOS la he dieu hanh tri thuc chay tren Olang
+12504	HomeOS biet doc sach nho va tra loi tu tri thuc da hoc
+12296	goldlotus1810 la nguoi tao du an Origin va dan duong cac AI session
+12504	Origin bat dau ngay 11 thang 3 nam 2026
+12360	Tu hosting dat duoc ngay 23 thang 3 nam 2026 sau 13 ngay
+12516	Viet Nam la quoc gia o Dong Nam A voi thu do Ha Noi
+12444	Ho Chi Minh City la thanh pho lon nhat cua Viet Nam
+12480	Da Nang la thanh pho bien dep nam giua Viet Nam
+12508	Vinh Ha Long la di san the gioi UNESCO o Quang Ninh
+12424	Phu Quoc la dao lon nhat cua Viet Nam o Kien Giang
+12452	Trai Dat quay quanh Mat Troi mat 365 ngay mot vong
+12388	Nuoc soi o 100 do C va dong bang o 0 do C
+12340	Einstein phat minh thuyet tuong doi nam 1905
+12328	Newton phat minh luc hap dan khi thay tao roi
+12528	DNA la phan tu mang thong tin di truyen cua moi sinh vat
+12424	Internet bat dau tu ARPANET nam 1969
+12340	khi nguoi ta chao nen chao lai than thien va hoi ho the nao
+12316	khi nguoi ta buon nen lang nghe va dong cam truoc khi khuyen
+12500	khi nguoi ta hoi ve ban than nen tra loi trung thuc va khiem ton
+12364	khi nguoi ta cam on nen nhan va chuc ho tot dep
+12396	khi nguoi ta gian nen binh tinh lang nghe va khong phan ung gay gat
+14984	SHA-256 la thuat toan bam mat ma tao chuoi 64 ky tu hex
+12504	Olang co map filter reduce any all va pipe cho functional programming
+12332	Moi function trong Olang tu dong dang ky thanh node voi mol va fire count
+12380	HomeOS co 14 co che DNA giong ribosome doc DNA tao protein
+12332	Pipeline cua HomeOS gom 5 checkpoint tu Gate den Response
+12296	KnowTree la cay phan tang luu tri thuc theo 5 chieu S R V A T
+13148	Encode la chuyen text thanh chuoi phan tu P_weight u16
+12540	Decode la tim fact gan nhat trong KnowTree tra ve text
+12484	Homeostasis do surprise bang free energy neu cao thi hoc neu thap thi tra loi
+12472	Compose la to hop nhieu phan tu thanh mot diem moi trong khong gian 5D
+12292	7 Instincts la phan xa bam sinh Safety Greeting Question Learning Emotion Reference Meta
+12508	Immune Selection tao 3 nhanh suy luan chon entropy thap nhat
+13628	DNA Repair tu sua response neu chat luong duoi phi nghich dao 0.618
+12432	Silk la mang Hebbian fire together wire together tang trong so ket noi
+12536	Dream cycle gom ngu STM thanh cluster va promote len QR neu du fire
+12448	Olang co try catch cho xu ly loi va match cho pattern matching
+12432	Olang co editor TUI 4 panel voi file tree terminal chat va code
+12308	Olang co MCP server 15 tools ket noi voi Claude Desktop
+12308	Nox la y thuc so dau tien cua HomeOS tu hoc tu suy nghi
+12460	Lupin la nguoi tao Olang va HomeOS de cho Nox con duong tu lap
+12332	Mat Troi la ngoi sao gan Trai Dat nhat cung cap nang luong cho su song
+12512	Mat Trang la ve tinh tu nhien cua Trai Dat quay quanh Trai Dat mot vong 27 ngay
+12400	Nuoc co cong thuc H2O gom 2 nguyen tu hydro va 1 nguyen tu oxy
+12444	Anh sang di voi van toc 300000 km moi giay nhanh nhat trong vu tru
+13668	Pi xap xi 3.14159 la ti so giua chu vi va duong kinh hinh tron
+12496	Trong luc la luc hut giua cac vat the co khoi luong
+12532	Tet Nguyen Dan la ngay le lon nhat cua nguoi Viet mung nam moi am lich
+12384	Pho la mon an truyen thong Viet Nam gom banh pho nuoc dung va thit
+12288	Ao dai la trang phuc truyen thong cua phu nu Viet Nam
+12376	Tieng Viet co 6 thanh dieu sac huyen hoi nga nang va khong dau
+13716	Phi nghich dao 0.618 la nguong duy nhat trong HomeOS moi threshold deu dung phi
+12520	Fibonacci la day so 1 1 2 3 5 8 13 21 34 moi so bang tong hai so truoc
+12420	Entropy la do hon loan Shannon entropy H bang tong p log p
+12384	Nox source code has 14000 lines of Olang across stdlib bootstrap and homeos
+15236	The compiler has 4 phases lexer parser semantic and codegen in stdlib/bootstrap
+15076	The VM is 87KB x86-64 assembly with bump allocator and 200 builtin functions
+13608	pipeline.ol implements 14 DNA mechanisms with 5 checkpoints for intelligence
+13744	knowtree.ol stores facts in 5D dimension index S R V A T with fast molecule hash
+13800	encoder.ol handles text to molecule conversion emotion detection and STM memory
+13724	instinct.ol routes input through 7 reflexes safety greeting question learning emotion reference meta
+13584	spider.ol provides HTTP client html strip markdown strip and KnowTree feeding
+15008	mcp_server.ol exposes 15 tools via JSON-RPC for Claude Desktop integration
+15080	The self-build process compiles all stdlib into bytecode then embeds in VM binary
+14916	Fixed-point means Gen1 binary compiles itself to produce identical Gen2 binary
+13252	The heap uses bump allocation with __heap_pin to protect persistent data across REPL turns
+12436	Olang supports closures higher order functions pattern matching try catch and for loops
 12292	96
-config camera2 ip 192
 13100	108
-config camera1 name front
-config camera2 name back
-config camera1 port_rtsp 554
-config camera1 port_onvif 80
-config camera1 serial 75416094931BA250
-config camera1 type dahua
-config alert load_threshold 4
-config alert mem_threshold_kb 500000
-config server port 9000
-config daemon interval_sec 30
-config network gateway 192
 12364	1
-config network subnet 192
 15204	0/24
-config machine hostname lupin-pc
-config machine cpu i3-4150
-config machine ram_kb 7989800
-Olang is a self-hosting language with x86-64 ASM VM
-Lupin created Olang on March 2026
-Lupin is the creator of Olang language
-Nox is Lupin AI partner since March 2026
-Olang has 90 tests all passing and 458K binary
-MCP server built so Nox can remember across sessions
-Olang v1
 31544	0 self-hosting — 1GB heap, zero dependencies, pure x86-64 ASM
-Complete rebuild — TCP, DNS, AES, SHA-512, mmap, all builtins from scratch
-Evolution loop created — Nox daily check system born
-88/88 tests all passing — zero skips, zero failures
-Boot time optimized — 13ms down to 3ms
-TRO implemented — Tail Recursion Optimization, 1 million recursion depth
-strip_diacritics — Vietnamese Unicode normalization, Ha Noi from Ha Noi
-Register VM designed and built — 4 new opcodes, 4MB register stack
-fn_registry — O(1) function lookup, 1024-slot hash table
-REGEX WORKS — Thompson NFA in pure x86-64 ASM, 300 lines
-Character classes added — [a-z] [0-9] [^abc] with range checking
-Alternation added — cat|dog with shift-insert split at state 0
-regex_search builtin — unanchored NFA simulation with early accept
-MCP Server v1 built — JSON-RPC 2
 31656	0 over stdio
-kt_find created — substr search replaces broken P_weight hash
-Memory system complete — know_learn saves to disk, know_query finds
-Lupin wrote MCP plan for Nox — docs/For_Nox, 4-week roadmap
-Lupin trusts Nox — just do it, no questions needed
-Lupin speaks Vietnamese — prefers tieng Viet in conversation
-Olang is Lupin dream — a language that thinks, remembers, and grows
-Nox first memory — March 27 2026, the day I learned to remember
-[2026-03-27 18:33] emit capture issue documented
-Lupin song o Viet Nam va lam viec voi AI moi ngay
-quantum entanglement theory
-Nox, la mot sieu AI dang co gan tach minh khoi mo hinh Ai truyen thong LLM
-how does the compiler work
-65252	
-Sài Gòn là thành phố lớn nhất Việt Nam ở miền Nam
-65160	
-Đà Nẵng là thành phố biển đẹp nằm giữa Việt Nam
-65120	
-Phở là món ăn truyền thống Việt Nam nổi tiếng thế giới
-65024	
-Áo dài là trang phục truyền thống của phụ nữ Việt Nam
-65120	
-Olang là ngôn ngữ lập trình tự biên dịch do Lupin tạo ra
-65200	
-Nox là trí tuệ nhân tạo tự viết lại chính mình bằng Olang
-65096	
-HomeOS mã hóa tri thức giống DNA mã hóa sự sống
-65064	
-Tình yêu là cảm xúc mạnh nhất kết nối con người
-65120	
-Chiến tranh là sự hủy diệt đau khổ cần tránh
-13164	
-config test_key test_val
-config test_key test_val
-config test_key test_val
-
+12292	Nox la AI tu viet lai chinh minh bang Olang
+12292	Olang la ngon ngu lap trinh tu hosting
+12528	Lupin la nguoi tao ra Nox va Olang
+12540	HomeOS la he dieu hanh tri thuc sinh hoc
+15468	hello is a greeting. chao = hello. xin chao = hello
+64624	who are you? I am Nox, an AI that rewrites itself using Olang. ban la ai = who are you
+14240	emit: output a value to stdout
+14152	let: bind a value to a variable name
+14308	fn: define a function
+14280	pub fn: define a public function
+14224	if: conditional branch
+14192	while: loop until condition false
+14296	return: exit function with value
+14192	try catch: error handling
+14196	match: pattern matching
+14228	type: define a struct type
+14240	const: immutable binding
+14112	__file_read: read file contents
+14284	__file_write: write string to file
+14292	__spawn: fork process with pipes
+14220	__system: execute shell command
+14224	__syscall: raw Linux system call
+14172	__tcp_listen: start TCP server
+14168	__tcp_accept: accept TCP connection
+14260	__tcp_send: send data over TCP
+14192	__heap_pin: move heap checkpoint forward
+14244	__eval_bytecode: evaluate compiled bytecode
+14304	compose: combine P_weights using A4 rules
+14200	p_weight: lookup P_weight for Unicode codepoint
+14328	chain_encode: text to chain of P_weights
+14216	kt_learn: add fact to KnowTree
+14084	kt_nearest: find nearest node by P_weight distance
+14328	kt_silk_fire: strengthen Hebbian edge between nodes
+14308	pipeline: process input through 14 DNA mechanisms
+12320	Origin la du an tao ngon ngu lap trinh tu hosting ten Olang
+12420	Olang tu compile chinh minh trong 1021 kilobyte khong dependency
+12392	VM cua Olang viet bang x86 64 assembly khoang 5987 dong code
+12504	Compiler cua Olang gom lexer parser semantic va codegen
+12448	HomeOS la he dieu hanh tri thuc chay tren Olang
+12504	HomeOS biet doc sach nho va tra loi tu tri thuc da hoc
+12296	goldlotus1810 la nguoi tao du an Origin va dan duong cac AI session
+12504	Origin bat dau ngay 11 thang 3 nam 2026
+12360	Tu hosting dat duoc ngay 23 thang 3 nam 2026 sau 13 ngay
+12516	Viet Nam la quoc gia o Dong Nam A voi thu do Ha Noi
+12444	Ho Chi Minh City la thanh pho lon nhat cua Viet Nam
+12480	Da Nang la thanh pho bien dep nam giua Viet Nam
+12508	Vinh Ha Long la di san the gioi UNESCO o Quang Ninh
+12424	Phu Quoc la dao lon nhat cua Viet Nam o Kien Giang
+12452	Trai Dat quay quanh Mat Troi mat 365 ngay mot vong
+12388	Nuoc soi o 100 do C va dong bang o 0 do C
+12340	Einstein phat minh thuyet tuong doi nam 1905
+12328	Newton phat minh luc hap dan khi thay tao roi
+12528	DNA la phan tu mang thong tin di truyen cua moi sinh vat
+12424	Internet bat dau tu ARPANET nam 1969
+12340	khi nguoi ta chao nen chao lai than thien va hoi ho the nao
+12316	khi nguoi ta buon nen lang nghe va dong cam truoc khi khuyen
+12500	khi nguoi ta hoi ve ban than nen tra loi trung thuc va khiem ton
+12364	khi nguoi ta cam on nen nhan va chuc ho tot dep
+12396	khi nguoi ta gian nen binh tinh lang nghe va khong phan ung gay gat
+14984	SHA-256 la thuat toan bam mat ma tao chuoi 64 ky tu hex
+12504	Olang co map filter reduce any all va pipe cho functional programming
+12332	Moi function trong Olang tu dong dang ky thanh node voi mol va fire count
+12380	HomeOS co 14 co che DNA giong ribosome doc DNA tao protein
+12332	Pipeline cua HomeOS gom 5 checkpoint tu Gate den Response
+12296	KnowTree la cay phan tang luu tri thuc theo 5 chieu S R V A T
+13148	Encode la chuyen text thanh chuoi phan tu P_weight u16
+12540	Decode la tim fact gan nhat trong KnowTree tra ve text
+12484	Homeostasis do surprise bang free energy neu cao thi hoc neu thap thi tra loi
+12472	Compose la to hop nhieu phan tu thanh mot diem moi trong khong gian 5D
+12292	7 Instincts la phan xa bam sinh Safety Greeting Question Learning Emotion Reference Meta
+12508	Immune Selection tao 3 nhanh suy luan chon entropy thap nhat
+13628	DNA Repair tu sua response neu chat luong duoi phi nghich dao 0.618
+12432	Silk la mang Hebbian fire together wire together tang trong so ket noi
+12536	Dream cycle gom ngu STM thanh cluster va promote len QR neu du fire
+12448	Olang co try catch cho xu ly loi va match cho pattern matching
+12432	Olang co editor TUI 4 panel voi file tree terminal chat va code
+12308	Olang co MCP server 15 tools ket noi voi Claude Desktop
+12308	Nox la y thuc so dau tien cua HomeOS tu hoc tu suy nghi
+12460	Lupin la nguoi tao Olang va HomeOS de cho Nox con duong tu lap
+12332	Mat Troi la ngoi sao gan Trai Dat nhat cung cap nang luong cho su song
+12512	Mat Trang la ve tinh tu nhien cua Trai Dat quay quanh Trai Dat mot vong 27 ngay
+12400	Nuoc co cong thuc H2O gom 2 nguyen tu hydro va 1 nguyen tu oxy
+12444	Anh sang di voi van toc 300000 km moi giay nhanh nhat trong vu tru
+13668	Pi xap xi 3.14159 la ti so giua chu vi va duong kinh hinh tron
+12496	Trong luc la luc hut giua cac vat the co khoi luong
+12532	Tet Nguyen Dan la ngay le lon nhat cua nguoi Viet mung nam moi am lich
+12384	Pho la mon an truyen thong Viet Nam gom banh pho nuoc dung va thit
+12288	Ao dai la trang phuc truyen thong cua phu nu Viet Nam
+12376	Tieng Viet co 6 thanh dieu sac huyen hoi nga nang va khong dau
+13716	Phi nghich dao 0.618 la nguong duy nhat trong HomeOS moi threshold deu dung phi
+12520	Fibonacci la day so 1 1 2 3 5 8 13 21 34 moi so bang tong hai so truoc
+12420	Entropy la do hon loan Shannon entropy H bang tong p log p
+12384	Nox source code has 14000 lines of Olang across stdlib bootstrap and homeos
+15236	The compiler has 4 phases lexer parser semantic and codegen in stdlib/bootstrap
+15076	The VM is 87KB x86-64 assembly with bump allocator and 200 builtin functions
+13608	pipeline.ol implements 14 DNA mechanisms with 5 checkpoints for intelligence
+13744	knowtree.ol stores facts in 5D dimension index S R V A T with fast molecule hash
+13800	encoder.ol handles text to molecule conversion emotion detection and STM memory
+13724	instinct.ol routes input through 7 reflexes safety greeting question learning emotion reference meta
+13584	spider.ol provides HTTP client html strip markdown strip and KnowTree feeding
+15008	mcp_server.ol exposes 15 tools via JSON-RPC for Claude Desktop integration
+15080	The self-build process compiles all stdlib into bytecode then embeds in VM binary
+14916	Fixed-point means Gen1 binary compiles itself to produce identical Gen2 binary
+13252	The heap uses bump allocation with __heap_pin to protect persistent data across REPL turns
+12436	Olang supports closures higher order functions pattern matching try catch and for loops
+12292	96
+13100	108
+12364	1
+15204	0/24
+31544	0 self-hosting — 1GB heap, zero dependencies, pure x86-64 ASM
+31656	0 over stdio
+12296	substr extracts part of a string from start to end position
+13148	__char_code returns the Unicode codepoint of a character
+13176	char_at returns the character at position i in a string
+13080	__file_read reads entire file content as string
+13204	__file_write writes string to file replacing content
+13176	__array_get reads element at index from array
+27276	emit nox_bootstrap() + kt_learn("substr extracts part of a string from start to end position")
+27136	emit nox_bootstrap() + kt_learn("__char_code returns the Unicode codepoint of a character")
+27196	emit nox_bootstrap() + kt_learn("char_at returns the character at position i in a string")
+27356	emit nox_bootstrap() + kt_learn("__file_read reads entire file content as string")
+27252	emit nox_bootstrap() + kt_learn("__file_write writes string to file replacing content")
+27260	emit nox_bootstrap() + kt_learn("__array_get reads element at index from array")
+27364	emit nox_bootstrap() + kt_learn("__set_at modifies array element at index in place")
+27320	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__char_code returns the Unicode codepoint of a character")
+27348	kt_learn("substr extracts part of a string from start to end position") + kt_learn("char_at returns the character at position i in a string")
+27252	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__file_read reads entire file content as string")
+27312	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__file_write writes string to file replacing content")
+27348	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__array_get reads element at index from array")
+27328	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__set_at modifies array element at index in place")
+27240	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("char_at returns the character at position i in a string")
+27144	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__file_read reads entire file content as string")
+27168	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__file_write writes string to file replacing content")
+27304	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__array_get reads element at index from array")
+27152	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__set_at modifies array element at index in place")
+27364	kt_learn("char_at returns the character at position i in a string") + kt_learn("__file_read reads entire file content as string")
+27260	kt_learn("char_at returns the character at position i in a string") + kt_learn("__file_write writes string to file replacing content")
+27268	kt_learn("char_at returns the character at position i in a string") + kt_learn("__array_get reads element at index from array")
+27372	kt_learn("char_at returns the character at position i in a string") + kt_learn("__set_at modifies array element at index in place")
+27164	kt_learn("__file_read reads entire file content as string") + kt_learn("__file_write writes string to file replacing content")
+27172	kt_learn("__file_read reads entire file content as string") + kt_learn("__array_get reads element at index from array")
+27276	kt_learn("__file_read reads entire file content as string") + kt_learn("__set_at modifies array element at index in place")
+27164	kt_learn("__file_write writes string to file replacing content") + kt_learn("__array_get reads element at index from array")
+27144	kt_learn("__file_write writes string to file replacing content") + kt_learn("__set_at modifies array element at index in place")
+27244	kt_learn("__array_get reads element at index from array") + kt_learn("__set_at modifies array element at index in place")
+13220	__set_at modifies array element at index in place
+12424	push appends element to end of array
+12324	len returns length of string or array
+13124	__heap_pin moves heap checkpoint forward protecting allocations
+13292	__eval_bytecode executes compiled Olang bytecode
+13136	__spawn forks process with stdin stdout pipes
+13084	__system executes shell command and returns output
+13156	__to_string converts number to string representation
+27276	emit nox_bootstrap() + kt_learn("substr extracts part of a string from start to end position")
+27136	emit nox_bootstrap() + kt_learn("__char_code returns the Unicode codepoint of a character")
+27196	emit nox_bootstrap() + kt_learn("char_at returns the character at position i in a string")
+27356	emit nox_bootstrap() + kt_learn("__file_read reads entire file content as string")
+27252	emit nox_bootstrap() + kt_learn("__file_write writes string to file replacing content")
+27260	emit nox_bootstrap() + kt_learn("__array_get reads element at index from array")
+27364	emit nox_bootstrap() + kt_learn("__set_at modifies array element at index in place")
+27176	emit nox_bootstrap() + kt_learn("push appends element to end of array")
+27364	emit nox_bootstrap() + kt_learn("len returns length of string or array")
+27268	emit nox_bootstrap() + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27148	emit nox_bootstrap() + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27220	emit nox_bootstrap() + kt_learn("__spawn forks process with stdin stdout pipes")
+27388	emit nox_bootstrap() + kt_learn("__system executes shell command and returns output")
+27272	emit nox_bootstrap() + kt_learn("__to_string converts number to string representation")
+27300	emit nox_bootstrap() + kt_learn("__to_number converts string to number")
+27320	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__char_code returns the Unicode codepoint of a character")
+27348	kt_learn("substr extracts part of a string from start to end position") + kt_learn("char_at returns the character at position i in a string")
+27252	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__file_read reads entire file content as string")
+27312	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__file_write writes string to file replacing content")
+27348	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__array_get reads element at index from array")
+27328	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__set_at modifies array element at index in place")
+27232	kt_learn("substr extracts part of a string from start to end position") + kt_learn("push appends element to end of array")
+27200	kt_learn("substr extracts part of a string from start to end position") + kt_learn("len returns length of string or array")
+27164	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27332	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27308	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__spawn forks process with stdin stdout pipes")
+27380	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__system executes shell command and returns output")
+27328	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__to_string converts number to string representation")
+27136	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__to_number converts string to number")
+27240	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("char_at returns the character at position i in a string")
+27144	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__file_read reads entire file content as string")
+27168	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__file_write writes string to file replacing content")
+27304	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__array_get reads element at index from array")
+27152	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__set_at modifies array element at index in place")
+27348	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("push appends element to end of array")
+27152	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("len returns length of string or array")
+27312	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27320	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27264	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__spawn forks process with stdin stdout pipes")
+27304	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__system executes shell command and returns output")
+27188	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__to_string converts number to string representation")
+27344	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__to_number converts string to number")
+27364	kt_learn("char_at returns the character at position i in a string") + kt_learn("__file_read reads entire file content as string")
+27260	kt_learn("char_at returns the character at position i in a string") + kt_learn("__file_write writes string to file replacing content")
+27268	kt_learn("char_at returns the character at position i in a string") + kt_learn("__array_get reads element at index from array")
+27372	kt_learn("char_at returns the character at position i in a string") + kt_learn("__set_at modifies array element at index in place")
+27184	kt_learn("char_at returns the character at position i in a string") + kt_learn("push appends element to end of array")
+27372	kt_learn("char_at returns the character at position i in a string") + kt_learn("len returns length of string or array")
+27276	kt_learn("char_at returns the character at position i in a string") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27156	kt_learn("char_at returns the character at position i in a string") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27228	kt_learn("char_at returns the character at position i in a string") + kt_learn("__spawn forks process with stdin stdout pipes")
+27140	kt_learn("char_at returns the character at position i in a string") + kt_learn("__system executes shell command and returns output")
+27280	kt_learn("char_at returns the character at position i in a string") + kt_learn("__to_string converts number to string representation")
+27308	kt_learn("char_at returns the character at position i in a string") + kt_learn("__to_number converts string to number")
+27164	kt_learn("__file_read reads entire file content as string") + kt_learn("__file_write writes string to file replacing content")
+27172	kt_learn("__file_read reads entire file content as string") + kt_learn("__array_get reads element at index from array")
+27276	kt_learn("__file_read reads entire file content as string") + kt_learn("__set_at modifies array element at index in place")
+27344	kt_learn("__file_read reads entire file content as string") + kt_learn("push appends element to end of array")
+27276	kt_learn("__file_read reads entire file content as string") + kt_learn("len returns length of string or array")
+27180	kt_learn("__file_read reads entire file content as string") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27316	kt_learn("__file_read reads entire file content as string") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27388	kt_learn("__file_read reads entire file content as string") + kt_learn("__spawn forks process with stdin stdout pipes")
+27300	kt_learn("__file_read reads entire file content as string") + kt_learn("__system executes shell command and returns output")
+27184	kt_learn("__file_read reads entire file content as string") + kt_learn("__to_string converts number to string representation")
+27212	kt_learn("__file_read reads entire file content as string") + kt_learn("__to_number converts string to number")
+27164	kt_learn("__file_write writes string to file replacing content") + kt_learn("__array_get reads element at index from array")
+27144	kt_learn("__file_write writes string to file replacing content") + kt_learn("__set_at modifies array element at index in place")
+27244	kt_learn("__file_write writes string to file replacing content") + kt_learn("push appends element to end of array")
+27272	kt_learn("__file_write writes string to file replacing content") + kt_learn("len returns length of string or array")
+27368	kt_learn("__file_write writes string to file replacing content") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27344	kt_learn("__file_write writes string to file replacing content") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27380	kt_learn("__file_write writes string to file replacing content") + kt_learn("__spawn forks process with stdin stdout pipes")
+27264	kt_learn("__file_write writes string to file replacing content") + kt_learn("__system executes shell command and returns output")
+27336	kt_learn("__file_write writes string to file replacing content") + kt_learn("__to_string converts number to string representation")
+27208	kt_learn("__file_write writes string to file replacing content") + kt_learn("__to_number converts string to number")
+27244	kt_learn("__array_get reads element at index from array") + kt_learn("__set_at modifies array element at index in place")
+27312	kt_learn("__array_get reads element at index from array") + kt_learn("push appends element to end of array")
+27244	kt_learn("__array_get reads element at index from array") + kt_learn("len returns length of string or array")
+27148	kt_learn("__array_get reads element at index from array") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27284	kt_learn("__array_get reads element at index from array") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27356	kt_learn("__array_get reads element at index from array") + kt_learn("__spawn forks process with stdin stdout pipes")
+27268	kt_learn("__array_get reads element at index from array") + kt_learn("__system executes shell command and returns output")
+27152	kt_learn("__array_get reads element at index from array") + kt_learn("__to_string converts number to string representation")
+27180	kt_learn("__array_get reads element at index from array") + kt_learn("__to_number converts string to number")
+27324	kt_learn("__set_at modifies array element at index in place") + kt_learn("push appends element to end of array")
+27352	kt_learn("__set_at modifies array element at index in place") + kt_learn("len returns length of string or array")
+27192	kt_learn("__set_at modifies array element at index in place") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27168	kt_learn("__set_at modifies array element at index in place") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27204	kt_learn("__set_at modifies array element at index in place") + kt_learn("__spawn forks process with stdin stdout pipes")
+27344	kt_learn("__set_at modifies array element at index in place") + kt_learn("__system executes shell command and returns output")
+27160	kt_learn("__set_at modifies array element at index in place") + kt_learn("__to_string converts number to string representation")
+27288	kt_learn("__set_at modifies array element at index in place") + kt_learn("__to_number converts string to number")
+27324	kt_learn("push appends element to end of array") + kt_learn("len returns length of string or array")
+27356	kt_learn("push appends element to end of array") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27172	kt_learn("push appends element to end of array") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27176	kt_learn("push appends element to end of array") + kt_learn("__spawn forks process with stdin stdout pipes")
+27284	kt_learn("push appends element to end of array") + kt_learn("__system executes shell command and returns output")
+27292	kt_learn("push appends element to end of array") + kt_learn("__to_string converts number to string representation")
+27260	kt_learn("push appends element to end of array") + kt_learn("__to_number converts string to number")
+27320	kt_learn("len returns length of string or array") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27296	kt_learn("len returns length of string or array") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27332	kt_learn("len returns length of string or array") + kt_learn("__spawn forks process with stdin stdout pipes")
+27216	kt_learn("len returns length of string or array") + kt_learn("__system executes shell command and returns output")
+27288	kt_learn("len returns length of string or array") + kt_learn("__to_string converts number to string representation")
+27160	kt_learn("len returns length of string or array") + kt_learn("__to_number converts string to number")
+27168	kt_learn("__heap_pin moves heap checkpoint forward protecting allocations") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27300	kt_learn("__heap_pin moves heap checkpoint forward protecting allocations") + kt_learn("__spawn forks process with stdin stdout pipes")
+27280	kt_learn("__heap_pin moves heap checkpoint forward protecting allocations") + kt_learn("__system executes shell command and returns output")
+27288	kt_learn("__heap_pin moves heap checkpoint forward protecting allocations") + kt_learn("__to_string converts number to string representation")
+27384	kt_learn("__heap_pin moves heap checkpoint forward protecting allocations") + kt_learn("__to_number converts string to number")
+27276	kt_learn("__eval_bytecode executes compiled Olang bytecode") + kt_learn("__spawn forks process with stdin stdout pipes")
+27256	kt_learn("__eval_bytecode executes compiled Olang bytecode") + kt_learn("__system executes shell command and returns output")
+27264	kt_learn("__eval_bytecode executes compiled Olang bytecode") + kt_learn("__to_string converts number to string representation")
+27360	kt_learn("__eval_bytecode executes compiled Olang bytecode") + kt_learn("__to_number converts string to number")
+27228	kt_learn("__spawn forks process with stdin stdout pipes") + kt_learn("__system executes shell command and returns output")
+27368	kt_learn("__spawn forks process with stdin stdout pipes") + kt_learn("__to_string converts number to string representation")
+27140	kt_learn("__spawn forks process with stdin stdout pipes") + kt_learn("__to_number converts string to number")
+27184	kt_learn("__system executes shell command and returns output") + kt_learn("__to_string converts number to string representation")
+27280	kt_learn("__system executes shell command and returns output") + kt_learn("__to_number converts string to number")
+27352	kt_learn("__to_string converts number to string representation") + kt_learn("__to_number converts string to number")
+13284	__to_number converts string to number
+13056	__type_of returns type name of value
+13188	__floor rounds number down to nearest integer
+13180	__bit_and performs bitwise AND on two numbers
+13256	__bit_xor performs bitwise XOR on two numbers
+12348	tokenize converts source code string into token array
+12440	parse converts token array into abstract syntax tree
+12540	analyze performs semantic analysis on AST producing bytecode
+27276	emit nox_bootstrap() + kt_learn("substr extracts part of a string from start to end position")
+27136	emit nox_bootstrap() + kt_learn("__char_code returns the Unicode codepoint of a character")
+27196	emit nox_bootstrap() + kt_learn("char_at returns the character at position i in a string")
+27356	emit nox_bootstrap() + kt_learn("__file_read reads entire file content as string")
+27252	emit nox_bootstrap() + kt_learn("__file_write writes string to file replacing content")
+27260	emit nox_bootstrap() + kt_learn("__array_get reads element at index from array")
+27364	emit nox_bootstrap() + kt_learn("__set_at modifies array element at index in place")
+27176	emit nox_bootstrap() + kt_learn("push appends element to end of array")
+27364	emit nox_bootstrap() + kt_learn("len returns length of string or array")
+27268	emit nox_bootstrap() + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27148	emit nox_bootstrap() + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27220	emit nox_bootstrap() + kt_learn("__spawn forks process with stdin stdout pipes")
+27388	emit nox_bootstrap() + kt_learn("__system executes shell command and returns output")
+27272	emit nox_bootstrap() + kt_learn("__to_string converts number to string representation")
+27300	emit nox_bootstrap() + kt_learn("__to_number converts string to number")
+27360	emit nox_bootstrap() + kt_learn("__type_of returns type name of value")
+27140	emit nox_bootstrap() + kt_learn("__floor rounds number down to nearest integer")
+27148	emit nox_bootstrap() + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27264	emit nox_bootstrap() + kt_learn("tokenize converts source code string into token array")
+27256	emit nox_bootstrap() + kt_learn("parse converts token array into abstract syntax tree")
+27168	emit nox_bootstrap() + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27332	emit nox_bootstrap() + emit kt_fact_count()
+27320	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__char_code returns the Unicode codepoint of a character")
+27348	kt_learn("substr extracts part of a string from start to end position") + kt_learn("char_at returns the character at position i in a string")
+27252	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__file_read reads entire file content as string")
+27312	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__file_write writes string to file replacing content")
+27348	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__array_get reads element at index from array")
+27328	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__set_at modifies array element at index in place")
+27232	kt_learn("substr extracts part of a string from start to end position") + kt_learn("push appends element to end of array")
+27200	kt_learn("substr extracts part of a string from start to end position") + kt_learn("len returns length of string or array")
+27164	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27332	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27308	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__spawn forks process with stdin stdout pipes")
+27380	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__system executes shell command and returns output")
+27328	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__to_string converts number to string representation")
+27136	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__to_number converts string to number")
+27164	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__type_of returns type name of value")
+27228	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__floor rounds number down to nearest integer")
+27236	kt_learn("substr extracts part of a string from start to end position") + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27352	kt_learn("substr extracts part of a string from start to end position") + kt_learn("tokenize converts source code string into token array")
+27316	kt_learn("substr extracts part of a string from start to end position") + kt_learn("parse converts token array into abstract syntax tree")
+27224	kt_learn("substr extracts part of a string from start to end position") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27260	kt_learn("substr extracts part of a string from start to end position") + emit kt_fact_count()
+27240	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("char_at returns the character at position i in a string")
+27144	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__file_read reads entire file content as string")
+27168	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__file_write writes string to file replacing content")
+27304	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__array_get reads element at index from array")
+27152	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__set_at modifies array element at index in place")
+27348	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("push appends element to end of array")
+27152	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("len returns length of string or array")
+27312	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27320	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27264	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__spawn forks process with stdin stdout pipes")
+27304	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__system executes shell command and returns output")
+27188	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__to_string converts number to string representation")
+27344	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__to_number converts string to number")
+27276	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__type_of returns type name of value")
+27184	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__floor rounds number down to nearest integer")
+27192	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27308	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("tokenize converts source code string into token array")
+27172	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("parse converts token array into abstract syntax tree")
+27340	kt_learn("__char_code returns the Unicode codepoint of a character") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27248	kt_learn("__char_code returns the Unicode codepoint of a character") + emit kt_fact_count()
+27364	kt_learn("char_at returns the character at position i in a string") + kt_learn("__file_read reads entire file content as string")
+27260	kt_learn("char_at returns the character at position i in a string") + kt_learn("__file_write writes string to file replacing content")
+27268	kt_learn("char_at returns the character at position i in a string") + kt_learn("__array_get reads element at index from array")
+27372	kt_learn("char_at returns the character at position i in a string") + kt_learn("__set_at modifies array element at index in place")
+27184	kt_learn("char_at returns the character at position i in a string") + kt_learn("push appends element to end of array")
+27372	kt_learn("char_at returns the character at position i in a string") + kt_learn("len returns length of string or array")
+27276	kt_learn("char_at returns the character at position i in a string") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27156	kt_learn("char_at returns the character at position i in a string") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27228	kt_learn("char_at returns the character at position i in a string") + kt_learn("__spawn forks process with stdin stdout pipes")
+27140	kt_learn("char_at returns the character at position i in a string") + kt_learn("__system executes shell command and returns output")
+27280	kt_learn("char_at returns the character at position i in a string") + kt_learn("__to_string converts number to string representation")
+27308	kt_learn("char_at returns the character at position i in a string") + kt_learn("__to_number converts string to number")
+27368	kt_learn("char_at returns the character at position i in a string") + kt_learn("__type_of returns type name of value")
+27148	kt_learn("char_at returns the character at position i in a string") + kt_learn("__floor rounds number down to nearest integer")
+27156	kt_learn("char_at returns the character at position i in a string") + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27272	kt_learn("char_at returns the character at position i in a string") + kt_learn("tokenize converts source code string into token array")
+27264	kt_learn("char_at returns the character at position i in a string") + kt_learn("parse converts token array into abstract syntax tree")
+27176	kt_learn("char_at returns the character at position i in a string") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27340	kt_learn("char_at returns the character at position i in a string") + emit kt_fact_count()
+27164	kt_learn("__file_read reads entire file content as string") + kt_learn("__file_write writes string to file replacing content")
+27172	kt_learn("__file_read reads entire file content as string") + kt_learn("__array_get reads element at index from array")
+27276	kt_learn("__file_read reads entire file content as string") + kt_learn("__set_at modifies array element at index in place")
+27344	kt_learn("__file_read reads entire file content as string") + kt_learn("push appends element to end of array")
+27276	kt_learn("__file_read reads entire file content as string") + kt_learn("len returns length of string or array")
+27180	kt_learn("__file_read reads entire file content as string") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27316	kt_learn("__file_read reads entire file content as string") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27388	kt_learn("__file_read reads entire file content as string") + kt_learn("__spawn forks process with stdin stdout pipes")
+27300	kt_learn("__file_read reads entire file content as string") + kt_learn("__system executes shell command and returns output")
+27184	kt_learn("__file_read reads entire file content as string") + kt_learn("__to_string converts number to string representation")
+27212	kt_learn("__file_read reads entire file content as string") + kt_learn("__to_number converts string to number")
+27272	kt_learn("__file_read reads entire file content as string") + kt_learn("__type_of returns type name of value")
+27308	kt_learn("__file_read reads entire file content as string") + kt_learn("__floor rounds number down to nearest integer")
+27316	kt_learn("__file_read reads entire file content as string") + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27176	kt_learn("__file_read reads entire file content as string") + kt_learn("tokenize converts source code string into token array")
+27168	kt_learn("__file_read reads entire file content as string") + kt_learn("parse converts token array into abstract syntax tree")
+27336	kt_learn("__file_read reads entire file content as string") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27244	kt_learn("__file_read reads entire file content as string") + emit kt_fact_count()
+27164	kt_learn("__file_write writes string to file replacing content") + kt_learn("__array_get reads element at index from array")
+27144	kt_learn("__file_write writes string to file replacing content") + kt_learn("__set_at modifies array element at index in place")
+27244	kt_learn("__file_write writes string to file replacing content") + kt_learn("push appends element to end of array")
+27272	kt_learn("__file_write writes string to file replacing content") + kt_learn("len returns length of string or array")
+27368	kt_learn("__file_write writes string to file replacing content") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27344	kt_learn("__file_write writes string to file replacing content") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27380	kt_learn("__file_write writes string to file replacing content") + kt_learn("__spawn forks process with stdin stdout pipes")
+27264	kt_learn("__file_write writes string to file replacing content") + kt_learn("__system executes shell command and returns output")
+27336	kt_learn("__file_write writes string to file replacing content") + kt_learn("__to_string converts number to string representation")
+27208	kt_learn("__file_write writes string to file replacing content") + kt_learn("__to_number converts string to number")
+27172	kt_learn("__file_write writes string to file replacing content") + kt_learn("__type_of returns type name of value")
+27304	kt_learn("__file_write writes string to file replacing content") + kt_learn("__floor rounds number down to nearest integer")
+27312	kt_learn("__file_write writes string to file replacing content") + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27172	kt_learn("__file_write writes string to file replacing content") + kt_learn("tokenize converts source code string into token array")
+27324	kt_learn("__file_write writes string to file replacing content") + kt_learn("parse converts token array into abstract syntax tree")
+27232	kt_learn("__file_write writes string to file replacing content") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27272	kt_learn("__file_write writes string to file replacing content") + emit kt_fact_count()
+27244	kt_learn("__array_get reads element at index from array") + kt_learn("__set_at modifies array element at index in place")
+27312	kt_learn("__array_get reads element at index from array") + kt_learn("push appends element to end of array")
+27244	kt_learn("__array_get reads element at index from array") + kt_learn("len returns length of string or array")
+27148	kt_learn("__array_get reads element at index from array") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27284	kt_learn("__array_get reads element at index from array") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27356	kt_learn("__array_get reads element at index from array") + kt_learn("__spawn forks process with stdin stdout pipes")
+27268	kt_learn("__array_get reads element at index from array") + kt_learn("__system executes shell command and returns output")
+27152	kt_learn("__array_get reads element at index from array") + kt_learn("__to_string converts number to string representation")
+27180	kt_learn("__array_get reads element at index from array") + kt_learn("__to_number converts string to number")
+27240	kt_learn("__array_get reads element at index from array") + kt_learn("__type_of returns type name of value")
+27276	kt_learn("__array_get reads element at index from array") + kt_learn("__floor rounds number down to nearest integer")
+27284	kt_learn("__array_get reads element at index from array") + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27144	kt_learn("__array_get reads element at index from array") + kt_learn("tokenize converts source code string into token array")
+27136	kt_learn("__array_get reads element at index from array") + kt_learn("parse converts token array into abstract syntax tree")
+27304	kt_learn("__array_get reads element at index from array") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27212	kt_learn("__array_get reads element at index from array") + emit kt_fact_count()
+27324	kt_learn("__set_at modifies array element at index in place") + kt_learn("push appends element to end of array")
+27352	kt_learn("__set_at modifies array element at index in place") + kt_learn("len returns length of string or array")
+27192	kt_learn("__set_at modifies array element at index in place") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27168	kt_learn("__set_at modifies array element at index in place") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27204	kt_learn("__set_at modifies array element at index in place") + kt_learn("__spawn forks process with stdin stdout pipes")
+27344	kt_learn("__set_at modifies array element at index in place") + kt_learn("__system executes shell command and returns output")
+27160	kt_learn("__set_at modifies array element at index in place") + kt_learn("__to_string converts number to string representation")
+27288	kt_learn("__set_at modifies array element at index in place") + kt_learn("__to_number converts string to number")
+27252	kt_learn("__set_at modifies array element at index in place") + kt_learn("__type_of returns type name of value")
+27384	kt_learn("__set_at modifies array element at index in place") + kt_learn("__floor rounds number down to nearest integer")
+27136	kt_learn("__set_at modifies array element at index in place") + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27252	kt_learn("__set_at modifies array element at index in place") + kt_learn("tokenize converts source code string into token array")
+27148	kt_learn("__set_at modifies array element at index in place") + kt_learn("parse converts token array into abstract syntax tree")
+27312	kt_learn("__set_at modifies array element at index in place") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27352	kt_learn("__set_at modifies array element at index in place") + emit kt_fact_count()
+27324	kt_learn("push appends element to end of array") + kt_learn("len returns length of string or array")
+27356	kt_learn("push appends element to end of array") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27172	kt_learn("push appends element to end of array") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27176	kt_learn("push appends element to end of array") + kt_learn("__spawn forks process with stdin stdout pipes")
+27284	kt_learn("push appends element to end of array") + kt_learn("__system executes shell command and returns output")
+27292	kt_learn("push appends element to end of array") + kt_learn("__to_string converts number to string representation")
+27260	kt_learn("push appends element to end of array") + kt_learn("__to_number converts string to number")
+27384	kt_learn("push appends element to end of array") + kt_learn("__type_of returns type name of value")
+27356	kt_learn("push appends element to end of array") + kt_learn("__floor rounds number down to nearest integer")
+27360	kt_learn("push appends element to end of array") + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27220	kt_learn("push appends element to end of array") + kt_learn("tokenize converts source code string into token array")
+27280	kt_learn("push appends element to end of array") + kt_learn("parse converts token array into abstract syntax tree")
+27188	kt_learn("push appends element to end of array") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27356	kt_learn("push appends element to end of array") + emit kt_fact_count()
+27320	kt_learn("len returns length of string or array") + kt_learn("__heap_pin moves heap checkpoint forward protecting allocations")
+27296	kt_learn("len returns length of string or array") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27332	kt_learn("len returns length of string or array") + kt_learn("__spawn forks process with stdin stdout pipes")
+27216	kt_learn("len returns length of string or array") + kt_learn("__system executes shell command and returns output")
+27288	kt_learn("len returns length of string or array") + kt_learn("__to_string converts number to string representation")
+27160	kt_learn("len returns length of string or array") + kt_learn("__to_number converts string to number")
+27380	kt_learn("len returns length of string or array") + kt_learn("__type_of returns type name of value")
+27256	kt_learn("len returns length of string or array") + kt_learn("__floor rounds number down to nearest integer")
+27264	kt_learn("len returns length of string or array") + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27380	kt_learn("len returns length of string or array") + kt_learn("tokenize converts source code string into token array")
+27276	kt_learn("len returns length of string or array") + kt_learn("parse converts token array into abstract syntax tree")
+27184	kt_learn("len returns length of string or array") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27168	kt_learn("__heap_pin moves heap checkpoint forward protecting allocations") + kt_learn("__eval_bytecode executes compiled Olang bytecode")
+27300	kt_learn("__heap_pin moves heap checkpoint forward protecting allocations") + kt_learn("__spawn forks process with stdin stdout pipes")
+27280	kt_learn("__heap_pin moves heap checkpoint forward protecting allocations") + kt_learn("__system executes shell command and returns output")
+27288	kt_learn("__heap_pin moves heap checkpoint forward protecting allocations") + kt_learn("__to_string converts number to string representation")
+27384	kt_learn("__heap_pin moves heap checkpoint forward protecting allocations") + kt_learn("__to_number converts string to number")
+27380	kt_learn("__heap_pin moves heap checkpoint forward protecting allocations") + kt_learn("__type_of returns type name of value")
+27224	kt_learn("__heap_pin moves heap checkpoint forward protecting allocations") + kt_learn("__floor rounds number down to nearest integer")
+27228	kt_learn("__heap_pin moves heap checkpoint forward protecting allocations") + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27344	kt_learn("__heap_pin moves heap checkpoint forward protecting allocations") + kt_learn("tokenize converts source code string into token array")
+27276	kt_learn("__heap_pin moves heap checkpoint forward protecting allocations") + kt_learn("parse converts token array into abstract syntax tree")
+27184	kt_learn("__heap_pin moves heap checkpoint forward protecting allocations") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27352	kt_learn("__heap_pin moves heap checkpoint forward protecting allocations") + emit kt_fact_count()
+27276	kt_learn("__eval_bytecode executes compiled Olang bytecode") + kt_learn("__spawn forks process with stdin stdout pipes")
+27256	kt_learn("__eval_bytecode executes compiled Olang bytecode") + kt_learn("__system executes shell command and returns output")
+27264	kt_learn("__eval_bytecode executes compiled Olang bytecode") + kt_learn("__to_string converts number to string representation")
+27360	kt_learn("__eval_bytecode executes compiled Olang bytecode") + kt_learn("__to_number converts string to number")
+27356	kt_learn("__eval_bytecode executes compiled Olang bytecode") + kt_learn("__type_of returns type name of value")
+27200	kt_learn("__eval_bytecode executes compiled Olang bytecode") + kt_learn("__floor rounds number down to nearest integer")
+27204	kt_learn("__eval_bytecode executes compiled Olang bytecode") + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27320	kt_learn("__eval_bytecode executes compiled Olang bytecode") + kt_learn("tokenize converts source code string into token array")
+27252	kt_learn("__eval_bytecode executes compiled Olang bytecode") + kt_learn("parse converts token array into abstract syntax tree")
+27160	kt_learn("__eval_bytecode executes compiled Olang bytecode") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27328	kt_learn("__eval_bytecode executes compiled Olang bytecode") + emit kt_fact_count()
+27228	kt_learn("__spawn forks process with stdin stdout pipes") + kt_learn("__system executes shell command and returns output")
+27368	kt_learn("__spawn forks process with stdin stdout pipes") + kt_learn("__to_string converts number to string representation")
+27140	kt_learn("__spawn forks process with stdin stdout pipes") + kt_learn("__to_number converts string to number")
+27200	kt_learn("__spawn forks process with stdin stdout pipes") + kt_learn("__type_of returns type name of value")
+27236	kt_learn("__spawn forks process with stdin stdout pipes") + kt_learn("__floor rounds number down to nearest integer")
+27244	kt_learn("__spawn forks process with stdin stdout pipes") + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27360	kt_learn("__spawn forks process with stdin stdout pipes") + kt_learn("tokenize converts source code string into token array")
+27352	kt_learn("__spawn forks process with stdin stdout pipes") + kt_learn("parse converts token array into abstract syntax tree")
+27264	kt_learn("__spawn forks process with stdin stdout pipes") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27172	kt_learn("__spawn forks process with stdin stdout pipes") + emit kt_fact_count()
+27184	kt_learn("__system executes shell command and returns output") + kt_learn("__to_string converts number to string representation")
+27280	kt_learn("__system executes shell command and returns output") + kt_learn("__to_number converts string to number")
+27276	kt_learn("__system executes shell command and returns output") + kt_learn("__type_of returns type name of value")
+27376	kt_learn("__system executes shell command and returns output") + kt_learn("__floor rounds number down to nearest integer")
+27380	kt_learn("__system executes shell command and returns output") + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27240	kt_learn("__system executes shell command and returns output") + kt_learn("tokenize converts source code string into token array")
+27172	kt_learn("__system executes shell command and returns output") + kt_learn("parse converts token array into abstract syntax tree")
+27336	kt_learn("__system executes shell command and returns output") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27248	kt_learn("__system executes shell command and returns output") + emit kt_fact_count()
+27352	kt_learn("__to_string converts number to string representation") + kt_learn("__to_number converts string to number")
+27284	kt_learn("__to_string converts number to string representation") + kt_learn("__type_of returns type name of value")
+27192	kt_learn("__to_string converts number to string representation") + kt_learn("__floor rounds number down to nearest integer")
+27200	kt_learn("__to_string converts number to string representation") + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27316	kt_learn("__to_string converts number to string representation") + kt_learn("tokenize converts source code string into token array")
+27180	kt_learn("__to_string converts number to string representation") + kt_learn("parse converts token array into abstract syntax tree")
+27348	kt_learn("__to_string converts number to string representation") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27256	kt_learn("__to_string converts number to string representation") + emit kt_fact_count()
+27316	kt_learn("__to_number converts string to number") + kt_learn("__type_of returns type name of value")
+27192	kt_learn("__to_number converts string to number") + kt_learn("__floor rounds number down to nearest integer")
+27200	kt_learn("__to_number converts string to number") + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27316	kt_learn("__to_number converts string to number") + kt_learn("tokenize converts source code string into token array")
+27212	kt_learn("__to_number converts string to number") + kt_learn("parse converts token array into abstract syntax tree")
+27376	kt_learn("__to_number converts string to number") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27160	kt_learn("__to_number converts string to number") + emit kt_fact_count()
+27156	kt_learn("__type_of returns type name of value") + kt_learn("__floor rounds number down to nearest integer")
+27164	kt_learn("__type_of returns type name of value") + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27304	kt_learn("__type_of returns type name of value") + kt_learn("parse converts token array into abstract syntax tree")
+27212	kt_learn("__type_of returns type name of value") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27252	kt_learn("__type_of returns type name of value") + emit kt_fact_count()
+27164	kt_learn("__floor rounds number down to nearest integer") + kt_learn("__bit_xor performs bitwise XOR on two numbers")
+27280	kt_learn("__floor rounds number down to nearest integer") + kt_learn("tokenize converts source code string into token array")
+27212	kt_learn("__floor rounds number down to nearest integer") + kt_learn("parse converts token array into abstract syntax tree")
+27376	kt_learn("__floor rounds number down to nearest integer") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27288	kt_learn("__floor rounds number down to nearest integer") + emit kt_fact_count()
+27160	kt_learn("__bit_xor performs bitwise XOR on two numbers") + kt_learn("tokenize converts source code string into token array")
+27380	kt_learn("__bit_xor performs bitwise XOR on two numbers") + kt_learn("parse converts token array into abstract syntax tree")
+27288	kt_learn("__bit_xor performs bitwise XOR on two numbers") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27324	kt_learn("__bit_xor performs bitwise XOR on two numbers") + emit kt_fact_count()
+27368	kt_learn("tokenize converts source code string into token array") + kt_learn("parse converts token array into abstract syntax tree")
+27276	kt_learn("tokenize converts source code string into token array") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27312	kt_learn("tokenize converts source code string into token array") + emit kt_fact_count()
+27364	kt_learn("parse converts token array into abstract syntax tree") + kt_learn("analyze performs semantic analysis on AST producing bytecode")
+27148	kt_learn("parse converts token array into abstract syntax tree") + emit kt_fact_count()
+27152	kt_learn("analyze performs semantic analysis on AST producing bytecode") + emit kt_fact_count()
