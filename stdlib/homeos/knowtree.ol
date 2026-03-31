@@ -172,11 +172,132 @@ pub fn kt_learn_to(_x, _b) { return kt_learn(_x); }
 pub fn kt_save(_p) { return ""; }
 pub fn kt_load(_p) { return ""; }
 pub fn kt_dim_stats() { return ""; }
-pub fn kt_silk_init() { }
-pub fn kt_silk_fire(_a, _b) { }
-pub fn kt_silk_weight(_a, _b) { return 0; }
-pub fn kt_silk_walk(_s, _d, _t) { return []; }
-pub fn kt_silk_decay() { }
+// ═══ G6: Silk — Hebbian per-dimension edges ═══
+// Edge = [target_mol, wS, wR, wV, wA, wT] = 6 values
+// Adjacency list: __kt_silk[hash(mol)] = [edge, edge, ...]
+let __kt_silk = [];
+let __kt_silk_ok = [0];
+
+fn _silk_init() {
+    if __array_get(__kt_silk_ok, 0) == 1 { return; };
+    let _ = __set_at(__kt_silk_ok, 0, 1);
+    let _i = 0; while _i < 256 { push(__kt_silk, []); let _i = _i + 1; };
+}
+
+fn _silk_hash(_mol) { return __bit_and(_mol, 255); }
+
+pub fn kt_silk_init() { _silk_init(); }
+
+// G6: Hebbian fire — strengthen edge between two mols
+pub fn kt_silk_fire(_a, _b) {
+    _silk_init();
+    let _va = _kt_mol_v(_a); let _aa = _kt_mol_a(_a);
+    let _emo = ((_kt_abs(_va - 4) * _aa) + 1) / 28;
+    if _emo > 1000 { let _emo = 1000; };
+    // Find or create edge
+    let _h = _silk_hash(_a);
+    let _edges = __kt_silk[_h];
+    let _found = [0 - 1];
+    let _ei = 0;
+    while _ei < len(_edges) {
+        if __array_get(_edges, _ei) == _b { let _ = __set_at(_found, 0, _ei); };
+        let _ei = _ei + 6;
+    };
+    let _fi = __array_get(_found, 0);
+    if _fi < 0 {
+        // New edge
+        push(_edges, _b);
+        push(_edges, _emo); push(_edges, _emo); push(_edges, _emo);
+        push(_edges, _emo); push(_edges, _emo);
+    } else {
+        // Update existing: w += emo * (1000 - w) / 10000
+        let _j = 1;
+        while _j <= 5 {
+            let _w = __array_get(_edges, _fi + _j);
+            let _dw = (_emo * (1000 - _w)) / 10000;
+            let _ = __set_at(_edges, _fi + _j, _w + _dw);
+            let _j = _j + 1;
+        };
+    };
+}
+
+// G6: Get max silk weight between two mols
+pub fn kt_silk_weight(_a, _b) {
+    _silk_init();
+    let _edges = __kt_silk[_silk_hash(_a)];
+    let _ei = 0;
+    while _ei < len(_edges) {
+        if __array_get(_edges, _ei) == _b {
+            let _max = 0; let _j = 1;
+            while _j <= 5 {
+                let _w = __array_get(_edges, _ei + _j);
+                if _w > _max { let _max = _w; };
+                let _j = _j + 1;
+            };
+            return _max;
+        };
+        let _ei = _ei + 6;
+    };
+    return 0;
+}
+
+// G6: Silk walk — follow strongest edges on dominant dimension
+pub fn kt_silk_walk(_start_mol, _depth, _threshold) {
+    _silk_init(); _bkt_init();
+    let _dim = mol_dominant_dim(_start_mol);
+    let _path = [_start_mol];
+    let _cur = _start_mol;
+    let _d = 0;
+    while _d < _depth {
+        // Find best neighbor on _dim
+        let _edges = __kt_silk[_silk_hash(_cur)];
+        let _best_mol = [0]; let _best_w = [0];
+        let _ei = 0;
+        while _ei < len(_edges) {
+            let _target = __array_get(_edges, _ei);
+            let _w = __array_get(_edges, _ei + 1 + _dim);
+            if _w > __array_get(_best_w, 0) {
+                let _ = __set_at(_best_w, 0, _w);
+                let _ = __set_at(_best_mol, 0, _target);
+            };
+            let _ei = _ei + 6;
+        };
+        // If no Hebbian edge, use implicit (nearest in KnowTree)
+        if __array_get(_best_w, 0) < _threshold {
+            let _near_text = kt_nearest(_cur);
+            if len(_near_text) > 0 {
+                let _ = __set_at(_best_mol, 0, _kt_real_mol(_near_text));
+            };
+        };
+        let _next = __array_get(_best_mol, 0);
+        if _next == 0 { return _path; };
+        if _next == _cur { return _path; };
+        push(_path, _next);
+        let _cur = _next;
+        let _d = _d + 1;
+    };
+    return _path;
+}
+
+// G6: Decay all silk edges by φ⁻¹
+pub fn kt_silk_decay() {
+    _silk_init();
+    let _hi = 0;
+    while _hi < 256 {
+        let _edges = __kt_silk[_hi];
+        let _ei = 0;
+        while _ei < len(_edges) {
+            let _j = 1;
+            while _j <= 5 {
+                let _w = __array_get(_edges, _ei + _j);
+                let _ = __set_at(_edges, _ei + _j, __floor(_w * 618 / 1000));
+                let _j = _j + 1;
+            };
+            let _ei = _ei + 6;
+        };
+        let _hi = _hi + 1;
+    };
+}
 pub fn kt_word_lookup(_w) { return []; }
 pub fn kt_get_dim(_d, _v) { return []; }
 pub fn kt_get_path(_p) { return []; }
