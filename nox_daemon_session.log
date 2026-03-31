@@ -1,0 +1,15 @@
+Continue signal written. Next task: investigate and fix the `evolve` command crash.
+Both `evolve` and `bench` work perfectly. 
+
+**Root cause:** The `evolve` command had its logic inline in the REPL dispatcher (`repl.ol`), doing heavy string concatenation with object field access (`.score`, `.pass`, `.total`) after running `bench_compile()` and `bench_growth()`. In the REPL context (stdin evaluation), this caused heap corruption and segfault because the intermediate strings from sub-compilations interfered with the string building.
+
+**Fix:** Moved the evolve logic into a proper `pub fn evolve()` function in `stdlib/homeos/benchmark.ol` (alongside `benchmark_full()`), and replaced the inline REPL code with a single `return evolve();` call. Functions compiled as part of stdlib don't have the REPL interference issue.
+
+**Results:**
+- `evolve` — works, no crash, C=100% G=100% OPTIMAL
+- `bench` — works, unchanged
+- Tests: 194/194 + 26/26 selfbuild
+- Fixed-point: Gen1 == Gen2
+
+No more work needed — daemon stays idle.
+[?1006l[?1003l[?1002l[?1000l[>4m[<u[?1004l[?2004l[?25h]9;4;0;]0;[?25h

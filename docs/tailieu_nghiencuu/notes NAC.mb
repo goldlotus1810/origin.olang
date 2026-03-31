@@ -1,0 +1,59 @@
+Bổ sung 
+1. Tóm tắt (Abstract) tổng quan chiến lược (Executive Summary) Cách hoạt động. Công thức tổng quát.
+2. Kiến trúc mô hình (Architectural Design) - Cấu trúc kỹ thuật cốt lõi (Technical Core) 
+3 Mô Hình
+3.1 Soma - Trung tâm điều khiển
+3.2 Axon - Kho lưu trữ dài hạn & Duy nhất
+3.3 Dendrites - Bộ nhớ đệm & Giao tiếp
+2.2 Kết Nối
+2.2.1 Cơ Chế (Broadcasting)
+2.2.2 Thuật toán Tìm hàng xóm gần nhất (k-Nearest Neighbors - kNN)
+2.2.3 Cấu trúc Liên kết Meta (The Meta-Cell Link)
+2.2.4 Cơ chế Suy luận Tập thể (Collective Reasoning)
+2.3 Cơ chế Thanh lọc (Pruning)
+2.3.1 Thuật toán Suy giảm theo thời gian (Decay Function)
+2.3.2 Phép toán Hiệu số Hình học (SDF Difference)
+2.3.3 Cơ chế Kiểm định Xung đột (Conflict Resolution)
+2.4 Quy trình (Offline Processing)
+2.4.1 Thuật toán Hợp nhất Bối cảnh (Contextual Consolidation)
+2.4.2 Thuật toán Tối ưu hóa Khoảng cách (Spatial Optimization)
+2.4.3 Thuật toán Khử nhiễu & Làm mượt (Denoising & Smoothing)
+2.5 Trạng thái (Simulation/Generative Dreaming)
+2.5.1 Thuật toán Xáo trộn Khái niệm (Stochastic Concept Perturbation)
+2.5.2 Chạy Giả lập (Neural Rewiring Simulation)
+2.5.3 Thuật toán Đối đầu (Adversarial Concept Testing)
+2.5.4 Củng cố Sợi trục (Axon Hardening)
+2.5.5 Thuật toán Kiểm tra Tính Nhất quán (Consistency Check)
+2.5.6 Thuật toán Giới hạn Biến dạng (SDF Deformation Limit)
+2.5.7 Thuật toán Định vị Meta (Meta-Cell Validation)
+2.6 Hồi phục Hệ thống (System Recovery)
+2.6.1 Thuật toán Điểm kiểm soát (Snapshotting)
+2.6.2 Kích hoạt Cầu chì (Triggering)
+2.6.3  Quy trình Thực thi Lệnh
+2.7 Nhật ký Lỗi (Negative Knowledge Log)
+2.7.1 Thuật toán Đánh dấu Tọa độ Cấm (Prohibited Space)
+2.7.2. Thuật toán Liên kết Meta-Cảnh báo (Blacklist Meta-links)
+2.7.3. Thuật toán Phân tích Nguyên nhân gốc (Root Cause Metadata)
+2.8 Trí tuệ Cộng đồng (Swarm Intelligence)
+2.8.1 Thuật toán Phát tán Kháng thể (Antibody Broadcasting)
+2.8.2. Cơ chế Tiếp nhận & Cập nhật Bộ lọc (Filtering Update)
+2.8.3. Thuật toán Đồng thuận mạng lưới (Network Consensus)
+2.9 Hệ thống phân tán có tính đối xứng cao - Leader/Orchestrator 
+2.9.1. Cấu trúc: Bản đồ Rủi ro (Global Risk Map)
+2.9.1  Thành phần 1: Thông tin Duy nhất (Unique Personal Data)
+2.9.2 Thành phần 2: Leader/Orchestrator (Shared Core/DNA)
+2.9.2.1 Thuật toán: Nhịp đập Hệ thống (System Heartbeat)
+2.9.2.2 Cơ chế: Phân giải Xung đột (Conflict Resolution Leader)
+2.9.2.3 Đặc điểm "Duy nhất" của Axon Leader
+2.9.3 Cơ chế vận hành - Tính bảo mật (Safety) và Tính bảo tồn (Retention) 
+2.9.3.1. Cơ chế "Bóng ma" (Shadow Concepts) trong Meta-links
+2.9.3.2. Phân tách Lỗi: Lỗi Dữ liệu vs. Lỗi Logic
+2.9.3.3. Cơ chế "Tiến hóa bù đắp" (Redundancy through Evolution)
+2.10 Tế bào Lưu trữ Dự phòng (Archive Cell)
+2.10.1  Cấu trúc Axon "Siêu khối" (Hyper-Axon)
+2.10.2 Thuật toán "Tiếng gọi cuối cùng" (The Last Gasp)
+2.10.3 Cơ chế Phục hồi: Tái sinh Khái niệm (Concept Reincarnation)
+2.10.4. Vai trò "Trọng tài Lịch sử"
+
+
+3. Bản quy chiếu thuật ngữ. (Glossary Mapping)
