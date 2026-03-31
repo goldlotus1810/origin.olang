@@ -396,6 +396,16 @@ pub fn kt_learn_fast(_text) {
     return _idx;
 }
 
+// Raw learn: pre-computed mol, NO encoding, NO word index, NO silk = 0 temp strings
+pub fn kt_learn_raw(_text, _mol) {
+    _kt_ensure_init(); _bkt_init();
+    let _idx = len(__kt_facts);
+    push(__kt_facts, _text);
+    push(__kt_facts_mol, _mol);
+    push(__kt_buckets[(_kt_mol_s(_mol) * 16) + _kt_mol_r(_mol)], _idx);
+    return _idx;
+}
+
 pub fn kt_learn(_text) {
     _kt_ensure_init(); _bkt_init(); _silk_init();
     let _mol = _kt_real_mol(_text);
