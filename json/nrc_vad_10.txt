@@ -1,0 +1,10 @@
+acrobatic	1000	1000
+activeness	1000	1000
+agilely	1000	1000
+annihilator	-1000	1000
+apoplectically	-1000	1000
+ardently	1000	1000
+armageddon	-1000	1000
+assassinated	-1000	1000
+assassinator	-1000	1000
+assaulter	-1000	1000

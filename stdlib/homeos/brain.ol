@@ -20,11 +20,14 @@ pub fn nox_brain(input) {
 pub fn nox_bootstrap() {
     let _stats = "";
 
-    // V/A already in P_weight table (baked at build time from NRC-VAD)
-    // Boot facts already in binary (71 from homeos.knowledge at compile time)
-    // This function loads ADDITIONAL facts if needed
+    // Boot facts already in binary (71 from homeos.knowledge)
     let _boot = kt_fact_count();
     let _stats = _stats + "Boot:" + __to_string(_boot);
+
+    // Load NRC-VAD top words as KnowTree facts (simple TSV, safe)
+    // Load top 200 emotion words (VM heap limit per turn ~200-500 learns)
+    let _vad_n = _load_vad_as_facts("json/nrc_vad_200.txt");
+    let _stats = _stats + " VAD:" + __to_string(_vad_n);
 
     __heap_pin();
     return _stats;
@@ -50,6 +53,44 @@ fn _load_lines(_path) {
     };
     let _last = substr(_c, __array_get(_start, 0), len(_c));
     if len(_last) > 3 { kt_learn(_last); let _ = __set_at(_count, 0, __array_get(_count, 0) + 1); };
+    __heap_pin();
+    return __array_get(_count, 0);
+}
+
+// Load NRC-VAD words as KnowTree facts
+fn _load_vad_as_facts(_path) {
+    let _c = __file_read(_path);
+    if len(_c) == 0 { return 0; };
+    let _clen = len(_c);
+    let _count = [0];
+    let _line_start = [0];
+    let _i = 0;
+    while _i < _clen {
+        let _ch = __char_code(char_at(_c, _i));
+        if _ch == 10 {
+            // Find first tab (char code 9) in this line
+            let _tab_pos = [0 - 1];
+            let _j = __array_get(_line_start, 0);
+            while _j < _i {
+                if __char_code(char_at(_c, _j)) == 9 {
+                    let _ = __set_at(_tab_pos, 0, _j);
+                    let _j = _i;
+                };
+                let _j = _j + 1;
+            };
+            let _tp = __array_get(_tab_pos, 0);
+            if _tp > __array_get(_line_start, 0) {
+                let _word = substr(_c, __array_get(_line_start, 0), _tp);
+                if len(_word) >= 2 {
+                    kt_learn(_word);
+                    let _ = __set_at(_count, 0, __array_get(_count, 0) + 1);
+                    if (__array_get(_count, 0) % 50) == 0 { __heap_pin(); };
+                };
+            };
+            let _ = __set_at(_line_start, 0, _i + 1);
+        };
+        let _i = _i + 1;
+    };
     __heap_pin();
     return __array_get(_count, 0);
 }
