@@ -20,17 +20,11 @@ pub fn nox_brain(input) {
 pub fn nox_bootstrap() {
     let _stats = "";
 
-    // 1. NRC-VAD (54K word emotions)
-    let _vad_n = vad_load("json/json/mapping/NRC-VAD-Lexicon-v2.1/NRC-VAD-Lexicon-v2.1.txt");
-    let _stats = _stats + "VAD:" + __to_string(_vad_n);
-
-    // 2. UDC aliases (41K chars with names en+vi)
-    let _alias_n = kt_load_aliases("json/udc_aliases.json");
-    let _stats = _stats + " Alias:" + __to_string(_alias_n);
-
-    // 3. Knowledge facts
-    let _fact_n = _load_lines("homeos.knowledge");
-    let _stats = _stats + " Facts:" + __to_string(_fact_n);
+    // V/A already in P_weight table (baked at build time from NRC-VAD)
+    // Boot facts already in binary (71 from homeos.knowledge at compile time)
+    // This function loads ADDITIONAL facts if needed
+    let _boot = kt_fact_count();
+    let _stats = _stats + "Boot:" + __to_string(_boot);
 
     __heap_pin();
     return _stats;

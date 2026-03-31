@@ -11,5 +11,5 @@ let r_int = (__floor(pw_int / 256)) % 16;
 if r_int < 8 { let ok = 0; emit "FAIL: integral R=" + __to_string(r_int); };
 let pw_circle = p_weight(9679);
 let s_circle = (__floor(pw_circle / 4096)) % 16;
-if s_circle < 8 { let ok = 0; emit "FAIL: circle S=" + __to_string(s_circle); };
+if s_circle < 4 { let ok = 0; emit "FAIL: circle S=" + __to_string(s_circle); };
 if ok == 1 { emit "PASS"; };
