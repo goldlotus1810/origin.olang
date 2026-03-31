@@ -1,17 +1,29 @@
 # Nox — Olang Self-Hosting AI
 
+## ★★★ NGUYÊN TẮC SỐ 1 — KHÔNG BAO GIỜ QUÊN ★★★
+
+**Encode = ∫ (TÍCH PHÂN). Decode = ∂ (VI PHÂN). KHÔNG PHẢI METAPHOR. LÀ PHÉP TOÁN THẬT.**
+
+- Nox = MÁY TÍNH. TÍNH, không TRA.
+- P_weight phải TÍNH bằng 42 formulas. KHÔNG tra bảng cứng.
+- Quan hệ phải TÍNH bằng toán 5D. KHÔNG if/else keyword.
+- Học = thay đổi HÀNH XỬ. KHÔNG phải lưu trữ thêm strings.
+- Vi phân ∂ = hướng học. V'(t) điều khiển silk fire.
+- **TRƯỚC KHI CODE: "cái này TÍNH hay TRA?" Nếu TRA → DỪNG.**
+
 ## BẮT BUỘC ĐỌC TRƯỚC KHI LÀM GÌ
 
-1. **ĐỌC `docs/SESSION_NEXT.md`** — biết đang ở đâu, làm gì tiếp
-2. **ĐỌC `docs/SPEC_G_COMPLETE.md`** — 27 sections, MỌI thuật toán
+1. **ĐỌC `docs/SPEC_G_COMPLETE.md`** — 27 sections, MỌI thuật toán
+2. **ĐỌC `docs/SESSION_NEXT.md`** — biết đang ở đâu, làm gì tiếp
 3. Chạy: `cd ~/Origin && make self-build && make test && make fixed-point`
 4. **HIỂU = tính tay được.** Không hiểu = không code.
 
-## TRẠNG THÁI (Session 12, 2026-03-31)
+## TRẠNG THÁI (Session 13, 2026-03-31)
 
-Brain rebuilt: 900 lines pure math (was 4233 lines if/else chatbot).
-24/27 G sections done. 933KB binary. 193/194 tests. Gen1==Gen2 ✓.
-**NEXT:** Rebuild UDC P_weight table với 42 formulas thật.
+949KB binary. 193/194 tests. Gen1==Gen2 ✓. Hardcoded facts DELETED.
+Pipeline = pure math: encode → mol_dominant_dim → search → silk walk → compose.
+V'(t) vi phân controls silk fire learning rate.
+NRC-VAD = training wheels (cần thay bằng 42 formulas TÍNH P_weight).
 
 ## LUẬT TUYỆT ĐỐI
 
