@@ -22,10 +22,10 @@ pub fn nox_bootstrap() {
 
     // Register L0: identity, keywords, builtins as nodes
     kt_register_l0();
+    // Load NRC-VAD emotion data (10K English words → V/A scores)
+    let _vad_n = vad_load("json/nrc_vad_top10k.txt");
     // Load saved memory from previous session
     let _mem_n = kt_load("nox_memory.dat");
-    // Data loaded via multi-turn or batch_load_raw command
-    // Use: emit _batch_load_raw("json/nrc_precomputed.dat")
     let _data_n = 0;
     let _boot = kt_fact_count();
     let _stats = _stats + "L0:" + __to_string(_boot) + " Mem:" + __to_string(_mem_n) + " Data:" + __to_string(_data_n);

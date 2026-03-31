@@ -99,23 +99,32 @@ pub fn chain_encode(_text) {
 
 pub fn chain_summary(_ch) { return compose(_ch); }
 
-// Real mol from text — SEMANTIC compose (A4 rules) + hash for uniqueness WITHIN bucket
+// Real mol from text — word-level compose with NRC-VAD for V/A
+// G3: encode(text) = split words → compose word mols → compose sentence mol
 pub fn _kt_real_mol(_text) {
     _kt_ensure_init();
+    _vad_init();
     let _tlen = len(_text);
     if _tlen == 0 { return 0; };
 
-    // Compose SRVAT: S,R,T from char P_weights. V,A from CONTENT hash.
-    // Hash ensures different text → different mol even with same char distribution.
+    // Per-char: S, R, T from char P_weights (structure)
     let _s_max = [0]; let _r_max = [0];
     let _t_vote = [0, 0, 0, 0];
+    // Per-char: hash for disambiguation
     let _hash = [5381];
+
+    // Per-word: V, A from NRC-VAD (real emotion) or hash fallback
+    let _v_sum = [0]; let _a_sum = [0]; let _vad_count = [0];
+    // Word accumulator
+    let _word_start = [0];
 
     let _i = 0;
     while _i < _tlen {
         let _cp = __char_code(char_at(_text, _i));
         let _pw = p_weight(_cp);
+        // Hash every char
         let _ = __set_at(_hash, 0, __bit_and((__array_get(_hash, 0) * 33) + _cp, 65535));
+        // S, R, T from char P_weights
         if _pw > 0 {
             let _s = (__floor(_pw / 4096)) % 16;
             let _r = (__floor(_pw / 256)) % 16;
@@ -124,16 +133,53 @@ pub fn _kt_real_mol(_text) {
             if _r > __array_get(_r_max, 0) { let _ = __set_at(_r_max, 0, _r); };
             let _ = __set_at(_t_vote, _t, __array_get(_t_vote, _t) + 1);
         };
+        // Word boundary: space or end of text
+        let _is_boundary = 0;
+        if _cp == 32 { let _is_boundary = 1; };
+        if _cp == 10 { let _is_boundary = 1; };
+        if _i == (_tlen - 1) { let _is_boundary = 1; };
+        if _is_boundary == 1 {
+            let _ws = __array_get(_word_start, 0);
+            let _we = _i;
+            if _i == (_tlen - 1) { let _we = _tlen; };
+            if _we > _ws {
+                let _word = substr(_text, _ws, _we);
+                // NRC-VAD lookup for this word
+                let _va = vad_query(_word);
+                if __array_get(_va, 0) > 0 {
+                    // Has NRC-VAD data: V/A are real emotion values
+                    let _ = __set_at(_v_sum, 0, __array_get(_v_sum, 0) + __array_get(_va, 0));
+                    let _ = __set_at(_a_sum, 0, __array_get(_a_sum, 0) + __array_get(_va, 1));
+                    let _ = __set_at(_vad_count, 0, __array_get(_vad_count, 0) + 1);
+                };
+            };
+            let _ = __set_at(_word_start, 0, _i + 1);
+        };
         let _i = _i + 1;
     };
 
-    // S, R from char compose (structure: math symbols, arrows → high S/R)
+    // S, R from char compose
     let _S = __array_get(_s_max, 0);
     let _R = __array_get(_r_max, 0);
-    // V, A from hash (differentiation: different text → different V,A bucket)
+    // V, A: NRC-VAD average if available, hash fallback if not
     let _h = __array_get(_hash, 0);
-    let _V = (__floor(_h / 32)) % 8;
-    let _A = (__floor(_h / 4)) % 8;
+    let _vc = __array_get(_vad_count, 0);
+    let _V = 4; let _A = 4;  // neutral default
+    if _vc > 0 {
+        // NRC-VAD: raw values 0-1000 (0=min, 500=neutral, 1000=max) → V 0-7, A 0-7
+        let _v_avg = __array_get(_v_sum, 0) / _vc;
+        let _a_avg = __array_get(_a_sum, 0) / _vc;
+        let _V = __floor(_v_avg / 143);  // 1000/7 ≈ 143
+        if _V > 7 { let _V = 7; };
+        let _A = __floor(_a_avg / 143);
+        if _A > 7 { let _A = 7; };
+    } else {
+        // No NRC-VAD: use hash for differentiation
+        let _V = (__floor(_h / 32)) % 8;
+        let _A = (__floor(_h / 4)) % 8;
+    };
+    // R: use hash bits for differentiation when R=0 (plain text)
+    if _R == 0 { let _R = (__floor(_h / 256)) % 16; };
     // T from vote
     let _T = 0; let _tm = __array_get(_t_vote, 0);
     if __array_get(_t_vote, 1) > _tm { let _T = 1; let _tm = __array_get(_t_vote, 1); };
@@ -163,43 +209,52 @@ fn _vad_hash(_w) {
     return __array_get(_h, 0);
 }
 
-// Load NRC-VAD from tab-separated file
+// Find tab (code 9) position in string, scanning char by char
+fn _find_tab(_s, _from) {
+    let _i = _from;
+    while _i < len(_s) {
+        if __char_code(char_at(_s, _i)) == 9 { return _i; };
+        let _i = _i + 1;
+    };
+    return 0 - 1;
+}
+
+// Load NRC-VAD from tab-separated file: word\tV\tA[\tD]
 pub fn vad_load(_path) {
     _vad_init();
     let _c = __file_read(_path);
     if len(_c) == 0 { return 0; };
     let _count = [0];
-    let _start = [0];
-    let _line_start = 1;  // skip header
+    let _ls = [0];  // line start
     let _i = 0;
     while _i < len(_c) {
         if __char_code(char_at(_c, _i)) == 10 {
-            if _line_start == 0 {
-                let _line = substr(_c, __array_get(_start, 0), _i);
-                // Parse: word\tvalence\tarousal\tdominance
-                let _tab1 = __str_index_of(_line, "	");
-                if _tab1 > 0 {
-                    let _word = substr(_line, 0, _tab1);
-                    let _rest = substr(_line, _tab1 + 1, len(_line));
-                    let _tab2 = __str_index_of(_rest, "	");
-                    if _tab2 > 0 {
-                        let _vs = substr(_rest, 0, _tab2);
-                        let _rest2 = substr(_rest, _tab2 + 1, len(_rest));
-                        let _tab3 = __str_index_of(_rest2, "	");
-                        let _as = _rest2;
-                        if _tab3 > 0 { let _as = substr(_rest2, 0, _tab3); };
+            let _le = _i;  // line end
+            let _lstart = __array_get(_ls, 0);
+            if _le > _lstart {
+                // Find tabs by scanning chars (avoid __str_index_of bug)
+                let _t1 = _find_tab(_c, _lstart);
+                if _t1 > _lstart {
+                    let _t2 = _find_tab(_c, _t1 + 1);
+                    if _t2 > _t1 {
+                        let _word = substr(_c, _lstart, _t1);
+                        let _vs = substr(_c, _t1 + 1, _t2);
+                        // A: either next field or to end of line
+                        let _t3 = _find_tab(_c, _t2 + 1);
+                        let _ae = _le;
+                        if _t3 > _t2 { let _ae = _t3; };
+                        let _as = substr(_c, _t2 + 1, _ae);
                         let _v = __to_number(_vs);
                         let _a = __to_number(_as);
                         let _h = _vad_hash(_word);
                         push(__nrc_vad[_h], _word);
-                        push(__nrc_vad[_h], __floor(_v * 1000));
-                        push(__nrc_vad[_h], __floor(_a * 1000));
+                        push(__nrc_vad[_h], __floor(_v));
+                        push(__nrc_vad[_h], __floor(_a));
                         let _ = __set_at(_count, 0, __array_get(_count, 0) + 1);
                     };
                 };
             };
-            let _line_start = 0;
-            let _ = __set_at(_start, 0, _i + 1);
+            let _ = __set_at(_ls, 0, _i + 1);
         };
         let _i = _i + 1;
     };
@@ -444,16 +499,13 @@ pub fn kt_learn(_text) {
     _kt_ensure_init(); _bkt_init(); _silk_init();
     let _mol = _kt_real_mol(_text);
     let _idx = len(__kt_facts);
+    // Pin BEFORE pushes to prevent temp data from mol computation being permanently pinned
+    __heap_pin();
     push(__kt_facts, _text);
     push(__kt_facts_mol, _mol);
     push(__kt_buckets[(_kt_mol_s(_mol) * 16) + _kt_mol_r(_mol)], _idx);
     // Auto-silk with previous
     if _idx > 0 { kt_silk_fire(_mol, __array_get(__kt_facts_mol, _idx - 1)); };
-    // Pin BEFORE array relocation (capacity = 512)
-    // Boot has 71 facts. Pin at 400 to prevent relocation crash.
-    let _ = __set_at(__kt_learn_count, 0, __array_get(__kt_learn_count, 0) + 1);
-    let _lc = __array_get(__kt_learn_count, 0);
-    if (_lc % 50) == 0 { __heap_pin(); };
     // G20: Index words for O(1) lookup
     _widx_init();
     let _wi = 0; let _ws = [0];
