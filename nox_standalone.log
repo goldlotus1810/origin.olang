@@ -1,2 +1,3 @@
  alive cycle=300 load=0.959999 mem=0MB
  BRAIN: 
+ alive cycle=600 load=1.66 mem=0MB

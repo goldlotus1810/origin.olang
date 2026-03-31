@@ -1,37 +1,32 @@
-# Session Tiep Theo
+# Session 13 — Fix 4 Blockers
 
-## TRẠNG THÁI: G1-G27 brain DONE. UDC table cần rebuild.
+## TRẠNG THÁI
+- Brain: 900 lines, 24/27 G sections, Gen1==Gen2 ✓
+- DNA: 161K P_weights, 41K aliases, 54K NRC-VAD, 13MB knowledge
+- KnowTree: 271 nodes (71 boot + 200 VAD words)
+- Diagnostics: kt_diagnostic(), kt_map(), kt_silk_stats()
+- Tests: 193/194 ALL PASS
 
-### Session 12 đã xong:
-- Đọc + hiểu sâu toàn bộ A-F + UDC docs
-- Viết SPEC_G_COMPLETE.md (27 sections)
-- XÓA 4233 dòng brain code cũ → viết lại 900 dòng từ G
-- Gen1 works, Gen1==Gen2, 193/194 tests ALL PASS
-- G sections: 24/27 implemented (G15=hardware, G21/G23=docs)
+## FIX THESE (in order):
 
-### BƯỚC TIẾP THEO: Rebuild UDC P_weight Table
+### BLOCKER #1: Mol Collision (CRITICAL)
+ALL text → same P_weight. "Ha Noi" = "Olang" = mol 4240.
+**Fix:** hybrid mol = compose(S,R,T) + hash(text) for uniqueness
+**Verify:** `_kt_real_mol("Ha Noi") != _kt_real_mol("Olang")`
 
-**Vấn đề:** udc_p_table.bin hiện tại dùng hardcoded defaults.
-Thiếu: SDF formulas (S), Spline (T), Physics (V/A), Category theory (R).
-42 sub-classifiers từ A3 chưa implement.
+### BLOCKER #2+#4: Silk + Search (auto-fix from #1)
+Only 6 silk edges. Same search result for all queries.
+Fix #1 → different mols → different buckets → silk works → search works.
 
-**Giải pháp:** Rebuild tools/build_full_udc.py với 42 formulas thật:
-1. S: SDF type classify (18 primitives) từ UDC_S*_tree.md
-2. R: Operator/relation classify từ UDC_R_RELATION_tree.md
-3. V: NRC-VAD lexicon + emoji subgroup từ UDC_V_VALENCE_tree.md
-4. A: Damped oscillator model từ UDC_A_AROUSAL_tree.md
-5. T: Temporal classify từ UDC_T_TIME_tree.md
+### BLOCKER #3: VM Heap
+Crash after ~200 learns. Need multi-turn loading or VM fix.
 
-DNA đúng → mọi thứ downstream (silk, dream, instincts) đúng theo.
+## ĐỌC TRƯỚC:
+1. `docs/SPEC_G_COMPLETE.md` — G2 (compose), G5 (nearest)
+2. `CLAUDE.md` — rules
+3. Run: `printf 'emit kt_diagnostic()\n' | timeout 5 ./origin_gen1.olang`
 
-### ĐỌC TRƯỚC KHI LÀM GÌ:
-1. **SPEC_G_COMPLETE.md** — THE implementation guide
-2. **UDC_formulas.md** — 42 formula structure
-3. **UDC_*_tree.md** — per-dimension formulas
-4. **CLAUDE.md** — build rules
-
-### Build:
+## Build:
 ```bash
-cd ~/Origin && make vm && make self-build && make test && make fixed-point
-# Or: origin_bootstrap.olang --build
+cd ~/Origin && make self-build && make test
 ```
