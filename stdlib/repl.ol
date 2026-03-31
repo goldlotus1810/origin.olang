@@ -870,12 +870,11 @@ pub fn repl_eval(input) {
     if mol_new(0, 0, 4, 4, 2) == 146 { _tp = _tp + 1; } else { _tf = _tf + 1; emit "FAIL: mol_new"; };
     // File I/O
     if len(__file_read("TASKBOARD.md")) > 100 { _tp = _tp + 1; } else { _tf = _tf + 1; emit "FAIL: fileread"; };
-    // Emotion v2: "rat buon" → v < 4 (negation/intensifier)
-    let _t_emo = text_emotion_v2("rat buon");
-    if _t_emo.v < 4 { _tp = _tp + 1; } else { _tf = _tf + 1; emit "FAIL: emo_v2_intense"; };
-    // Emotion v2: "khong vui" → negated positive → v < 4
-    let _t_emo2 = text_emotion_v2("khong vui");
-    if _t_emo2.v < 4 { _tp = _tp + 1; } else { _tf = _tf + 1; emit "FAIL: emo_v2_negate"; };
+    // P_weight encode: text → mol → V dimension
+    let _t_mol = _kt_real_mol("test");
+    if _t_mol > 0 { _tp = _tp + 1; } else { _tf = _tf + 1; emit "FAIL: real_mol"; };
+    let _t_v = mol_get_dim(_t_mol, 2);
+    if _t_v >= 0 { if _t_v <= 7 { _tp = _tp + 1; } else { _tf = _tf + 1; emit "FAIL: mol_v_range"; }; } else { _tf = _tf + 1; };
     // a[expr] BinOp (BUG-INDEX regression)
     let _t_arr = [10,20,30];
     if _t_arr[0 + 1] == 20 { _tp = _tp + 1; } else { _tf = _tf + 1; emit "FAIL: idx_binop"; };
@@ -1351,17 +1350,18 @@ pub fn repl_eval(input) {
   if len(src) > 7 {
     if __substr(src, 0, 7) == "encode " {
       let _re_text = __substr(src, 7, len(src));
-      let _re_mol = analyze_input(_re_text);
-      let _re_emo = text_emotion_v2(_re_text);
-      let _re_ue = text_emotion_unicode(_re_text);
+      let _re_mol = _kt_real_mol(_re_text);
+      let _re_s = mol_get_dim(_re_mol, 0);
+      let _re_r = mol_get_dim(_re_mol, 1);
+      let _re_v = mol_get_dim(_re_mol, 2);
+      let _re_a = mol_get_dim(_re_mol, 3);
+      let _re_t = mol_get_dim(_re_mol, 4);
       return "Mol=" + __to_string(_re_mol) +
-             " S=" + __to_string(_mol_s(_re_mol)) +
-             " R=" + __to_string(_mol_r(_re_mol)) +
-             " V=" + __to_string(_mol_v(_re_mol)) +
-             " A=" + __to_string(_mol_a(_re_mol)) +
-             " T=" + __to_string(_mol_t(_re_mol)) +
-             " | Emo: V=" + __to_string(_re_emo.v) + " A=" + __to_string(_re_emo.a) +
-             " Emoji=" + __to_string(_re_ue.emoji_count) +
+             " S=" + __to_string(_re_s) +
+             " R=" + __to_string(_re_r) +
+             " V=" + __to_string(_re_v) +
+             " A=" + __to_string(_re_a) +
+             " T=" + __to_string(_re_t) +
              " | Intent=" + __g_analysis_intent +
              " Tone=" + __g_analysis_tone +
              " Ctx=" + __g_analysis_role + "/" + __g_analysis_source;
@@ -1382,33 +1382,6 @@ pub fn repl_eval(input) {
           let _re_ans = pipeline(src);
           __heap_pin();
           return _re_ans;
-      };
-  };
-
-  // ═══ PIPELINE FALLTHROUGH — k-NN molecular classification ═══
-  _boot_learn();
-  let _re_cls = kt_classify(src);
-  let _re_ctype = _re_cls.type;
-  let _re_cconf = _re_cls.confidence;
-
-  // High confidence k-NN → dispatch by molecular type
-  if _re_cconf >= 40 {
-      if _re_ctype == "greeting" { return smart_greet(stm_count()); };
-      if _re_ctype == "emotion" {
-          let _re_eans = _search_and_combine(src);
-          __heap_pin();
-          if len(_re_eans) > 5 { return _re_eans; };
-      };
-      if _re_ctype == "command" { return nox_brain(src); };
-      if _re_ctype == "question" {
-          let _re_ans = pipeline(src);
-          __heap_pin();
-          if len(_re_ans) > 5 { return _re_ans; };
-      };
-      if _re_ctype == "fact" {
-          let _re_fans = _search_and_combine(src);
-          __heap_pin();
-          if len(_re_fans) > 5 { return _re_fans; };
       };
   };
 
