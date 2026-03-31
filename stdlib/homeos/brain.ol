@@ -27,11 +27,16 @@ pub fn nox_bootstrap() {
     // Saved knowledge from previous sessions
     let _mem_n = kt_load("nox_memory.dat");
     __heap_pin();
-    // Multilingual sentiment (12 languages, V from labels — data file, not hardcode)
+    // Multilingual sentiment
     let _sent_n = kt_load("json/sentiment_precomputed.dat");
     __heap_pin();
+    // MEM: load persisted silk + STM
+    let _silk_n = silk_ld("nox_silk.dat");
+    __heap_pin();
+    let _stm_n = stm_ld("nox_stm.dat");
+    __heap_pin();
     let _boot = kt_fact_count();
-    let _stats = "L0:" + __to_string(_boot) + " VAD:" + __to_string(_vad_n) + " Mem:" + __to_string(_mem_n) + " Sent:" + __to_string(_sent_n);
+    let _stats = "L0:" + __to_string(_boot) + " Silk:" + __to_string(_silk_n) + " STM:" + __to_string(_stm_n);
 
     // Fire semantic silk: facts in same bucket are RELATED → connect them
     _bkt_init();
@@ -184,25 +189,7 @@ pub fn nox_metrics() {
          + " " + learning_status();
 }
 
-// ═══ MEM: silk_save — persist silk edges to file ═══
-pub fn nox_save_silk(_path) {
-    kt_silk_init();
-    let _out = "";
-    let _hi = 0;
-    while _hi < 256 {
-        let _e = __kt_silk[_hi];
-        let _ei = 0;
-        while _ei < len(_e) {
-            let _t = __to_string(__array_get(_e, _ei));
-            let _w = __to_string(__array_get(_e, _ei + 1));
-            let _out = _out + __to_string(_hi) + "\t" + _t + "\t" + _w + "\t" + __to_string(__array_get(_e, _ei + 2)) + "\t" + __to_string(__array_get(_e, _ei + 3)) + "\t" + __to_string(__array_get(_e, _ei + 4)) + "\t" + __to_string(__array_get(_e, _ei + 5)) + "\n";
-            let _ei = _ei + 6;
-        };
-        let _hi = _hi + 1;
-    };
-    __file_write(_path, _out);
-    return "saved";
-}
+// MEM: silk/stm save/load now in persist.ol. nox_save() saves all.
 
 // G25: Failure recovery
 let __fail_count = [0];

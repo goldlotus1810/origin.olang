@@ -93,7 +93,7 @@ fn build_wasm(config, bytecode) {
 };
 
 fn compile_all(_ca_stdlib_path) {
-  let _ca_all_bc = [];
+  let _ca_all_bc = __array_with_cap(65536);
 
   // Compile bootstrap files explicitly (compile_dir corrupts dir path after 1st file)
   emit "  Compiling: bootstrap";

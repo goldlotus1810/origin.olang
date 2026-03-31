@@ -115,8 +115,9 @@ pub fn pipeline(input) {
         let _ri = _ri + 1;
     };
 
-    // STEP 10: Dream (periodic consolidation)
+    // STEP 10: Dream + auto-save every 20 turns
     if (__array_get(__v_idx, 0) % 8) == 0 { dream(); };
+    if (__array_get(__v_idx, 0) % 20) == 0 { nox_save(); };
 
     // STEP 13: STM push
     kt_stm_push(input);
