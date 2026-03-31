@@ -82,7 +82,7 @@ pub fn compose(_mols) {
 // G3: P_weight lookup
 pub fn p_weight(_cp) {
     _kt_ensure_init();
-    if _cp < 0 { return 0; }; if _cp >= 157386 { return 0; };
+    if _cp < 0 { return 0; }; if _cp >= 196608 { return 0; };
     return __floor(__bytes_get(__kt_tbl, _cp * 2) + (__bytes_get(__kt_tbl, _cp * 2 + 1) * 256));
 }
 
