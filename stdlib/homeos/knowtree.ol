@@ -239,6 +239,40 @@ pub fn kt_stm_count() { return len(__kt_stm_text); }
 pub fn kt_stm_mol_at(_i) { return __array_get(__kt_stm_mol, _i); }
 pub fn kt_stm_text_at(_i) { return __array_get(__kt_stm_text, _i); }
 
+// ═══ String split: global buffer in knowtree scope (works across boot↔eval) ═══
+let __kt_words = __array_with_cap(64);
+
+pub fn kt_split_words(_text) {
+    // Clear: set len to 0 by recreating (push appends, can't shrink)
+    // Workaround: use count tracker
+    let _ws = [0];
+    let _wc = [0];
+    let _i = 0;
+    while _i <= len(_text) {
+        let _is_sp = 0;
+        if _i == len(_text) { let _is_sp = 1; } else {
+            let _ch = __char_code(char_at(_text, _i));
+            if _ch == 32 { let _is_sp = 1; };
+            if _ch == 63 { let _is_sp = 1; };
+        };
+        if _is_sp == 1 {
+            let _s = __array_get(_ws, 0);
+            if _i > _s {
+                push(__kt_words, substr(_text, _s, _i));
+                let _ = __set_at(_wc, 0, __array_get(_wc, 0) + 1);
+            };
+            let _ = __set_at(_ws, 0, _i + 1);
+        };
+        let _i = _i + 1;
+    };
+    return __array_get(_wc, 0);
+}
+
+pub fn kt_word_at(_idx) {
+    if _idx < len(__kt_words) { return __array_get(__kt_words, _idx); };
+    return "";
+}
+
 // ═══ L0 Registry: everything = node = SRVAT ═══
 // Olang keywords, builtins, identity — all registered as KnowTree nodes
 pub fn kt_register_l0() {

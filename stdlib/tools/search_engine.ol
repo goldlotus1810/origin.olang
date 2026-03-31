@@ -1,31 +1,19 @@
 // stdlib/tools/search_engine.ol — Relevance search. Pure Olang.
 
 pub fn relevance_score(_query, _fact) {
-    let _score = [0];
-    let _qwords = _split_to_words(_query);
-    let _matches = [0];
-    let _qi = 0;
-    while _qi < len(_qwords) {
-        let _qw = __array_get(_qwords, _qi);
-        if len(_qw) >= 2 {
-            if _str_has(_fact, _qw) {
-                let _ = __set_at(_matches, 0, __array_get(_matches, 0) + 1);
-                let _pos = _find_in(_fact, _qw);
-                if _pos >= 0 {
-                    if _pos < 20 { let _ = __set_at(_score, 0, __array_get(_score, 0) + 50); };
-                };
+    let _sc = [0];
+    let _nw = kt_split_words(_query);
+    let _qi = [0];
+    while __array_get(_qi, 0) < _nw {
+        let _w = kt_word_at(__array_get(_qi, 0));
+        if len(_w) >= 2 {
+            if _str_has(_fact, _w) == 1 {
+                let _ = __set_at(_sc, 0, __array_get(_sc, 0) + 100);
             };
         };
-        let _qi = _qi + 1;
+        let _ = __set_at(_qi, 0, __array_get(_qi, 0) + 1);
     };
-    let _ = __set_at(_score, 0, __array_get(_score, 0) + __array_get(_matches, 0) * 100);
-    if len(_qwords) > 0 {
-        let _ = __set_at(_score, 0, __array_get(_score, 0) + __array_get(_matches, 0) * 100 / len(_qwords));
-    };
-    if len(_fact) > 200 {
-        let _ = __set_at(_score, 0, __array_get(_score, 0) - (len(_fact) - 200) / 10);
-    };
-    return __array_get(_score, 0);
+    return __array_get(_sc, 0);
 }
 
 pub fn mol_relevance(_query_mol, _fact_mol) {
@@ -76,8 +64,13 @@ pub fn respond(_query) {
     return __array_get(_results, 0);
 }
 
+// Global word buffer (avoids push-to-local-array bug)
+let __se_words = __array_with_cap(64);
+let __se_word_count = [0];
+
 pub fn _split_to_words(_text) {
-    let _words = [];
+    // Reset global buffer
+    let _ = __set_at(__se_word_count, 0, 0);
     let _ws = [0];
     let _i = 0;
     while _i <= len(_text) {
@@ -89,12 +82,18 @@ pub fn _split_to_words(_text) {
         };
         if _is_sp == 1 {
             let _s = __array_get(_ws, 0);
-            if _i > _s { push(_words, substr(_text, _s, _i)); };
+            if _i > _s {
+                let _wc = __array_get(__se_word_count, 0);
+                if _wc < 64 {
+                    push(__se_words, substr(_text, _s, _i));
+                    let _ = __set_at(__se_word_count, 0, _wc + 1);
+                };
+            };
             let _ = __set_at(_ws, 0, _i + 1);
         };
         let _i = _i + 1;
     };
-    return _words;
+    return __se_words;
 }
 
 pub fn _find_in(_hay, _needle) {
