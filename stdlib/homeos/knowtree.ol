@@ -99,48 +99,61 @@ pub fn chain_encode(_text) {
 
 pub fn chain_summary(_ch) { return compose(_ch); }
 
-// Real mol from text — hybrid: compose(S,R,T) + hash(V,A) for uniqueness
+// Real mol from text — SEMANTIC compose (A4 rules) + hash for uniqueness WITHIN bucket
 pub fn _kt_real_mol(_text) {
     _kt_ensure_init();
     let _tlen = len(_text);
     if _tlen == 0 { return 0; };
-    // FNV-1a hash → unique fingerprint per text
-    let _h = [2166136261];
-    let _s_max = [0];
-    let _r_max = [0];
-    let _t_vote = [0, 0, 0, 0];
+
+    // Step 1: Compose SRVAT from real P_weights (semantic meaning)
+    let _s_max = [0]; let _r_max = [0]; let _v_sum = [0]; let _v_cnt = [0];
+    let _a_max = [0]; let _t_vote = [0, 0, 0, 0];
+    let _hash = [5381];  // djb2 hash for uniqueness within bucket
+
     let _i = 0;
     while _i < _tlen {
         let _cp = __char_code(char_at(_text, _i));
         let _pw = p_weight(_cp);
-        // Hash: FNV-1a
-        let _ = __set_at(_h, 0, __bit_xor(__array_get(_h, 0), _cp));
-        let _ = __set_at(_h, 0, __bit_and(__array_get(_h, 0) * 16777619, 4294967295));
-        // Compose S=max, R=max, T=vote from P_weights
+        // Hash for minor differentiation
+        let _ = __set_at(_hash, 0, __bit_and((__array_get(_hash, 0) * 33) + _cp, 65535));
         if _pw > 0 {
             let _s = (__floor(_pw / 4096)) % 16;
             let _r = (__floor(_pw / 256)) % 16;
+            let _v = (__floor(_pw / 32)) % 8;
+            let _a = (__floor(_pw / 4)) % 8;
             let _t = _pw % 4;
+            // A4: S=max, R=max, V=accumulate, A=max, T=vote
             if _s > __array_get(_s_max, 0) { let _ = __set_at(_s_max, 0, _s); };
             if _r > __array_get(_r_max, 0) { let _ = __set_at(_r_max, 0, _r); };
+            let _ = __set_at(_v_sum, 0, __array_get(_v_sum, 0) + _v);
+            let _ = __set_at(_v_cnt, 0, __array_get(_v_cnt, 0) + 1);
+            if _a > __array_get(_a_max, 0) { let _ = __set_at(_a_max, 0, _a); };
             let _ = __set_at(_t_vote, _t, __array_get(_t_vote, _t) + 1);
         };
         let _i = _i + 1;
     };
-    // ALL dimensions from hash — ensures unique distribution across buckets
-    let _hash = __array_get(_h, 0);
-    if _hash < 0 { let _hash = 0 - _hash; };
-    // Mix hash into S and R (spread across ALL 256 buckets)
-    let _S = __bit_and(__floor(_hash / 4096), 15);
-    let _R = __bit_and(__floor(_hash / 256), 15);
-    // V, A from hash too
-    let _V = __bit_and(__floor(_hash / 32), 7);
-    let _A = __bit_and(__floor(_hash / 4), 7);
-    // T from vote
+
+    // S, R from compose (SEMANTIC — similar content = similar S,R)
+    let _S = __array_get(_s_max, 0);
+    let _R = __array_get(_r_max, 0);
+
+    // V = average (semantic) + hash low bits for uniqueness
+    let _vc = __array_get(_v_cnt, 0);
+    let _V = 4;
+    if _vc > 0 { let _V = __floor(__array_get(_v_sum, 0) / _vc); };
+    // Mix 1 bit of hash into V for differentiation (stays in same neighborhood)
+    let _V = __bit_and(_V + __bit_and(__array_get(_hash, 0), 1), 7);
+
+    // A = max (semantic) + hash bit
+    let _A = __array_get(_a_max, 0);
+    let _A = __bit_and(_A + __bit_and(__floor(__array_get(_hash, 0) / 2), 1), 7);
+
+    // T = vote
     let _T = 0; let _tm = __array_get(_t_vote, 0);
     if __array_get(_t_vote, 1) > _tm { let _T = 1; let _tm = __array_get(_t_vote, 1); };
     if __array_get(_t_vote, 2) > _tm { let _T = 2; let _tm = __array_get(_t_vote, 2); };
     if __array_get(_t_vote, 3) > _tm { let _T = 3; };
+
     return _kt_pack(_S, _R, _V, _A, _T);
 }
 
@@ -594,7 +607,16 @@ pub fn kt_diagnostic() {
 }
 pub fn kt_search(q) { return kt_nearest(_kt_real_mol(q)); }
 pub fn kt_search_n(q, n) { return kt_find(q, n); }
-pub fn kt_classify(_t) { return "unknown"; }
+// Classify by dominant dimension → L2 branch
+pub fn kt_classify(_t) {
+    let _mol = _kt_real_mol(_t);
+    let _dim = mol_dominant_dim(_mol);
+    if _dim == 0 { return "shape"; };      // S dominant → visual/spatial
+    if _dim == 1 { return "relation"; };   // R dominant → logic/math
+    if _dim == 2 { return "emotion"; };    // V dominant → feeling/value
+    if _dim == 3 { return "energy"; };     // A dominant → action/intensity
+    return "temporal";                      // T dominant → time/sequence
+}
 pub fn kt_decode(_q) { return kt_nearest(_kt_real_mol(_q)); }
 pub fn kt_learn_tagged(_t, _x) { return kt_learn(_x); }
 pub fn kt_learn_to(_x, _b) { return kt_learn(_x); }
