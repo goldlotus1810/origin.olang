@@ -377,6 +377,27 @@ pub fn repl_eval(input) {
   // Result saved — used if compile fails (natural language).
   let _pipeline_result = pipeline(src);
 
+  // ═══ M5: Auto-capture — save observation for session persistence ═══
+  // Only save natural language, skip code and commands
+  if len(src) > 3 {
+    let _is_code = 0;
+    if char_at(src, 0) == "/" { let _is_code = 1; };
+    if len(src) >= 4 { if __substr(src, 0, 4) == "let " { let _is_code = 1; }; };
+    if len(src) >= 4 { if __substr(src, 0, 4) == "emit" { let _is_code = 1; }; };
+    if len(src) >= 3 { if __substr(src, 0, 3) == "fn " { let _is_code = 1; }; };
+    if len(src) >= 3 { if __substr(src, 0, 3) == "if " { let _is_code = 1; }; };
+    // Check for semicolon (code indicator)
+    let _oi = 0;
+    while _oi < len(src) {
+      if __char_code(char_at(src, _oi)) == 59 { let _is_code = 1; let _oi = len(src); };
+      let _oi = _oi + 1;
+    };
+    if _is_code == 0 {
+      let _obs_mol = _kt_real_mol(src);
+      __file_append("nox_observations.dat", __to_string(_obs_mol) + "\t" + src + "\n");
+    };
+  };
+
   // ── Slash commands ──
   if len(src) > 1 {
     if char_at(src, 0) == "/" {

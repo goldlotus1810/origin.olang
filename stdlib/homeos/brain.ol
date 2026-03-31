@@ -30,6 +30,9 @@ pub fn nox_bootstrap() {
     // Load multilingual sentiment at boot (small, 599 facts)
     let _data_n = kt_load("json/sentiment_precomputed.dat");
     __heap_pin();
+    // Load past observations (auto-captured from REPL sessions)
+    let _obs_n = kt_load("nox_observations.dat");
+    __heap_pin();
     // NRC data (5K facts) loaded via REPL: /load_nrc or nox_load_data()
     let _boot = kt_fact_count();
     let _stats = _stats + "L0:" + __to_string(_boot) + " Mem:" + __to_string(_mem_n) + " Data:" + __to_string(_data_n);
