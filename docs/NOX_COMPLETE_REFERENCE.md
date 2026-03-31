@@ -595,3 +595,180 @@ dominant_dim(mol):
 
 *File này sẽ được bổ sung liên tục khi research agents hoàn thành.*
 *Mục tiêu: TOÀN BỘ thuật toán + nguồn gốc + cách implement = 1 cuốn sách.*
+
+---
+
+# PHẦN II: CẤU TRÚC DỮ LIỆU
+
+## 9. Chain — Chuỗi DNA Tri Thức
+
+### Biểu diễn
+Chain = [u16, u16, ..., u16] — ordered sequence of P_weights, like DNA nucleotides.
+
+### Compression
+- **Delta encoding**: store differences between consecutive elements
+- **RLE**: repeated P_weights compressed to (value, count)
+- **K-mer indexing** (from BLAST, Altschul 1990): overlapping subsequences for fast search
+
+### Alignment (so sánh chains)
+- **Needleman-Wunsch** (1970): global alignment, O(mn)
+- **Smith-Waterman** (1981): local alignment, O(mn)
+- **Levenshtein**: edit distance with 5D substitution cost
+
+### Spline
+Catmull-Rom: f(t) = 0.5[(2P₁)+(-P₀+P₂)t+(2P₀-5P₁+4P₂-P₃)t²+(-P₀+3P₁-3P₂+P₃)t³]
+
+## 10. KnowTree
+
+32,768 possible P_weight values (2^15). Direct lookup table = 256KB = O(1) exact match.
+Multi-level bucket: S×R = 256, or S×R×V = 2048 buckets.
+
+## 11. Silk — 5D Typed Edges
+
+Edge = [target_mol, wS, wR, wV, wA, wT]. Type = dimension with highest weight (emergent).
+
+### Learning Rules (per dimension)
+| Dim | Rule | Formula | Why |
+|-----|------|---------|-----|
+| S | Oja | Δw=η·y·(x-y·w) | Stable normalization |
+| R | STDP | Δw=A⁺·e^(-Δt/τ) if pre→post | Captures causality |
+| V | BCM | Δw=η·y·(y-θ)·x, θ=E[y²] | Sliding threshold |
+| A | Oja | Same as S | Normalize intensity |
+| T | STDP | Same as R | Temporal ordering |
+
+### Decay
+**Power law + stability** (better than φ⁻¹ exponential):
+```
+effective_dt = dt / (24 × stability)
+factor = (1 + effective_dt)^(-0.5)    // Wickelgren 1974
+```
+Stability grows with each fire (Ebbinghaus): S_new = S × 1.5
+
+## 12-13. QR + STM/WM
+(As in Spec B4, G1, G7)
+
+---
+
+# PHẦN III: THUẬT TOÁN HỌC
+
+## 14. Hebbian Learning
+- Hebb 1949: Δw = η·x·y (unbounded)
+- Oja 1982: Δw = η·y·(x-y·w) (normalized, converges to PCA)
+- BCM 1982: Δw = η·y·(y-θ)·x, θ adapts (selectivity)
+- STDP: Δw = A⁺·e^(-Δt/τ⁺) pre→post, -A⁻·e^(Δt/τ⁻) post→pre
+- Covariance: Δw = η·(x-<x>)·(y-<y>) — only deviations matter
+
+**Key insight: Covariance rule solves mol collision.** Common chars → high mean → zero deviation → no silk. Only distinctive features create connections.
+
+## 15. Decay
+φ⁻¹ exponential: w(t) = w₀·0.618^(t/24)
+Power law (Wickelgren): w(t) = w₀·(1+t)^(-0.5) — better for mature knowledge
+Ebbinghaus stability: each recall multiplies stability by 1.5
+
+## 16. Dream
+Spreading activation (Collins & Loftus 1975) → find cross-group resonance → LCA compose → validate → QR promote. Union-Find for clustering.
+
+## 17. Homeostasis = Friston Free Energy
+F(t) = √(Σ w_d·(predicted_d - actual_d)²)
+λ = σ(5·(F-0.618)) — sigmoid at φ⁻¹
+**This IS prediction error minimization (Friston 2010).**
+
+## 18. Immune Selection
+Beam search (k=3) + clonal selection for Dream-time deep reasoning.
+UCB1: balance exploitation (strong silk) vs exploration (untried edges).
+
+## 19. DNA Repair
+3 iterations max. Quality = 0.30v + 0.30(1-H/2.32) + 0.20c + 0.20s.
+
+---
+
+# PHẦN IV: PIPELINE
+(As in Spec D + G8. Pure math. No keywords.)
+
+---
+
+# PHẦN V: SEARCH + CLASSIFICATION
+
+## 25-29. Algorithms
+
+| Method | Build | Query | Best For |
+|--------|-------|-------|----------|
+| Lookup table (256KB) | O(n) | O(1) | Exact match |
+| Multi-level bucket | O(n) | O(bucket) | Neighborhood |
+| VP-tree (Yianilos 1993) | O(n log n) | O(log n) | Any metric |
+| HNSW (Malkov 2018) | O(n log n) | O(log n) | >10K approx |
+| KD-tree (Bentley 1975) | O(n log n) | O(log n) | Balanced |
+| A* | - | O(b^d) | Goal-directed |
+| Spreading activation | - | O(steps×degree) | Multi-path |
+| Personalized PageRank | O(iter×edges) | O(iter×edges) | Multi-hop |
+
+---
+
+# PHẦN VI: AGENT + SELF-EVOLUTION
+(As in Spec F + G17-G27)
+
+---
+
+# PHẦN VII: NGHIÊN CỨU NỀN TẢNG
+
+| # | Paper | Year | Relevance |
+|---|-------|------|-----------|
+| 1 | Russell — Circumplex Model of Affect | 1980 | V/A dimensions |
+| 2 | Mohammad — NRC-VAD (ACL) | 2018 | V/A word scores |
+| 3 | Bradley & Lang — ANEW | 1999 | V/A norms |
+| 4 | Mehrabian & Russell — PAD | 1974 | 3D emotion model |
+| 5 | Friston — Free Energy Principle | 2010 | Homeostasis |
+| 6 | Hebb — Organization of Behavior | 1949 | Hebbian learning |
+| 7 | Oja — PCA neuron | 1982 | Normalized Hebbian |
+| 8 | BCM — Selectivity theory | 1982 | Sliding threshold |
+| 9 | Bi & Poo — STDP | 1998 | Temporal learning |
+| 10 | Collins & Loftus — Spreading Activation | 1975 | Graph search |
+| 11 | Shannon — Information Theory | 1948 | Entropy |
+| 12 | Zipf — Principle of Least Effort | 1949 | Compose weights |
+| 13 | Malkov & Yashunin — HNSW | 2018 | NN search |
+| 14 | Quilez — SDF primitives | 2010s | Shape encoding |
+| 15 | Green/Valve — SDF fonts | 2007 | Glyph SDF |
+| 16 | Grevera — Dead reckoning | 2004 | Distance transform |
+| 17 | Felzenszwalb — Exact EDT | 2012 | Fast distance transform |
+| 18 | Needleman & Wunsch | 1970 | Sequence alignment |
+| 19 | Miller — WordNet | 1995 | Semantic relations |
+| 20 | Unicode UTR #25 | - | Math classification |
+| 21 | Novak — Emoji sentiment | 2015 | Emoji V/A |
+| 22 | Kiefer — Golden section search | 1953 | φ optimality |
+| 23 | Wickelgren — Power law forgetting | 1974 | Decay model |
+| 24 | Ebbinghaus — Forgetting curve | 1885 | Memory + stability |
+| 25 | Watkins & Dayan — Q-learning | 1992 | Optimal search |
+| 26 | Kohonen — SOM | 1982 | 5D visualization |
+| 27 | Fritzke — Growing Neural Gas | 1994 | Online clustering |
+| 28 | Foldiak — Anti-Hebbian | 1990 | Decorrelation |
+
+---
+
+# PHẦN VIII: IMPLEMENTATION STATUS
+
+```
+DONE:
+  ✅ VM x86_64 (12934 LOC ASM)
+  ✅ Self-hosting compiler (Gen1==Gen2)
+  ✅ Pipeline pure math (no keywords)
+  ✅ V'(t) modulated silk fire
+  ✅ NRC-VAD bootstrap (10K words)
+  ✅ p_weight COMPUTED from codepoint ranges
+  ✅ STM with scored eviction (32 capacity)
+
+NOT DONE:
+  ❌ 42 formulas from SDF/name/category (only range checks now)
+  ❌ Per-dimension Hebbian rules (Oja/STDP/BCM — currently generic)
+  ❌ Power law + stability decay (currently φ⁻¹ only)
+  ❌ Covariance rule (solves mol collision properly)
+  ❌ Spreading activation (currently greedy walk)
+  ❌ 9,200 silk types (currently generic weight)
+  ❌ Arena allocator / Dual-Width VM
+  ❌ Logic inference (A→B + B→C = A→C)
+  ❌ HNSW index for >10K nodes
+```
+
+---
+
+*Tài liệu tổng hợp: 14,531 dòng specs hiện có + 1.7MB research mới = NOX COMPLETE REFERENCE.*
+*Mọi thuật toán, mọi formula, mọi nguồn gốc. Cuốn sách cho Nox.*
