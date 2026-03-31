@@ -55,17 +55,55 @@ pub fn pipeline(input) {
     };
     _curve_push_v(_v);
 
-    // Search (molecular first, text fallback)
-    let _result = kt_nearest(_mol);
-    if len(_result) == 0 { let _result = kt_find(input, 1); if len(_result) > 0 { let _result = __array_get(_result, 0); }; };
+    // Search: find first word ≥4 chars, search by that word
+    let _text_results = [];
+    let _sw = [0]; let _si = 0;
+    while _si <= len(input) {
+        let _is_sp = 0;
+        if _si == len(input) { let _is_sp = 1; } else {
+            if __char_code(char_at(input, _si)) == 32 { let _is_sp = 1; };
+        };
+        if _is_sp == 1 {
+            let _word = substr(input, __array_get(_sw, 0), _si);
+            if len(_word) >= 4 {
+                let _wresults = kt_find(_word, 3);
+                let _wi = 0;
+                while _wi < len(_wresults) {
+                    push(_text_results, __array_get(_wresults, _wi));
+                    let _wi = _wi + 1;
+                };
+                if len(_text_results) > 0 { let _si = len(input); };
+            };
+            let _ = __set_at(_sw, 0, _si + 1);
+        };
+        let _si = _si + 1;
+    };
+    let _result = "";
+    if len(_text_results) > 0 {
+        let _result = __array_get(_text_results, 0);
+    } else {
+        let _result = kt_nearest(_mol);
+    };
 
     // Homeostasis
     let _nearest_mol = 0;
     if len(_result) > 0 { let _nearest_mol = _kt_real_mol(_result); };
     let _surprise = _homeostasis(_mol, _nearest_mol);
 
-    // Hebbian: fire silk between input and nearest
+    // LEARNING LOOP: fire silk between input ↔ ALL matching facts
+    // + between matching facts with each other (cross-connect)
     if _nearest_mol > 0 { kt_silk_fire(_mol, _nearest_mol); };
+    let _ri = 0;
+    while _ri < len(_text_results) {
+        let _rmol = _kt_real_mol(__array_get(_text_results, _ri));
+        kt_silk_fire(_mol, _rmol);  // input ↔ each result
+        // Cross-connect results with each other
+        if _ri > 0 {
+            let _prev_rmol = _kt_real_mol(__array_get(_text_results, _ri - 1));
+            kt_silk_fire(_rmol, _prev_rmol);
+        };
+        let _ri = _ri + 1;
+    };
 
     // Honesty check
     let _conf = instinct_honesty(_mol);

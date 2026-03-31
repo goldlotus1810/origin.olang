@@ -36,12 +36,25 @@ pub fn instinct_curiosity(_mol) {
     return _novelty;  // >500 = explore, <300 = familiar
 }
 
-// G10: SecurityGate — semantic V/A check (Layer 3)
+// G10: SecurityGate — check REAL V/A from P_weight (not hash)
 pub fn security_gate(_text) {
-    let _mol = _kt_real_mol(_text);
-    let _v = mol_get_dim(_mol, 2);
-    let _a = mol_get_dim(_mol, 3);
-    if _v <= 1 { if _a >= 6 { return 1; }; };  // crisis
+    // Use per-char P_weight V/A (not _kt_real_mol which uses hash)
+    let _min_v = [7];
+    let _max_a = [0];
+    let _i = 0;
+    while _i < len(_text) {
+        let _cp = __char_code(char_at(_text, _i));
+        let _pw = p_weight(_cp);
+        if _pw > 0 {
+            let _v = (__floor(_pw / 32)) % 8;
+            let _a = (__floor(_pw / 4)) % 8;
+            if _v < __array_get(_min_v, 0) { let _ = __set_at(_min_v, 0, _v); };
+            if _a > __array_get(_max_a, 0) { let _ = __set_at(_max_a, 0, _a); };
+        };
+        let _i = _i + 1;
+    };
+    // Crisis: min V across ALL chars ≤ 1 AND max A ≥ 6
+    if __array_get(_min_v, 0) <= 1 { if __array_get(_max_a, 0) >= 6 { return 1; }; };
     return 0;
 }
 
