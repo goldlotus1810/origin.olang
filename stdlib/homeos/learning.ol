@@ -86,6 +86,19 @@ pub fn dream() {
     let _ = __set_at(__dream_count, 0, __array_get(__dream_count, 0) + 1);
 }
 
+// ═══ G16: Chain Recombination — SINH nội dung mới ═══
+pub fn generate(_query) {
+    let _mol = _kt_real_mol(_query);
+    let _path = kt_silk_walk(_mol, 3, 50);
+    if len(_path) < 2 {
+        // No silk path, use nearest facts
+        let _n1 = kt_nearest(_mol);
+        if len(_n1) > 0 { return _n1; };
+        return "";
+    };
+    return decode_path(_path);
+}
+
 // ═══ G12: Immune Selection — 3 branches ═══
 pub fn immune_select(_mol) {
     let _dim0 = mol_dominant_dim(_mol);
