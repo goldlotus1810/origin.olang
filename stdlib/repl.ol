@@ -1420,7 +1420,25 @@ pub fn repl_eval(input) {
   if _g_pos_box[0] == 0 { return ""; }
 
   // Phase 5: Execute compiled bytecode
-  return __eval_bytecode(bc);
+  let _eval_result = __eval_bytecode(bc);
+  // If eval empty + input is single word without code syntax → use pipeline
+  if len(_eval_result) == 0 {
+      // Single word or no semicolons/operators = likely text, not code
+      let _has_syntax = [0];
+      let _ci = 0;
+      while _ci < len(src) {
+          let _cc = __char_code(char_at(src, _ci));
+          if _cc == 59 { let _ = __set_at(_has_syntax, 0, 1); };  // ;
+          if _cc == 61 { let _ = __set_at(_has_syntax, 0, 1); };  // =
+          if _cc == 40 { let _ = __set_at(_has_syntax, 0, 1); };  // (
+          if _cc == 123 { let _ = __set_at(_has_syntax, 0, 1); }; // {
+          let _ci = _ci + 1;
+      };
+      if __array_get(_has_syntax, 0) == 0 {
+          if len(_pipeline_result) > 3 { return _pipeline_result; };
+      };
+  };
+  return _eval_result;
 }
 
 // ════════════════════════════════════════════════════════
