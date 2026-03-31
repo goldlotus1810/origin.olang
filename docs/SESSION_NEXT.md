@@ -1,6 +1,6 @@
 # Session Tiep Theo
 
-## TRẠNG THÁI: G COMPLETE — Sẵn sàng code
+## TRẠNG THÁI: G COMPLETE — REBUILD brain từ 0
 
 ### Đã xong:
 - Phase 0-1 code (cũ, cần viết lại)
@@ -8,28 +8,40 @@
 - Mọi mâu thuẫn giữa tài liệu đã giải quyết (G0)
 - Mọi thắc mắc đã tìm đáp án trong A-F + UDC docs + SPEC_v3
 
-### BƯỚC TIẾP THEO: Viết lại từ đầu
+### BƯỚC TIẾP THEO: XÓA brain code cũ → viết mới từ G
 
-Code hiện tại = tích lũy lỗi qua nhiều session. Không sửa. Viết lại.
+Code hiện tại (knowtree.ol 1231 dòng, encoder.ol 1200+ dòng, pipeline.ol 899 dòng)
+= tích lũy if/else chatbot từ session 6-9 + math code từ session 10.
+Xung đột logic → bytecode lớn → gen1 boot hang.
+
+**GIẢI PHÁP:** Xóa sạch 5 brain files → viết mới từ SPEC_G_COMPLETE.
+Brain mới sẽ ~500 dòng tổng (thay vì 4000+). Bytecode nhỏ → gen1 works.
+
+**BUILDER:** Dùng `origin_bootstrap.olang --build` (820KB, luôn works).
+KHÔNG dùng origin.olang hay gen1 để build. Bootstrap = builder duy nhất.
 
 ```
-THỨ TỰ IMPLEMENT (theo G):
+STEP 0: XÓA brain code cũ
+  - Backup: git stash hoặc branch
+  - Xóa nội dung: knowtree.ol, encoder.ol, pipeline.ol, instinct.ol, learning.ol, brain.ol
+  - Giữ: repl.ol (REPL loop), system.ol, network.ol, crypto.ol, etc (body code)
+  - Build: origin_bootstrap.olang --build → gen1 nhỏ → gen1 works
+  - Verify: echo "emit 42;" | ./origin_gen1.olang → 42
+
+STEP 1-16: IMPLEMENT theo G (mỗi step = build + test + fixed-point)
   1. G2  Core math (pack, compose, distance, dominant_dim)
   2. G3  Encode ∫ (text → chain)
-  3. G1  Data structures (KnowTree tree, SilkIndex, STM, WM)
+  3. G1  Data structures (KnowTree bucket, SilkIndex, STM, WM)
   4. G5  KnowTree ops (insert, nearest, classify)
   5. G6  Silk ops (walk, fire, decay)
   6. G4  Decode ∂ (lookup + generative)
-  7. G9  Instincts (7 formulas)
-  8. G10 SecurityGate (Bloom filter)
+  7. G9  Instincts (7 formulas, PURE MATH)
+  8. G10 SecurityGate
   9. G11 Homeostasis + ConversationCurve
   10. G12 Immune Selection + DNA Repair
-  11. G8  Pipeline (14 steps, 5 checkpoints) — wires everything together
+  11. G8  Pipeline (14 steps, wires everything)
   12. G7  Memory (STM eviction, dream)
-  13. G13-G14 Self-model + NAC
-  14. G17 Agent cycle
-  15. G18-G19 Bootstrap + Persistence
-  16. G22-G27 Meta (goals, metrics, failure recovery, persistence, evolution)
+  13+ G13-G27 (self-model, agent, persistence, evolution)
 ```
 
 ### QUY TẮC:
