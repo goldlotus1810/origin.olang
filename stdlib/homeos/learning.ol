@@ -1,11 +1,11 @@
 // homeos/learning.ol — G7+G12+G4: STM, Dream, Immune, Repair, Decode
 
 // ═══ G7: STM — 32 slots with eviction scoring ═══
-let __stm_text = [];
-let __stm_mol = [];
-let __stm_v = [];
-let __stm_a = [];
-let __stm_access = [];
+let __ls_text = __array_with_cap(64);
+let __ls_mol = __array_with_cap(64);
+let __ls_v = __array_with_cap(64);
+let __ls_a = __array_with_cap(64);
+let __ls_access = __array_with_cap(64);
 let __stm_max = 32;
 let __stm_turn = [0];
 
@@ -14,16 +14,16 @@ pub fn stm_push(_text) {
     let _v = mol_get_dim(_mol, 2);
     let _a = mol_get_dim(_mol, 3);
     // Evict if full
-    if len(__stm_text) >= __stm_max {
+    if len(__ls_text) >= __stm_max {
         let _min_score = [999999];
         let _min_idx = [0];
         let _i = 0;
-        while _i < len(__stm_text) {
+        while _i < len(__ls_text) {
             let _turns_ago = __array_get(__stm_turn, 0) - _i;
             let _recency = 1000;
             if _turns_ago > 0 { let _recency = __floor(618000 / (1000 + (_turns_ago * 382))); };
-            let _emo = _kt_abs(__array_get(__stm_v, _i) - 4) * __array_get(__stm_a, _i);
-            let _score = (__array_get(__stm_access, _i) * 300) + (_emo * 400) + (_recency * 300);
+            let _emo = _kt_abs(__array_get(__ls_v, _i) - 4) * __array_get(__ls_a, _i);
+            let _score = (__array_get(__ls_access, _i) * 300) + (_emo * 400) + (_recency * 300);
             let _score = __floor(_score / 1000);
             if _score < __array_get(_min_score, 0) {
                 let _ = __set_at(_min_score, 0, _score);
@@ -32,39 +32,39 @@ pub fn stm_push(_text) {
             let _i = _i + 1;
         };
         let _evict = __array_get(_min_idx, 0);
-        let _ = __set_at(__stm_text, _evict, _text);
-        let _ = __set_at(__stm_mol, _evict, _mol);
-        let _ = __set_at(__stm_v, _evict, _v);
-        let _ = __set_at(__stm_a, _evict, _a);
-        let _ = __set_at(__stm_access, _evict, 1);
+        let _ = __set_at(__ls_text, _evict, _text);
+        let _ = __set_at(__ls_mol, _evict, _mol);
+        let _ = __set_at(__ls_v, _evict, _v);
+        let _ = __set_at(__ls_a, _evict, _a);
+        let _ = __set_at(__ls_access, _evict, 1);
     } else {
-        push(__stm_text, _text);
-        push(__stm_mol, _mol);
-        push(__stm_v, _v);
-        push(__stm_a, _a);
-        push(__stm_access, 1);
+        push(__ls_text, _text);
+        push(__ls_mol, _mol);
+        push(__ls_v, _v);
+        push(__ls_a, _a);
+        push(__ls_access, 1);
     };
     let _ = __set_at(__stm_turn, 0, __array_get(__stm_turn, 0) + 1);
     // Silk fire with recent entries
-    let _n = len(__stm_mol);
-    if _n >= 2 { kt_silk_fire(_mol, __array_get(__stm_mol, _n - 2)); };
+    let _n = len(__ls_mol);
+    if _n >= 2 { kt_silk_fire(_mol, __array_get(__ls_mol, _n - 2)); };
 }
 
-pub fn stm_count() { return len(__stm_text); }
+pub fn stm_count() { return len(__ls_text); }
 
 // ═══ G7: Dream — cross-group consolidation ═══
 let __dream_count = [0];
 
 pub fn dream() {
     // Scan STM pairs for cross-bucket connections
-    let _n = len(__stm_mol);
+    let _n = kt_stm_count();
     if _n < 2 { return; };
     let _i = 0;
     while _i < _n {
         let _j = _i + 1;
         while _j < _n {
-            let _mi = __array_get(__stm_mol, _i);
-            let _mj = __array_get(__stm_mol, _j);
+            let _mi = kt_stm_mol_at(_i);
+            let _mj = kt_stm_mol_at(_j);
             // Different S,R bucket = cross-group
             let _si = (__floor(_mi / 4096)) % 16;
             let _sj = (__floor(_mj / 4096)) % 16;
@@ -87,15 +87,15 @@ pub fn dream() {
     while _i2 < _n {
         let _j2 = _i2 + 1;
         while _j2 < _n {
-            let _mi2 = __array_get(__stm_mol, _i2);
-            let _mj2 = __array_get(__stm_mol, _j2);
+            let _mi2 = kt_stm_mol_at(_i2);
+            let _mj2 = kt_stm_mol_at(_j2);
             let _si2 = (__floor(_mi2 / 4096)) % 16;
             let _sj2 = (__floor(_mj2 / 4096)) % 16;
             if _mi2 != _mj2 {
                 // Cross-group → LCA = compose → new concept
                 let _lca = compose([_mi2, _mj2]);
-                let _text_i = __array_get(__stm_text, _i2);
-                let _text_j = __array_get(__stm_text, _j2);
+                let _text_i = kt_stm_text_at(_i2);
+                let _text_j = kt_stm_text_at(_j2);
                 // Only create if both texts exist and LCA is novel
                 if len(_text_i) > 0 {
                 if len(_text_j) > 0 {

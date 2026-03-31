@@ -112,7 +112,7 @@ pub fn pipeline(input) {
     };
 
     // STM push
-    stm_push(input);
+    kt_stm_push(input);
 
     // Dream check (every 8 turns)
     if (__array_get(__v_idx, 0) % 8) == 0 { dream(); };

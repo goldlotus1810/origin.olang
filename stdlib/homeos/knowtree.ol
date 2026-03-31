@@ -222,6 +222,23 @@ pub fn vad_query(_word) {
     return [0, 0];
 }
 
+// ═══ STM — moved to knowtree.ol for global scope compatibility ═══
+let __kt_stm_text = __array_with_cap(64);
+let __kt_stm_mol = __array_with_cap(64);
+
+pub fn kt_stm_push(_text) {
+    let _mol = _kt_real_mol(_text);
+    push(__kt_stm_text, _text);
+    push(__kt_stm_mol, _mol);
+    // Auto-silk with previous
+    let _n = len(__kt_stm_mol);
+    if _n >= 2 { kt_silk_fire(_mol, __array_get(__kt_stm_mol, _n - 2)); };
+}
+
+pub fn kt_stm_count() { return len(__kt_stm_text); }
+pub fn kt_stm_mol_at(_i) { return __array_get(__kt_stm_mol, _i); }
+pub fn kt_stm_text_at(_i) { return __array_get(__kt_stm_text, _i); }
+
 // ═══ L0 Registry: everything = node = SRVAT ═══
 // Olang keywords, builtins, identity — all registered as KnowTree nodes
 pub fn kt_register_l0() {
