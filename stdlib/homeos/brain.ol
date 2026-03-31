@@ -27,9 +27,10 @@ pub fn nox_bootstrap() {
     // Load saved memory from previous session
     let _mem_n = kt_load("nox_memory.dat");
     __heap_pin();
-    // Load multilingual sentiment (12 languages, 599 facts, V from labels)
+    // Load multilingual sentiment at boot (small, 599 facts)
     let _data_n = kt_load("json/sentiment_precomputed.dat");
     __heap_pin();
+    // NRC data (5K facts) loaded via REPL: /load_nrc or nox_load_data()
     let _boot = kt_fact_count();
     let _stats = _stats + "L0:" + __to_string(_boot) + " Mem:" + __to_string(_mem_n) + " Data:" + __to_string(_data_n);
 
@@ -163,6 +164,17 @@ fn _batch_load_raw(_path) {
     };
     __heap_pin();
     return __array_get(_count, 0);
+}
+
+// REPL data loader: call from REPL to load NRC chunks (each call = 1 chunk, heap resets between)
+let __nrc_chunk_idx = [0];
+pub fn nox_load_data() {
+    let _ci = __array_get(__nrc_chunk_idx, 0);
+    if _ci >= 10 { return "All 10 chunks loaded. " + __to_string(kt_fact_count()) + " total facts."; };
+    let _path = "json/nrc_chunk_" + __to_string(_ci) + ".dat";
+    let _n = kt_load(_path);
+    let _ = __set_at(__nrc_chunk_idx, 0, _ci + 1);
+    return "Chunk " + __to_string(_ci) + ": " + __to_string(_n) + " facts. Total: " + __to_string(kt_fact_count()) + ". Call again for next.";
 }
 
 // G24: Growth metrics
