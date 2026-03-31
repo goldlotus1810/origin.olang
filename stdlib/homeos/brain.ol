@@ -22,8 +22,8 @@ pub fn nox_bootstrap() {
 
     // Register L0: identity, keywords, builtins as nodes
     kt_register_l0();
-    // Load Vietnamese knowledge WITH diacritics (A3: diacritics = SRVAT differentiation)
-    let _vi_n = _load_lines("homeos_vi.knowledge");
+    // Load pre-built knowledge from json/ data (NRC-VAD + aliases)
+    let _vi_n = _load_lines("homeos_data.knowledge");
     let _boot = kt_fact_count();
     let _stats = _stats + "L0:" + __to_string(_boot) + " Vi:" + __to_string(_vi_n);
 

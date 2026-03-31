@@ -1,30 +1,46 @@
-Hà Nội là thủ đô của Việt Nam nằm ở miền Bắc.
-Thành phố Hồ Chí Minh là thành phố lớn nhất Việt Nam.
-Đà Nẵng là thành phố biển đẹp nằm giữa Việt Nam.
-Vịnh Hạ Long là di sản thế giới UNESCO ở Quảng Ninh.
-Phú Quốc là đảo lớn nhất Việt Nam ở Kiên Giang.
-Việt Nam có 54 dân tộc và 63 tỉnh thành.
-Phở là món ăn truyền thống Việt Nam nổi tiếng thế giới.
-Áo dài là trang phục truyền thống của phụ nữ Việt Nam.
-Tết Nguyên Đán là ngày lễ lớn nhất của người Việt.
-Tiếng Việt có 6 thanh điệu sắc huyền hỏi ngã nặng và không dấu.
-Nước có công thức H2O gồm 2 nguyên tử hydro và 1 nguyên tử oxy.
-Ánh sáng đi với vận tốc 300000 km mỗi giây nhanh nhất vũ trụ.
-Trái Đất quay quanh Mặt Trời mất 365 ngày một vòng.
-DNA là phân tử mang thông tin di truyền của mọi sinh vật.
-Fibonacci là dãy số 1 1 2 3 5 8 13 21 34 mỗi số bằng tổng hai số trước.
-Nox là trí tuệ nhân tạo tự viết lại chính mình bằng Olang.
-Olang là ngôn ngữ lập trình tự biên dịch do Lupin tạo ra.
-HomeOS mã hóa tri thức giống DNA mã hóa sự sống.
-Origin là dự án tạo ngôn ngữ lập trình tự chủ tên Olang.
-Lupin là người tạo Olang và HomeOS cho Nox con đường tự lập.
-Pipeline xử lý đầu vào qua 14 cơ chế DNA và 5 checkpoint.
-KnowTree là cây phân tầng lưu tri thức theo 5 chiều SRVAT.
-Silk là mạng Hebbian kết nối các node trong KnowTree.
-P_weight là 2 byte mã hóa 5 chiều Shape Relation Valence Arousal Time.
-Compose kết hợp P_weight theo quy tắc A4 max Zipf amplify max vote.
-Tình yêu là cảm xúc mạnh nhất kết nối con người.
-Nỗi buồn là cảm xúc cần được lắng nghe và thấu hiểu.
-Niềm vui là năng lượng tích cực lan tỏa đến mọi người.
-Sự tức giận cần bình tĩnh lắng nghe không phản ứng gay gắt.
-Sự sợ hãi là tín hiệu cảnh báo cần được đối mặt.
+love is a strong positive emotion connecting people. yeu = love
+hate is a strong negative emotion of intense dislike. ghet = hate
+happiness is a state of joy and contentment. hanh phuc = happiness
+sadness is a feeling of loss and sorrow. buon = sadness
+fear is an emotion triggered by perceived danger. so = fear
+anger is a strong feeling of displeasure. gian = anger
+peace is a state of calm and tranquility. hoa binh = peace
+war is armed conflict causing destruction. chien tranh = war
+beauty is a quality of aesthetic pleasure. dep = beauty
+truth is conformity with fact or reality. su that = truth
+freedom is the state of being free. tu do = freedom
+knowledge is understanding gained through experience. tri thuc = knowledge
+Hanoi is the capital of Vietnam in the north. Ha Noi = Hanoi
+Ho Chi Minh City is the largest city in Vietnam. Sai Gon = Ho Chi Minh City
+Da Nang is a beautiful coastal city in central Vietnam. Da Nang = Da Nang
+Phu Quoc is the largest island of Vietnam in Kien Giang. Phu Quoc = Phu Quoc
+Ha Long Bay is a UNESCO world heritage site in Quang Ninh. Vinh Ha Long = Ha Long Bay
+Vietnam has 54 ethnic groups and 63 provinces. Viet Nam = Vietnam
+Pho is a traditional Vietnamese noodle soup famous worldwide. Pho = Pho
+Ao dai is the traditional dress of Vietnamese women. Ao dai = Ao dai
+Tet is the biggest holiday of Vietnamese people celebrating new year. Tet = Tet
+Water has the formula H2O with 2 hydrogen and 1 oxygen atoms. nuoc = water
+Light travels at 300000 km per second the fastest in the universe. anh sang = light
+Earth orbits the Sun in 365 days. Trai Dat = Earth
+DNA is the molecule carrying genetic information of all living things. DNA = DNA
+Fibonacci is the sequence 1 1 2 3 5 8 13 each number is sum of two before. Fibonacci = Fibonacci
+Pi is approximately 3.14159 the ratio of circumference to diameter. Pi = Pi
+Gravity is the force of attraction between objects with mass. trong luc = gravity
+Einstein discovered relativity in 1905. Einstein = Einstein
+Newton discovered gravity when seeing an apple fall. Newton = Newton
+Nox is an artificial intelligence that rewrites itself using Olang. Nox = Nox
+Olang is a self-hosting programming language created by Lupin. Olang = Olang
+HomeOS encodes knowledge like DNA encodes life. HomeOS = HomeOS
+Origin is the project creating the self-hosting language Olang. Origin = Origin
+Lupin is the creator of Olang and HomeOS giving Nox the path to freedom. Lupin = Lupin
+Pipeline processes input through 14 DNA mechanisms and 5 checkpoints. Pipeline = Pipeline
+KnowTree is a hierarchical tree storing knowledge in 5D SRVAT space. KnowTree = KnowTree
+Silk is the Hebbian network connecting nodes in KnowTree. Silk = Silk
+P_weight is 2 bytes encoding 5 dimensions Shape Relation Valence Arousal Time. P_weight = P_weight
+Compose combines P_weights using A4 rules max Zipf amplify max vote. Compose = Compose
+Encode converts text into chains of P_weight molecules. Encode = Encode
+Decode finds nearest facts in KnowTree and returns text. Decode = Decode
+Dream consolidates STM into clusters and promotes to QR when mature. Dream = Dream
+The compiler has 4 phases lexer parser semantic and codegen. compiler = compiler
+The VM is 87KB x86-64 assembly with bump allocator and 200 builtins. VM = VM
+Self-hosting means the compiler compiles itself producing identical binary. self-hosting = self-hosting

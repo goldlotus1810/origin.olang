@@ -105,50 +105,36 @@ pub fn _kt_real_mol(_text) {
     let _tlen = len(_text);
     if _tlen == 0 { return 0; };
 
-    // Step 1: Compose SRVAT from real P_weights (semantic meaning)
-    let _s_max = [0]; let _r_max = [0]; let _v_sum = [0]; let _v_cnt = [0];
-    let _a_max = [0]; let _t_vote = [0, 0, 0, 0];
-    let _hash = [5381];  // djb2 hash for uniqueness within bucket
+    // Compose SRVAT: S,R,T from char P_weights. V,A from CONTENT hash.
+    // Hash ensures different text → different mol even with same char distribution.
+    let _s_max = [0]; let _r_max = [0];
+    let _t_vote = [0, 0, 0, 0];
+    let _hash = [5381];
 
     let _i = 0;
     while _i < _tlen {
         let _cp = __char_code(char_at(_text, _i));
         let _pw = p_weight(_cp);
-        // Hash for minor differentiation
         let _ = __set_at(_hash, 0, __bit_and((__array_get(_hash, 0) * 33) + _cp, 65535));
         if _pw > 0 {
             let _s = (__floor(_pw / 4096)) % 16;
             let _r = (__floor(_pw / 256)) % 16;
-            let _v = (__floor(_pw / 32)) % 8;
-            let _a = (__floor(_pw / 4)) % 8;
             let _t = _pw % 4;
-            // A4: S=max, R=max, V=accumulate, A=max, T=vote
             if _s > __array_get(_s_max, 0) { let _ = __set_at(_s_max, 0, _s); };
             if _r > __array_get(_r_max, 0) { let _ = __set_at(_r_max, 0, _r); };
-            let _ = __set_at(_v_sum, 0, __array_get(_v_sum, 0) + _v);
-            let _ = __set_at(_v_cnt, 0, __array_get(_v_cnt, 0) + 1);
-            if _a > __array_get(_a_max, 0) { let _ = __set_at(_a_max, 0, _a); };
             let _ = __set_at(_t_vote, _t, __array_get(_t_vote, _t) + 1);
         };
         let _i = _i + 1;
     };
 
-    // S, R from compose (SEMANTIC — similar content = similar S,R)
+    // S, R from char compose (structure: math symbols, arrows → high S/R)
     let _S = __array_get(_s_max, 0);
     let _R = __array_get(_r_max, 0);
-
-    // V = average (semantic) + hash low bits for uniqueness
-    let _vc = __array_get(_v_cnt, 0);
-    let _V = 4;
-    if _vc > 0 { let _V = __floor(__array_get(_v_sum, 0) / _vc); };
-    // Mix 1 bit of hash into V for differentiation (stays in same neighborhood)
-    let _V = __bit_and(_V + __bit_and(__array_get(_hash, 0), 1), 7);
-
-    // A = max (semantic) + hash bit
-    let _A = __array_get(_a_max, 0);
-    let _A = __bit_and(_A + __bit_and(__floor(__array_get(_hash, 0) / 2), 1), 7);
-
-    // T = vote
+    // V, A from hash (differentiation: different text → different V,A bucket)
+    let _h = __array_get(_hash, 0);
+    let _V = (__floor(_h / 32)) % 8;
+    let _A = (__floor(_h / 4)) % 8;
+    // T from vote
     let _T = 0; let _tm = __array_get(_t_vote, 0);
     if __array_get(_t_vote, 1) > _tm { let _T = 1; let _tm = __array_get(_t_vote, 1); };
     if __array_get(_t_vote, 2) > _tm { let _T = 2; let _tm = __array_get(_t_vote, 2); };
