@@ -51,5 +51,47 @@ pub fn nox_bootstrap() {
 pub fn nox_metrics() {
     return "facts:" + __to_string(kt_fact_count())
          + " stm:" + __to_string(stm_count())
+         + " goals:" + __to_string(goal_count())
          + " " + learning_status();
+}
+
+// G25: Failure recovery — log failures as negative knowledge
+let __fail_count = [0];
+
+pub fn nox_fail(_input, _reason) {
+    let _ = __set_at(__fail_count, 0, __array_get(__fail_count, 0) + 1);
+    // Mark this region as knowledge gap
+    nac_mark(_input);
+    // Add goal to learn about this topic
+    let _dim = mol_dominant_dim(_kt_real_mol(_input));
+    goal_add("gap_dim" + __to_string(_dim), 800);
+    return "logged failure #" + __to_string(__array_get(__fail_count, 0));
+}
+
+// G26: Session persistence
+pub fn nox_session_save() {
+    let _r = kt_save_state("nox_knowtree.dat");
+    // Append growth log
+    let _log = __to_string(__array_get(__fail_count, 0)) + " fails, "
+             + __to_string(kt_fact_count()) + " facts, "
+             + __to_string(stm_count()) + " stm\n";
+    __file_append("nox_growth.log", _log);
+    return _r;
+}
+
+pub fn nox_session_load() {
+    return kt_load_state("nox_knowtree.dat");
+}
+
+// G27: Self-evolution — measure → identify → report
+pub fn nox_evolve_check() {
+    let _facts = kt_fact_count();
+    let _fails = __array_get(__fail_count, 0);
+    let _goals = goal_count();
+    let _top = goal_top();
+    let _out = "Evolution: " + __to_string(_facts) + " facts";
+    let _out = _out + ", " + __to_string(_fails) + " fails";
+    let _out = _out + ", " + __to_string(_goals) + " goals";
+    if len(_top) > 0 { let _out = _out + ", top: " + _top; };
+    return _out;
 }

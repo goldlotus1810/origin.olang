@@ -128,9 +128,105 @@ pub fn dn_observe(fact) {
 }
 
 pub fn dn_count() { return len(_qr_facts); }
-pub fn qr_count() { return 0; }
+pub fn qr_count() { return len(__qr_proven); }
 pub fn learning_status() {
     return "DN:" + __to_string(len(_qr_facts))
+         + " QR:" + __to_string(len(__qr_proven))
          + " STM:" + __to_string(stm_count())
          + " Dream:" + __to_string(__array_get(__dream_count, 0));
 }
+
+// ═══ G14: Negative Knowledge — prohibited space ═══
+let __nac_prohibited = [];
+
+pub fn nac_mark(_text) {
+    push(__nac_prohibited, _kt_real_mol(_text));
+}
+
+pub fn nac_check(_mol) {
+    let _i = 0;
+    while _i < len(__nac_prohibited) {
+        if _kt_mol_dist(_mol, __array_get(__nac_prohibited, _i)) < 3 { return 1; };
+        let _i = _i + 1;
+    };
+    return 0;
+}
+
+// ═══ G14: QR promotion — fire count threshold ═══
+let __qr_proven = [];
+let __dn_fire = [];
+
+pub fn dn_fire_check() {
+    // Check if any DN fact has fired enough → promote to QR
+    let _i = 0;
+    while _i < len(_qr_facts) {
+        if _i < len(__dn_fire) {
+            let _fc = __array_get(__dn_fire, _i);
+            // Fibonacci threshold: 2,3,5,8,13...
+            if _fc >= 5 {
+                // Promote to QR
+                push(__qr_proven, __array_get(_qr_facts, _i));
+                let _ = __set_at(__dn_fire, _i, 0);
+            };
+        };
+        let _i = _i + 1;
+    };
+}
+
+// ═══ G19: Persistence — save/load KnowTree ═══
+pub fn kt_save_state(_path) {
+    let _out = "";
+    let _i = 0;
+    while _i < len(__kt_facts) {
+        let _out = _out + __array_get(__kt_facts, _i) + "\n";
+        let _i = _i + 1;
+    };
+    __file_write(_path, _out);
+    return "Saved " + __to_string(len(__kt_facts)) + " facts to " + _path;
+}
+
+pub fn kt_load_state(_path) {
+    let _c = __file_read(_path);
+    if len(_c) == 0 { return "empty"; };
+    let _count = [0];
+    let _start = [0];
+    let _i = 0;
+    while _i < len(_c) {
+        if __char_code(char_at(_c, _i)) == 10 {
+            let _line = substr(_c, __array_get(_start, 0), _i);
+            if len(_line) > 3 {
+                kt_learn(_line);
+                let _ = __set_at(_count, 0, __array_get(_count, 0) + 1);
+            };
+            let _ = __set_at(_start, 0, _i + 1);
+        };
+        let _i = _i + 1;
+    };
+    __heap_pin();
+    return "Loaded " + __to_string(__array_get(_count, 0)) + " facts from " + _path;
+}
+
+// ═══ G22: Goal System — self-directed learning ═══
+let __goals = [];
+
+pub fn goal_add(_domain, _priority) {
+    push(__goals, _domain);
+    push(__goals, _priority);
+}
+
+pub fn goal_top() {
+    if len(__goals) < 2 { return ""; };
+    let _best = [""]; let _bp = [0];
+    let _i = 0;
+    while _i < len(__goals) {
+        let _p = __array_get(__goals, _i + 1);
+        if _p > __array_get(_bp, 0) {
+            let _ = __set_at(_bp, 0, _p);
+            let _ = __set_at(_best, 0, __array_get(__goals, _i));
+        };
+        let _i = _i + 2;
+    };
+    return __array_get(_best, 0);
+}
+
+pub fn goal_count() { return __floor(len(__goals) / 2); }
