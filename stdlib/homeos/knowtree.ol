@@ -525,6 +525,8 @@ pub fn kt_load_aliases(_path) {
 // Pre-allocate with 8192 capacity to prevent relocation crash
 let __kt_facts = __array_with_cap(8192);
 let __kt_facts_mol = __array_with_cap(8192);
+let __kt_facts_fire = __array_with_cap(8192);    // fire count per fact
+let __kt_facts_maturity = __array_with_cap(8192); // 0=Formula, 1=Evaluating, 2=Mature
 let __kt_buckets = [];
 let __kt_bkt_ok = [0];
 
@@ -551,6 +553,7 @@ pub fn kt_learn_fast(_text) {
     let _idx = len(__kt_facts);
     push(__kt_facts, _text);
     push(__kt_facts_mol, _mol);
+    push(__kt_facts_fire, 0); push(__kt_facts_maturity, 0);
     push(__kt_buckets[(_kt_mol_s(_mol) * 16) + _kt_mol_r(_mol)], _idx);
     if _idx > 0 { kt_silk_fire(_mol, __array_get(__kt_facts_mol, _idx - 1)); };
     let _ = __set_at(__kt_learn_count, 0, __array_get(__kt_learn_count, 0) + 1);
@@ -564,6 +567,7 @@ pub fn kt_learn_raw(_text, _mol) {
     let _idx = len(__kt_facts);
     push(__kt_facts, _text);
     push(__kt_facts_mol, _mol);
+    push(__kt_facts_fire, 0); push(__kt_facts_maturity, 0);
     push(__kt_buckets[(_kt_mol_s(_mol) * 16) + _kt_mol_r(_mol)], _idx);
     return _idx;
 }
@@ -576,6 +580,7 @@ pub fn kt_learn(_text) {
     __heap_pin();
     push(__kt_facts, _text);
     push(__kt_facts_mol, _mol);
+    push(__kt_facts_fire, 0); push(__kt_facts_maturity, 0);
     push(__kt_buckets[(_kt_mol_s(_mol) * 16) + _kt_mol_r(_mol)], _idx);
     // Auto-silk with previous
     if _idx > 0 { kt_silk_fire(_mol, __array_get(__kt_facts_mol, _idx - 1)); };
@@ -599,6 +604,21 @@ pub fn kt_learn(_text) {
     __heap_pin();
     return _idx;
 }
+
+// Maturity: fire a fact index, advance lifecycle
+pub fn kt_fire(_idx) {
+    if _idx < 0 { return; };
+    if _idx >= len(__kt_facts_fire) { return; };
+    let _fc = __array_get(__kt_facts_fire, _idx) + 1;
+    let _ = __set_at(__kt_facts_fire, _idx, _fc);
+    // Advance: Formula(0)→Evaluating(1) when fire>0
+    let _mat = __array_get(__kt_facts_maturity, _idx);
+    if _mat == 0 { let _ = __set_at(__kt_facts_maturity, _idx, 1); };
+    // Advance: Evaluating(1)→Mature(2) when fire>=8 (Fib threshold)
+    if _mat == 1 { if _fc >= 8 { let _ = __set_at(__kt_facts_maturity, _idx, 2); }; };
+}
+pub fn kt_maturity(_idx) { if _idx >= 0 { if _idx < len(__kt_facts_maturity) { return __array_get(__kt_facts_maturity, _idx); }; }; return 0; }
+pub fn kt_fire_count(_idx) { if _idx >= 0 { if _idx < len(__kt_facts_fire) { return __array_get(__kt_facts_fire, _idx); }; }; return 0; }
 
 pub fn kt_nearest(_mol) {
     _bkt_init();
@@ -867,6 +887,7 @@ pub fn kt_load(_path) {
                         let _idx = len(__kt_facts);
                         push(__kt_facts, _fact);
                         push(__kt_facts_mol, _mol);
+    push(__kt_facts_fire, 0); push(__kt_facts_maturity, 0);
                         push(__kt_buckets[(_kt_mol_s(_mol) * 16) + _kt_mol_r(_mol)], _idx);
                         let _ = __set_at(_count, 0, __array_get(_count, 0) + 1);
                     };
