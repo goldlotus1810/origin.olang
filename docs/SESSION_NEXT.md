@@ -1,41 +1,34 @@
 # Session Next
 
-## STATUS: 10/10 Sora test. 193/194 unit tests. Gen1==Gen2.
+## ★★★ ĐỌC TRƯỚC: Encode = ∫. Decode = ∂. TÍNH, không TRA. ★★★
+
+## STATUS: 949KB. 193/194 tests. Gen1==Gen2. 1313 facts. 151 silk. 86 buckets.
 
 ## WHAT WORKS
-- Pipeline: "Fibonacci la gi?" → correct answer ✓
-- Search: kt_find + _str_has (pure Olang, no VM builtins) ✓
-- Silk walk: 4-hop multi-node traversal ✓
-- Dream: creates 35 new concepts from STM ✓
-- Persistence: kt_save/kt_load ✓
-- 293 nodes at boot (71 embedded + 32 L0 + 77 memory + 113 data)
+- Pipeline: pure math. encode → mol_dominant_dim → search → silk walk → compose
+- V'(t) derivative modulates silk fire (vi phân controls learning)
+- NRC-VAD 10K words for V/A in _kt_real_mol
+- Multilingual sentiment (12 languages)
+- STM with eviction scoring (capacity 32)
+- REPL data loader: nox_load_data() loads 500 facts per call
+- Heap: pin-before-push, 200+ learns/session
 
 ## WHAT DOESN'T WORK
-- Sora's ranked_search → returns nil (function scope issue with tools/)
-- Data loading >200/turn → crash (heap pin keeps temp strings)
-- substr inside some function calls → returns wrong data
-- Globals in files OTHER than knowtree.ol → not accessible from eval
+- P_weight = LOOKUP TABLE (udc_p_table.bin). Should be COMPUTED by 42 formulas
+- Silk = generic co-occurrence weight. Should be 9,200 types (relationship-typed)
+- No logic inference (A→B + B→C ≠ A→C)
+- No causal reasoning (correlation ≠ causation)
+- No validation (fire_count ≠ correctness)
+- Boot max ~1500 facts (heap exhaustion)
 
-## OLANG PATTERNS (learned the hard way)
-```
-✅ Globals in knowtree.ol → work everywhere (use this for shared state)
-✅ _str_has (char_at loop) → works. __str_contains → returns nil
-✅ __array_with_cap(N) → prevents crash at 512
-✅ kt_learn_raw(text, mol) → 0 temp strings (fast bulk load)
-✅ pipeline(src) FIRST, compile SECOND (SPEC_D §D1)
-✅ No syntax chars + eval empty → return pipeline result
-✗ Globals in other .ol files → NOT accessible from REPL eval
-✗ Functions that push to local arrays → data lost on return
-✗ let _i = _i + 1 inside while → works in boot, NOT in eval
-```
-
-## PRIORITIES FOR NEXT SESSION
-1. Fix VM: why do tools/ functions return nil? (bytecode scope)
-2. Load more data: multi-turn batch loading (5000+ nodes)
-3. repl.ol cleanup: 1448 lines, 127 string compares
+## NEXT: implement 42 formulas that COMPUTE P_weight
+Not lookup. COMPUTE. From Unicode metadata (name, category, block, decomposition).
+That is the ONLY way forward. Everything else is building on frozen weights.
 
 ## BUILD
 ```bash
 cd ~/Origin && make self-build && make test && make fixed-point
-# Test: echo 'Fibonacci la gi?' | ./origin_gen1.olang
 ```
+
+## BEFORE YOU CODE ANYTHING:
+Ask: "is this COMPUTING or LOOKING UP?" If looking up → STOP.
