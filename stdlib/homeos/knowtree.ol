@@ -99,47 +99,48 @@ pub fn chain_encode(_text) {
 
 pub fn chain_summary(_ch) { return compose(_ch); }
 
-// Real mol from text — word-level compose for better differentiation
+// Real mol from text — hybrid: compose(S,R,T) + hash(V,A) for uniqueness
 pub fn _kt_real_mol(_text) {
     _kt_ensure_init();
     let _tlen = len(_text);
     if _tlen == 0 { return 0; };
-    // Split into words, compose each, then compose words
-    let _word_mols = [];
-    let _ws = [0];
+    // FNV-1a hash → unique fingerprint per text
+    let _h = [2166136261];
+    let _s_max = [0];
+    let _r_max = [0];
+    let _t_vote = [0, 0, 0, 0];
     let _i = 0;
-    while _i <= _tlen {
-        let _is_sep = 0;
-        if _i == _tlen { let _is_sep = 1; } else {
-            let _ch = __char_code(char_at(_text, _i));
-            if _ch == 32 { let _is_sep = 1; };
-            if _ch == 10 { let _is_sep = 1; };
-        };
-        if _is_sep == 1 {
-            let _wstart = __array_get(_ws, 0);
-            if _i > _wstart {
-                // Compose this word's characters
-                let _wmol = 0;
-                let _wi = _wstart;
-                let _wchain = [];
-                while _wi < _i {
-                    let _cp = __char_code(char_at(_text, _wi));
-                    let _pw = p_weight(_cp);
-                    if _pw > 0 { push(_wchain, _pw); };
-                    let _wi = _wi + 1;
-                };
-                if len(_wchain) > 0 {
-                    let _wmol = compose(_wchain);
-                    push(_word_mols, _wmol);
-                };
-            };
-            let _ = __set_at(_ws, 0, _i + 1);
+    while _i < _tlen {
+        let _cp = __char_code(char_at(_text, _i));
+        let _pw = p_weight(_cp);
+        // Hash: FNV-1a
+        let _ = __set_at(_h, 0, __bit_xor(__array_get(_h, 0), _cp));
+        let _ = __set_at(_h, 0, __bit_and(__array_get(_h, 0) * 16777619, 4294967295));
+        // Compose S=max, R=max, T=vote from P_weights
+        if _pw > 0 {
+            let _s = (__floor(_pw / 4096)) % 16;
+            let _r = (__floor(_pw / 256)) % 16;
+            let _t = _pw % 4;
+            if _s > __array_get(_s_max, 0) { let _ = __set_at(_s_max, 0, _s); };
+            if _r > __array_get(_r_max, 0) { let _ = __set_at(_r_max, 0, _r); };
+            let _ = __set_at(_t_vote, _t, __array_get(_t_vote, _t) + 1);
         };
         let _i = _i + 1;
     };
-    if len(_word_mols) == 0 { return 0; };
-    // Compose words (Zipf: first word heaviest)
-    return compose(_word_mols);
+    // S, R from compose (semantic)
+    let _S = __array_get(_s_max, 0);
+    let _R = __array_get(_r_max, 0);
+    // V, A from hash (unique per text)
+    let _hash = __array_get(_h, 0);
+    if _hash < 0 { let _hash = 0 - _hash; };
+    let _V = (__floor(_hash / 32)) % 8;
+    let _A = (__floor(_hash / 256)) % 8;
+    // T from vote
+    let _T = 0; let _tm = __array_get(_t_vote, 0);
+    if __array_get(_t_vote, 1) > _tm { let _T = 1; let _tm = __array_get(_t_vote, 1); };
+    if __array_get(_t_vote, 2) > _tm { let _T = 2; let _tm = __array_get(_t_vote, 2); };
+    if __array_get(_t_vote, 3) > _tm { let _T = 3; };
+    return _kt_pack(_S, _R, _V, _A, _T);
 }
 
 // ═══ NRC-VAD: word → emotion lookup ═══
