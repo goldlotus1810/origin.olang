@@ -61,6 +61,12 @@ pub fn pipeline(input) {
         if len(_result) == 0 { return ""; };
     };
 
+    // STM push
+    stm_push(input);
+
+    // Dream check (every 8 turns)
+    if (__array_get(__v_idx, 0) % 8) == 0 { dream(); };
+
     // ConversationCurve tone
     let _tone = _curve_tone();
 
