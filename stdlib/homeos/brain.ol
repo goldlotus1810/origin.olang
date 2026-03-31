@@ -27,8 +27,11 @@ pub fn nox_bootstrap() {
     // Saved knowledge from previous sessions
     let _mem_n = kt_load("nox_memory.dat");
     __heap_pin();
+    // Multilingual sentiment (12 languages, V from labels — data file, not hardcode)
+    let _sent_n = kt_load("json/sentiment_precomputed.dat");
+    __heap_pin();
     let _boot = kt_fact_count();
-    let _stats = "L0:" + __to_string(_boot) + " VAD:" + __to_string(_vad_n) + " Mem:" + __to_string(_mem_n);
+    let _stats = "L0:" + __to_string(_boot) + " VAD:" + __to_string(_vad_n) + " Mem:" + __to_string(_mem_n) + " Sent:" + __to_string(_sent_n);
 
     // Fire semantic silk: facts in same bucket are RELATED → connect them
     _bkt_init();
