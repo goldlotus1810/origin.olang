@@ -12507,12 +12507,12 @@ builtin_jump_table:
     .quad   .builtin_slot_1
     .quad   .builtin_slot_2
     .quad   .builtin_slot_3
-    .quad   .call_not_builtin
+    .quad   .builtin_u16a
     .quad   .builtin_slot_5
     .quad   .builtin_slot_6
     .quad   .call_not_builtin
     .quad   .call_not_builtin
-    .quad   .builtin_slot_10_u16
+    .quad   .call_not_builtin
     .quad   .builtin_slot_10
     .quad   .call_not_builtin
     .quad   .builtin_slot_12
@@ -12580,12 +12580,12 @@ builtin_jump_table:
     .quad   .builtin_slot_74
     .quad   .call_not_builtin
     .quad   .call_not_builtin
-    .quad   .builtin_slot_78_u16
+    .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .builtin_slot_79
     .quad   .call_not_builtin
-    .quad   .builtin_slot_82_u16
     .quad   .call_not_builtin
+    .quad   .builtin_ktrd
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .call_not_builtin
@@ -12593,7 +12593,7 @@ builtin_jump_table:
     .quad   .builtin_slot_87
     .quad   .call_not_builtin
     .quad   .builtin_slot_89
-    .quad   .builtin_slot_91_u16
+    .quad   .call_not_builtin
     .quad   .builtin_slot_91
     .quad   .call_not_builtin
     .quad   .call_not_builtin
@@ -12657,7 +12657,7 @@ builtin_jump_table:
     .quad   .builtin_slot_151
     .quad   .call_not_builtin
     .quad   .builtin_slot_153
-    .quad   .call_not_builtin
+    .quad   .builtin_u16s
     .quad   .call_not_builtin
     .quad   .builtin_slot_156
     .quad   .call_not_builtin
@@ -12738,7 +12738,7 @@ builtin_jump_table:
     .quad   .call_not_builtin
     .quad   .builtin_slot_233
     .quad   .call_not_builtin
-    .quad   .call_not_builtin
+    .quad   .builtin_u16d
     .quad   .call_not_builtin
     .quad   .builtin_slot_237
     .quad   .call_not_builtin
@@ -12762,8 +12762,8 @@ builtin_jump_table:
 
 # ═══ Dual-Width u16 builtins (Phase 0.5) ═══════════════════════════════
 
-.builtin_slot_91_u16:
-    movabs  $0x169FC5E6777396DB, %rdx
+.builtin_u16a:
+    movabs  $0x708C104117D2D104, %rdx
     cmp     %rdx, %rax
     jne     .call_not_builtin
     add     %rcx, %r13
@@ -12779,8 +12779,8 @@ builtin_jump_table:
     movq    $F64_MARKER, 8(%r14)
     jmp     vm_loop
 
-.builtin_slot_78_u16:
-    movabs  $0x5278D1C30D8892CE, %rdx
+.builtin_u16s:
+    movabs  $0x708C224117D2EF9A, %rdx
     cmp     %rdx, %rax
     jne     .call_not_builtin
     add     %rcx, %r13
@@ -12797,8 +12797,8 @@ builtin_jump_table:
     movq    $F64_MARKER, 8(%r14)
     jmp     vm_loop
 
-.builtin_slot_82_u16:
-    movabs  $0xBA85ADC3487F7352, %rdx
+.builtin_ktrd:
+    movabs  $0x0B2D25CE47474352, %rdx
     cmp     %rdx, %rax
     jne     .call_not_builtin
     add     %rcx, %r13
@@ -12814,8 +12814,8 @@ builtin_jump_table:
     movq    $F64_MARKER, 8(%r14)
     jmp     vm_loop
 
-.builtin_slot_10_u16:
-    movabs  $0x19B784DB69D2118A, %rdx
+.builtin_u16d:
+    movabs  $0x708C0D4117D2CBEB, %rdx
     cmp     %rdx, %rax
     jne     .call_not_builtin
     add     %rcx, %r13
