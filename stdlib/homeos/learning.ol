@@ -12,44 +12,13 @@ let _qr_facts = [];        // QR: proven knowledge (permanent)
 let _qr_times = [];        // promotion timestamp
 let _dn_threshold = [3];   // fire count needed for promotion
 
-// NAC.mb: Negative knowledge (prohibited space)
-let _nac_facts = [];       // facts that are WRONG
-let _nac_reasons = [];     // why they're wrong
-let _nac_times = [];       // when marked negative
-
 // Hebbian co-activation: track recent observations for edge creation
 // Use boxed array ref so functions can update it
 let _hebb_recent_box = [[]];  // box containing the recent facts array
 let _hebb_window = [5];       // window size
 let _hebb_min_co = [2];       // minimum co-fires to create edge
 
-// F1: AAM auto-approve gate for ĐN→QR promotion
-fn _aam_approve(_aa_fact, _aa_fire) {
-    // Security: reject if NAC
-    if nac_check(_aa_fact) == 1 { return 0; };
-    // Quality: fire count must reach threshold
-    if _aa_fire < _dn_threshold[0] { return 0; };
-    // Contradiction: check if any QR contradicts this
-    let _aa_mol = _kt_real_mol(_aa_fact);
-    let _aa_qi = 0;
-    while _aa_qi < len(_qr_facts) {
-        if len(_qr_facts[_aa_qi]) > 0 {
-            let _aa_qmol = _kt_real_mol(_qr_facts[_aa_qi]);
-            // D2②: d_V > 0.8 normalized (5.6/7 → >= 6), d_R < 0.2 (3/15 → < 3)
-            let _aa_dv = _kt_mol_v(_aa_mol) - _kt_mol_v(_aa_qmol);
-            if _aa_dv < 0 { let _aa_dv = 0 - _aa_dv; };
-            let _aa_dr = _kt_mol_r(_aa_mol) - _kt_mol_r(_aa_qmol);
-            if _aa_dr < 0 { let _aa_dr = 0 - _aa_dr; };
-            if _aa_dv >= 6 { if _aa_dr < 3 { return 0; }; };
-        };
-        let _aa_qi = _aa_qi + 1;
-    };
-    return 1;
-}
-
 pub fn dn_observe(fact) {
-    // NAC check: reject if in prohibited space
-    if nac_check(fact) == 1 { return "NAC (prohibited: " + fact + ")"; };
     // Check if already QR (proven) — reinforce, don't duplicate
     let _do_qi = 0;
     while _do_qi < len(_qr_facts) {
@@ -66,9 +35,9 @@ pub fn dn_observe(fact) {
         if _dn_facts[_do_di] == fact {
             set_at(_dn_fire, _do_di, _dn_fire[_do_di] + 1);
             let _do_count = _dn_fire[_do_di];
-            // Check promotion: fire >= threshold + AAM gate
-            if _aam_approve(fact, _do_count) == 1 {
-                // AAM approved → Promote to QR!
+            // Check promotion: fire >= threshold
+            if _do_count >= _dn_threshold[0] {
+                // Promote to QR!
                 push(_qr_facts, fact);
                 push(_qr_times, _fmt_ts(__timestamp()));
                 // Record promotion in knowledge graph
@@ -179,84 +148,6 @@ pub fn learning_stats() {
     return "ĐN: " + __to_string(_ls_dn) + " learning, QR: " + __to_string(len(_qr_facts)) + " proven, threshold: " + __to_string(_dn_threshold[0]);
 }
 
-// ════════════════════════════════════════════════════════════════
-// E6: NAC.mb — Negative knowledge (prohibited space)
-// ════════════════════════════════════════════════════════════════
-
-// Mark a fact as wrong (move from ĐN/QR to NAC)
-pub fn nac_mark(_nm_fact, _nm_reason) {
-    // Check if already NAC
-    let _nm_i = 0;
-    while _nm_i < len(_nac_facts) {
-        if _nac_facts[_nm_i] == _nm_fact { return "NAC (already marked)"; };
-        let _nm_i = _nm_i + 1;
-    };
-    // Remove from ĐN if present
-    let _nm_di = 0;
-    while _nm_di < len(_dn_facts) {
-        if _dn_facts[_nm_di] == _nm_fact {
-            set_at(_dn_facts, _nm_di, "");
-            set_at(_dn_fire, _nm_di, 0);
-        };
-        let _nm_di = _nm_di + 1;
-    };
-    // Remove from QR if present
-    let _nm_qi = 0;
-    while _nm_qi < len(_qr_facts) {
-        if _qr_facts[_nm_qi] == _nm_fact {
-            set_at(_qr_facts, _nm_qi, "");
-        };
-        let _nm_qi = _nm_qi + 1;
-    };
-    // Add to NAC
-    push(_nac_facts, _nm_fact);
-    push(_nac_reasons, _nm_reason);
-    push(_nac_times, _fmt_ts(__timestamp()));
-    kg_add(_nm_fact, "status", "NAC");
-    kg_add(_nm_fact, "nac_reason", _nm_reason);
-    return "NAC (marked as wrong: " + _nm_reason + ")";
-}
-
-// Check if a fact is in prohibited space
-pub fn nac_check(_nc_fact) {
-    let _nc_i = 0;
-    while _nc_i < len(_nac_facts) {
-        if _nac_facts[_nc_i] == _nc_fact { return 1; };
-        let _nc_i = _nc_i + 1;
-    };
-    return 0;
-}
-
-// Recovery: reincarnate a concept (remove from NAC, re-observe as ĐN)
-pub fn nac_recover(_nr_fact) {
-    let _nr_i = 0;
-    while _nr_i < len(_nac_facts) {
-        if _nac_facts[_nr_i] == _nr_fact {
-            set_at(_nac_facts, _nr_i, "");
-            set_at(_nac_reasons, _nr_i, "");
-            kg_add(_nr_fact, "status", "recovered");
-            // Re-observe as fresh ĐN
-            dn_observe(_nr_fact);
-            return "Recovered: " + _nr_fact;
-        };
-        let _nr_i = _nr_i + 1;
-    };
-    return "Not found in NAC";
-}
-
-// List all negative knowledge
-pub fn nac_list() {
-    let _nl_result = [];
-    let _nl_i = 0;
-    while _nl_i < len(_nac_facts) {
-        if len(_nac_facts[_nl_i]) > 0 {
-            push(_nl_result, "NAC[" + _nac_reasons[_nl_i] + "] " + _nac_facts[_nl_i]);
-        };
-        let _nl_i = _nl_i + 1;
-    };
-    return _nl_result;
-}
-
 pub fn learning_save(path) {
     let _lsv_out = "";
     // Save QR first (permanent)
@@ -273,16 +164,8 @@ pub fn learning_save(path) {
         };
         let _lsv_di = _lsv_di + 1;
     };
-    // Save NAC (negative)
-    let _lsv_ni = 0;
-    while _lsv_ni < len(_nac_facts) {
-        if len(_nac_facts[_lsv_ni]) > 0 {
-            _lsv_out = _lsv_out + "NAC|" + _nac_times[_lsv_ni] + "|" + _nac_reasons[_lsv_ni] + "|" + _nac_facts[_lsv_ni] + "\n";
-        };
-        let _lsv_ni = _lsv_ni + 1;
-    };
     __file_write(path, _lsv_out);
-    return len(_qr_facts) + len(_dn_facts) + len(_nac_facts);
+    return len(_qr_facts) + len(_dn_facts);
 }
 
 pub fn learning_load(path) {

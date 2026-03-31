@@ -1,61 +1,49 @@
 # Session Tiep Theo
 
-## DA XONG:
+## TRẠNG THÁI: G COMPLETE — Sẵn sàng code
+
+### Đã xong:
+- Phase 0-1 code (cũ, cần viết lại)
+- **SPEC_G_COMPLETE.md** — 27 sections, toàn bộ thuật toán triển khai A-F
+- Mọi mâu thuẫn giữa tài liệu đã giải quyết (G0)
+- Mọi thắc mắc đã tìm đáp án trong A-F + UDC docs + SPEC_v3
+
+### BƯỚC TIẾP THEO: Viết lại từ đầu
+
+Code hiện tại = tích lũy lỗi qua nhiều session. Không sửa. Viết lại.
+
 ```
-Phase 0: Fix 5 SAI ✅
-  ✅ kt_classify thay instinct if/else (threshold 60 = 3/5 majority)
-  ✅ Molecular search primary, text fallback
-  ✅ Emotion từ P_weight, bỏ keyword lists
-  ✅ Compose fusion dùng A4 rules (S=max, R=Zipf, V=amplify, A=max, T=vote)
-
-Phase 1: Brain Core ✅
-  ✅ Silk walk multi-hop depth 3 (kt_silk_walk + kt_silk_weight in knowtree.ol)
-  ✅ Chain recombination (chain_recombine in pipeline.ol)
-  ✅ Decode ∂ real (kt_decode full 5D ranking, top-8 results)
-  ✅ STM eviction scoring + WM 4 slots (recency+emo+knowledge)
-  ✅ Homeostasis F(t) mode switching (LEARN: silk fire + "Co the:" prefix)
-  ✅ ConversationCurve V'(t), V''(t) (D7 tone selection + ΔV_max clamp)
-```
-
-## ĐỌC TRƯỚC KHI LÀM GÌ:
-1. **SPEC_A_FOUNDATION.md** — SDF, P_weight, Encode ∫, Compose, Decode ∂
-2. **SPEC_B_STRUCTURE.md** — Chain, KnowTree (L0 center), Silk 9,200 types, QR
-3. **SPEC_C_NEURON.md** — Vòng đời, vật lý, 9 QT
-4. **SPEC_D_PIPELINE.md** — 14 mechanisms, 7 instinct formulas, 5 checkpoints
-5. **SPEC_E_ORGANISM.md** — Capture, Silk triple-duty, Chain gen, Memory, Self-model, NAC.mb
-6. **SPEC_F_AGENT.md** — Hiện tại: AAM gate + self-modify + actuators + scheduler
-7. **SPEC_G_CODE_AUDIT.md** — 12 đúng, 5 SAI (đã fix), 22 thiếu (6 done), 4 phases
-8. **SPEC_UNIFIED.md** — Index tổng
-
-## HIỂU TRƯỚC KHI LÀM:
-- S = SDF (hàm khoảng cách, tĩnh). T = Spline (hàm theo thời gian, động)
-- Silk = 3 vai trò: phân loại + định vị + liên kết
-- Trong chain: structural silk (0 bytes). Giữa nhánh: Hebbian silk
-- P_weight + Silk thay thế ISL. 16 bits đủ.
-- Compose IS fusion. Không cần fusion riêng
-- Emotion = V/A trong P_weight. Organism state = ConversationCurve V(t)
-- A-D = não. Sai 1 nhịp = sụp đổ.
-
-## IMPLEMENT THEO THỨ TỰ (SPEC_G):
-```
-Phase 2: Brain Health
-  □ Dream consolidation thật (cross-group resonance, not just count)
-  □ Immune Selection 3 branches (real entropy comparison)
-  □ DNA Repair dimension-level (fix weakest dimension only)
-  □ Silk decay φ⁻¹ per 24h
-  □ Pipeline checkpoints CP2-4
-  □ Instinct formulas (confidence, contradiction, causality...)
-
-Phase 3: Expand
-  □ Camera/Audio/Interoception encoders
-  □ Self-model
-  □ NAC.mb negative knowledge + recovery
-
-Phase 4: Agent
-  □ AAM gate + scheduler + verify loop
+THỨ TỰ IMPLEMENT (theo G):
+  1. G2  Core math (pack, compose, distance, dominant_dim)
+  2. G3  Encode ∫ (text → chain)
+  3. G1  Data structures (KnowTree tree, SilkIndex, STM, WM)
+  4. G5  KnowTree ops (insert, nearest, classify)
+  5. G6  Silk ops (walk, fire, decay)
+  6. G4  Decode ∂ (lookup + generative)
+  7. G9  Instincts (7 formulas)
+  8. G10 SecurityGate (Bloom filter)
+  9. G11 Homeostasis + ConversationCurve
+  10. G12 Immune Selection + DNA Repair
+  11. G8  Pipeline (14 steps, 5 checkpoints) — wires everything together
+  12. G7  Memory (STM eviction, dream)
+  13. G13-G14 Self-model + NAC
+  14. G17 Agent cycle
+  15. G18-G19 Bootstrap + Persistence
+  16. G22-G27 Meta (goals, metrics, failure recovery, persistence, evolution)
 ```
 
-## Build:
+### QUY TẮC:
+- Mỗi step: viết code → `make test && make fixed-point`
+- G23: HIỂU = tính tay được. Tính tay test cases TRƯỚC khi code
+- Không skip step. Không check done khi chưa test
+- Mỗi thuật toán = tham chiếu G section. Không tự sáng tạo
+
+### ĐỌC TRƯỚC KHI LÀM GÌ:
+1. **SPEC_G_COMPLETE.md** — THE implementation guide (27 sections)
+2. **SPEC_A_FOUNDATION.md** — nếu thắc mắc → quay về A
+3. **CLAUDE.md** — build rules
+
+### Build:
 ```bash
 cd ~/Origin && make vm && make self-build && make test && make fixed-point
 ```

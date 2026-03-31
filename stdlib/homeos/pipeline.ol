@@ -247,14 +247,9 @@ pub fn instinct_honesty(_ih_mol, _ih_facts) {
         let _ih_cons = 200 - __floor(_ih_d * 200 / 47);
         if _ih_cons < 0 { let _ih_cons = 0; };
     };
-    // Silk connectivity → 0-300 (fast: single lookup, no self_model scan)
-    let _ih_silk2 = 0;
-    if _ih_nfacts >= 2 {
-        let _ih_fm0 = _kt_fast_mol(__array_get(_ih_facts, 0));
-        let _ih_fm1 = _kt_fast_mol(__array_get(_ih_facts, 1));
-        let _ih_silk2 = __floor(kt_silk_weight(_ih_fm0, _ih_fm1) * 300 / 1000);
-    };
-    return _ih_silk + _ih_src + _ih_cons + _ih_silk2;
+    // fire_count: best fire from KnowTree silk → 0-300
+    let _ih_fire = 0;
+    return _ih_silk + _ih_src + _ih_cons + _ih_fire;
 }
 
 // ② Contradiction: V distance high + R distance low = contradict
@@ -341,26 +336,12 @@ pub fn compose(_co_mols) {
     let _co_rw = __array_get(_co_r_wsum, 0);
     let _co_rr = 0;
     if _co_rw > 0 { let _co_rr = (__floor(__array_get(_co_r_sum, 0) / _co_rw)) % 16; };
-    // V = amplify: base + sign × |spread| × 0.5 (spec A4)
-    // "Cortisol + adrenaline → stress STRONGER than each alone"
+    // V = amplify: base + sign(sum) × boost
     let _co_vsum = __array_get(_co_v_sum, 0);
     let _co_vbase = __floor(_co_vsum / _co_n);
-    // Spread = max deviation from base across all inputs
-    let _co_vspread = [0];
-    let _co_vi = 0;
-    while _co_vi < _co_n {
-        let _co_vm = __array_get(_co_mols, _co_vi);
-        let _co_vdev = _kt_mol_v(_co_vm) - _co_vbase;
-        if _co_vdev < 0 { let _co_vdev = 0 - _co_vdev; };
-        if _co_vdev > __array_get(_co_vspread, 0) { let _ = __set_at(_co_vspread, 0, _co_vdev); };
-        let _co_vi = _co_vi + 1;
-    };
-    // Boost = spread / 2 (amplify, not average)
-    let _co_vboost = __floor(__array_get(_co_vspread, 0) / 2);
-    // Sign: if sum > neutral (4*n), positive boost; else negative
-    let _co_rv = _co_vbase;
-    if _co_vsum > (_co_n * 4) { let _co_rv = _co_vbase + _co_vboost; };
-    if _co_vsum < (_co_n * 4) { let _co_rv = _co_vbase - _co_vboost; };
+    let _co_vdiff = _co_vsum - (_co_vbase * _co_n);
+    let _co_vboost = __floor(_co_vdiff / _co_n);
+    let _co_rv = _co_vbase + _co_vboost;
     if _co_rv > 7 { let _co_rv = 7; };
     if _co_rv < 0 { let _co_rv = 0; };
     // A = max
@@ -547,29 +528,19 @@ pub fn dna_repair(_dr_response_mol, _dr_input_mol, _dr_max_iter) {
 // Quality critique: 0-1000 score
 // 0.30×valid + 0.30×(1−H/2320) + 0.20×distance + 0.20×silk
 fn _critique(_cq_mol, _cq_input_mol) {
-    // D5: 0.30×valid + 0.30×(1−H/2.32) + 0.20×consistency + 0.20×silk
-    // ── Term 1: valid (0-300) ──
+    // Valid: is this mol non-zero and in a populated bucket?
     let _cq_valid = 0;
     if _cq_mol > 0 {
         let _cq_s = _kt_mol_s(_cq_mol);
         let _cq_bucket = kt_get_dim(0, _cq_s);
-        if len(_cq_bucket) > 0 { let _cq_valid = 300; };
+        if len(_cq_bucket) > 0 { let _cq_valid = 1000; };
     };
-    // ── Term 2: 1 - H/2.32 (0-300) — low entropy = confident ──
-    let _cq_s_val = _kt_mol_s(_cq_mol);
-    let _cq_facts = kt_get_dim(0, _cq_s_val);
-    let _cq_h = _is_fact_entropy(_cq_facts);
-    // H scaled ×1000, max useful H ≈ 2320 (log2(5) × 1000)
-    let _cq_h_norm = 300 - __floor(_cq_h * 300 / 2320);
-    if _cq_h_norm < 0 { let _cq_h_norm = 0; };
-    // ── Term 3: consistency = distance to input (0-200) ──
+    // Distance to input (closer = better, invert)
     let _cq_dist = _kt_mol_dist(_cq_mol, _cq_input_mol);
-    let _cq_cons = 200 - __floor(_cq_dist * 200 / 47);
-    if _cq_cons < 0 { let _cq_cons = 0; };
-    // ── Term 4: silk weight to input (0-200) ──
-    let _cq_silk = __floor(kt_silk_weight(_cq_mol, _cq_input_mol) * 200 / 1000);
-    if _cq_silk > 200 { let _cq_silk = 200; };
-    return _cq_valid + _cq_h_norm + _cq_cons + _cq_silk;
+    let _cq_dist_score = 1000 - (__floor(_cq_dist * 1000 / 47));
+    if _cq_dist_score < 0 { let _cq_dist_score = 0; };
+    // Simple quality: 50% valid + 50% distance
+    return __floor((_cq_valid * 500 + _cq_dist_score * 500) / 1000);
 }
 
 // Fix the weakest (most distant) dimension
@@ -621,9 +592,9 @@ pub fn pipeline(_pl_input) {
     let _pl_chain = chain_encode(_pl_input);
     let _pl_chain_mol = chain_summary(_pl_chain);
 
-    // ⑩ Encode: text → molecule + context
-    // sense_capture NOT in hot path (causes gen1 hang). Call via /sense command.
+    // ⑩ Fusion: text mol + context (V/A from P_weight, not keyword lists)
     let _pl_text_mol = _kt_fast_mol(_pl_input);
+    // WM slot 0 = query, slot 1 = context (previous result)
     wm_set(0, _pl_text_mol);
     let _pl_context = wm_get(3);
     let _pl_fused = fusion(_pl_text_mol, 0, _pl_context);
@@ -632,38 +603,24 @@ pub fn pipeline(_pl_input) {
 
     // ⑬ Pronoun resolution: replace "it"/"that" with last topic
     let _pl_resolved = _pl_resolve_pronouns(_pl_input);
-    // Search strategy depends on instinct:
-    // QUESTION → text search first (keywords matter), molecular fallback
-    // Everything else → molecular first (5D meaning), text fallback
-    // NOTE: use _pl_facts_box[0] pattern to survive Olang block scoping
-    let _pl_facts_box = [[]];
-    if _pl_safe.instinct == "QUESTION" {
-        let _ = __set_at(_pl_facts_box, 0, _pl_text_search(_pl_resolved));
-        if len(__array_get(_pl_facts_box, 0)) == 0 {
-            let _pl_mol_dec = kt_decode(_pl_resolved);
-            let _ = __set_at(_pl_facts_box, 0, _pl_mol_dec.facts);
-        };
-    } else {
-        let _pl_mol_dec = kt_decode(_pl_resolved);
-        let _ = __set_at(_pl_facts_box, 0, _pl_mol_dec.facts);
-        if len(__array_get(_pl_facts_box, 0)) == 0 {
-            let _ = __set_at(_pl_facts_box, 0, _pl_text_search(_pl_resolved));
+    // Search: MOLECULAR FIRST (5D P_weight), text fallback
+    let _pl_mol_dec = kt_decode(_pl_resolved);
+    let _pl_facts = _pl_mol_dec.facts;
+    // Silk walk: follow associations depth 3, threshold 10 (weak links OK)
+    if len(_pl_facts) > 0 {
+        let _pl_sw_mol = _kt_fast_mol(__array_get(_pl_facts, 0));
+        let _pl_silk = kt_silk_walk(_pl_sw_mol, 3, 10);
+        let _pl_swi = 0;
+        while _pl_swi < len(_pl_silk) {
+            if len(_pl_facts) < 10 {
+                push(_pl_facts, __array_get(_pl_silk, _pl_swi).text);
+            };
+            let _pl_swi = _pl_swi + 1;
         };
     };
-    let _pl_facts = __array_get(_pl_facts_box, 0);
-    // Silk walk: enrich with associated knowledge (skip for exact text matches)
-    if len(_pl_facts) > 0 {
-        if len(_pl_facts) < 3 {
-            let _pl_sw_mol = _kt_fast_mol(__array_get(_pl_facts, 0));
-            let _pl_silk = kt_silk_walk(_pl_sw_mol, 3, 10);
-            let _pl_swi = 0;
-            while _pl_swi < len(_pl_silk) {
-                if len(_pl_facts) < 10 {
-                    push(_pl_facts, __array_get(_pl_silk, _pl_swi).text);
-                };
-                let _pl_swi = _pl_swi + 1;
-            };
-        };
+    // Fallback: text search if molecular + silk found nothing
+    if len(_pl_facts) == 0 {
+        let _pl_facts = _pl_text_search(_pl_resolved);
     };
 
     // ⑫ Homeostasis: surprise detection
@@ -677,8 +634,6 @@ pub fn pipeline(_pl_input) {
     let _pl_inst = _pl_safe;
     if _pl_inst.instinct == "GREETING" { return instinct_act(_pl_inst, _pl_input); };
     if _pl_inst.instinct == "META" { return instinct_act(_pl_inst, _pl_input); };
-    if _pl_inst.instinct == "EMOTION" { return instinct_act(_pl_inst, _pl_input); };
-    if _pl_inst.instinct == "REFERENCE" { return instinct_act(_pl_inst, _pl_input); };
 
     if len(_pl_facts) == 0 {
         if _pl_home.mode == "LEARN" { dn_observe(_pl_input); kt_learn(_pl_input); __file_append("homeos.knowledge", _pl_input + "\n"); __heap_pin(); return "Toi se hoc them ve dieu nay."; };
@@ -712,10 +667,6 @@ pub fn pipeline(_pl_input) {
     };
     // DNA repair: improve composed mol quality (max 3 iterations)
     let _pl_repaired = dna_repair(_pl_composed, _pl_fused, 3);
-    // Use repaired mol for response selection (closer to input = better match)
-    if _pl_repaired != _pl_composed {
-        let _pl_composed = _pl_repaired;
-    };
 
     // Track topic for follow-up questions
     let _pl_topic_words = _pl_split_words(_pl_resolved);
