@@ -24,7 +24,7 @@
 
 # ── Constants ────────────────────────────────────────────────────────────
 .equ STACK_SIZE,    0x1000000       # 16 MB VM stack
-.equ HEAP_SIZE,     0x40000000      # 1 GB heap arena
+.equ HEAP_SIZE,     0x100000000     # 4 GB heap arena (was 1GB)
 .equ HEADER_SIZE,   32
 .equ ELF_HEADER_SIZE, 120           # ELF64 header + 1 program header
 .equ F64_MARKER,    -1              # len = 0xFFFFFFFFFFFFFFFF means f64
@@ -277,7 +277,7 @@ _start:
     # Allocate heap
     mov     $SYS_MMAP, %eax
     xor     %edi, %edi
-    mov     $HEAP_SIZE, %esi            # 16 MB
+    movabs  $HEAP_SIZE, %rsi            # 4 GB heap (64-bit register for >4GB)
     mov     $PROT_RW, %edx
     mov     $MAP_PRIV_ANON, %r10d
     mov     $-1, %r8d
