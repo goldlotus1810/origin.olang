@@ -499,7 +499,7 @@ pub fn kt_word_lookup(_w) {
 }
 
 // String contains: check if haystack contains needle (pure Olang, no builtins)
-fn _str_has(_hay, _needle) {
+pub fn _str_has(_hay, _needle) {
     let _hlen = len(_hay);
     let _nlen = len(_needle);
     if _nlen == 0 { return 1; };
