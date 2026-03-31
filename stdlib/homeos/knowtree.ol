@@ -121,6 +121,23 @@ pub fn kt_learn(_text) {
     push(__kt_facts, _text);
     push(__kt_facts_mol, _mol);
     push(__kt_buckets[(_kt_mol_s(_mol) * 16) + _kt_mol_r(_mol)], _idx);
+    // G20: Index words for O(1) lookup
+    _widx_init();
+    let _wi = 0; let _ws = [0];
+    while _wi <= len(_text) {
+        let _is_space = 0;
+        if _wi == len(_text) { let _is_space = 1; } else {
+            let _ch = __char_code(char_at(_text, _wi));
+            if _ch == 32 { let _is_space = 1; };
+            if _ch == 10 { let _is_space = 1; };
+        };
+        if _is_space == 1 {
+            let _word = substr(_text, __array_get(_ws, 0), _wi);
+            _widx_add(_word, _idx);
+            let _ = __set_at(_ws, 0, _wi + 1);
+        };
+        let _wi = _wi + 1;
+    };
     __heap_pin();
     return _idx;
 }
@@ -151,7 +168,52 @@ pub fn kt_nearest(_mol) {
     return __array_get(__kt_facts, _idx);
 }
 
+// G20: Word index — O(1) word → fact indices
+let __kt_widx = [];
+let __kt_widx_ok = [0];
+
+fn _widx_init() {
+    if __array_get(__kt_widx_ok, 0) == 1 { return; };
+    let _ = __set_at(__kt_widx_ok, 0, 1);
+    let _i = 0; while _i < 256 { push(__kt_widx, []); let _i = _i + 1; };
+}
+
+fn _widx_hash(_w) {
+    let _h = [0]; let _i = 0;
+    while _i < len(_w) {
+        let _ = __set_at(_h, 0, __bit_and((__array_get(_h, 0) * 31) + __char_code(char_at(_w, _i)), 255));
+        let _i = _i + 1;
+    };
+    return __array_get(_h, 0);
+}
+
+fn _widx_add(_word, _fidx) {
+    _widx_init();
+    if len(_word) < 3 { return; };
+    push(__kt_widx[_widx_hash(_word)], _fidx);
+}
+
+pub fn kt_word_lookup(_w) {
+    _widx_init();
+    if len(_w) < 3 { return []; };
+    return __kt_widx[_widx_hash(_w)];
+}
+
 pub fn kt_find(_q, _max) {
+    // Try word index first (O(1))
+    _widx_init();
+    let _indices = kt_word_lookup(_q);
+    if len(_indices) > 0 {
+        let _out = []; let _i = 0;
+        while _i < len(_indices) {
+            if len(_out) >= _max { return _out; };
+            let _fi = __array_get(_indices, _i);
+            if _fi < len(__kt_facts) { push(_out, __array_get(__kt_facts, _fi)); };
+            let _i = _i + 1;
+        };
+        if len(_out) > 0 { return _out; };
+    };
+    // Fallback: linear scan
     let _out = []; let _i = 0;
     while _i < len(__kt_facts) {
         if len(_out) >= _max { return _out; };
