@@ -15,14 +15,10 @@ let __boot_learned = 0;
 fn _boot_learn() {
     if __boot_learned == 1 { return; };
     let __boot_learned = 1;
-    // Init L2 tree structure
     _kt_boot_tree();
-    // Load persistent KnowTree first
-    kt_load("homeos.knowledge");
-    // If empty, load embedded facts directly into KnowTree
-    if len(__kt_facts) == 0 {
-        _boot_embedded_kt();
-    };
+    _boot_embedded_kt();
+    // Load ALL data: L0 registry + saved memory + pre-built knowledge
+    nox_bootstrap();
 }
 
 fn _boot_embedded_kt() {

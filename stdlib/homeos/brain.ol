@@ -29,6 +29,32 @@ pub fn nox_bootstrap() {
     let _boot = kt_fact_count();
     let _stats = _stats + "L0:" + __to_string(_boot) + " Mem:" + __to_string(_mem_n) + " Data:" + __to_string(_data_n);
 
+    // Fire semantic silk: facts in same bucket are RELATED → connect them
+    _bkt_init();
+    let _silk_n = [0];
+    let _bi = 0;
+    while _bi < 256 {
+        let _bkt = __kt_buckets[_bi];
+        let _blen = len(_bkt);
+        if _blen >= 2 {
+            // Connect first 10 pairs in bucket (O(n) not O(n²))
+            let _j = 0;
+            while _j < _blen {
+                if _j >= 10 { let _j = _blen; } else {
+                    if _j > 0 {
+                        let _m1 = __array_get(__kt_facts_mol, __array_get(_bkt, _j));
+                        let _m2 = __array_get(__kt_facts_mol, __array_get(_bkt, _j - 1));
+                        kt_silk_fire(_m1, _m2);
+                        let _ = __set_at(_silk_n, 0, __array_get(_silk_n, 0) + 1);
+                    };
+                };
+                let _j = _j + 1;
+            };
+        };
+        let _bi = _bi + 1;
+    };
+    let _stats = _stats + " Silk:" + __to_string(__array_get(_silk_n, 0));
+
     __heap_pin();
     return _stats;
 }

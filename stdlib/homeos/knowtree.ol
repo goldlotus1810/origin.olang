@@ -468,8 +468,31 @@ pub fn kt_word_lookup(_w) {
     return __kt_widx[_widx_hash(_w)];
 }
 
+// String contains: check if haystack contains needle (pure Olang, no builtins)
+fn _str_has(_hay, _needle) {
+    let _hlen = len(_hay);
+    let _nlen = len(_needle);
+    if _nlen == 0 { return 1; };
+    if _nlen > _hlen { return 0; };
+    let _i = 0;
+    while _i <= _hlen - _nlen {
+        let _match = [1];
+        let _j = 0;
+        while _j < _nlen {
+            if char_at(_hay, _i + _j) != char_at(_needle, _j) {
+                let _ = __set_at(_match, 0, 0);
+                let _j = _nlen;
+            };
+            let _j = _j + 1;
+        };
+        if __array_get(_match, 0) == 1 { return 1; };
+        let _i = _i + 1;
+    };
+    return 0;
+}
+
 pub fn kt_find(_q, _max) {
-    // Word index → candidates → VERIFY with __str_contains
+    // Word index → candidates → VERIFY with _str_has
     _widx_init();
     let _indices = kt_word_lookup(_q);
     let _out = [];
@@ -481,7 +504,7 @@ pub fn kt_find(_q, _max) {
             if _fi < len(__kt_facts) {
                 let _fact = __array_get(__kt_facts, _fi);
                 // VERIFY: fact must actually contain query
-                if __str_contains(_fact, _q) { push(_out, _fact); };
+                if _str_has(_fact, _q) { push(_out, _fact); };
             };
             let _i = _i + 1;
         };
@@ -491,7 +514,7 @@ pub fn kt_find(_q, _max) {
     let _i = 0;
     while _i < len(__kt_facts) {
         if len(_out) >= _max { return _out; };
-        if __str_contains(__array_get(__kt_facts, _i), _q) { push(_out, __array_get(__kt_facts, _i)); };
+        if _str_has(__array_get(__kt_facts, _i), _q) { push(_out, __array_get(__kt_facts, _i)); };
         let _i = _i + 1;
     };
     return _out;
