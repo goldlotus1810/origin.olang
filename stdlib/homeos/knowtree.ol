@@ -48,8 +48,23 @@ pub fn mol_get_dim(_m, _d) {
 
 pub fn mol_dim_range(_d) { if _d <= 1 { return 15; }; if _d <= 3 { return 7; }; return 3; }
 
-// G2: Compose (A4: S=max R=Zipf V=amplify A=max T=vote)
+// G2: Compose — now uses mol_lca (biological, not average)
 pub fn compose(_mols) {
+    let _n = len(_mols);
+    if _n == 0 { return 0; };
+    if _n == 1 { return __array_get(_mols, 0); };
+    // Pairwise LCA with Zipf weighting (first element heaviest)
+    let _result = __array_get(_mols, 0);
+    let _i = 1;
+    while _i < _n {
+        let _result = mol_lca(_result, __array_get(_mols, _i));
+        let _i = _i + 1;
+    };
+    return _result;
+}
+
+// G2: Compose legacy (kept for backward compat, used by chain_summary)
+pub fn compose_legacy(_mols) {
     let _n = len(_mols);
     if _n == 0 { return 0; };
     if _n == 1 { return __array_get(_mols, 0); };
