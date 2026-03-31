@@ -2,19 +2,23 @@
 // ALL formulas. NO if/else on keywords. Pure P_weight math.
 
 // G9①: Honesty — confidence from evidence
-pub fn instinct_honesty(_mol) {
-    let _near = kt_nearest(_mol);
-    if len(_near) == 0 { return 0; };
-    let _near_mol = _kt_real_mol(_near);
-    let _sw = kt_silk_weight(_mol, _near_mol);
-    let _dist = _kt_mol_dist(_mol, _near_mol);
-    // Closer = higher confidence, silk = higher confidence
-    let _proximity = 1000 - (_dist * 40);
-    if _proximity < 0 { let _proximity = 0; };
-    let _silk_score = _sw;
-    let _conf = (_proximity * 300 + _silk_score * 700) / 1000;
-    return _conf;  // 0-1000, threshold: 400=silence, 700=think, 900=fact
+// Uses result count from pipeline, not mol-based nearest (avoids mol mismatch)
+pub fn instinct_honesty_with_results(_mol, _result_count) {
+    if _result_count == 0 { return 0; };
+    // More results = more confident (evidence-based)
+    let _evidence = _result_count * 250;
+    if _evidence > 700 { let _evidence = 700; };
+    // Silk check: any edge from this mol?
+    let _sw = 0;
+    let _edges = __kt_silk[_silk_hash(_mol)];
+    if len(_edges) > 0 { let _sw = 200; };
+    // Fact density
+    let _density = kt_fact_count() / 50;
+    if _density > 300 { let _density = 300; };
+    return _evidence + _sw + _density;  // 0-1200, but typically 250-1000
 }
+// Backward compat
+pub fn instinct_honesty(_mol) { return instinct_honesty_with_results(_mol, 0); }
 
 // G9②: Contradiction — V distance + same topic
 pub fn instinct_contradiction(_a_mol, _b_mol) {

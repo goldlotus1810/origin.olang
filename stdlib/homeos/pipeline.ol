@@ -38,8 +38,9 @@ pub fn pipeline(input) {
         return "Neu ban can ho tro, xin goi 1800 599 920";
     };
 
-    // ═══ STEP 2: Encode (A3) ═══
+    // ═══ STEP 2: Encode (A3) + WM bind ═══
     let _mol = _kt_real_mol(input);
+    wm_set(0, _mol);  // WM[0] = query
     let _v = mol_get_dim(_mol, 2);
     _curve_push_v(_v);
 
@@ -71,28 +72,33 @@ pub fn pipeline(input) {
         let _near = kt_nearest(_mol);
         if len(_near) > 0 { push(_text_results, _near); };
     };
-    // Silk walk: follow strongest edges for 3 hops → more related facts
+    // Silk walk: follow strongest edges for 3 hops
+    // Only include if mol distance < threshold (semantically related)
     let _walk = kt_silk_walk(_mol, 3, 10);
     if len(_walk) > 1 {
-        let _wi = 1;  // skip start node (= input mol)
+        let _wi = 1;
         while _wi < len(_walk) {
             let _wmol = __array_get(_walk, _wi);
-            let _wfact = kt_nearest(_wmol);
-            if len(_wfact) > 0 { push(_text_results, _wfact); };
+            let _wdist = _kt_mol_dist(_mol, _wmol);
+            if _wdist < 8 {  // close in 5D = semantically related
+                let _wfact = kt_nearest(_wmol);
+                if len(_wfact) > 0 { push(_text_results, _wfact); };
+            };
             let _wi = _wi + 1;
         };
     };
 
-    // ═══ STEP 4: Homeostasis (D4) ═══
+    // ═══ STEP 4: Homeostasis (D4) + WM context ═══
     let _nearest_mol = 0;
     if len(_text_results) > 0 { let _nearest_mol = _kt_real_mol(__array_get(_text_results, 0)); };
+    wm_set(1, _nearest_mol);  // WM[1] = context (best match)
     let _surprise = _homeostasis(_mol, _nearest_mol);
 
     // ═══ CP2: ENCODE check ═══
-    if _mol == 0 { return ""; };
+    if _mol == 0 { wm_set(0, 0); wm_set(1, 0); wm_set(2, 0); wm_set(3, 0); return ""; };
 
-    // ═══ STEP 6: Instincts (D2) ═══
-    let _conf = instinct_honesty(_mol);
+    // ═══ STEP 6: Instincts (D2) — use result count for confidence ═══
+    let _conf = instinct_honesty_with_results(_mol, len(_text_results));
 
     // ═══ STEP 9: Hebbian silk fire (C3) ═══
     if _nearest_mol > 0 { kt_silk_fire(_mol, _nearest_mol); };
@@ -156,8 +162,18 @@ pub fn pipeline(input) {
     if _tone == "supportive" { let _prefix = ""; };
     if _tone == "gentle" { let _prefix = ""; };
 
-    if len(_response) == 0 { return ""; };
-    return _prefix + _response;
+    if len(_response) == 0 { wm_set(0, 0); wm_set(1, 0); wm_set(2, 0); wm_set(3, 0); return ""; };
+
+    // WM[2] = candidate mol, WM[3] = final result mol
+    wm_set(2, _nearest_mol);
+    wm_set(3, _kt_real_mol(_response));
+
+    let _final = _prefix + _response;
+
+    // ═══ STEP 14: WM clear ═══
+    wm_set(0, 0); wm_set(1, 0); wm_set(2, 0); wm_set(3, 0);
+
+    return _final;
 }
 
 pub fn bootstrap() {
