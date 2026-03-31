@@ -783,11 +783,35 @@ pub fn kt_silk_walk(_start_mol, _depth, _threshold) {
             };
             let _ei = _ei + 6;
         };
-        // If no Hebbian edge, use implicit (nearest in KnowTree)
+        // If no Hebbian edge, find nearest DIFFERENT node in same bucket
         if __array_get(_best_w, 0) < _threshold {
-            let _near_text = kt_nearest(_cur);
-            if len(_near_text) > 0 {
-                let _ = __set_at(_best_mol, 0, _kt_real_mol(_near_text));
+            let _s = _kt_mol_s(_cur);
+            let _r = _kt_mol_r(_cur);
+            let _bkt = __kt_buckets[(_s * 16) + _r];
+            let _bd = [99999]; let _bm = [0];
+            let _bi = 0;
+            while _bi < len(_bkt) {
+                let _fi = __array_get(_bkt, _bi);
+                let _fm = __array_get(__kt_facts_mol, _fi);
+                if _fm != _cur {
+                    // Check not already in path
+                    let _in_path = [0]; let _pi = 0;
+                    while _pi < len(_path) {
+                        if __array_get(_path, _pi) == _fm { let _ = __set_at(_in_path, 0, 1); };
+                        let _pi = _pi + 1;
+                    };
+                    if __array_get(_in_path, 0) == 0 {
+                        let _dd = _kt_mol_dist(_cur, _fm);
+                        if _dd < __array_get(_bd, 0) {
+                            let _ = __set_at(_bd, 0, _dd);
+                            let _ = __set_at(_bm, 0, _fm);
+                        };
+                    };
+                };
+                let _bi = _bi + 1;
+            };
+            if __array_get(_bm, 0) > 0 {
+                let _ = __set_at(_best_mol, 0, __array_get(_bm, 0));
             };
         };
         let _next = __array_get(_best_mol, 0);
