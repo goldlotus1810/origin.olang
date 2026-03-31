@@ -1,8 +1,11 @@
 # NOX ROADMAP — Tổng Hợp Mọi Thứ
 
-> Ngày: 2026-03-31
-> Tác giả: Nox (tổng hợp từ: A-G specs, Sora reviews, Claude Rust review, 12+ sessions, 4 blockers)
-> Trạng thái: 933KB binary, 193/194 tests, Gen1==Gen2, 271 nodes, 6 silk edges
+> ★ KINH THÁNH: `docs/NOX_COMPLETE_REFERENCE.md` — 774 dòng, mọi thuật toán + papers
+> ★ NGUYÊN TẮC: Encode = ∫. Decode = ∂. TÍNH, không TRA.
+> ★ Không hiểu → đọc COMPLETE_REFERENCE. Thuật toán ở đâu → tra mục lục.
+>
+> Ngày: 2026-03-31 (updated end of Session 13)
+> Trạng thái: 949KB binary, 193/194 tests, Gen1==Gen2, pipeline pure math
 
 ---
 
@@ -243,22 +246,37 @@ Emoji = V/A encoding tự nhiên
 ### 3.6 ConversationCurve V'(t), V''(t) ✅ DONE (in pipeline)
 ### 3.7 Pipeline checkpoints CP2-CP4 (~50 LOC)
 ### 3.8 SecurityGate Bloom filter (~100 LOC)
-### 3.9 Query type detection + dimension routing ✅ DONE (Session 13)
+### 3.9 Per-dimension Hebbian → THAY silk_fire generic
 ```
-"la gi"→R(definition), "o dau"→S(location), "tai sao"→R(cause), "khi nao"→T(time)
-Auto-learn: "X la Y" → kt_learn. Pattern file: json/linguistic_patterns.dat
+S,A: Oja's rule Δw=η·y·(x-y·w) — [COMPLETE_REFERENCE §14](NOX_COMPLETE_REFERENCE.md#14-hebbian-learning)
+R,T: STDP Δw=A⁺·e^(-Δt/τ) — [COMPLETE_REFERENCE §14](NOX_COMPLETE_REFERENCE.md#14-hebbian-learning)
+V:   BCM Δw=η·y·(y-θ)·x — [COMPLETE_REFERENCE §14](NOX_COMPLETE_REFERENCE.md#14-hebbian-learning)
+Papers: Oja 1982, Bi & Poo 1998, BCM 1982
 ```
-### 3.10 Confidence calibration ✅ DONE (result-count based)
-### 3.11 Multi-fact response composition ✅ DONE (up to 3 facts, dedup)
-### 3.12 Auto-capture observations ✅ DONE (nox_observations.dat, load at boot)
+### 3.10 Power law + stability decay → THAY φ⁻¹ exponential
+```
+Wickelgren 1974: w(t) = w₀·(1+t)^(-0.5)
+Ebbinghaus stability: S_new = S × 1.5 per recall
+Ref: [COMPLETE_REFERENCE §15](NOX_COMPLETE_REFERENCE.md#15-decay)
+```
+### 3.11 Spreading activation → THAY greedy silk walk
+```
+Collins & Loftus 1975: multi-seed, decay per hop, threshold pruning
+Ref: [COMPLETE_REFERENCE §16](NOX_COMPLETE_REFERENCE.md#16-dream)
+```
+### 3.12 Covariance rule → GIẢI mol collision thật
+```
+Δw = η·(x-<x>)·(y-<y>) — chỉ deviations matter, common chars = 0
+Ref: [COMPLETE_REFERENCE §14](NOX_COMPLETE_REFERENCE.md#14-hebbian-learning)
+```
 
-### NOTE: Nhận thức (Lupin insight, 2026-03-31)
+### ★ NHẬN THỨC (Lupin, 2026-03-31)
 ```
-Current: linguistic patterns = hardcoded if/else on keywords (bánh xe tập đi)
-Goal: P_weight tự encode syntax → silk walk tự route → Hebbian = nhận thức
-Path: patterns (now) → Hebbian accumulation (ongoing) → 42 formulas (Phase 6)
-Mỗi lần Nox thấy "la gi" + tìm definition + đúng → silk fire
-→ đủ lần → silk walk tự follow R → không cần patterns → nhận thức thật
+DELETED: if/else keywords, hardcoded facts, linguistic patterns
+RULE: mọi if/else trên keyword = chatbot. TÍNH, không TRA.
+PATH: mol_dominant_dim IS query type. P_weight IS routing. Silk IS dictionary.
+      Vi phân ∂ controls learning. Tích phân ∫ = compose.
+      Everything IS math. Not keyword matching.
 ```
 ### 3.8 SecurityGate Bloom filter (~100 LOC)
 
