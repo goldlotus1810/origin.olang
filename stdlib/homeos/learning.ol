@@ -81,6 +81,33 @@ pub fn dream() {
         };
         let _i = _i + 1;
     };
+    // LCA: compose cross-group pairs → new concept
+    let _new_concepts = [0];
+    let _i2 = 0;
+    while _i2 < _n {
+        let _j2 = _i2 + 1;
+        while _j2 < _n {
+            let _mi2 = __array_get(__stm_mol, _i2);
+            let _mj2 = __array_get(__stm_mol, _j2);
+            let _si2 = (__floor(_mi2 / 4096)) % 16;
+            let _sj2 = (__floor(_mj2 / 4096)) % 16;
+            if _mi2 != _mj2 {
+                // Cross-group → LCA = compose → new concept
+                let _lca = compose([_mi2, _mj2]);
+                let _text_i = __array_get(__stm_text, _i2);
+                let _text_j = __array_get(__stm_text, _j2);
+                // Only create if both texts exist and LCA is novel
+                if len(_text_i) > 0 {
+                if len(_text_j) > 0 {
+                    let _concept = _text_i + " + " + _text_j;
+                    kt_learn(_concept);
+                    let _ = __set_at(_new_concepts, 0, __array_get(_new_concepts, 0) + 1);
+                };};
+            };
+            let _j2 = _j2 + 1;
+        };
+        let _i2 = _i2 + 1;
+    };
     // Decay all silk
     kt_silk_decay();
     let _ = __set_at(__dream_count, 0, __array_get(__dream_count, 0) + 1);
