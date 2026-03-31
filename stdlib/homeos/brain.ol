@@ -26,7 +26,8 @@ pub fn nox_bootstrap() {
     let _vad_n = vad_load("json/nrc_vad_top10k.txt");
     // Load saved memory from previous session
     let _mem_n = kt_load("nox_memory.dat");
-    let _data_n = 0;
+    // Load knowledge with FRESH mols (NRC-VAD V/A per word)
+    let _data_n = kt_load_text("json/knowledge_500.txt");
     let _boot = kt_fact_count();
     let _stats = _stats + "L0:" + __to_string(_boot) + " Mem:" + __to_string(_mem_n) + " Data:" + __to_string(_data_n);
 

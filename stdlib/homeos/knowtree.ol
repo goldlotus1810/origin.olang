@@ -789,7 +789,8 @@ pub fn kt_load(_path) {
                 let _fact = substr(_line, _tp + 1, len(_line));
                 let _mol = __to_number(_mol_str);
                 if len(_fact) > 0 {
-                    if len(__kt_facts) < 500 {
+                    if len(__kt_facts) < 7500 {
+                        __heap_pin();
                         let _idx = len(__kt_facts);
                         push(__kt_facts, _fact);
                         push(__kt_facts_mol, _mol);
@@ -806,6 +807,34 @@ pub fn kt_load(_path) {
     return __array_get(_count, 0);
 }
 pub fn kt_dim_stats() { return ""; }
+
+// Load plain text file (one fact per line) using kt_learn (fresh mol with NRC-VAD)
+pub fn kt_load_text(_path) {
+    _kt_ensure_init(); _bkt_init(); _silk_init();
+    let _c = __file_read(_path);
+    if len(_c) == 0 { return 0; };
+    let _count = [0];
+    let _ls = [0];
+    let _i = 0;
+    while _i < len(_c) {
+        if __char_code(char_at(_c, _i)) == 10 {
+            let _lstart = __array_get(_ls, 0);
+            if _i > _lstart {
+                if len(__kt_facts) < 7500 {
+                    let _fact = substr(_c, _lstart, _i);
+                    if len(_fact) > 2 {
+                        kt_learn(_fact);
+                        let _ = __set_at(_count, 0, __array_get(_count, 0) + 1);
+                    };
+                };
+            };
+            let _ = __set_at(_ls, 0, _i + 1);
+        };
+        let _i = _i + 1;
+    };
+    __heap_pin();
+    return __array_get(_count, 0);
+}
 // ═══ G6: Silk — Hebbian per-dimension edges ═══
 // Edge = [target_mol, wS, wR, wV, wA, wT] = 6 values
 // Adjacency list: __kt_silk[hash(mol)] = [edge, edge, ...]
