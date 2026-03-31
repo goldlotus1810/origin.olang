@@ -611,8 +611,64 @@ pub fn kt_classify(_t) { return _kt_real_mol(_t); }
 pub fn kt_decode(_q) { return kt_nearest(_kt_real_mol(_q)); }
 pub fn kt_learn_tagged(_t, _x) { return kt_learn(_x); }
 pub fn kt_learn_to(_x, _b) { return kt_learn(_x); }
-pub fn kt_save(_p) { return ""; }
-pub fn kt_load(_p) { return ""; }
+// G19: Persistence — save KnowTree to disk, load at boot
+pub fn kt_save(_path) {
+    let _out = "";
+    let _i = 0;
+    while _i < len(__kt_facts) {
+        let _fact = __array_get(__kt_facts, _i);
+        if len(_fact) > 0 {
+            let _mol = __array_get(__kt_facts_mol, _i);
+            let _out = _out + __to_string(_mol) + "\t" + _fact + "\n";
+        };
+        let _i = _i + 1;
+    };
+    __file_write(_path, _out);
+    return "Saved " + __to_string(len(__kt_facts)) + " to " + _path;
+}
+
+pub fn kt_load(_path) {
+    _kt_ensure_init(); _bkt_init(); _silk_init();
+    let _c = __file_read(_path);
+    if len(_c) == 0 { return 0; };
+    let _count = [0];
+    let _start = [0];
+    let _i = 0;
+    while _i < len(_c) {
+        if __char_code(char_at(_c, _i)) == 10 {
+            let _line = substr(_c, __array_get(_start, 0), _i);
+            // Format: mol\tfact
+            let _tab = [0 - 1];
+            let _j = 0;
+            while _j < len(_line) {
+                if __char_code(char_at(_line, _j)) == 9 {
+                    let _ = __set_at(_tab, 0, _j);
+                    let _j = len(_line);
+                };
+                let _j = _j + 1;
+            };
+            let _tp = __array_get(_tab, 0);
+            if _tp > 0 {
+                let _mol_str = substr(_line, 0, _tp);
+                let _fact = substr(_line, _tp + 1, len(_line));
+                let _mol = __to_number(_mol_str);
+                if len(_fact) > 0 {
+                    if len(__kt_facts) < 500 {
+                        let _idx = len(__kt_facts);
+                        push(__kt_facts, _fact);
+                        push(__kt_facts_mol, _mol);
+                        push(__kt_buckets[(_kt_mol_s(_mol) * 16) + _kt_mol_r(_mol)], _idx);
+                        let _ = __set_at(_count, 0, __array_get(_count, 0) + 1);
+                    };
+                };
+            };
+            let _ = __set_at(_start, 0, _i + 1);
+        };
+        let _i = _i + 1;
+    };
+    __heap_pin();
+    return __array_get(_count, 0);
+}
 pub fn kt_dim_stats() { return ""; }
 // ═══ G6: Silk — Hebbian per-dimension edges ═══
 // Edge = [target_mol, wS, wR, wV, wA, wT] = 6 values
