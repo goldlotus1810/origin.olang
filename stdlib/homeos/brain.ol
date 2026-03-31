@@ -22,13 +22,10 @@ pub fn nox_bootstrap() {
 
     // Register L0: identity, keywords, builtins as nodes
     kt_register_l0();
+    // Load Vietnamese knowledge WITH diacritics (A3: diacritics = SRVAT differentiation)
+    let _vi_n = _load_lines("homeos_vi.knowledge");
     let _boot = kt_fact_count();
-    let _stats = _stats + "L0:" + __to_string(_boot);
-
-    // Load NRC-VAD top words as KnowTree facts (simple TSV, safe)
-    // Load top 200 emotion words (VM heap limit per turn ~200-500 learns)
-    let _vad_n = _load_vad_as_facts("json/nrc_vad_200.txt");
-    let _stats = _stats + " VAD:" + __to_string(_vad_n);
+    let _stats = _stats + "L0:" + __to_string(_boot) + " Vi:" + __to_string(_vi_n);
 
     __heap_pin();
     return _stats;
