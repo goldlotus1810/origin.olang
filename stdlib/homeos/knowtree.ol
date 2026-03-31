@@ -181,6 +181,80 @@ pub fn vad_query(_word) {
     return [0, 0];
 }
 
+// ═══ Load UDC aliases JSON into KnowTree ═══
+// Each alias = "U+XXXX name [vi: translation] [keywords]"
+pub fn kt_load_aliases(_path) {
+    _kt_ensure_init(); _bkt_init();
+    let _c = __file_read(_path);
+    if len(_c) < 10 { return 0; };
+    // Simple JSON parse: find "XXXX":{"n":"NAME",...} patterns
+    let _count = [0];
+    let _i = 0;
+    let _clen = len(_c);
+    while _i < _clen {
+        // Find "XXXX":
+        if char_at(_c, _i) == "\"" {
+            let _key_start = _i + 1;
+            let _i = _i + 1;
+            while _i < _clen {
+                if char_at(_c, _i) == "\"" { break; };
+                let _i = _i + 1;
+            };
+            let _key = substr(_c, _key_start, _i);
+            let _i = _i + 1;
+            // Skip to value
+            if _i < _clen {
+                if char_at(_c, _i) == ":" {
+                    let _i = _i + 1;
+                    // Find "n":"..." (name)
+                    let _chunk_end = _i + 500;
+                    if _chunk_end > _clen { let _chunk_end = _clen; };
+                    let _n_pos = __str_index_of(substr(_c, _i, _chunk_end), "\"n\":\"");
+                    if _n_pos >= 0 {
+                        let _name_start = _i + _n_pos + 5;
+                        let _name_end = _name_start;
+                        while _name_end < _clen {
+                            if char_at(_c, _name_end) == "\"" { break; };
+                            let _name_end = _name_end + 1;
+                        };
+                        let _name = substr(_c, _name_start, _name_end);
+                        // Find Vietnamese "v":"..."
+                        let _ch_end = _i + 500;
+                        if _ch_end > _clen { let _ch_end = _clen; };
+                        let _chunk = substr(_c, _i, _ch_end);
+                        let _v_pos = __str_index_of(_chunk, "\"v\":\"");
+                        let _vi = "";
+                        if _v_pos >= 0 {
+                            let _vi_start = _i + _v_pos + 5;
+                            let _vi_end = _vi_start;
+                            while _vi_end < _clen {
+                                if char_at(_c, _vi_end) == "\"" { break; };
+                                let _vi_end = _vi_end + 1;
+                            };
+                            let _vi = substr(_c, _vi_start, _vi_end);
+                        };
+                        // Learn: "ARROW: LEFTWARDS ARROW (mũi tên hướng trái)"
+                        let _fact = "U+" + _key + " " + _name;
+                        if len(_vi) > 0 { let _fact = _fact + " (" + _vi + ")"; };
+                        kt_learn(_fact);
+                        let _ = __set_at(_count, 0, __array_get(_count, 0) + 1);
+                        // Pin every 1000 to avoid heap overflow
+                        if (__array_get(_count, 0) % 1000) == 0 { __heap_pin(); };
+                    };
+                    // Skip to next entry (find next "})
+                    while _i < _clen {
+                        if char_at(_c, _i) == "}" { break; };
+                        let _i = _i + 1;
+                    };
+                };
+            };
+        };
+        let _i = _i + 1;
+    };
+    __heap_pin();
+    return __array_get(_count, 0);
+}
+
 // ═══ G1+G5: KnowTree bucket structure ═══
 let __kt_facts = [];
 let __kt_facts_mol = [];
