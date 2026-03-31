@@ -845,3 +845,4 @@ config test_key test_val
 config test_key test_val
 config test_key test_val
 config test_key test_val
+config test_key test_val
