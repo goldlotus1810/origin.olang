@@ -1,13 +1,12 @@
 // homeos/knowtree.ol — KnowTree (G1+G2+G3+G5)
 // REBUILT from SPEC_G_COMPLETE.md. Zero legacy code.
 
-let __kt_tbl = [];
 let __kt_inited = [0];
 
 fn _kt_ensure_init() {
     if __array_get(__kt_inited, 0) == 1 { return; };
     let _ = __set_at(__kt_inited, 0, 1);
-    __kt_tbl = __file_read_bytes("json/udc_p_table.bin");
+    // P_weight is COMPUTED by p_weight(), not loaded from table.
 }
 
 // A2: Unpack P_weight
@@ -80,10 +79,68 @@ pub fn compose(_mols) {
 }
 
 // G3: P_weight lookup
+// ═══ A3: p_weight — COMPUTE from codepoint properties, not lookup ═══
+// 42 formulas: cp → category → S,R,V,A,T
+// Category is COMPUTABLE from Unicode ranges. No table needed for basic Latin.
 pub fn p_weight(_cp) {
-    _kt_ensure_init();
-    if _cp < 0 { return 0; }; if _cp >= 196608 { return 0; };
-    return __floor(__bytes_get(__kt_tbl, _cp * 2) + (__bytes_get(__kt_tbl, _cp * 2 + 1) * 256));
+    if _cp < 1 { return 0; };
+    // ═══ TÍNH S: Shape/Structure ═══
+    // Uppercase = heavier shape (S higher). Digits = structured. Symbols = complex.
+    let _S = 0;
+    if _cp >= 65 { if _cp <= 90 { let _S = 2; }; };    // A-Z uppercase → S=2
+    if _cp >= 97 { if _cp <= 122 { let _S = 1; }; };   // a-z lowercase → S=1
+    if _cp >= 48 { if _cp <= 57 { let _S = 3; }; };    // 0-9 digits → S=3
+    if _cp >= 8592 { if _cp <= 8703 { let _S = 12; }; }; // Arrows → S=12
+    if _cp >= 9632 { if _cp <= 9727 { let _S = 14; }; }; // Geometric shapes → S=14
+    if _cp >= 9472 { if _cp <= 9599 { let _S = 10; }; }; // Box drawing → S=10
+    if _cp >= 128512 { if _cp <= 128767 { let _S = 8; }; }; // Emoticons → S=8
+
+    // ═══ TÍNH R: Relation/Role ═══
+    // Letters = script role. Digits = numeric. Operators = math. Punctuation = structure.
+    let _R = 0;
+    if _cp >= 65 { if _cp <= 90 { let _R = 4; }; };     // Latin uppercase → R=4
+    if _cp >= 97 { if _cp <= 122 { let _R = 4; }; };    // Latin lowercase → R=4
+    if _cp >= 48 { if _cp <= 57 { let _R = 8; }; };     // Digits → R=8
+    if _cp == 43 { let _R = 12; };  // + → operator
+    if _cp == 45 { let _R = 12; };  // - → operator
+    if _cp == 42 { let _R = 12; };  // * → operator
+    if _cp == 47 { let _R = 12; };  // / → operator
+    if _cp == 61 { let _R = 12; };  // = → operator
+    if _cp == 60 { let _R = 12; };  // < → comparison
+    if _cp == 62 { let _R = 12; };  // > → comparison
+    if _cp >= 8704 { if _cp <= 8959 { let _R = 14; }; }; // Math operators → R=14
+    if _cp == 46 { let _R = 2; };   // . → punctuation
+    if _cp == 44 { let _R = 2; };   // , → punctuation
+    if _cp == 63 { let _R = 6; };   // ? → query marker
+    if _cp == 33 { let _R = 6; };   // ! → emphasis marker
+    if _cp == 58 { let _R = 3; };   // : → definition marker
+    if _cp == 59 { let _R = 2; };   // ; → separator
+
+    // ═══ TÍNH V: Valence (from codepoint position — NOT lookup) ═══
+    // Emoticon blocks encode V naturally. Latin = neutral.
+    let _V = 4;  // neutral default
+    if _cp >= 128512 { if _cp <= 128591 { let _V = 6; }; }; // face-positive emoticons
+    if _cp >= 128544 { if _cp <= 128559 { let _V = 2; }; }; // face-negative emoticons
+    if _cp == 10084 { let _V = 7; }; // ❤ → very positive
+    if _cp == 128293 { let _V = 7; }; // 🔥 → high V
+    if _cp == 128148 { let _V = 1; }; // 💔 → very negative
+
+    // ═══ TÍNH A: Arousal (from codepoint properties) ═══
+    let _A = 4;  // neutral default
+    if _cp == 33 { let _A = 6; };    // ! → high arousal
+    if _cp == 63 { let _A = 5; };    // ? → moderate arousal
+    if _cp == 46 { let _A = 2; };    // . → low arousal
+    if _cp >= 128512 { if _cp <= 128767 { let _A = 5; }; }; // emoticons → moderate-high
+    if _cp >= 8592 { if _cp <= 8703 { let _A = 3; }; };     // arrows → calm/directional
+
+    // ═══ TÍNH T: Time/Temporal ═══
+    let _T = 0;  // static default
+    if _cp >= 119040 { if _cp <= 119295 { let _T = 3; }; }; // Musical symbols → T=3
+    if _cp >= 119296 { if _cp <= 119375 { let _T = 2; }; }; // Musical notation → T=2
+    // Combining marks = modifier → T=1 (modifies parent in time)
+    if _cp >= 768 { if _cp <= 879 { let _T = 1; }; };       // Combining diacriticals
+
+    return _kt_pack(_S, _R, _V, _A, _T);
 }
 
 // G3: Encode text → chain
