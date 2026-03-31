@@ -120,7 +120,8 @@ fn compile_one_file(_cof_path, _cof_output) {
   let _cof_src = __file_read(_cof_path);
   if len(_cof_src) == 0 { return; };
   let _cof_bc = compile_source(_cof_src);
-  __heap_pin();
+  // NO __heap_pin() here — temp objects (tokens, AST) should NOT become permanent
+  // Only the bytecode in _cof_output needs to survive
   let _cof_bclen = len(_cof_bc);
   emit "  " + _cof_path + " → " + __to_string(_cof_bclen) + " bytes";
   if _cof_bclen < 2 { return; };
@@ -151,7 +152,7 @@ fn compile_dir(_xcd_dir, _xcd_output) {
         let _xcd_bi = 0;
         while _xcd_bi < _xcd_bclen { push(_xcd_output, _xcd_bc[_xcd_bi]); _xcd_bi = _xcd_bi + 1; };
       };
-      __heap_pin();
+      // NO __heap_pin() — let temp objects be reusable
     };
     _xcd_idx = _xcd_idx + 1;
   };

@@ -6,8 +6,17 @@ let __kt_inited = [0];
 fn _kt_ensure_init() {
     if __array_get(__kt_inited, 0) == 1 { return; };
     let _ = __set_at(__kt_inited, 0, 1);
-    // P_weight is COMPUTED by p_weight(), not loaded from table.
+    // Allocate u16 native array for mol storage
+    let _ = __set_at(__kt_facts_mol_u16, 0, __u16a(8192));
 }
+// u16 mol helpers (native 16-bit, 8x smaller than f64)
+fn _mol_push(_mol) {
+    let _c = __array_get(__kt_mol_count, 0);
+    let _ = __u16s(__array_get(__kt_facts_mol_u16, 0), _c, _mol);
+    let _ = __set_at(__kt_mol_count, 0, _c + 1);
+}
+fn _mol_get(_i) { return __ktrd(__array_get(__kt_facts_mol_u16, 0), _i); }
+fn _mol_count() { return __array_get(__kt_mol_count, 0); }
 
 // A2: Unpack P_weight
 fn _kt_mol_s(_m) { return (__floor(_m / 4096)) % 16; }
@@ -507,9 +516,10 @@ pub fn kt_load_aliases(_path) {
 }
 
 // ═══ G1+G5: KnowTree bucket structure ═══
-// Pre-allocate with 8192 capacity to prevent relocation crash
 let __kt_facts = __array_with_cap(8192);
-let __kt_facts_mol = __array_with_cap(8192);
+let __kt_facts_mol = __array_with_cap(8192);  // legacy f64 (for backward compat)
+let __kt_facts_mol_u16 = [0];  // u16 native (set in _kt_ensure_init)
+let __kt_mol_count = [0];
 let __kt_buckets = [];
 let __kt_bkt_ok = [0];
 
