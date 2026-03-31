@@ -68,6 +68,26 @@ pub fn pipeline(input) {
     if _str_has(input, "why") { let _ = __set_at(_query_dim, 0, 1); let _ = __set_at(_query_type, 0, "cause"); };
     if _str_has(input, "when") { let _ = __set_at(_query_dim, 0, 4); let _ = __set_at(_query_type, 0, "time"); };
     if _str_has(input, "how") { let _ = __set_at(_query_dim, 0, 1); let _ = __set_at(_query_type, 0, "method"); };
+    // ═══ Feedback: dung/sai → reinforce/mark negative ═══
+    // "dung" after a response → reinforce last response (silk fire boost)
+    // "sai" after a response → mark last response as negative knowledge
+    if input == "dung" || input == "yes" || input == "correct" || input == "ok" {
+        // Reinforce: boost silk between last query and last result
+        let _q = wm_get(0); let _r = wm_get(3);
+        if _q > 0 { if _r > 0 {
+            kt_silk_fire(_q, _r); kt_silk_fire(_q, _r); kt_silk_fire(_q, _r);  // 3x fire = strong reinforce
+        }; };
+        return "OK, da ghi nho.";
+    };
+    if input == "sai" || input == "no" || input == "wrong" || input == "khong dung" {
+        // Negative knowledge: save to negative file, weaken silk
+        let _r = wm_get(3);
+        if _r > 0 {
+            __file_append("nox_negative.dat", __to_string(_r) + "\tSAI:" + input + "\n");
+        };
+        return "Da ghi nho la sai. Lan sau se tranh.";
+    };
+
     // Learn-pattern: "X la Y" without question → learn, don't search
     let _is_learn = 0;
     if _str_has(input, " la ") {
@@ -145,6 +165,21 @@ pub fn pipeline(input) {
     // ═══ CP2: ENCODE check ═══
     if _mol == 0 { wm_set(0, 0); wm_set(1, 0); wm_set(2, 0); wm_set(3, 0); return ""; };
 
+    // ═══ G14: Filter negative knowledge — remove facts marked "sai" ═══
+    let _neg_content = __file_read("nox_negative.dat");
+    if len(_neg_content) > 0 {
+        let _filtered = [];
+        let _fi = 0;
+        while _fi < len(_text_results) {
+            let _fact = __array_get(_text_results, _fi);
+            let _is_neg = 0;
+            if _str_has(_neg_content, _fact) { let _is_neg = 1; };
+            if _is_neg == 0 { push(_filtered, _fact); };
+            let _fi = _fi + 1;
+        };
+        let _text_results = _filtered;
+    };
+
     // ═══ STEP 6: Instincts (D2) — use result count for confidence ═══
     let _conf = instinct_honesty_with_results(_mol, len(_text_results));
 
@@ -181,14 +216,15 @@ pub fn pipeline(input) {
     if _conf >= 400 { if _conf < 700 { let _prefix = "Toi nghi: "; }; };
     if _conf >= 700 { if _conf < 900 { let _prefix = "Co le: "; }; };
 
-    // G16: Chain recombination — compose unique results into response
+    // G16: Context-aware response composition
+    let _qtype = __array_get(_query_type, 0);
     let _seen = [];
     let _response = "";
     let _count = [0];
     let _ri = 0;
     while _ri < len(_text_results) {
         let _fact = __array_get(_text_results, _ri);
-        // Dedup: skip if already in response
+        // Dedup
         let _dup = 0;
         let _si = 0;
         while _si < len(_seen) {
@@ -201,14 +237,17 @@ pub fn pipeline(input) {
             let _response = _response + _fact;
             let _ = __set_at(_count, 0, __array_get(_count, 0) + 1);
         };
-        // Max 3 facts in response
-        if __array_get(_count, 0) >= 3 { let _ri = len(_text_results); };
+        // Max facts based on query type: definition=3, emotion=1, other=2
+        let _max_facts = 2;
+        if _qtype == "definition" { let _max_facts = 3; };
+        if _qtype == "statement" { let _max_facts = 1; };
+        if __array_get(_count, 0) >= _max_facts { let _ri = len(_text_results); };
         let _ri = _ri + 1;
     };
 
-    // D7: Apply tone prefix
-    if _tone == "supportive" { let _prefix = ""; };
-    if _tone == "gentle" { let _prefix = ""; };
+    // D7: Tone-appropriate framing
+    if _tone == "supportive" { let _prefix = ""; };  // no prefix when comforting
+    if _tone == "gentle" { let _prefix = ""; };       // no prefix when soft
 
     if len(_response) == 0 { wm_set(0, 0); wm_set(1, 0); wm_set(2, 0); wm_set(3, 0); return ""; };
 
