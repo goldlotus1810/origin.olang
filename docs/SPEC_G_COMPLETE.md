@@ -159,10 +159,23 @@ unpack_A(mol) = (mol >> 2) & 0x7
 unpack_T(mol) = mol & 0x3
 
 p_weight(codepoint):
-  // Lookup from compiled binary table
-  if codepoint < 157386: return udc_p_table[codepoint]
-  else: return 0  // unknown → neutral
-  O(1)
+  // ★ COMPUTE from 42 formulas, NOT lookup table ★
+  // Tier 1: determine block → which dimension(s) to compute
+  // Tier 2: dimension encoder (f_S, f_R, f_V, f_A, f_T)
+  // Tier 3: 36 sub-classifiers per dimension
+  //
+  // S: SDF complexity = perimeter²/(4π×area) of glyph (Isoperimetric ratio)
+  //    Ref: Quilez SDF primitives, Grevera 2004 dead reckoning
+  // R: Unicode General_Category → role (UTR #25 MathClass, OpenMath CDs)
+  //    Ref: Unicode Standard Ch.4, MathML Operator Dictionary
+  // V: NRC-VAD bootstrap → silk learned (Russell 1980, Mohammad 2018)
+  //    Physics: V(w) = -tanh(U(w)/U_ref), potential energy well model
+  // A: Arousal from harmonic oscillator energy states
+  //    Physics: A(w) = tanh((E_kinetic+E_potential)/E_threshold)
+  // T: Musical symbol classifier (note/pitch/dynamics/neume/hexagram/modifier)
+  //
+  // Ref: NOX_COMPLETE_REFERENCE.md §1-§6 for all formulas + papers
+  O(1) per codepoint
 ```
 
 ### Compose
@@ -451,21 +464,45 @@ silk_strength(a, b, dim):
 ```
 Derive: C3
 
-silk_fire(a_mol, b_mol, emotion_V, emotion_A):
+silk_fire(a_mol, b_mol, emotion_V, emotion_A, dt_turns):
   edge = silk_index.get_or_create(a_mol, b_mol)
-  emotion_factor = (|emotion_V - 4| / 4.0) × (emotion_A / 7.0)
-  // Strong emotion → stronger connection
+  eta = 0.1 × emotion_factor(emotion_V, emotion_A)
 
-  for dim in 0..5:
-    delta_a = unpack_dim(a_mol, dim)
-    delta_b = unpack_dim(b_mol, dim)
-    proximity = 1.0 - |delta_a - delta_b| / max_range[dim]
-    // Closer on this dim → stronger update on this dim
-    dw = emotion_factor × proximity × (1 - edge.weights[dim]) × 0.1
-    edge.weights[dim] += dw
+  // ★ PER-DIMENSION LEARNING RULES (not generic Hebb) ★
+  // S, A: Oja's rule (Oja 1982) — normalized, stable
+  for dim in [S=0, A=3]:
+    x = unpack_dim(a_mol, dim) / max_range[dim]
+    y = unpack_dim(b_mol, dim) / max_range[dim]
+    dw = eta × y × (x - y × edge.weights[dim])
+    edge.weights[dim] = clamp(edge.weights[dim] + dw, 0, 1000)
+
+  // R, T: STDP (Bi & Poo 1998) — captures causality/temporal order
+  for dim in [R=1, T=4]:
+    proximity = 1.0 - |unpack_dim(a_mol, dim) - unpack_dim(b_mol, dim)| / max_range[dim]
+    if dt_turns > 0:  // a before b (causal direction)
+      dw = eta × proximity × exp(-dt_turns / 3.0)
+    else:  // b before a (anti-causal)
+      dw = -1.2 × eta × proximity × exp(dt_turns / 3.0)
+    edge.weights[dim] = clamp(edge.weights[dim] + dw, 0, 1000)
+
+  // V: BCM (Bienenstock-Cooper-Munro 1982) — sliding threshold prevents saturation
+  x_v = 1.0 - |unpack_V(a_mol) - unpack_V(b_mol)| / 7.0
+  y_v = edge.weights[V] / 1000.0
+  theta = edge.theta_V / 1000.0  // per-edge sliding threshold
+  dw = eta × y_v × (y_v - theta) × x_v × 1000
+  edge.weights[V] = clamp(edge.weights[V] + dw, 0, 1000)
+  edge.theta_V = 0.9 × edge.theta_V + 0.1 × edge.weights[V]² / 1000
+
+  // ★ V'(t) MODULATION — vi phân controls learning rate ★
+  // V'(t) > 0 → conversation improving → fire normally
+  // V'(t) < 0 → declining → SKIP fire (don't reinforce mistakes)
+  // Ref: ConversationCurve G11
 
   edge.last_fire = now()
   O(1)
+
+  Ref: NOX_COMPLETE_REFERENCE.md §14 (Hebbian Learning)
+  Papers: Oja 1982, BCM 1982, Bi & Poo 1998
 ```
 
 ### Silk Decay
@@ -474,9 +511,16 @@ silk_fire(a_mol, b_mol, emotion_V, emotion_A):
 Derive: C3
 
 silk_decay_all(dt_hours):
-  factor = pow(0.618, dt_hours / 24.0)  // φ⁻¹ per 24h
+  // ★ Power law + stability (replaces simple φ⁻¹ exponential) ★
+  // Power law (Wickelgren 1974): w(t) = w₀·(1+t)^(-0.5)
+  // Stability (Ebbinghaus 1885): each fire multiplies stability by 1.5
+  // Combined: effective_dt = dt / (24 × stability)
+  //           factor = (1 + effective_dt)^(-0.5)
+  // Result: new edges decay fast, mature edges persist
   for node_mol, edges in silk_index:
     for edge in edges:
+      effective_dt = dt_hours / (24.0 × edge.stability)
+      factor = pow(1 + effective_dt, -0.5)
       for dim in 0..5:
         edge.weights[dim] *= factor
       // Prune dead edges
