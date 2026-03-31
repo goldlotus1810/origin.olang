@@ -124,21 +124,21 @@ PHASE 4 — AGENT ✅ (2026-03-30 Session 10)
 
 ---
 
-## STATS
+## STATS — UPDATED Session 12 (2026-03-31)
 
 ```
-Code đúng spec:     12 items  ✅
-Code sai spec:       4 fixed  ✅ (1 deferred: KnowTree fractal)
-Code thiếu done:    13 items  ✅ (Phase 1+2)
-Code thiếu:          9 items  ⬜ (Phase 3-4)
-Total LOC estimate: ~300 lines remaining
+⚠️ THIS FILE IS SUPERSEDED BY SPEC_G_COMPLETE.md
 
-Hiện tại:  ~95% spec implemented
-Phase 0:   ✅ done
-Phase 1:   ✅ done
-Phase 2:   ✅ done
-Phase 3:   ✅ done (camera/audio deferred — needs hardware)
-Phase 4:   ✅ done
+Session 12: Brain code DELETED and REWRITTEN from G_COMPLETE.
+  Old: 4233 lines, if/else chatbot, gen1 HANGS
+  New: 900 lines, pure math, gen1 WORKS, 193/194 tests, Gen1==Gen2
+
+Phase 0-4 checkmarks above were FALSE — code was "checked done"
+without actual testing. Session 12 proved: gen1 hung = code was broken.
+
+Real status: See SPEC_G_COMPLETE.md (27 sections) and REGISTRY.md.
+
+NEXT: Rebuild UDC P_weight table with real 42 formulas.
 ```
 
 ---

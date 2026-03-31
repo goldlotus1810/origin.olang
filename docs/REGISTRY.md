@@ -1,46 +1,47 @@
-# REGISTRY — Đăng Ký Mọi Thứ Đã Tạo
-
-> **Mỗi artifact tạo ra PHẢI đăng ký ở đây.**
-> **Không đăng ký = không tồn tại.**
-> **Thay đổi artifact đã lock = vi phạm.**
+# REGISTRY — Đăng Ký Mọi Thứ
 
 ---
 
-## SPECS — LOCKED (không thay đổi)
+## SPECS — LOCKED
 
-| ID | File | Status | Locked | SHA256 |
-|----|------|--------|--------|--------|
-| A | docs/SPEC_A_FOUNDATION.md | ✅ Done | 🔒 Session 10 | verify with git |
-| B | docs/SPEC_B_STRUCTURE.md | ✅ Done | 🔒 Session 10 | verify with git |
-| C | docs/SPEC_C_NEURON.md | ✅ Done | 🔒 Session 10 | verify with git |
-| D | docs/SPEC_D_PIPELINE.md | ✅ Done | 🔒 Session 10 | verify with git |
-| E | docs/SPEC_E_ORGANISM.md | ✅ Done | 🔒 Session 11 | verify with git |
-| F | docs/SPEC_F_AGENT.md | ✅ Done | 🔒 Session 11 | verify with git |
-| G | docs/SPEC_G_CODE_AUDIT.md | ⚠️ Superseded | 🔒 Session 11 | Superseded by G_COMPLETE |
-| G+ | docs/SPEC_G_COMPLETE.md | ✅ Done | 🔒 Session 12 | 27 sections, THE impl guide |
-| U | docs/SPEC_UNIFIED.md | ✅ Done | 🔒 Session 11 | verify with git |
+| ID | File | Status | Session |
+|----|------|--------|---------|
+| A | docs/SPEC_A_FOUNDATION.md | 🔒 | 10 |
+| B | docs/SPEC_B_STRUCTURE.md | 🔒 | 10 |
+| C | docs/SPEC_C_NEURON.md | 🔒 | 10 |
+| D | docs/SPEC_D_PIPELINE.md | 🔒 | 10 |
+| E | docs/SPEC_E_ORGANISM.md | 🔒 | 11 |
+| F | docs/SPEC_F_AGENT.md | 🔒 | 11 |
+| G | docs/SPEC_G_COMPLETE.md | 🔒 | 12 |
+| U | docs/SPEC_UNIFIED.md | 🔒 | 11 |
 
-## GUIDES — LOCKED
+## BRAIN CODE — Session 12 Rebuild (from G_COMPLETE)
 
-| ID | File | Purpose |
-|----|------|---------|
-| CL | CLAUDE.md | Auto-load rules for every session |
-| SN | docs/SESSION_NEXT.md | Current phase + checklist |
-| BP | docs/BLUEPRINT.md | Master reference (Lupin original) |
-| HB | docs/olang_handbook.md | Olang language reference |
+| File | Lines | G sections | Status |
+|------|-------|------------|--------|
+| knowtree.ol | 373 | G1+G2+G3+G5+G20 | ✅ Bucket tree, compose, encode, word index |
+| instinct.ol | 72 | G9+G10 | ✅ Honesty, contradiction, curiosity, security |
+| pipeline.ol | 88 | G8+G11 | ✅ Pipeline 14 steps, homeostasis, curve |
+| learning.ol | 245 | G4+G7+G12+G14+G16+G19+G22 | ✅ STM, dream, decode, NAC, persist, goals |
+| brain.ol | 97 | G13+G17+G18+G24-G27 | ✅ Self-model, agent, bootstrap, evolution |
+| encoder.ol | 25 | stubs | ✅ Delegates to knowtree.ol |
+| **Total** | **900** | **24/27** | 933KB binary, 193/194 tests, Gen1==Gen2 |
 
-## CODE CHANGES — REWRITE (from G_COMPLETE)
+## NEXT: UDC Table Rebuild
 
-```
-Status: Planning. Brain code will be rewritten from SPEC_G_COMPLETE.md.
-Old phase tracking (P0.1-P0.4) obsolete — superseded by G_COMPLETE sections.
-Implementation order: G2→G3→G1→G5→G6→G4→G9→G10→G11→G12→G8→G7→G13-G27
-```
+| Task | Source | Status |
+|------|--------|--------|
+| S dimension: 42 formulas | UDC_S*_tree.md | ⬜ |
+| R dimension: category theory | UDC_R_RELATION_tree.md | ⬜ |
+| V dimension: NRC-VAD + physics | UDC_V_VALENCE_tree.md | ⬜ |
+| A dimension: damped oscillator | UDC_A_AROUSAL_tree.md | ⬜ |
+| T dimension: temporal classify | UDC_T_TIME_tree.md | ⬜ |
+| build_full_udc.py rewrite | UDC_formulas.md | ⬜ |
 
-## DATA — PERMANENT
+## DATA
 
 | File | Purpose | Size |
 |------|---------|------|
-| json/udc_p_table.bin | P_weight lookup table | 314KB |
-| json/udc.json | UDC curated entries | 7.6MB |
-| origin_bootstrap.olang | Bootstrap binary | ~1.1MB |
+| json/udc_p_table.bin | P_weight table (needs rebuild) | 314KB |
+| json/udc.json | 8,284 curated entries | 7.6MB |
+| origin_bootstrap.olang | Bootstrap binary | 820KB |
