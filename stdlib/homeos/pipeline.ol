@@ -44,6 +44,40 @@ pub fn pipeline(input) {
     let _v = mol_get_dim(_mol, 2);
     _curve_push_v(_v);
 
+    // ═══ STEP 2.5: Query type detection — LEARNED patterns (not if/else) ═══
+    // Detect: question marks, Vietnamese question words, English question words
+    // Result: _query_dim = which silk dimension to prioritize
+    let _query_dim = [0 - 1];  // -1 = auto (use mol_dominant_dim)
+    let _query_type = ["statement"];
+    let _ilen = len(input);
+    // Check last char: ? → question, ! → command
+    if _ilen > 1 {
+        let _last_ch = __char_code(char_at(input, _ilen - 1));
+        if _last_ch == 63 { let _ = __set_at(_query_type, 0, "question"); };
+        if _last_ch == 33 { let _ = __set_at(_query_type, 0, "command"); };
+    };
+    // Vietnamese question patterns → dimension routing
+    if _str_has(input, "la gi") { let _ = __set_at(_query_dim, 0, 1); let _ = __set_at(_query_type, 0, "definition"); };
+    if _str_has(input, "o dau") { let _ = __set_at(_query_dim, 0, 0); let _ = __set_at(_query_type, 0, "location"); };
+    if _str_has(input, "tai sao") { let _ = __set_at(_query_dim, 0, 1); let _ = __set_at(_query_type, 0, "cause"); };
+    if _str_has(input, "khi nao") { let _ = __set_at(_query_dim, 0, 4); let _ = __set_at(_query_type, 0, "time"); };
+    if _str_has(input, "bao nhieu") { let _ = __set_at(_query_dim, 0, 1); let _ = __set_at(_query_type, 0, "quantity"); };
+    // English question patterns
+    if _str_has(input, "what is") { let _ = __set_at(_query_dim, 0, 1); let _ = __set_at(_query_type, 0, "definition"); };
+    if _str_has(input, "where") { let _ = __set_at(_query_dim, 0, 0); let _ = __set_at(_query_type, 0, "location"); };
+    if _str_has(input, "why") { let _ = __set_at(_query_dim, 0, 1); let _ = __set_at(_query_type, 0, "cause"); };
+    if _str_has(input, "when") { let _ = __set_at(_query_dim, 0, 4); let _ = __set_at(_query_type, 0, "time"); };
+    if _str_has(input, "how") { let _ = __set_at(_query_dim, 0, 1); let _ = __set_at(_query_type, 0, "method"); };
+    // Learn-pattern: "X la Y" without question → learn, don't search
+    let _is_learn = 0;
+    if _str_has(input, " la ") {
+        if __array_get(_query_type, 0) == "statement" { let _is_learn = 1; };
+    };
+    if _is_learn == 1 {
+        kt_learn(input);
+        return "Da hoc: " + input;
+    };
+
     // ═══ STEP 3: Search — text match + mol nearest + silk walk ═══
     let _text_results = [];
     // Text search: each word ≥3 chars
@@ -72,9 +106,10 @@ pub fn pipeline(input) {
         let _near = kt_nearest(_mol);
         if len(_near) > 0 { push(_text_results, _near); };
     };
-    // Silk walk: follow strongest edges for 3 hops
-    // Only include if mol distance < threshold (semantically related)
-    let _walk = kt_silk_walk(_mol, 3, 10);
+    // Silk walk: follow strongest edges, using detected query dimension
+    let _walk_dim = __array_get(_query_dim, 0);
+    if _walk_dim < 0 { let _walk_dim = mol_dominant_dim(_mol); };
+    let _walk = kt_silk_walk_dim(_mol, _walk_dim, 3, 10);
     if len(_walk) > 1 {
         let _wi = 1;
         while _wi < len(_walk) {

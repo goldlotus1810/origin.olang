@@ -904,10 +904,20 @@ pub fn kt_silk_weight(_a, _b) {
     return 0;
 }
 
+// G6: Silk walk with explicit dimension (for query-routed search)
+pub fn kt_silk_walk_dim(_start_mol, _dim, _depth, _threshold) {
+    _silk_init(); _bkt_init();
+    return _kt_silk_walk_internal(_start_mol, _dim, _depth, _threshold);
+}
+
 // G6: Silk walk — follow strongest edges on dominant dimension
 pub fn kt_silk_walk(_start_mol, _depth, _threshold) {
     _silk_init(); _bkt_init();
     let _dim = mol_dominant_dim(_start_mol);
+    return _kt_silk_walk_internal(_start_mol, _dim, _depth, _threshold);
+}
+
+fn _kt_silk_walk_internal(_start_mol, _dim, _depth, _threshold) {
     let _path = [_start_mol];
     let _cur = _start_mol;
     let _d = 0;

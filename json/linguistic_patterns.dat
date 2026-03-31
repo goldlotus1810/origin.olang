@@ -1,0 +1,46 @@
+12800	PATTERN:question_word la_gi → R_dominant → search definition
+12801	PATTERN:question_word o_dau → S_dominant → search location
+12802	PATTERN:question_word tai_sao → R_causal → search cause
+12803	PATTERN:question_word bao_nhieu → R_quantity → search count
+12804	PATTERN:question_word khi_nao → T_dominant → search time
+12805	PATTERN:question_word nhu_the_nao → R_method → search method
+12806	PATTERN:question_mark ? → query mode → search not assert
+12807	PATTERN:exclaim ! → command mode → act not search
+12808	PATTERN:period . → statement mode → assert not search
+12900	SYNTAX:subject verb object → first_noun = subject
+12901	SYNTAX:vi subject predicate → first_word = context
+12902	SYNTAX:en subject verb object → SVO order
+12903	SYNTAX:question vi → subject + la gi/o dau/tai sao + ?
+12904	SYNTAX:question en → what/where/why/how + verb + subject + ?
+13000	POS:noun → R=high → names things → subject or object
+13001	POS:verb → R=mid → describes action → predicate
+13002	POS:adjective → V=varies → describes quality → modifier
+13003	POS:question_word → R=specific → asks for info → query type
+13004	POS:preposition → S=low → connects → relation marker
+13100	ROLE:la → copula → connects subject to predicate
+13101	ROLE:cua → possessive → ownership relation
+13102	ROLE:o → locative → location relation
+13103	ROLE:vi/tai → causal → reason relation
+13104	ROLE:khi → temporal → time relation
+13105	ROLE:nhung/ma → adversative → contrast relation
+13106	ROLE:va → conjunctive → addition relation
+13107	ROLE:hay → disjunctive → choice relation
+13200	DETECT:? at end → input is question → search mode
+13201	DETECT:! at end → input is command → act mode
+13202	DETECT:la gi → definition query → follow R silk to definitions
+13203	DETECT:o dau → location query → follow S silk to places
+13204	DETECT:tai sao → causal query → follow R silk to causes
+13205	DETECT:bao nhieu → quantity query → follow R silk to numbers
+13206	DETECT:khi nao → time query → follow T silk to events
+13207	DETECT:nhu the nao → method query → follow R silk to processes
+13208	DETECT:co X khong → yes/no query → check existence in KnowTree
+13209	DETECT:word1 la word2 → definition statement → learn word1=word2
+13210	DETECT:word1 o word2 → location statement → learn word1@word2
+13300	EN:what is → definition → R dominant
+13301	EN:where is → location → S dominant
+13302	EN:why → cause → R causal
+13303	EN:how → method → R method
+13304	EN:when → time → T dominant
+13305	EN:who → person → R identity
+13306	EN:how many → quantity → R quantity
+13307	EN:do you → yes/no → existence check

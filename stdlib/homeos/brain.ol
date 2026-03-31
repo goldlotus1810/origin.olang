@@ -30,6 +30,9 @@ pub fn nox_bootstrap() {
     // Load multilingual sentiment at boot (small, 599 facts)
     let _data_n = kt_load("json/sentiment_precomputed.dat");
     __heap_pin();
+    // Load linguistic patterns (how to recognize sentence structure)
+    let _ling_n = kt_load("json/linguistic_patterns.dat");
+    __heap_pin();
     // Load past observations (auto-captured from REPL sessions)
     let _obs_n = kt_load("nox_observations.dat");
     __heap_pin();
