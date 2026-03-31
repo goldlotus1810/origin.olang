@@ -376,48 +376,9 @@ pub fn repl_eval(input) {
   // Boot knowledge on first real input (lazy — avoids slow startup)
   _boot_learn();
 
-  // ═══ INSTINCT ROUTING FIRST — before ANY hardcoded handler ═══
-  // Slash commands bypass instincts (they're explicit commands)
-  if len(src) > 0 {
-      if char_at(src, 0) != "/" {
-          let _re_route = instinct_route(src);
-          let _re_inst = _re_route.instinct;
-          if _re_inst == "GREETING" { return smart_greet(stm_count()); };
-          if _re_inst == "META" { return _re_route.data; };
-          if _re_inst == "SAFETY" { return "Blocked."; };
-          if _re_inst == "COMMAND" { return nox_brain(src); };
-          if _re_inst == "LEARNING" { kt_learn(src); return "Learned."; };
-          if _re_inst == "CODE" {
-              // Strip trailing ? = ! (math: "1+1=?" → "1+1")
-              let _re_csrc = _strip_trailing(src);
-              // Wrap bare expressions with emit (math: "1+1" → "emit 1+1")
-              if len(_re_csrc) > 0 {
-                  let _fc = char_at(_re_csrc, 0);
-                  let _is_expr = 0;
-                  if __char_code(_fc) >= 48 { if __char_code(_fc) <= 57 { _is_expr = 1; }; };
-                  if _is_expr == 1 { let _re_csrc = "emit " + _re_csrc; };
-              };
-              let _re_code = _re_csrc + _repl_maybe_semi(_re_csrc);
-              _g_parse_source = _re_code;
-              let _re_tokens = tokenize(_re_code);
-              if len(_re_tokens) > 0 {
-                  let _re_ast = parse(_re_tokens);
-                  if _g_parse_error == 0 {
-                      set_at(_g_pos_box, 0, 0);
-                      analyze(_re_ast);
-                      let _re_bc = _g_output;
-                      if _g_pos_box[0] > 0 { return __eval_bytecode(_re_bc); };
-                  };
-                  _g_parse_error = 0;
-              };
-          };
-          if _re_inst == "QUESTION" || _re_inst == "QUERY" || _re_inst == "EMOTION" || _re_inst == "REFERENCE" {
-              let _re_ans = _search_and_combine(src);
-              __heap_pin();
-              if len(_re_ans) > 5 { return _re_ans; };
-          };
-      };
-  };
+  // ═══ G8: Try compile first. Fail → natural language → pipeline ═══
+  // No if/else keyword detection. Math: compile succeeds → run.
+  // Slash commands handled below. Everything else = try compile.
 
   // ── Slash commands (like Claude Code) ──
   if len(src) > 1 {
