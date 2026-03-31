@@ -607,9 +607,10 @@ pub fn kt_diagnostic() {
 }
 pub fn kt_search(q) { return kt_nearest(_kt_real_mol(q)); }
 pub fn kt_search_n(q, n) { return kt_find(q, n); }
-// Classify = dominant dimension index. No strings. Pure number.
-// 0=S(shape) 1=R(relation) 2=V(emotion) 3=A(energy) 4=T(temporal)
-pub fn kt_classify(_t) { return mol_dominant_dim(_kt_real_mol(_t)); }
+// Classify = the mol itself. SRVAT IS the classification.
+// No labels. No limits. Position in 5D = identity.
+// Similar content → similar mol → same neighborhood → group emerges.
+pub fn kt_classify(_t) { return _kt_real_mol(_t); }
 pub fn kt_decode(_q) { return kt_nearest(_kt_real_mol(_q)); }
 pub fn kt_learn_tagged(_t, _x) { return kt_learn(_x); }
 pub fn kt_learn_to(_x, _b) { return kt_learn(_x); }
