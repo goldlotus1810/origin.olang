@@ -1,39 +1,41 @@
-# Session 13 — Não KHỎE hơn
+# Session Next
 
-## ĐÃ XONG (Session 12, 45 commits)
-- Brain rebuilt: 900 lines pure math
-- 10/10 Sora test
-- 580+ nodes, 493+ silk, persistence works
-- 193/194 unit tests, Gen1==Gen2
-- Pipeline captures ALL input
-- _str_has fixes search (__str_contains was broken)
-- __array_with_cap(8192) fixes crash
+## STATUS: 10/10 Sora test. 193/194 unit tests. Gen1==Gen2.
 
-## 3 VIỆC (Sora Session 13 Direction)
+## WHAT WORKS
+- Pipeline: "Fibonacci la gi?" → correct answer ✓
+- Search: kt_find + _str_has (pure Olang, no VM builtins) ✓
+- Silk walk: 4-hop multi-node traversal ✓
+- Dream: creates 35 new concepts from STM ✓
+- Persistence: kt_save/kt_load ✓
+- 293 nodes at boot (71 embedded + 32 L0 + 77 memory + 113 data)
 
-### ① repl.ol dọn (1448 dòng, 127 string compares)
-- Tách slash commands → commands.ol
-- Tách tools → tools.ol
-- repl.ol = compile → fallback pipeline
-- Đo: red_alert.sh trước/sau
+## WHAT DOESN'T WORK
+- Sora's ranked_search → returns nil (function scope issue with tools/)
+- Data loading >200/turn → crash (heap pin keeps temp strings)
+- substr inside some function calls → returns wrong data
+- Globals in files OTHER than knowtree.ol → not accessible from eval
 
-### ② Silk walk multi-hop + decay
-- kt_silk_walk depth 3 = reasoning
-- "Ha Noi" → "thu do" → "Viet Nam" → "Dong Nam A"
-- kt_silk_decay() chạy chưa?
-- Đo: walk depth trước/sau
+## OLANG PATTERNS (learned the hard way)
+```
+✅ Globals in knowtree.ol → work everywhere (use this for shared state)
+✅ _str_has (char_at loop) → works. __str_contains → returns nil
+✅ __array_with_cap(N) → prevents crash at 512
+✅ kt_learn_raw(text, mol) → 0 temp strings (fast bulk load)
+✅ pipeline(src) FIRST, compile SECOND (SPEC_D §D1)
+✅ No syntax chars + eval empty → return pipeline result
+✗ Globals in other .ol files → NOT accessible from REPL eval
+✗ Functions that push to local arrays → data lost on return
+✗ let _i = _i + 1 inside while → works in boot, NOT in eval
+```
 
-### ③ Dream thật
-- dream() hiện tại = đếm, chưa cluster + LCA + promote
-- Dream TẠO tri thức mới (cross-group resonance)
-- Đo: QR count trước/sau dream
+## PRIORITIES FOR NEXT SESSION
+1. Fix VM: why do tools/ functions return nil? (bytecode scope)
+2. Load more data: multi-turn batch loading (5000+ nodes)
+3. repl.ol cleanup: 1448 lines, 127 string compares
 
-## ĐỌC TRƯỚC
-1. docs/For_Nox/SORA_SESSION13_DIRECTION.md
-2. docs/SPEC_G_COMPLETE.md
-3. memory/feedback_session12_mistakes.md — SAI LẦM cần tránh
-
-## Build
+## BUILD
 ```bash
 cd ~/Origin && make self-build && make test && make fixed-point
+# Test: echo 'Fibonacci la gi?' | ./origin_gen1.olang
 ```
