@@ -24,8 +24,10 @@ pub fn nox_bootstrap() {
     kt_register_l0();
     // Load saved memory from previous session
     let _mem_n = kt_load("nox_memory.dat");
-    // Load pre-built knowledge (English primary + Vietnamese aliases)
-    let _data_n = _load_lines("homeos_data.knowledge");
+    // Load NRC-VAD data (compiled into binary, no runtime parsing)
+    let _before_nrc = kt_fact_count();
+    _load_nrc_data();
+    let _data_n = kt_fact_count() - _before_nrc;
     let _boot = kt_fact_count();
     let _stats = _stats + "L0:" + __to_string(_boot) + " Mem:" + __to_string(_mem_n) + " Data:" + __to_string(_data_n);
 
@@ -72,6 +74,7 @@ fn _load_lines(_path) {
             if len(_line) > 3 {
                 kt_learn(_line);
                 let _ = __set_at(_count, 0, __array_get(_count, 0) + 1);
+                if (__array_get(_count, 0) % 80) == 0 { __heap_pin(); };
             };
             let _ = __set_at(_start, 0, _i + 1);
         };
