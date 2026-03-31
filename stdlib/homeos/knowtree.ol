@@ -340,9 +340,9 @@ pub fn kt_load_aliases(_path) {
 }
 
 // ═══ G1+G5: KnowTree bucket structure ═══
-let __kt_facts = [];
-let __kt_facts_mol = [];
-let __kt_facts_len = [0];  // real count (push uses this, not len())
+// Pre-allocate with 8192 capacity to prevent relocation crash
+let __kt_facts = __array_with_cap(8192);
+let __kt_facts_mol = __array_with_cap(8192);
 let __kt_buckets = [];
 let __kt_bkt_ok = [0];
 
@@ -357,7 +357,6 @@ let __kt_learn_count = [0];
 // Fast learn: skip word-level compose, use simple hash (10x faster)
 pub fn kt_learn_fast(_text) {
     _kt_ensure_init(); _bkt_init(); _silk_init();
-    if len(__kt_facts) >= 500 { return 0 - 1; };
     // Fast mol: hash only (no per-char P_weight lookup)
     let _h = [2166136261];
     let _i = 0;
@@ -379,8 +378,6 @@ pub fn kt_learn_fast(_text) {
 
 pub fn kt_learn(_text) {
     _kt_ensure_init(); _bkt_init(); _silk_init();
-    // Guard: prevent array relocation crash at 512 capacity
-    if len(__kt_facts) >= 500 { return 0 - 1; };
     let _mol = _kt_real_mol(_text);
     let _idx = len(__kt_facts);
     push(__kt_facts, _text);
