@@ -1,32 +1,36 @@
-# Session 13 — Fix 4 Blockers
+# Session 13
+
+## ĐỌC TRƯỚC KHI LÀM GÌ
+1. **memory/feedback_session12_mistakes.md** — sai lầm cần tránh
+2. **memory/feedback_english_is_L0.md** — English = gốc, Vietnamese = alias
+3. **SPEC_A3** — word partition, KHÔNG char partition
+4. **Chạy:** `printf 'emit kt_diagnostic()\n' | timeout 5 ./origin_gen1.olang`
 
 ## TRẠNG THÁI
-- Brain: 900 lines, 24/27 G sections, Gen1==Gen2 ✓
-- DNA: 161K P_weights, 41K aliases, 54K NRC-VAD, 13MB knowledge
-- KnowTree: 271 nodes (71 boot + 200 VAD words)
-- Diagnostics: kt_diagnostic(), kt_map(), kt_silk_stats()
-- Tests: 193/194 ALL PASS
+- 900 lines brain, Gen1==Gen2, 193/194 tests
+- 161K P_weights, 13MB json knowledge on disk
+- 149 nodes, 148 silk edges, 7 buckets
+- Search: works for exact text match, FAILS for semantic
+- Mol: all text → same bucket (char-level compose = flat)
 
-## FIX THESE (in order):
+## 1 VIỆC DUY NHẤT: Fix _kt_real_mol
 
-### BLOCKER #1: Mol Collision (CRITICAL)
-ALL text → same P_weight. "Ha Noi" = "Olang" = mol 4240.
-**Fix:** hybrid mol = compose(S,R,T) + hash(text) for uniqueness
-**Verify:** `_kt_real_mol("Ha Noi") != _kt_real_mol("Olang")`
+**Problem:** char-level compose → all Latin text = same mol
+**Solution from A3:** WORD-level partition
+  "love is beautiful" → P_w("love"), P_w("is"), P_w("beautiful")
+  Each WORD gets mol from NRC-VAD V/A (not char shapes)
+  Then compose WORDS → sentence mol
 
-### BLOCKER #2+#4: Silk + Search (auto-fix from #1)
-Only 6 silk edges. Same search result for all queries.
-Fix #1 → different mols → different buckets → silk works → search works.
+**Steps:**
+1. Load NRC-VAD into hash table at boot (top 200 words, heap safe)
+2. _kt_real_mol: split text → words → each word: lookup NRC-VAD V/A → mol
+3. Compose word mols → sentence mol (Zipf weighted)
+4. Test: _kt_real_mol("love") ≠ _kt_real_mol("hate")
+5. Test: pipeline("love") → correct result
+6. ONLY after this works → move to more data loading
 
-### BLOCKER #3: VM Heap
-Crash after ~200 learns. Need multi-turn loading or VM fix.
-
-## ĐỌC TRƯỚC:
-1. `docs/SPEC_G_COMPLETE.md` — G2 (compose), G5 (nearest)
-2. `CLAUDE.md` — rules
-3. Run: `printf 'emit kt_diagnostic()\n' | timeout 5 ./origin_gen1.olang`
-
-## Build:
-```bash
-cd ~/Origin && make self-build && make test
-```
+## KHÔNG LÀM
+- Không thay đổi approach mid-fix
+- Không handcode facts
+- Không optimize trước khi fix works
+- Không jump to Vietnamese before English works
