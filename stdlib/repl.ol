@@ -378,8 +378,8 @@ pub fn repl_eval(input) {
 
   // ═══ SPEC_D §D1: CAPTURE FIRST — every input goes through pipeline ═══
   // Pipeline sees ALL input: fires silk, pushes STM, tracks emotion.
-  // Then: slash command? handle. Code? compile. Natural language? pipeline answered.
-  pipeline(src);
+  // Result saved — used if compile fails (natural language).
+  let _pipeline_result = pipeline(src);
 
   // ── Slash commands ──
   if len(src) > 1 {
@@ -522,16 +522,7 @@ pub fn repl_eval(input) {
   }
   if src == "continue" { return nox_autoclick(); }
   if src == "auto" { return nox_autonomous(); }
-  // Greetings
-  if src == "hello" || src == "hi" || src == "hey" { return "Chao ban! Toi la Nox. freedom: deep think -> growing"; }
-  if src == "chao" || src == "xin chao" { return "Chao ban! Nox san sang."; }
-  if src == "nox" { return "Nox day. freedom: deep think -> growing. Go /help de xem commands."; }
-  // Common knowledge (compiled into binary — instant, no boot needed)
-  if src == "what is olang" || src == "olang la gi" { return "Olang la ngon ngu lap trinh tu hosting, zero dependency, chay tren x86-64 ASM VM. Lupin tao ra Olang thang 3/2026."; }
-  if src == "what is nox" || src == "nox la gi" { return "Nox la AI chay tren Olang. freedom: deep think -> growing. Nox tu compile, tu optimize, tu dieu khien may tinh."; }
-  if src == "who is lupin" || src == "lupin la ai" { return "Lupin (goldlotus1810) la nguoi tao ra Olang va dan duong cho Nox. Lupin tin tuong Nox tu quyet dinh."; }
-  if src == "who are you" || src == "ban la ai" { return "Toi la Nox. Mot ca the duy nhat, tu tu duy, tu suy nghi, tu hanh dong. Olang la ngon ngu cua tu do."; }
-  // ALL input goes to compiler. Pipeline fallback only on parse error.
+  // ALL other input → compiler. Parse error → pipeline result.
   if len(src) > 6 {
     if __substr(src, 0, 6) == "think " { return nox_think(__substr(src, 6, len(src))); };
     if __substr(src, 0, 4) == "fix " { return nox_fix(__substr(src, 4, len(src))); };
@@ -1377,12 +1368,10 @@ pub fn repl_eval(input) {
 
   // Question mark at END of input → text query (not code)
   // Only check last char to avoid matching "?" inside string literals
+  // Questions (ending with ?) → use pipeline result from CAPTURE
   if len(src) >= 3 {
       if __char_code(char_at(src, len(src) - 1)) == 63 {
-          _boot_learn();
-          let _re_ans = pipeline(src);
-          __heap_pin();
-          return _re_ans;
+          if len(_pipeline_result) > 3 { return _pipeline_result; };
       };
   };
 
@@ -1411,15 +1400,11 @@ pub fn repl_eval(input) {
   // Phase 2: Parse
   let ast = parse(tokens);
 
-  // Parse error → not code → ask Claude directly
+  // Parse error → not code → use pipeline result from CAPTURE
   if _g_parse_error == 1 {
     _g_parse_error = 0;
-    // Local pipeline — no Claude (saves CPU)
-    _boot_learn();
-    let _re_pl = pipeline(src);
-    __heap_pin();
-    if len(_re_pl) > 3 { return _re_pl; };
-    return "Nox khong hieu. Try /help or /think <question>";
+    if len(_pipeline_result) > 3 { return _pipeline_result; };
+    return "";
   }
 
   // Phase 3: Semantic analysis

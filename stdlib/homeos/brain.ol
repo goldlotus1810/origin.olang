@@ -22,10 +22,12 @@ pub fn nox_bootstrap() {
 
     // Register L0: identity, keywords, builtins as nodes
     kt_register_l0();
-    // Load saved memory from previous session (if exists)
+    // Load saved memory from previous session
     let _mem_n = kt_load("nox_memory.dat");
+    // Load pre-built knowledge (English primary + Vietnamese aliases)
+    let _data_n = _load_lines("homeos_data.knowledge");
     let _boot = kt_fact_count();
-    let _stats = _stats + "L0:" + __to_string(_boot) + " Mem:" + __to_string(_mem_n);
+    let _stats = _stats + "L0:" + __to_string(_boot) + " Mem:" + __to_string(_mem_n) + " Data:" + __to_string(_data_n);
 
     __heap_pin();
     return _stats;
