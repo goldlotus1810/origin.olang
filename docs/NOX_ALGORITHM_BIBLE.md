@@ -2848,3 +2848,152 @@ Everything is a P_weight. Everything composes. One math. One brain.
 
 *End of NOX Algorithm Bible. Every algorithm here = math Nox can execute.
 No lookup tables. No magic numbers. COMPUTE.*
+
+---
+
+# 11. SDF ENGINE — RENDERING WITHOUT RAY TRACING
+
+> Source: Exhaustive SDF rendering research. Quilez, Valve 2007, Chlumsky 2015, Felzenszwalb 2012.
+> Key: ALL lighting/shadows computed from SDF gradient. No rays. No GPU.
+
+## 11.1 Direct Pixel-Grid Evaluation
+```
+for each pixel (i,j):
+    p = screen_to_world(i, j)
+    d = sdf(p)
+    if d <= 0: shade(p, gradient(sdf, p))
+    elif d < pixel_size: alpha = 1 - d/pixel_size  // anti-alias
+```
+O(W×H×C_sdf). Simplest method. Works on CPU.
+
+## 11.2 Lighting from SDF Gradient (No Rays)
+```
+Normal:   N = ∇f(p) = (∂f/∂x, ∂f/∂y, ∂f/∂z)
+Diffuse:  I = k_d × max(0, N·L)
+Specular: H = normalize(L+V); I = k_s × max(0, N·H)^n
+AO:       AO = 1 - Σ w_i × (d_i - f(p + d_i×N))/d_i  (5 SDF evals)
+Shadow:   S = min(k × f(p + t×L)/t)  (4 fixed samples, no marching)
+```
+
+## 11.3 CSG Boolean Operations
+```
+Union:     min(f1, f2)
+Intersect: max(f1, f2)
+Subtract:  max(f1, -f2)
+Smooth:    smin(a,b,k) = -ln(e^(-ka)+e^(-kb))/k
+```
+
+## 11.4 Domain Operations (O(1), no extra cost)
+```
+Translation:  f(p - offset)
+Rotation:     f(R⁻¹ × p)
+Scaling:      f(p/s) × s
+Repetition:   f(mod(p, period) - period/2)  // infinite tiling, O(1)!
+Rounding:     f(p) - radius
+Onion shell:  abs(f(p)) - thickness
+```
+
+## 11.5 Isometric Projection (No Perspective)
+```
+sx = (x - y) × cos(30°) = (x - y) × 0.866
+sy = (x + y) × sin(30°) - z = (x + y) × 0.5 - z
+// No perspective division. Parallel projection.
+```
+
+## 11.6 Felzenszwalb EDT — O(N) Exact Distance Transform
+```
+1D: parabolic lower envelope intersection. O(n) per row.
+2D: apply 1D to rows, then columns. O(N) total.
+SDF = sqrt(outside_EDT) - sqrt(inside_EDT)
+```
+Used by: tiny-sdf (Mapbox), FreeType SDF renderer.
+
+## 11.7 Multi-Channel SDF (msdfgen)
+```
+Decompose shape edges → 3 channels (R,G,B)
+At render: d = median(r, g, b)
+median(a,b,c) = max(min(a,b), min(max(a,b), c))
+Preserves sharp corners that single-channel SDF rounds.
+```
+Paper: Chlumsky 2015, Czech Technical University.
+
+## 11.8 SDF Acceleration
+```
+BVH: O(log N) per eval for complex CSG trees
+Lipschitz skip: if |f(center)| > cell_diagonal → skip entire cell
+SIMD SSE2: 4 points/instruction, AVX2: 8 points/instruction
+```
+
+## 11.9 Memory Budget for 949KB Binary
+```
+SDF eval + CSG:     ~10KB code
+Marching Squares:    ~2KB
+Felzenszwalb EDT:    ~3KB
+Lighting + AO:       ~2KB
+Isometric + project: ~1KB
+Total: ~20KB. Fits easily.
+```
+
+## 11.10 Primitive SDF Library
+```
+Sphere:   f = |p| - r
+Box:      f = |max(|p|-b, 0)| + min(max(|p.x|-b.x, ...), 0)
+Capsule:  f = |p - a - clamp(dot(p-a,b-a)/dot(b-a,b-a), 0, 1)×(b-a)| - r
+Torus:    f = |(|p.xz|-R, p.y)| - r
+Plane:    f = n·p + d
+```
+Ref: Inigo Quilez, iquilezles.org/articles/distfunctions/
+
+---
+
+# 12. FONT/EMOJI → SDF → SRVAT PIPELINE
+
+## 12.1 Glyph → Vector Outlines
+```
+FreeType: FT_Load_Glyph → FT_Outline (quadratic/cubic Bezier curves)
+Quadratic: B(t) = (1-t)²P₀ + 2(1-t)tP₁ + t²P₂
+Cubic:     B(t) = (1-t)³P₀ + 3(1-t)²tP₁ + 3(1-t)t²P₂ + t³P₃
+```
+
+## 12.2 Outlines → SDF
+```
+For each texel, find minimum distance to nearest Bezier curve:
+  Quadratic: solve cubic d/dt|B(t)-p|² = 0
+  Cubic: solve quintic (numerical: Newton iterations)
+  Sign: winding number (ray casting count crossings)
+```
+
+## 12.3 SDF → Shape Features → S value
+```
+Isoperimetric ratio: C = P²/(4π×A)
+  Circle=1.0, Star=high. Quantize: S = clamp(floor(log2(C)×2.2), 0, 15)
+
+Additional features:
+  contours: 'A'=2(outer+hole), 'B'=3, 'O'=2
+  symmetry: correlation(f(x,y), f(-x,y))
+  medial axis length: count local maxima of |f(p)|
+```
+
+## 12.4 Emoji → SRVAT
+```
+S: shape complexity of emoji glyph SDF
+R: emoji category (face=0, hand=1, object=2, symbol=3...)
+V: emoji sentiment (Novak 2015: face-smiling=+0.8, face-negative=-0.7)
+A: visual intensity (saturation, action depicted)
+T: 0 for static, >0 for animated
+```
+
+## 12.5 Store SDF as Formula (not pixels)
+```
+Option A: CSG tree expression → compact, O(1) eval
+Option B: Fourier descriptors → frequency coefficients
+Option C: P_weight IS the compressed representation
+  S = shape complexity, chain links = sub-shape sequence
+```
+
+## 12.6 Complete Pipeline
+```
+Unicode cp → FreeType → Bezier outlines → SDF (msdfgen/EDT)
+  → features (compactness, contours, symmetry)
+  → S quantize → pack(S,R,V,A,T) → u16 P_weight
+```
