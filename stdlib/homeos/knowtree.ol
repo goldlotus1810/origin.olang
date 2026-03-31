@@ -466,21 +466,26 @@ pub fn kt_word_lookup(_w) {
 }
 
 pub fn kt_find(_q, _max) {
-    // Try word index first (O(1))
+    // Word index → candidates → VERIFY with __str_contains
     _widx_init();
     let _indices = kt_word_lookup(_q);
+    let _out = [];
     if len(_indices) > 0 {
-        let _out = []; let _i = 0;
+        let _i = 0;
         while _i < len(_indices) {
             if len(_out) >= _max { return _out; };
             let _fi = __array_get(_indices, _i);
-            if _fi < len(__kt_facts) { push(_out, __array_get(__kt_facts, _fi)); };
+            if _fi < len(__kt_facts) {
+                let _fact = __array_get(__kt_facts, _fi);
+                // VERIFY: fact must actually contain query
+                if __str_contains(_fact, _q) { push(_out, _fact); };
+            };
             let _i = _i + 1;
         };
         if len(_out) > 0 { return _out; };
     };
-    // Fallback: linear scan
-    let _out = []; let _i = 0;
+    // Fallback: linear scan (slow but accurate)
+    let _i = 0;
     while _i < len(__kt_facts) {
         if len(_out) >= _max { return _out; };
         if __str_contains(__array_get(__kt_facts, _i), _q) { push(_out, __array_get(__kt_facts, _i)); };
