@@ -75,12 +75,12 @@ pub fn pipeline(input) {
         if len(_near) > 0 { push(_text_results, _near); };
     };
 
-    // 3c: Silk walk on dominant dimension (reasoning — follow connections)
+    // 3c: Silk walk — filter by implicit silk strength (COMPUTED, not magic number)
     let _walk = kt_silk_walk_dim(_mol, _dim, 3, 10);
     let _wi = 1;
     while _wi < len(_walk) {
         let _wmol = __array_get(_walk, _wi);
-        if _kt_mol_dist(_mol, _wmol) < 8 {
+        if implicit_strength(_mol, _wmol) >= 400 {
             let _wf = kt_nearest(_wmol);
             if len(_wf) > 0 { push(_text_results, _wf); };
         };
