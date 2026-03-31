@@ -342,6 +342,7 @@ pub fn kt_load_aliases(_path) {
 // ═══ G1+G5: KnowTree bucket structure ═══
 let __kt_facts = [];
 let __kt_facts_mol = [];
+let __kt_facts_len = [0];  // real count (push uses this, not len())
 let __kt_buckets = [];
 let __kt_bkt_ok = [0];
 
@@ -356,6 +357,7 @@ let __kt_learn_count = [0];
 // Fast learn: skip word-level compose, use simple hash (10x faster)
 pub fn kt_learn_fast(_text) {
     _kt_ensure_init(); _bkt_init(); _silk_init();
+    if len(__kt_facts) >= 500 { return 0 - 1; };
     // Fast mol: hash only (no per-char P_weight lookup)
     let _h = [2166136261];
     let _i = 0;
@@ -377,6 +379,8 @@ pub fn kt_learn_fast(_text) {
 
 pub fn kt_learn(_text) {
     _kt_ensure_init(); _bkt_init(); _silk_init();
+    // Guard: prevent array relocation crash at 512 capacity
+    if len(__kt_facts) >= 500 { return 0 - 1; };
     let _mol = _kt_real_mol(_text);
     let _idx = len(__kt_facts);
     push(__kt_facts, _text);
@@ -384,9 +388,11 @@ pub fn kt_learn(_text) {
     push(__kt_buckets[(_kt_mol_s(_mol) * 16) + _kt_mol_r(_mol)], _idx);
     // Auto-silk with previous
     if _idx > 0 { kt_silk_fire(_mol, __array_get(__kt_facts_mol, _idx - 1)); };
-    // Auto-pin every 100 learns
+    // Pin BEFORE array relocation (capacity = 512)
+    // Boot has 71 facts. Pin at 400 to prevent relocation crash.
     let _ = __set_at(__kt_learn_count, 0, __array_get(__kt_learn_count, 0) + 1);
-    if (__array_get(__kt_learn_count, 0) % 100) == 0 { __heap_pin(); };
+    let _lc = __array_get(__kt_learn_count, 0);
+    if (_lc % 50) == 0 { __heap_pin(); };
     // G20: Index words for O(1) lookup
     _widx_init();
     let _wi = 0; let _ws = [0];

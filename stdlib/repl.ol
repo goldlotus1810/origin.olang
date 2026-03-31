@@ -376,11 +376,12 @@ pub fn repl_eval(input) {
   // Boot knowledge on first real input (lazy — avoids slow startup)
   _boot_learn();
 
-  // ═══ G8: Try compile first. Fail → natural language → pipeline ═══
-  // No if/else keyword detection. Math: compile succeeds → run.
-  // Slash commands handled below. Everything else = try compile.
+  // ═══ SPEC_D §D1: CAPTURE FIRST — every input goes through pipeline ═══
+  // Pipeline sees ALL input: fires silk, pushes STM, tracks emotion.
+  // Then: slash command? handle. Code? compile. Natural language? pipeline answered.
+  pipeline(src);
 
-  // ── Slash commands (like Claude Code) ──
+  // ── Slash commands ──
   if len(src) > 1 {
     if char_at(src, 0) == "/" {
       let _sc = __substr(src, 1, len(src));
