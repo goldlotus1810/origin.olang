@@ -39,39 +39,13 @@ pub fn chain_encode(_ce_text) {
     return _ce_chain;
 }
 
-// Chain summary: Zipf-weighted average (first word heavier)
+// Chain summary: A4 compose rules (G2) — S=max R=Zipf V=amplify A=max T=vote
 // Returns single u16 mol for KnowTree indexing
 pub fn chain_summary(_cs_chain) {
     let _cs_n = len(_cs_chain);
     if _cs_n == 0 { return 0; };
     if _cs_n == 1 { return __array_get(_cs_chain, 0); };
-    // Accumulate: weight = 1000/(i+1) (Zipf, integer scaled)
-    let _cs_ts = [0];
-    let _cs_tr = [0];
-    let _cs_tv = [0];
-    let _cs_ta = [0];
-    let _cs_tt = [0];
-    let _cs_tw = [0];
-    let _cs_i = 0;
-    while _cs_i < _cs_n {
-        let _cs_m = __array_get(_cs_chain, _cs_i);
-        let _cs_w = __floor(1000 / (_cs_i + 1));
-        let _ = __set_at(_cs_ts, 0, __array_get(_cs_ts, 0) + (_kt_mol_s(_cs_m) * _cs_w));
-        let _ = __set_at(_cs_tr, 0, __array_get(_cs_tr, 0) + (_kt_mol_r(_cs_m) * _cs_w));
-        let _ = __set_at(_cs_tv, 0, __array_get(_cs_tv, 0) + (_kt_mol_v(_cs_m) * _cs_w));
-        let _ = __set_at(_cs_ta, 0, __array_get(_cs_ta, 0) + (_kt_mol_a(_cs_m) * _cs_w));
-        let _ = __set_at(_cs_tt, 0, __array_get(_cs_tt, 0) + (_kt_mol_t(_cs_m) * _cs_w));
-        let _ = __set_at(_cs_tw, 0, __array_get(_cs_tw, 0) + _cs_w);
-        let _cs_i = _cs_i + 1;
-    };
-    let _cs_wtotal = __array_get(_cs_tw, 0);
-    if _cs_wtotal == 0 { return 0; };
-    let _cs_rs = __floor(__array_get(_cs_ts, 0) / _cs_wtotal) % 16;
-    let _cs_rr = __floor(__array_get(_cs_tr, 0) / _cs_wtotal) % 16;
-    let _cs_rv = __floor(__array_get(_cs_tv, 0) / _cs_wtotal) % 8;
-    let _cs_ra = __floor(__array_get(_cs_ta, 0) / _cs_wtotal) % 8;
-    let _cs_rt = __floor(__array_get(_cs_tt, 0) / _cs_wtotal) % 4;
-    return (_cs_rs * 4096) + (_cs_rr * 256) + (_cs_rv * 32) + (_cs_ra * 4) + _cs_rt;
+    return compose(_cs_chain);
 }
 
 // Store chain + text in KnowTree (chain-aware)

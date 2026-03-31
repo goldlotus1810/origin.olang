@@ -791,6 +791,39 @@ fn _kt_mol_dist(_kmd_a, _kmd_b) {
 
 fn _kt_abs(_v) { if _v < 0 { return 0 - _v; }; return _v; }
 
+// G2: Dominant dimension (which dim deviates most from neutral)
+// Returns 0=S 1=R 2=V 3=A 4=T. Silk walk uses this as search direction.
+pub fn mol_dominant_dim(_mdd_mol) {
+    let _mdd_ds = _kt_abs((_kt_mol_s(_mdd_mol) * 66) - 500);
+    let _mdd_dr = _kt_abs((_kt_mol_r(_mdd_mol) * 66) - 500);
+    let _mdd_dv = _kt_abs((_kt_mol_v(_mdd_mol) * 142) - 500);
+    let _mdd_da = _kt_abs((_kt_mol_a(_mdd_mol) * 142) - 500);
+    let _mdd_dt = _kt_abs((_kt_mol_t(_mdd_mol) * 333) - 500);
+    let _mdd_max = _mdd_ds;
+    let _mdd_dim = 0;
+    if _mdd_dr > _mdd_max { let _mdd_max = _mdd_dr; let _mdd_dim = 1; };
+    if _mdd_dv > _mdd_max { let _mdd_max = _mdd_dv; let _mdd_dim = 2; };
+    if _mdd_da > _mdd_max { let _mdd_max = _mdd_da; let _mdd_dim = 3; };
+    if _mdd_dt > _mdd_max { let _mdd_max = _mdd_dt; let _mdd_dim = 4; };
+    return _mdd_dim;
+}
+
+// G2: Extract dimension value from mol. dim: 0=S 1=R 2=V 3=A 4=T
+pub fn mol_get_dim(_mgd_mol, _mgd_dim) {
+    if _mgd_dim == 0 { return _kt_mol_s(_mgd_mol); };
+    if _mgd_dim == 1 { return _kt_mol_r(_mgd_mol); };
+    if _mgd_dim == 2 { return _kt_mol_v(_mgd_mol); };
+    if _mgd_dim == 3 { return _kt_mol_a(_mgd_mol); };
+    return _kt_mol_t(_mgd_mol);
+}
+
+// G2: Max range per dimension [15,15,7,7,3]
+pub fn mol_dim_range(_mdr_dim) {
+    if _mdr_dim <= 1 { return 15; };
+    if _mdr_dim <= 3 { return 7; };
+    return 3;
+}
+
 // ════════════════════════════════════════════════════════════════
 // Decode ∂ — the inverse of Encode ∫
 // Given query text → compute molecule → find nearest facts → return
