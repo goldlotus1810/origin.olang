@@ -21,10 +21,14 @@ pub fn nox_brain(input) {
     return "";
 }
 
-// G18: Bootstrap — load knowledge from file
+// G18: Bootstrap — load ALL data
 pub fn nox_bootstrap() {
+    // Load NRC-VAD (54K word emotions)
+    let _vad_n = vad_load("json/json/mapping/NRC-VAD-Lexicon-v2.1/NRC-VAD-Lexicon-v2.1.txt");
+
+    // Load knowledge facts
     let _c = __file_read("homeos.knowledge");
-    if len(_c) == 0 { return "no homeos.knowledge"; };
+    if len(_c) == 0 { return "NRC-VAD:" + __to_string(_vad_n) + " facts:0"; };
     // Split by newlines, learn each
     let _count = [0];
     let _start = [0];
@@ -44,7 +48,7 @@ pub fn nox_bootstrap() {
     let _last = substr(_c, __array_get(_start, 0), len(_c));
     if len(_last) > 3 { kt_learn(_last); let _ = __set_at(_count, 0, __array_get(_count, 0) + 1); };
     __heap_pin();
-    return "Loaded " + __to_string(__array_get(_count, 0)) + " facts";
+    return "NRC-VAD:" + __to_string(_vad_n) + " facts:" + __to_string(__array_get(_count, 0));
 }
 
 // G24: Growth metrics

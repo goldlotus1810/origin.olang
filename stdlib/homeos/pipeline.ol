@@ -41,6 +41,18 @@ pub fn pipeline(input) {
     // Encode
     let _mol = _kt_real_mol(input);
     let _v = mol_get_dim(_mol, 2);
+    // NRC-VAD: check first word for real V/A
+    let _space = __str_index_of(input, " ");
+    if _space < 0 { let _space = len(input); };
+    let _first_word = substr(input, 0, _space);
+    let _vad = vad_query(_first_word);
+    if __array_get(_vad, 0) != 0 {
+        // Real NRC-VAD data → use it
+        let _real_v = __array_get(_vad, 0);  // v * 1000
+        let _v = __floor((_real_v + 1000) * 7 / 2000);
+        if _v > 7 { let _v = 7; };
+        if _v < 0 { let _v = 0; };
+    };
     _curve_push_v(_v);
 
     // Search (molecular first, text fallback)

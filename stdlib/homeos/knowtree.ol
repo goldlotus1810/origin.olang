@@ -102,6 +102,85 @@ pub fn chain_summary(_ch) { return compose(_ch); }
 // Real mol from text
 pub fn _kt_real_mol(_text) { return compose(chain_encode(_text)); }
 
+// ═══ NRC-VAD: word → emotion lookup ═══
+let __nrc_vad = [];
+let __nrc_vad_ok = [0];
+
+fn _vad_init() {
+    if __array_get(__nrc_vad_ok, 0) == 1 { return; };
+    let _ = __set_at(__nrc_vad_ok, 0, 1);
+    // 256 hash buckets, each = [word, v*1000, a*1000, word, v, a, ...]
+    let _i = 0; while _i < 256 { push(__nrc_vad, []); let _i = _i + 1; };
+}
+
+fn _vad_hash(_w) {
+    let _h = [0]; let _i = 0;
+    while _i < len(_w) {
+        let _ = __set_at(_h, 0, __bit_and((__array_get(_h, 0) * 31) + __char_code(char_at(_w, _i)), 255));
+        let _i = _i + 1;
+    };
+    return __array_get(_h, 0);
+}
+
+// Load NRC-VAD from tab-separated file
+pub fn vad_load(_path) {
+    _vad_init();
+    let _c = __file_read(_path);
+    if len(_c) == 0 { return 0; };
+    let _count = [0];
+    let _start = [0];
+    let _line_start = 1;  // skip header
+    let _i = 0;
+    while _i < len(_c) {
+        if __char_code(char_at(_c, _i)) == 10 {
+            if _line_start == 0 {
+                let _line = substr(_c, __array_get(_start, 0), _i);
+                // Parse: word\tvalence\tarousal\tdominance
+                let _tab1 = __str_index_of(_line, "	");
+                if _tab1 > 0 {
+                    let _word = substr(_line, 0, _tab1);
+                    let _rest = substr(_line, _tab1 + 1, len(_line));
+                    let _tab2 = __str_index_of(_rest, "	");
+                    if _tab2 > 0 {
+                        let _vs = substr(_rest, 0, _tab2);
+                        let _rest2 = substr(_rest, _tab2 + 1, len(_rest));
+                        let _tab3 = __str_index_of(_rest2, "	");
+                        let _as = _rest2;
+                        if _tab3 > 0 { let _as = substr(_rest2, 0, _tab3); };
+                        let _v = __to_number(_vs);
+                        let _a = __to_number(_as);
+                        let _h = _vad_hash(_word);
+                        push(__nrc_vad[_h], _word);
+                        push(__nrc_vad[_h], __floor(_v * 1000));
+                        push(__nrc_vad[_h], __floor(_a * 1000));
+                        let _ = __set_at(_count, 0, __array_get(_count, 0) + 1);
+                    };
+                };
+            };
+            let _line_start = 0;
+            let _ = __set_at(_start, 0, _i + 1);
+        };
+        let _i = _i + 1;
+    };
+    __heap_pin();
+    return __array_get(_count, 0);
+}
+
+// Query: word → [v_raw*1000, a_raw*1000] or [0, 0]
+pub fn vad_query(_word) {
+    _vad_init();
+    let _h = _vad_hash(_word);
+    let _bkt = __nrc_vad[_h];
+    let _i = 0;
+    while _i < len(_bkt) {
+        if __array_get(_bkt, _i) == _word {
+            return [__array_get(_bkt, _i + 1), __array_get(_bkt, _i + 2)];
+        };
+        let _i = _i + 3;
+    };
+    return [0, 0];
+}
+
 // ═══ G1+G5: KnowTree bucket structure ═══
 let __kt_facts = [];
 let __kt_facts_mol = [];
