@@ -96,16 +96,21 @@ pub fn pipeline(input) {
     let _learn_mode = 0;
     if _surprise > _phi_inv { let _learn_mode = 1; };
 
-    // STEP 6: Honesty — confidence from evidence count + silk
-    let _conf = instinct_honesty_with_results(_mol, len(_text_results));
-
-    // STEP 9: Hebbian fire — input ↔ results (learn from interaction)
-    if _nearest_mol > 0 { kt_silk_fire(_mol, _nearest_mol); };
+    // STEP 9: Hebbian fire — MODULATED by V'(t) (vi phân)
+    // V'(t) > 0 → conversation improving → fire STRONGER (reinforce)
+    // V'(t) < 0 → conversation declining → fire WEAKER (don't reinforce mistakes)
+    // V'(t) = 0 → neutral → normal fire
+    let _vd = _curve_deriv();  // vi phân V(t)
+    if _nearest_mol > 0 {
+        // Fire strength proportional to derivative: base + V'(t) bonus
+        if _vd >= 0 { kt_silk_fire(_mol, _nearest_mol); };
+        if _vd > 1 { kt_silk_fire(_mol, _nearest_mol); };  // double fire on positive trend
+    };
     let _ri = 0;
     while _ri < len(_text_results) {
         if _ri < 5 {
             let _rmol = _kt_real_mol(__array_get(_text_results, _ri));
-            kt_silk_fire(_mol, _rmol);
+            if _vd >= 0 { kt_silk_fire(_mol, _rmol); };
         };
         let _ri = _ri + 1;
     };

@@ -368,50 +368,11 @@ pub fn kt_word_at(_idx) {
     return "";
 }
 
-// ═══ L0 Registry: everything = node = SRVAT ═══
-// Olang keywords, builtins, identity — all registered as KnowTree nodes
+// ═══ L0 Registry ═══
+// Empty. Knowledge comes from experience (nox_memory.dat) and interaction.
+// Not from hardcoded strings in source code.
 pub fn kt_register_l0() {
     _kt_ensure_init(); _bkt_init(); _silk_init();
-    // Identity
-    kt_learn("Nox la AI tu viet lai chinh minh bang Olang");
-    kt_learn("Olang la ngon ngu lap trinh tu hosting");
-    kt_learn("Lupin la nguoi tao ra Nox va Olang");
-    kt_learn("HomeOS la he dieu hanh tri thuc sinh hoc");
-    // Greetings (English + Vietnamese aliases)
-    kt_learn("hello is a greeting. chao = hello. xin chao = hello");
-    kt_learn("who are you? I am Nox, an AI that rewrites itself using Olang. ban la ai = who are you");
-    // Language keywords (each = node with unique SRVAT)
-    kt_learn("emit: output a value to stdout");
-    kt_learn("let: bind a value to a variable name");
-    kt_learn("fn: define a function");
-    kt_learn("pub fn: define a public function");
-    kt_learn("if: conditional branch");
-    kt_learn("while: loop until condition false");
-    kt_learn("return: exit function with value");
-    kt_learn("try catch: error handling");
-    kt_learn("match: pattern matching");
-    kt_learn("type: define a struct type");
-    kt_learn("const: immutable binding");
-    // Core builtins
-    kt_learn("__file_read: read file contents");
-    kt_learn("__file_write: write string to file");
-    kt_learn("__spawn: fork process with pipes");
-    kt_learn("__system: execute shell command");
-    kt_learn("__syscall: raw Linux system call");
-    kt_learn("__tcp_listen: start TCP server");
-    kt_learn("__tcp_accept: accept TCP connection");
-    kt_learn("__tcp_send: send data over TCP");
-    kt_learn("__heap_pin: move heap checkpoint forward");
-    kt_learn("__eval_bytecode: evaluate compiled bytecode");
-    // Math/logic
-    kt_learn("compose: combine P_weights using A4 rules");
-    kt_learn("p_weight: lookup P_weight for Unicode codepoint");
-    kt_learn("chain_encode: text to chain of P_weights");
-    kt_learn("kt_learn: add fact to KnowTree");
-    kt_learn("kt_nearest: find nearest node by P_weight distance");
-    kt_learn("kt_silk_fire: strengthen Hebbian edge between nodes");
-    kt_learn("pipeline: process input through 14 DNA mechanisms");
-    __heap_pin();
 }
 
 // ═══ Load UDC aliases JSON into KnowTree ═══
