@@ -11,3 +11,10 @@
  alive cycle=1800 load=2.14 mem=0MB
  alive cycle=2100 load=1.719999 mem=0MB
  BRAIN: 
+ alive cycle=2400 load=3.609999 mem=0MB
+ BRAIN: 
+ alive cycle=2700 load=3.129999 mem=0MB
+ BRAIN: 
+ alive cycle=3000 load=4.27 mem=0MB
+ BRAIN: 
+ alive cycle=3300 load=1.27 mem=0MB

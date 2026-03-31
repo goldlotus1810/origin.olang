@@ -20,25 +20,15 @@ pub fn nox_brain(input) {
 pub fn nox_bootstrap() {
     let _stats = "";
 
-    // Register L0: identity, keywords, builtins as nodes
+    // L0: builtins as nodes (engine knows itself)
     kt_register_l0();
-    // Load NRC-VAD emotion data (10K English words → V/A scores)
+    // NRC-VAD: word → V/A emotion lookup (used by _kt_real_mol)
     let _vad_n = vad_load("json/nrc_vad_top10k.txt");
-    // Load saved memory from previous session
+    // Saved knowledge from previous sessions
     let _mem_n = kt_load("nox_memory.dat");
     __heap_pin();
-    // Load multilingual sentiment at boot (small, 599 facts)
-    let _data_n = kt_load("json/sentiment_precomputed.dat");
-    __heap_pin();
-    // Load linguistic patterns (how to recognize sentence structure)
-    let _ling_n = kt_load("json/linguistic_patterns.dat");
-    __heap_pin();
-    // Load past observations (auto-captured from REPL sessions)
-    let _obs_n = kt_load("nox_observations.dat");
-    __heap_pin();
-    // NRC data (5K facts) loaded via REPL: /load_nrc or nox_load_data()
     let _boot = kt_fact_count();
-    let _stats = _stats + "L0:" + __to_string(_boot) + " Mem:" + __to_string(_mem_n) + " Data:" + __to_string(_data_n);
+    let _stats = "L0:" + __to_string(_boot) + " VAD:" + __to_string(_vad_n) + " Mem:" + __to_string(_mem_n);
 
     // Fire semantic silk: facts in same bucket are RELATED → connect them
     _bkt_init();
