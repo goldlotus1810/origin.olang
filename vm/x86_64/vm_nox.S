@@ -692,13 +692,46 @@ op_eq:
     DISPATCH
 
 op_ne:
-    # TODO: implement (inverse of eq)
+    mov     rax, [r14 + 16]         # a.ptr
+    mov     rdx, [r14 + 24]         # a.len
+    mov     rcx, [r14]              # b.ptr
+    mov     rsi, [r14 + 8]          # b.len
+    lea     r14, [r14 + 16]         # pop one (use lea to preserve flags)
+    cmp     rdx, F64_MARKER
+    jne     .ne_str
+    cmp     rsi, F64_MARKER
+    jne     .ne_true                # different types → not equal
+    cmp     rax, rcx                # compare f64 bits
+    jne     .ne_true
+    jmp     .ne_false
+.ne_str:
+    cmp     rdx, rsi                # same length?
+    jne     .ne_true
+    # Compare bytes
+    push    rcx
+    push    rdx
+    mov     rdi, rax
+    mov     rsi, rcx
+    mov     ecx, edx
+    repe    cmpsb
+    pop     rdx
+    pop     rcx
+    jne     .ne_true
+.ne_false:
+    xor     eax, eax
+    mov     [r14], rax
+    mov     qword ptr [r14 + 8], F64_MARKER
+    DISPATCH
+.ne_true:
+    mov     rax, 0x3FF0000000000000
+    mov     [r14], rax
+    mov     qword ptr [r14 + 8], F64_MARKER
     DISPATCH
 
 op_lt:
     movsd   xmm0, [r14 + 16]       # a
     ucomisd xmm0, qword ptr [r14]  # compare a vs b
-    add     r14, 16
+    lea     r14, [r14 + 16]
     jb      .lt_true                # a < b (below = less than for ucomisd)
     xor     eax, eax
     mov     [r14], rax
@@ -713,7 +746,7 @@ op_lt:
 op_gt:
     movsd   xmm0, [r14 + 16]
     ucomisd xmm0, qword ptr [r14]
-    add     r14, 16
+    lea     r14, [r14 + 16]
     ja      .gt_true
     xor     eax, eax
     mov     [r14], rax
@@ -728,7 +761,7 @@ op_gt:
 op_le:
     movsd   xmm0, [r14 + 16]
     ucomisd xmm0, qword ptr [r14]
-    add     r14, 16
+    lea     r14, [r14 + 16]
     jbe     .le_true
     xor     eax, eax
     mov     [r14], rax
@@ -743,7 +776,7 @@ op_le:
 op_ge:
     movsd   xmm0, [r14 + 16]
     ucomisd xmm0, qword ptr [r14]
-    add     r14, 16
+    lea     r14, [r14 + 16]
     jae     .ge_true
     xor     eax, eax
     mov     [r14], rax
@@ -770,28 +803,27 @@ op_call:
     add     r13, rcx                # advance PC past name
     movzx   ecx, byte ptr [r12 + r13]  # argc
     inc     r13
-    # Try builtin table first
-    push    rax                      # save hash
-    push    rcx                      # save argc
+    # Check var_matrix FIRST (user functions shadow builtins)
+    # rax = hash, ecx = argc. Save both.
+    mov     [rip + _call_save_hash], rax
+    mov     [rip + _call_save_argc], ecx
+    call    var_load_matrix          # rax=ptr, rdx=len
+    test    rax, rax
+    jz      .call_try_builtin        # not in var_matrix → try builtins
+    cmp     rdx, CLOSURE_MARKER
+    je      .call_closure            # found closure → call it
+    # Found but not closure — fall through to builtin
+.call_try_builtin:
+    mov     eax, [rip + _call_save_hash]
+    mov     ecx, [rip + _call_save_argc]
     mov     esi, eax
     and     esi, 0x1FF
     lea     rdx, [rip + builtin_jump_table]
     lea     rdx, [rdx + rsi*8]
     lea     rdi, [rip + .call_not_builtin]
     cmp     [rdx], rdi               # is it .call_not_builtin?
-    pop     rcx
-    pop     rax
     jne     .call_is_builtin
-    # Not a builtin → look up in var_matrix (user-defined closure)
-    push    rcx                      # save argc
-    call    var_load_matrix          # rax=ptr, rdx=len
-    pop     rcx
-    test    rax, rax
-    jz      .call_skip               # not found → skip
-    # Check if closure (len == CLOSURE_MARKER or CAPTURED_CLOSURE_MARKER)
-    cmp     rdx, CLOSURE_MARKER
-    je      .call_closure
-    jmp     .call_skip
+    jmp     .call_skip               # neither closure nor builtin
 .call_is_builtin:
     jmp     [rdx]                    # jump to builtin handler
 .call_closure:
@@ -799,7 +831,15 @@ op_call:
     push    r12                      # save bytecode base
     push    r13                      # save return PC
     push    rbx                      # save bc_size
-    # Scope: gen++
+    # Push MARKER to undo stack (for scope save/restore)
+    push    rax                      # save body_pc
+    lea     rcx, [rip + var_save_top]
+    mov     rdi, [rcx]
+    mov     qword ptr [rdi], -1      # MARKER (slot_off = -1)
+    add     rdi, 40                  # uniform 40-byte entry
+    mov     [rcx], rdi
+    pop     rax
+    # Scope: depth++
     inc     qword ptr [rip + closure_depth]
     # Jump to closure body
     mov     r13d, eax                # PC = body_pc
@@ -817,18 +857,43 @@ op_ret:
     pop     rbx                      # restore bc_size
     pop     r13                      # restore return PC
     pop     r12                      # restore bytecode base
-    # Scope: gen--
+    # Scope restore: pop undo stack until MARKER
     cmp     qword ptr [rip + closure_depth], 0
     je      .ret_no_scope
     dec     qword ptr [rip + closure_depth]
+    # Pop undo entries, restore var_matrix slots
+    push    rbx
+    lea     rax, [rip + var_save_top]
+    mov     rcx, [rax]               # current top
+    lea     rdi, [rip + var_matrix]
+.ret_undo:
+    sub     rcx, 40                  # back one entry
+    cmp     qword ptr [rcx], -1      # MARKER?
+    je      .ret_undo_done
+    # Restore: [slot_off:8][hash:8][depth:8][ptr:8][len:8]
+    mov     rdx, [rcx]               # slot byte offset
+    mov     rsi, [rcx + 8]
+    mov     [rdi + rdx], rsi         # restore hash
+    mov     rsi, [rcx + 16]
+    mov     [rdi + rdx + 8], rsi     # restore depth
+    mov     rsi, [rcx + 24]
+    mov     [rdi + rdx + 16], rsi    # restore ptr
+    mov     rsi, [rcx + 32]
+    mov     [rdi + rdx + 24], rsi    # restore len
+    jmp     .ret_undo
+.ret_undo_done:
+    # Consume MARKER
+    lea     rax, [rip + var_save_top]
+    mov     [rax], rcx               # top = before MARKER
+    pop     rbx
 .ret_no_scope:
     DISPATCH
 
 # 0x09: Jmp [offset:4]
 op_jmp:
-    mov     eax, [r12 + r13]        # 4-byte signed offset
+    movsxd  rax, dword ptr [r12 + r13]  # sign-extend offset
     add     r13, 4
-    add     r13, rax                # PC += offset
+    add     r13, rax
     DISPATCH
 
 # 0x0A: Jz [offset:4] — jump if zero/false
@@ -851,14 +916,14 @@ op_jz:
     add     r13, 4                  # skip offset
     DISPATCH
 .jz_take:
-    mov     eax, [r12 + r13]
+    movsxd  rax, dword ptr [r12 + r13]  # sign-extend offset
     add     r13, 4
     add     r13, rax
     DISPATCH
 
 # 0x0E: Loop [offset:4] — backward jump
 op_loop:
-    mov     eax, [r12 + r13]
+    movsxd  rax, dword ptr [r12 + r13]  # sign-extend 32-bit offset to 64
     add     r13, 4
     add     r13, rax                # PC += offset (negative for backward)
     DISPATCH
@@ -2319,6 +2384,32 @@ var_store_matrix:
     xor     ecx, ecx
     jmp     .vsm_probe
 .vsm_write:
+    # Save old value to undo stack if inside closure scope
+    cmp     qword ptr [rip + closure_depth], 0
+    je      .vsm_no_save
+    # Check if same depth → same scope update, no save needed
+    mov     rdx, [rip + closure_depth]
+    cmp     [rbx + rcx + 8], rdx
+    je      .vsm_no_save
+    # Different scope or empty → save old slot
+    push    rax
+    push    rdi
+    lea     rdi, [rip + var_save_top]
+    mov     rax, [rdi]
+    mov     [rax], rcx               # slot byte offset
+    mov     rdx, [rbx + rcx]
+    mov     [rax + 8], rdx           # old hash
+    mov     rdx, [rbx + rcx + 8]
+    mov     [rax + 16], rdx          # old depth
+    mov     rdx, [rbx + rcx + 16]
+    mov     [rax + 24], rdx          # old ptr
+    mov     rdx, [rbx + rcx + 24]
+    mov     [rax + 32], rdx          # old len
+    add     rax, 40
+    mov     [rdi], rax               # advance top
+    pop     rdi
+    pop     rax
+.vsm_no_save:
     mov     [rbx + rcx], eax         # hash
     mov     rdx, [rip + closure_depth]
     mov     [rbx + rcx + 8], rdx     # depth
@@ -4034,6 +4125,8 @@ v_history_ptr:  .space 1
 
 # ── Misc ──
 repl_heap_checkpoint: .space 8
+_call_save_hash: .space 8
+_call_save_argc: .space 8
 try_depth:      .space 8
 
 # SIMD temp buffer
