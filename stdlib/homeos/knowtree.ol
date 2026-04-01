@@ -555,6 +555,7 @@ pub fn kt_learn_fast(_text) {
     push(__kt_facts_mol, _mol);
     push(__kt_facts_fire, 0); push(__kt_facts_maturity, 0);
     push(__kt_buckets[(_kt_mol_s(_mol) * 16) + _kt_mol_r(_mol)], _idx);
+    __mx_w(_mol, _idx + 1);
     if _idx > 0 { kt_silk_fire(_mol, __array_get(__kt_facts_mol, _idx - 1)); };
     let _ = __set_at(__kt_learn_count, 0, __array_get(__kt_learn_count, 0) + 1);
     if (__array_get(__kt_learn_count, 0) % 20) == 0 { __heap_pin(); };
@@ -569,6 +570,7 @@ pub fn kt_learn_raw(_text, _mol) {
     push(__kt_facts_mol, _mol);
     push(__kt_facts_fire, 0); push(__kt_facts_maturity, 0);
     push(__kt_buckets[(_kt_mol_s(_mol) * 16) + _kt_mol_r(_mol)], _idx);
+    __mx_w(_mol, _idx + 1);
     return _idx;
 }
 
@@ -582,6 +584,7 @@ pub fn kt_learn(_text) {
     push(__kt_facts_mol, _mol);
     push(__kt_facts_fire, 0); push(__kt_facts_maturity, 0);
     push(__kt_buckets[(_kt_mol_s(_mol) * 16) + _kt_mol_r(_mol)], _idx);
+    __mx_w(_mol, _idx + 1);
     // Auto-silk with previous
     if _idx > 0 { kt_silk_fire(_mol, __array_get(__kt_facts_mol, _idx - 1)); };
     // G20: Index words for O(1) lookup
@@ -622,6 +625,13 @@ pub fn kt_fire_count(_idx) { if _idx >= 0 { if _idx < len(__kt_facts_fire) { ret
 
 pub fn kt_nearest(_mol) {
     _bkt_init();
+    // Matrix fast path: O(1) exact match
+    let _mx = __mxr(_mol);
+    if _mx > 0 {
+        let _fi = _mx - 1;
+        if _fi < len(__kt_facts) { return __array_get(__kt_facts, _fi); };
+    };
+    // Bucket fallback: scan S±1, R±1 neighborhood
     let _s = _kt_mol_s(_mol); let _r = _kt_mol_r(_mol);
     let _bi = [0 - 1]; let _bd = [99999];
     let _ds = 0 - 1;
