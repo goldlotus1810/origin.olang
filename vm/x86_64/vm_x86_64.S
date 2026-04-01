@@ -37,6 +37,7 @@
 # Dict heap layout:  [count:8][entry: key_ptr:8 key_len:8 val_ptr:8 val_len:8]...
 .equ ARRAY_INIT_CAP, 512
 .equ ARRAY_FORWARD_MARKER, -2      # sentinel: array relocated
+.equ ARRAY_CAP_MARKER, -5          # sentinel: capacity-tracked array ([marker][cap][count][data...])
 
 # ── Register frame constants ──
 .equ REG_MAX_SLOTS,  64             # max locals per function
@@ -3410,14 +3411,26 @@ op_call:
     mov     8(%rdi), %rdi
     jmp     .array_push_fwd
 .array_push_check:
-    # Check if write address is still within safe zone (< r15)
+    # Check capacity: if array has CAP_MARKER at [-16], use capacity check
     mov     (%rdi), %rcx               # count
+    cmpq    $ARRAY_CAP_MARKER, -16(%rdi) # is this a capacity-tracked array?
+    jne     .array_push_check_r15       # no → use old r15 check
+    # Capacity-tracked: count < capacity → write in-place (guaranteed safe)
+    cmp     -8(%rdi), %rcx             # count vs capacity
+    jge     .array_push_relocate        # count >= capacity → must relocate
+    jmp     .array_push_write_offset
+.array_push_check_r15:
+    # Legacy: check write < r15
+    mov     %rcx, %rax
+    shl     $4, %rax
+    add     $8, %rax
+    lea     16(%rdi, %rax), %rdx
+    cmp     %r15, %rdx
+    ja      .array_push_relocate
+.array_push_write_offset:
     mov     %rcx, %rax
     shl     $4, %rax
     add     $8, %rax                    # write offset = 8 + count*16
-    lea     16(%rdi, %rax), %rdx       # end of write = base + offset + 16
-    cmp     %r15, %rdx
-    ja      .array_push_relocate       # write would go past heap top → relocate
 
     # Safe: write in-place
     mov     %r8, (%rdi, %rax)          # write val ptr
@@ -3429,9 +3442,18 @@ op_call:
     jmp     vm_loop
 
 .array_push_relocate:
-    # Capacity zone overwritten by other allocations.
-    # Copy entire array to r15 (new location) + append new element.
-    mov     %r15, %rsi                  # new base
+    # Relocate array. If capacity-tracked, write new CAP_MARKER header.
+    # Write [CAP_MARKER][new_capacity] before new array for future push O(1).
+    movq    $ARRAY_CAP_MARKER, (%r15)   # marker
+    lea     1(%rcx), %rax              # new count
+    shl     $1, %rax                   # new_cap = new_count * 2
+    cmp     $ARRAY_INIT_CAP, %rax
+    jge     .push_reloc_cap_ok
+    mov     $ARRAY_INIT_CAP, %rax
+.push_reloc_cap_ok:
+    mov     %rax, 8(%r15)              # store capacity
+    lea     16(%r15), %rsi             # new array base (past marker+cap)
+    lea     1(%rcx), %rax              # new count (restore)
     lea     1(%rcx), %rax              # new count
     mov     %rax, (%rsi)               # write new count
     # Copy old elements
@@ -3458,16 +3480,10 @@ op_call:
     mov     %r8, (%r11)
     mov     %r9, 8(%r11)
     add     $16, %r11
-    # Bump r15 past new array + capacity
-    # Use max(count*2, ARRAY_INIT_CAP) to avoid repeated relocations
-    lea     8(%rsi), %rax
-    mov     (%rsi), %rdx               # new count (already incremented)
-    shl     $5, %rdx                   # count * 32 = count * 2 * 16 (double capacity)
-    cmp     $ARRAY_INIT_CAP * 16, %rdx
-    jae     .push_reloc_use_count
-    mov     $ARRAY_INIT_CAP * 16, %edx # use ARRAY_INIT_CAP if larger
-.push_reloc_use_count:
-    add     %rdx, %rax                 # base + 8 + capacity
+    # Bump r15 past new array using capacity from header at [-8]
+    mov     -8(%rsi), %rdx             # capacity (stored before array base)
+    shl     $4, %rdx                   # capacity * 16 bytes
+    lea     8(%rsi, %rdx), %rax        # base + 8 + capacity*16
     cmp     %rax, %r11
     jae     .push_reloc_bump
     mov     %rax, %r11
@@ -3548,15 +3564,16 @@ op_call:
     cvttsd2siq %xmm0, %rcx            # n = requested capacity
     add     $16, %r14                   # pop arg
 
-    # Create empty array with explicit capacity
-    mov     %r15, %rdi                  # array base
-    movq    $0, (%r15)                  # count = 0 (empty)
-    # Bump heap past capacity zone: base + 8 + n*16
+    # Create capacity-tracked array: [CAP_MARKER:8][capacity:8][count:8][data...]
+    # Array ptr → &count (offset +16 from allocation start)
+    movq    $ARRAY_CAP_MARKER, (%r15)  # marker at -16 from array ptr
+    mov     %rcx, 8(%r15)              # capacity at -8 from array ptr
+    lea     16(%r15), %rdi             # array ptr → count field
+    movq    $0, (%rdi)                  # count = 0
+    # Bump heap past capacity zone
     mov     %rcx, %rax
     shl     $4, %rax                    # n * 16
-    add     $8, %rax                    # + header
-    add     %rdi, %rax                  # base + 8 + n*16
-    mov     %rax, %r15                  # bump heap
+    lea     8(%rdi, %rax), %r15        # heap = array_ptr + 8 + cap*16
 
     # Push array
     sub     $16, %r14
