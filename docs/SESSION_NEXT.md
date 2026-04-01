@@ -1,43 +1,61 @@
-# Session Next — Session 15
+# Session 15 — M2 var_matrix (PRIORITY #1)
 
-## ★ NGUYEN TAC: TINH, khong TRA. Encode = ∫. Decode = ∂. ★
+## ★ SPEC: docs/For_Nox/SPEC_VM_MATRIX.md ★
+## ★ Lupin + Sora: "moi lan gap gioi han lai ton thoi gian. Fix GOC." ★
 
-## STATUS (end of Session 14)
-- 906KB binary, 193/194 tests, Gen1==Gen2
-- 4GB heap, 4 u16 builtins, compiler unlocked (65K bytecode cap)
-- MEM: silk+stm persist, auto-load boot, auto-save every 20 turns
-- Formula Engine: 16 RelationOps + 8 V states + 8 A states
-- LCA: biological compose (amplify synergy)
-- Implicit Silk: 1,147 types at 0 bytes
-- 7/7 Instincts: Honesty, Contradiction, Causality, Abstraction, Analogy, Curiosity, Reflection
-- Maturity: Formula → Evaluating → Mature (fires in pipeline)
-- compose() → mol_lca (biological, not average)
+## M2 PLAN: var_matrix + gen counter
 
-## PORTED FROM RUST (Session 14):
-- formula.rs → formula.ol (113 lines)
-- lca.rs → lca.ol (64 lines)
-- index.rs → implicit_silk.ol (63 lines)
-- molecular.rs maturity → knowtree.ol (21 lines)
-- instinct skills → instinct.ol (52 lines)
+### Buoc 1: Them var_matrix BSS (song song voi var_table)
+```asm
+;; BSS:
+var_matrix: .space 16384 * 16    ;; 256KB: [gen:8][value_ptr:8] × 16384 slots
+var_gen:    .space 8              ;; current generation counter
+```
 
-## REMAINING RUST GAP (~120 algorithms):
-1. 37-channel bucket indexing (SilkIndex full)
-2. HebbianLink 19-byte compact edges
-3. DreamCycle with dual-threshold clustering
-4. BuildZone + ConsolidationScheduler (Day/Dusk/Night/Dawn)
-5. 18 SDF primitives + FFR parametric rendering
-6. 41K alias table
-7. ConversationCurve phi-derived constants
-8. Graph 3-layer architecture (structural + hebbian + parent_map)
+### Buoc 2: Implement var_matrix_store
+```asm
+;; slot = hash & 0x3FFF (16384 slots)
+;; var_matrix[slot] = [gen, ptr, len]
+;; O(1). Overwrite. No accumulate. No leak.
+```
 
-## DOCS:
-- NOX_COMPLETE_REFERENCE.md (3721 lines)
-- NOX_ALGORITHM_BIBLE.md (2999 lines)
-- NOX_KINH_THANH_TIENG_VIET.md (4212 lines)
-- RUST_ORIGIN_ANALYSIS.md + RUST_CRATE_ANALYSIS_ORIGINAL.md (1601 lines)
-- RUST_vs_SPEC_KIEM_TRA.md (329 lines)
+### Buoc 3: Implement var_matrix_load  
+```asm
+;; slot = hash & 0x3FFF
+;; if var_matrix[slot].gen <= var_gen → valid, return value
+;; else → undefined
+;; O(1). No scan.
+```
+
+### Buoc 4: Scope enter/leave = gen++/gen--
+```asm
+;; scope_enter: incq var_gen → O(1)
+;; scope_leave: decq var_gen → O(1)
+;; Inner scope vars invisible after leave (gen > current)
+;; NO cleanup needed. Lazy. O(1).
+```
+
+### Buoc 5: Collision handling
+```
+16384 slots. ~1000 active vars max.
+Birthday: P(collision) ≈ 1000²/(2*16384) = 3%
+Store full hash for exact match. Linear probe on collision.
+[slot] = [stored_hash:8][gen:2][ptr:8][len:8] = 26 bytes
+```
+
+### Buoc 6: Replace var_table calls → var_matrix calls
+### Buoc 7: Remove var_table heap allocation (free 393KB heap!)
+### Buoc 8: Test: 193/194 tests, Gen1==Gen2, 1000 nested fn calls
+
+## CURRENT STATUS (end session 14)
+- 907KB binary, 193/194 tests, Gen1==Gen2
+- 4GB heap, 4 u16 builtins, 2 matrix builtins (__mx_w/__mxr)
+- Capacity-tracked push (no relocation for __array_with_cap)
+- MEM: silk+stm persist, auto save/load
+- Brain: Formula Engine, LCA, Implicit Silk, 7 Instincts, Maturity
+- Rust: 7 features ported, ~120 remaining
 
 ## BUILD
 ```bash
-cd ~/Origin && make self-build && make test && make fixed-point
+cd ~/Origin && make vm && make self-build && make test && make fixed-point
 ```
