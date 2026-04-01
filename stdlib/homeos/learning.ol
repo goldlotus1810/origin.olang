@@ -56,59 +56,55 @@ pub fn stm_count() { return len(__ls_text); }
 let __dream_count = [0];
 
 pub fn dream() {
-    // Scan STM pairs for cross-bucket connections
     let _n = kt_stm_count();
     if _n < 2 { return; };
+    // Phase 1: Cross-group silk fire (using implicit_strength, not bucket check)
     let _i = 0;
     while _i < _n {
-        let _j = _i + 1;
-        while _j < _n {
-            let _mi = kt_stm_mol_at(_i);
-            let _mj = kt_stm_mol_at(_j);
-            // Different S,R bucket = cross-group
-            let _si = (__floor(_mi / 4096)) % 16;
-            let _sj = (__floor(_mj / 4096)) % 16;
-            let _ri = (__floor(_mi / 256)) % 16;
-            let _rj = (__floor(_mj / 256)) % 16;
-            if _si != _sj {
-                // Cross-group: strengthen silk
-                kt_silk_fire(_mi, _mj);
+        if _i < 16 {
+            let _j = _i + 1;
+            while _j < _n {
+                if _j < 16 {
+                    let _mi = kt_stm_mol_at(_i);
+                    let _mj = kt_stm_mol_at(_j);
+                    let _is = implicit_strength(_mi, _mj);
+                    // Cross-group = low implicit strength (few shared dims)
+                    if _is > 0 { if _is < 600 { kt_silk_fire(_mi, _mj); }; };
+                };
+                let _j = _j + 1;
             };
-            if _ri != _rj {
-                kt_silk_fire(_mi, _mj);
-            };
-            let _j = _j + 1;
         };
         let _i = _i + 1;
     };
-    // LCA: compose cross-group pairs → new concept
-    let _new_concepts = [0];
+    // Phase 2: LCA cross-group → new concepts (validated by variance)
+    let _new = [0];
     let _i2 = 0;
     while _i2 < _n {
-        let _j2 = _i2 + 1;
-        while _j2 < _n {
-            let _mi2 = kt_stm_mol_at(_i2);
-            let _mj2 = kt_stm_mol_at(_j2);
-            let _si2 = (__floor(_mi2 / 4096)) % 16;
-            let _sj2 = (__floor(_mj2 / 4096)) % 16;
-            if _mi2 != _mj2 {
-                // Cross-group → LCA = compose → new concept
-                let _lca = compose([_mi2, _mj2]);
-                let _text_i = kt_stm_text_at(_i2);
-                let _text_j = kt_stm_text_at(_j2);
-                // Only create if both texts exist and LCA is novel
-                if len(_text_i) > 0 {
-                if len(_text_j) > 0 {
-                    let _concept = _text_i + " + " + _text_j;
-                    kt_learn(_concept);
-                    let _ = __set_at(_new_concepts, 0, __array_get(_new_concepts, 0) + 1);
-                };};
+        if _i2 < 8 {
+            let _j2 = _i2 + 1;
+            while _j2 < _n {
+                if _j2 < 8 {
+                    let _mi2 = kt_stm_mol_at(_i2);
+                    let _mj2 = kt_stm_mol_at(_j2);
+                    let _var = mol_variance(_mi2, _mj2);
+                    // Only create concept if variance is categorical (150-600)
+                    // Too low = same thing. Too high = unrelated.
+                    if _var > 150 { if _var < 600 {
+                        let _lca = mol_lca(_mi2, _mj2);
+                        let _ti = kt_stm_text_at(_i2);
+                        let _tj = kt_stm_text_at(_j2);
+                        if len(_ti) > 0 { if len(_tj) > 0 {
+                            kt_learn(_ti + " + " + _tj);
+                            let _ = __set_at(_new, 0, __array_get(_new, 0) + 1);
+                        }; };
+                    }; };
+                };
+                let _j2 = _j2 + 1;
             };
-            let _j2 = _j2 + 1;
         };
         let _i2 = _i2 + 1;
     };
-    // Decay all silk
+    // Phase 3: Decay silk
     kt_silk_decay();
     let _ = __set_at(__dream_count, 0, __array_get(__dream_count, 0) + 1);
 }
