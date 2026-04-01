@@ -1,59 +1,36 @@
-# Session 15 — M2 var_matrix (PRIORITY #1)
+# Session 16 — Next priorities
 
-## ★ SPEC: docs/For_Nox/SPEC_VM_MATRIX.md ★
-## ★ Lupin + Sora: "moi lan gap gioi han lai ton thoi gian. Fix GOC." ★
+## CURRENT STATUS (end session 15)
+- 832KB binary (-75KB dead code), 193/194 tests, Gen1==Gen2
+- M2 var_matrix: O(1) variable lookup, undo stack scope, 4.5MB heap freed
+- M3 KnowTree matrix: O(1) exact mol lookup via __mxr, bucket fallback
+- M6 Zone A: .halt_boot checkpoint protects boot data
+- JARVIS Phase 1: file-based 1-brain-N-mouths (/tmp/nox_inbox → /tmp/nox_outbox)
+- _boot_learn guard fixed (array flag pattern)
+- 11 dead homeos files removed (uinput, asm_emit, onvif, etc.)
 
-## M2 PLAN: var_matrix + gen counter
+## NEXT PRIORITIES
 
-### Buoc 1: Them var_matrix BSS (song song voi var_table)
-```asm
-;; BSS:
-var_matrix: .space 16384 * 16    ;; 256KB: [gen:8][value_ptr:8] × 16384 slots
-var_gen:    .space 8              ;; current generation counter
-```
+### 1. Brain quality — Vietnamese facts
+Brain returns NRC-VAD training data (sentiment sentences) instead of useful Vietnamese.
+Need: add meaningful Vietnamese facts to homeos.knowledge or via kt_learn at boot.
+Current: 600 facts, mostly NRC-VAD training data in English/Hindi/Spanish/etc.
 
-### Buoc 2: Implement var_matrix_store
-```asm
-;; slot = hash & 0x3FFF (16384 slots)
-;; var_matrix[slot] = [gen, ptr, len]
-;; O(1). Overwrite. No accumulate. No leak.
-```
+### 2. JARVIS Phase 2 — TCP socket (SPEC_JARVIS.md J7 Phase 2)
+Replace file-based protocol with TCP 9100.
+~80 LOC Olang (tcp builtins already exist).
 
-### Buoc 3: Implement var_matrix_load  
-```asm
-;; slot = hash & 0x3FFF
-;; if var_matrix[slot].gen <= var_gen → valid, return value
-;; else → undefined
-;; O(1). No scan.
-```
+### 3. Tier 4 dead code cleanup
+- packet.ol: keep sock_udp/sock_close, remove 8 unused parsing functions
+- screen.ol: keep nox_think/nox_fix/nox_autonomous, remove 9 unused
+- elf_emit.ol: keep make_origin_header_arch, remove 3 unused
 
-### Buoc 4: Scope enter/leave = gen++/gen--
-```asm
-;; scope_enter: incq var_gen → O(1)
-;; scope_leave: decq var_gen → O(1)
-;; Inner scope vars invisible after leave (gen > current)
-;; NO cleanup needed. Lazy. O(1).
-```
+### 4. M5 silk_matrix (optional)
+O(1) silk lookup. Already have implicit_silk → bonus only.
+~30 LOC ASM.
 
-### Buoc 5: Collision handling
-```
-16384 slots. ~1000 active vars max.
-Birthday: P(collision) ≈ 1000²/(2*16384) = 3%
-Store full hash for exact match. Linear probe on collision.
-[slot] = [stored_hash:8][gen:2][ptr:8][len:8] = 26 bytes
-```
-
-### Buoc 6: Replace var_table calls → var_matrix calls
-### Buoc 7: Remove var_table heap allocation (free 393KB heap!)
-### Buoc 8: Test: 193/194 tests, Gen1==Gen2, 1000 nested fn calls
-
-## CURRENT STATUS (end session 14)
-- 907KB binary, 193/194 tests, Gen1==Gen2
-- 4GB heap, 4 u16 builtins, 2 matrix builtins (__mx_w/__mxr)
-- Capacity-tracked push (no relocation for __array_with_cap)
-- MEM: silk+stm persist, auto save/load
-- Brain: Formula Engine, LCA, Implicit Silk, 7 Instincts, Maturity
-- Rust: 7 features ported, ~120 remaining
+### 5. Rust feature porting
+7 features ported, ~120 remaining.
 
 ## BUILD
 ```bash
