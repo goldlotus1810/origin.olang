@@ -344,16 +344,8 @@ _start:
     xor     r8d, r8d
     syscall
 
-    # ── 7. Detect bytecode format ────────────────────────────────────
-    # Check first byte: codegen format starts with known opcode patterns
-    movzx   eax, byte ptr [r12]
-    # Codegen format marker: if first instruction is a valid codegen opcode
-    cmp     al, 0x30                # Push opcode in codegen format
-    jb      .format_ir
-    mov     byte ptr [rip + bc_format], 1   # codegen format
-    jmp     vm_loop
-.format_ir:
-    mov     byte ptr [rip + bc_format], 0   # ir.rs format
+    # ── 7. VM v2: always codegen format ─────────────────────────────
+    mov     byte ptr [rip + bc_format], 1
 
     # ── 8. Enter VM loop ─────────────────────────────────────────────
     jmp     vm_loop
@@ -2522,12 +2514,12 @@ builtin_jump_table:
     mov     qword ptr [r14+8], 0
     DISPATCH
 
-# __system(cmd) → output string
+# __system(cmd) → output string (fork + exec /bin/sh -c "cmd" + read pipe)
 .builtin_system:
     mov     rsi, [r14]               # cmd ptr (u16 mols)
     mov     rdx, [r14+8]             # cmd len
     add     r14, 16
-    # Decode cmd to ASCII
+    # Decode cmd to ASCII on heap
     mov     rdi, r15
     xor     ecx, ecx
 .bsys_dec:
@@ -2539,14 +2531,177 @@ builtin_jump_table:
     jmp     .bsys_dec
 .bsys_run:
     mov     byte ptr [rdi + rcx], 0
-    # Pipe: /bin/sh -c "cmd" | read output
-    # Use popen-like approach via fork+exec+pipe
-    # Simplified: use __system via "sh -c CMD > /tmp/nox_sys.tmp"
-    # For now: just return empty (TODO: proper fork/exec/pipe)
+    push    rcx                      # save cmd len
+    # Create pipe: pipe2(pipefd, 0)
+    sub     rsp, 8
+    mov     rdi, rsp                 # pipefd[2] on stack
+    xor     esi, esi                 # flags = 0
+    mov     eax, 22                  # SYS_pipe
+    syscall
+    mov     r8d, [rsp]               # read end
+    mov     r9d, [rsp+4]             # write end
+    add     rsp, 8
+    # Fork
+    mov     eax, 57                  # SYS_fork
+    syscall
+    test    eax, eax
+    jz      .bsys_child
+    # Parent: close write end, read from read end
+    push    r8                       # save read fd
+    mov     edi, r9d
+    mov     eax, SYS_CLOSE
+    syscall
+    pop     rdi                      # read fd
+    # Read output
+    lea     rsi, [r15 + 4096]       # output buffer
+    mov     edx, 0x10000            # max 64KB
+    mov     eax, SYS_READ
+    syscall
+    mov     ecx, eax                 # bytes read
+    push    rcx
+    # Close read fd
+    mov     eax, SYS_CLOSE
+    syscall
+    # Wait for child
+    xor     edi, edi
+    mov     edi, -1                  # any child
+    xor     esi, esi
+    xor     edx, edx
+    xor     r10d, r10d
+    mov     eax, 61                  # SYS_wait4
+    syscall
+    pop     rcx
+    pop     rdx                      # discard saved cmd len
+    test    ecx, ecx
+    jle     .bsys_empty
+    # Encode bytes to u16 mols
+    lea     rsi, [r15 + 4096]
+    lea     rdi, [r15 + 0x20000]    # mol output
+    xor     edx, edx
+.bsys_enc:
+    cmp     edx, ecx
+    jge     .bsys_result
+    movzx   eax, byte ptr [rsi + rdx]
+    mov     word ptr [rdi + rdx*2], ax
+    inc     edx
+    jmp     .bsys_enc
+.bsys_result:
+    sub     r14, 16
+    mov     [r14], rdi
+    mov     [r14+8], rcx
+    DISPATCH
+.bsys_empty:
     sub     r14, 16
     xor     eax, eax
     mov     [r14], rax
     mov     qword ptr [r14+8], 0
+    DISPATCH
+.bsys_child:
+    # Child: close read end, dup write end to stdout
+    mov     edi, r8d
+    mov     eax, SYS_CLOSE
+    syscall
+    # dup2(write_end, 1) = stdout
+    mov     edi, r9d
+    mov     esi, 1
+    mov     eax, 33                  # SYS_dup2
+    syscall
+    # dup2(write_end, 2) = stderr
+    mov     edi, r9d
+    mov     esi, 2
+    mov     eax, 33
+    syscall
+    # Close original write fd
+    mov     edi, r9d
+    mov     eax, SYS_CLOSE
+    syscall
+    # exec /bin/sh -c "cmd"
+    sub     rsp, 40                  # argv on stack
+    lea     rax, [rip + str_bin_sh]
+    mov     [rsp], rax               # argv[0] = "/bin/sh"
+    lea     rax, [rip + str_dash_c]
+    mov     [rsp+8], rax             # argv[1] = "-c"
+    mov     [rsp+16], r15            # argv[2] = cmd (decoded earlier, still at r15)
+    mov     qword ptr [rsp+24], 0    # argv[3] = NULL
+    lea     rdi, [rip + str_bin_sh]  # path
+    lea     rsi, [rsp]               # argv
+    xor     edx, edx                 # envp = NULL
+    mov     eax, 59                  # SYS_execve
+    syscall
+    # If exec fails, exit child
+    mov     eax, SYS_EXIT
+    mov     edi, 1
+    syscall
+
+# __str_index_of(haystack, needle) → index or -1
+.builtin_str_index_of:
+    mov     r8, [r14]                # needle ptr
+    mov     r9, [r14+8]              # needle len
+    mov     rsi, [r14+16]            # haystack ptr
+    mov     rdx, [r14+24]            # haystack len
+    add     r14, 32
+    test    r9, r9
+    jz      .bsio_nf                 # empty needle → -1
+    cmp     r9, rdx
+    jg      .bsio_nf                 # needle longer → -1
+    xor     ecx, ecx                 # scan position
+.bsio_scan:
+    lea     rax, [rcx + r9]
+    cmp     rax, rdx
+    jg      .bsio_nf                 # not enough chars left
+    # Compare needle at position ecx
+    xor     edi, edi
+.bsio_cmp:
+    cmp     rdi, r9
+    jge     .bsio_found
+    lea     rax, [rcx + rdi]
+    movzx   eax, word ptr [rsi + rax*2]
+    movzx   r10d, word ptr [r8 + rdi*2]
+    cmp     eax, r10d
+    jne     .bsio_next
+    inc     rdi
+    jmp     .bsio_cmp
+.bsio_found:
+    cvtsi2sd xmm0, ecx
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+.bsio_next:
+    inc     ecx
+    jmp     .bsio_scan
+.bsio_nf:
+    sub     r14, 16
+    mov     rax, -1
+    cvtsi2sd xmm0, rax
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __bit_shl(a, n) → a << n
+.builtin_bit_shl:
+    movsd   xmm0, [r14]             # n
+    cvttsd2si ecx, xmm0
+    movsd   xmm0, [r14+16]          # a
+    cvttsd2si rax, xmm0
+    add     r14, 16
+    shl     rax, cl
+    cvtsi2sd xmm0, rax
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __bit_shr(a, n) → a >> n (logical)
+.builtin_bit_shr:
+    movsd   xmm0, [r14]
+    cvttsd2si ecx, xmm0
+    movsd   xmm0, [r14+16]
+    cvttsd2si rax, xmm0
+    add     r14, 16
+    shr     rax, cl
+    cvtsi2sd xmm0, rax
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
     DISPATCH
 
 # __file_append(path, content) → 0
@@ -3424,6 +3579,8 @@ str_err_mmap:      .ascii "mmap failed\n"
 str_err_read:      .ascii "Bytecode read fail\n"
 str_err_no_bc:     .ascii "No bytecode!\n\0"
 # Type name strings (u16 encoded for VM stack)
+str_bin_sh:        .asciz "/bin/sh"
+str_dash_c:        .asciz "-c"
 str_type_number:   .word 'n','u','m','b','e','r'
 str_type_string:   .word 's','t','r','i','n','g'
 str_type_array:    .word 'a','r','r','a','y'
