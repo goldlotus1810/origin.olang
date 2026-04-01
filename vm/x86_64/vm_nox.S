@@ -573,30 +573,41 @@ op_add:
     je      .add_f64_str
     cmp     rcx, F64_MARKER
     je      .add_str_f64
-    # Both strings: concat
-    mov     rax, r15                # dest
-    push    rsi
-    push    rcx
-    # Copy a
-    push    rdx
-    push    rcx
-    mov     rcx, rsi                # a.len
+    # Both strings: concat (u16 molecules — 2 bytes each)
+    mov     rax, r15                # dest = new string on heap
+    push    rsi                      # save a.len (mol count)
+    push    rcx                      # save b.len (mol count)
+    # Copy a: rsi bytes = a.len * 2
+    push    rdx                      # save b.ptr
+    mov     rcx, rsi                # a.len (mol count)
+    shl     rcx, 1                  # × 2 = byte count
     mov     rsi, rdi                # a.ptr
-    mov     rdi, r15
-    call    memcpy_inline
-    add     r15, [rsp + 8]          # += a.len
-    pop     rcx
-    pop     rdx
-    # Copy b
-    mov     rsi, rdx                # b.ptr
     mov     rdi, r15
     mov     edx, ecx
     call    memcpy_inline
-    pop     rcx                     # b.len
-    pop     rsi                     # a.len
-    add     rcx, rsi                # total len
-    add     r15, rcx
-    sub     r15, rsi                # fixup: already added a.len above
+    pop     rdx                      # restore b.ptr
+    pop     rcx                      # restore b.len
+    pop     rsi                      # restore a.len
+    # Advance heap past a
+    mov     rdi, rsi
+    shl     rdi, 1                  # a bytes
+    add     r15, rdi
+    # Copy b: rcx bytes = b.len * 2
+    push    rsi                      # save a.len
+    push    rcx                      # save b.len
+    mov     rsi, rdx                # b.ptr
+    mov     rdi, r15
+    mov     edx, ecx
+    shl     edx, 1                  # × 2
+    call    memcpy_inline
+    pop     rcx                      # b.len
+    pop     rsi                      # a.len
+    # Advance heap past b
+    mov     rdx, rcx
+    shl     rdx, 1
+    add     r15, rdx
+    # Result: ptr=rax, len=a.len+b.len
+    add     rcx, rsi                # total mol count
     sub     r14, 16
     mov     [r14], rax
     mov     [r14 + 8], rcx
