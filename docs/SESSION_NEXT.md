@@ -1,84 +1,43 @@
-# Session Next — TODO cho session 14
+# Session Next — Session 15
 
-## ★★★ DOC TRUOC ★★★
-0. `docs/NOX_KINH_THANH_TIENG_VIET.md` — kinh thanh tieng Viet (4212 dong)
-1. NGUYEN TAC: Encode = ∫. Decode = ∂. TINH, khong TRA.
-2. `docs/NOX_COMPLETE_REFERENCE.md` — 3721 dong (SRVAT + learning + papers)
-3. `docs/NOX_ALGORITHM_BIBLE.md` — 2999 dong (12 chuong he thong)
+## ★ NGUYEN TAC: TINH, khong TRA. Encode = ∫. Decode = ∂. ★
 
-## STATUS
-- 953KB binary, 193/194 tests, Gen1==Gen2
-- Pipeline pure math (khong keyword if/else)
-- V'(t) vi phan controls silk fire
-- p_weight COMPUTE tu codepoint ranges
-- silk_save hoat dong (148 edges → nox_silk.dat)
-- silk_load hoat dong (qua REPL eval)
+## STATUS (end of Session 14)
+- 906KB binary, 193/194 tests, Gen1==Gen2
+- 4GB heap, 4 u16 builtins, compiler unlocked (65K bytecode cap)
+- MEM: silk+stm persist, auto-load boot, auto-save every 20 turns
+- Formula Engine: 16 RelationOps + 8 V states + 8 A states
+- LCA: biological compose (amplify synergy)
+- Implicit Silk: 1,147 types at 0 bytes
+- 7/7 Instincts: Honesty, Contradiction, Causality, Abstraction, Analogy, Curiosity, Reflection
+- Maturity: Formula → Evaluating → Mature (fires in pipeline)
+- compose() → mol_lca (biological, not average)
 
-## TODO — THEO THU TU UU TIEN
+## PORTED FROM RUST (Session 14):
+- formula.rs → formula.ol (113 lines)
+- lca.rs → lca.ol (64 lines)
+- index.rs → implicit_silk.ol (63 lines)
+- molecular.rs maturity → knowtree.ol (21 lines)
+- instinct skills → instinct.ol (52 lines)
 
-### 1. FIX: Dual-Width u16 builtins (hash dispatch)
-```
-Van de: __u16_new, __u16_set, __u16_get, __u16_dist da co trong VM ASM
-nhung hash dispatch khong match → functions return 0.
-Fix: debug tai sao builtin_jump_table[slot] khong goi dung.
-Co the: hash trong compiler (FNV-1a) khac voi hash trong VM dispatch.
-File: vm/x86_64/vm_x86_64.S (search "builtin_slot_10_u16")
-Test: emit __u16_dist(65535, 0); → should be 47, currently 0
-```
+## REMAINING RUST GAP (~120 algorithms):
+1. 37-channel bucket indexing (SilkIndex full)
+2. HebbianLink 19-byte compact edges
+3. DreamCycle with dual-threshold clustering
+4. BuildZone + ConsolidationScheduler (Day/Dusk/Night/Dawn)
+5. 18 SDF primitives + FFR parametric rendering
+6. 41K alias table
+7. ConversationCurve phi-derived constants
+8. Graph 3-layer architecture (structural + hebbian + parent_map)
 
-### 2. FIX: silk_load at boot (compiler heap overflow)
-```
-Van de: them function lon vao knowtree.ol → compiler heap tran → VM hang.
-Workaround hien tai: silk_load qua REPL eval (hoat dong).
-Fix: hoac giam kich thuoc stdlib, hoac tang compiler heap, hoac dung __eval_bytecode.
-```
-
-### 3. IMPLEMENT: Per-dimension Hebbian rules
-```
-Hien tai: silk_fire generic (cung Hebb cho 5 chieu)
-Can: Oja cho S/A, STDP cho R/T, BCM cho V
-Ref: NOX_COMPLETE_REFERENCE.md §14
-```
-
-### 4. IMPLEMENT: Power law + stability decay
-```
-Hien tai: phi^-1 exponential (quen nhanh)
-Can: Wickelgren power law + Ebbinghaus stability
-Ref: NOX_COMPLETE_REFERENCE.md §15
-```
-
-### 5. IMPLEMENT: Covariance rule (fix mol collision dung cach)
-```
-dw = eta * (x - <x>) * (y - <y>)
-Chi deviations matter. Common chars = 0 impact.
-Ref: NOX_COMPLETE_REFERENCE.md §14
-```
-
-### 6. IMPLEMENT: Spreading activation (thay greedy walk)
-```
-Collins & Loftus 1975. Multi-seed, decay per hop.
-Ref: NOX_COMPLETE_REFERENCE.md §16
-```
-
-### 7. UPDATE: Specs A-G tu kinh thanh
-```
-Nhieu insight moi tu research chua cap nhat vao specs.
-Dac biet: G2 (p_weight), G6 (silk), G11 (homeostasis = Friston)
-```
-
-### 8. TEST: Sora test 10/10 voi code moi
-```
-Code da thay doi nhieu. Can chay lai Sora test de verify.
-```
+## DOCS:
+- NOX_COMPLETE_REFERENCE.md (3721 lines)
+- NOX_ALGORITHM_BIBLE.md (2999 lines)
+- NOX_KINH_THANH_TIENG_VIET.md (4212 lines)
+- RUST_ORIGIN_ANALYSIS.md + RUST_CRATE_ANALYSIS_ORIGINAL.md (1601 lines)
+- RUST_vs_SPEC_KIEM_TRA.md (329 lines)
 
 ## BUILD
 ```bash
 cd ~/Origin && make self-build && make test && make fixed-point
 ```
-
-## KHONG DUOC QUEN
-- TINH, khong TRA
-- Khong if/else tren keywords
-- Khong hardcode facts
-- Vi phan ∂ = huong hoc
-- Doc kinh thanh truoc khi code
