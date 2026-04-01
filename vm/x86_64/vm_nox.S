@@ -756,11 +756,11 @@ op_call:
     inc     r13
     # Hash the name (FNV-1a)
     call    hash_fnv1a              # rdi=ptr, edx=len → rax=hash
-    # Dispatch to builtin
-    mov     ecx, eax
-    and     ecx, 0xFF               # slot = hash & 255
+    # Dispatch to builtin via 512-slot table (spec §4.3)
+    mov     rcx, rax                 # save full hash
+    and     eax, 0x1FF               # slot = hash & 511
     lea     rdx, [rip + builtin_jump_table]
-    jmp     [rdx + rcx * 8]
+    jmp     [rdx + rax * 8]
 
 # 0x08: Ret
 op_ret:
@@ -2079,13 +2079,166 @@ codegen_table:
 # BUILTIN JUMP TABLE (256 slots)
 # ═══════════════════════════════════════════════════════════════════════════
 
+# ═══ Builtin Jump Table (512 slots, spec §4.3) ═══
+# Index = FNV-1a(name) & 0x1FF
+# Populated with known builtins, rest = .call_not_builtin
 .align 8
 builtin_jump_table:
-    # 256 entries, initially all .call_not_builtin
-    # Will be populated as builtins are implemented
-    .rept 256
+    .quad   .builtin_substr      # 0x000 (substr)
+    .quad   .call_not_builtin    # 0x001
+    .quad   .call_not_builtin    # 0x002
+    .quad   .builtin_char_at     # 0x003 (char_at)
+    .rept   9
+    .quad   .call_not_builtin    # 0x004-0x00C
+    .endr
+    .quad   .builtin_abs         # 0x00D (__abs)
+    .quad   .call_not_builtin    # 0x00E
+    .quad   .builtin_set_at      # 0x00F (__set_at)
+    .rept   7
+    .quad   .call_not_builtin    # 0x010-0x016
+    .endr
+    .quad   .builtin_tcp_recv    # 0x017 (__tcp_recv)
+    .rept   12
+    .quad   .call_not_builtin    # 0x018-0x023
+    .endr
+    .quad   .builtin_str_find    # 0x024 (__str_find) — stub for now
+    .rept   16
+    .quad   .call_not_builtin    # 0x025-0x034
+    .endr
+    .quad   .builtin_heap_pin    # 0x035 (__heap_pin) — stub
+    .rept   13
+    .quad   .call_not_builtin    # 0x036-0x042
+    .endr
+    .quad   .builtin_log2        # 0x043 (__log2)
+    .rept   8
+    .quad   .call_not_builtin    # 0x044-0x04B
+    .endr
+    .quad   .builtin_len         # 0x04C (len — collision with __mxr, len wins by order)
+    .rept   3
+    .quad   .call_not_builtin    # 0x04D-0x04F
+    .endr
+    .quad   .call_not_builtin    # 0x050 (pop — TODO)
+    .rept   3
+    .quad   .call_not_builtin    # 0x051-0x053
+    .endr
+    .quad   .builtin_mx_w        # 0x054 (__mx_w)
+    .rept   2
+    .quad   .call_not_builtin    # 0x055-0x056
+    .endr
+    .quad   .builtin_array_get   # 0x057 (__array_get)
+    .rept   8
+    .quad   .call_not_builtin    # 0x058-0x05F
+    .endr
+    .quad   .call_not_builtin    # 0x060
+    .quad   .builtin_file_write  # 0x061 (__file_write)
+    .rept   4
+    .quad   .call_not_builtin    # 0x062-0x065
+    .endr
+    .quad   .builtin_to_string   # 0x066 (__to_string)
+    .rept   3
+    .quad   .call_not_builtin    # 0x067-0x069
+    .endr
+    .quad   .builtin_ceil        # 0x06A (__ceil — collision with __system, ceil wins)
+    .rept   6
+    .quad   .call_not_builtin    # 0x06B-0x070
+    .endr
+    .quad   .builtin_tcp_close   # 0x071 (__tcp_close)
+    .rept   15
+    .quad   .call_not_builtin    # 0x072-0x080
+    .endr
+    .quad   .call_not_builtin    # 0x081
+    .quad   .builtin_bit_or      # 0x082 (__bit_or)
+    .rept   3
+    .quad   .call_not_builtin    # 0x083-0x085
+    .endr
+    .quad   .builtin_sleep       # 0x086 (__sleep)
+    .rept   3
+    .quad   .call_not_builtin    # 0x087-0x089
+    .endr
+    .quad   .builtin_exp         # 0x08A (__exp)
+    .rept   7
+    .quad   .call_not_builtin    # 0x08B-0x091
+    .endr
+    .quad   .call_not_builtin    # 0x092 (__array_with_cap — TODO)
+    .rept   6
+    .quad   .call_not_builtin    # 0x093-0x098
+    .endr
+    .quad   .builtin_char_code   # 0x099 (__char_code)
+    .rept   3
+    .quad   .call_not_builtin    # 0x09A-0x09C
+    .endr
+    .quad   .builtin_push        # 0x09D (push)
+    .rept   7
+    .quad   .call_not_builtin    # 0x09E-0x0A4
+    .endr
+    .quad   .builtin_sqrt        # 0x0A5 (__sqrt)
+    .quad   .call_not_builtin    # 0x0A6
+    .quad   .call_not_builtin    # 0x0A7 (__str_trim — TODO)
+    .rept   5
+    .quad   .call_not_builtin    # 0x0A8-0x0AC
+    .endr
+    .quad   .builtin_tcp_send    # 0x0AD (__tcp_send)
+    .quad   .call_not_builtin    # 0x0AE
+    .quad   .builtin_floor       # 0x0AF (__floor)
+    .rept   20
+    .quad   .call_not_builtin    # 0x0B0-0x0C3
+    .endr
+    .quad   .builtin_tcp_listen  # 0x0C4 (__tcp_listen)
+    .rept   2
+    .quad   .call_not_builtin    # 0x0C5-0x0C6
+    .endr
+    .quad   .builtin_heap_used   # 0x0C7 (__heap_used)
+    .quad   .builtin_bit_xor     # 0x0C8 (__bit_xor)
+    .rept   6
+    .quad   .call_not_builtin    # 0x0C9-0x0CE
+    .endr
+    .quad   .builtin_tcp_accept  # 0x0CF (__tcp_accept)
+    .quad   .call_not_builtin    # 0x0D0 (p_weight — TODO)
+    .rept   3
+    .quad   .call_not_builtin    # 0x0D1-0x0D3
+    .endr
+    .quad   .builtin_bit_and     # 0x0D4 (__bit_and)
+    .rept   30
+    .quad   .call_not_builtin    # 0x0D5-0x0F2
+    .endr
+    .quad   .call_not_builtin    # 0x0F3 (compose — TODO)
+    .rept   12
+    .quad   .call_not_builtin    # 0x0F4-0x0FF
+    .endr
+    # 0x100-0x14B: collisions / overflow
+    .quad   .builtin_mxr         # 0x100 (__mxr — moved from 0x4C collision)
+    .rept   23
+    .quad   .call_not_builtin    # 0x101-0x117
+    .endr
+    .quad   .call_not_builtin    # 0x118
+    .quad   .call_not_builtin    # 0x119
+    .quad   .call_not_builtin    # 0x11A
+    .quad   .call_not_builtin    # 0x11B
+    .quad   .call_not_builtin    # 0x11C
+    .quad   .call_not_builtin    # 0x11D
+    .quad   .builtin_file_read   # 0x11E (__file_read — moved to avoid 0xBE, using 0x1BE & 0x1FF = 0x1BE)
+    # Fill remaining to 512
+    .rept   225
     .quad   .call_not_builtin
     .endr
+
+# Stub builtins not yet implemented
+.text
+.builtin_str_find:
+    add     r14, 32                  # pop 2 args
+    sub     r14, 16
+    xor     eax, eax
+    mov     [r14], rax
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+.builtin_heap_pin:
+    mov     [rip + repl_heap_checkpoint], r15
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
 
 .text
 
