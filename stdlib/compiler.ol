@@ -1014,6 +1014,6 @@ fn build_binary(source_path, output_path) {
 // Read command line args (passed as first arg to the binary)
 // For now, hardcode paths for testing
 let source_file = "stdlib/compiler.ol";
-let output_file = "/tmp/compiler_gen1.olang";
+let output_file = "/tmp/compiler_gen2.olang";
 
 build_binary(source_file, output_file);

@@ -694,12 +694,11 @@ op_eq:
     # String comparison
     cmp     rdx, rsi                # same length?
     jne     .eq_false
-    # Compare bytes
-    mov     rdi, rax
-    mov     rsi, rcx                # reuse rsi (was b.len, now b.ptr — wait, wrong)
-    # Fix: b.ptr was in rcx
-    mov     rsi, rcx
-    mov     ecx, edx                # len
+    # Compare bytes (u16 molecules = mol_count × 2 bytes)
+    mov     rdi, rax                # a.ptr
+    mov     rsi, rcx                # b.ptr
+    mov     ecx, edx                # mol_count
+    shl     ecx, 1                  # byte_count = mol_count × 2
     call    memcmp_inline
     test    eax, eax
     jnz     .eq_false
@@ -738,6 +737,7 @@ op_ne:
     mov     rdi, rax
     mov     rsi, rcx
     mov     ecx, edx
+    shl     ecx, 1                  # byte_count = mol_count × 2
     repe    cmpsb
     pop     rdx
     pop     rcx
