@@ -497,19 +497,19 @@ class Codegen:
 
         elif kind == 'var':
             self.emit_byte(OP_LOAD)
-            self.emit_var_hash(node[1])
+            self.emit_name(node[1])
 
         elif kind == 'let':
             _, name, value = node
             self.compile_node(value)
             self.emit_byte(OP_STORE)
-            self.emit_var_hash(name)
+            self.emit_name(name)
 
         elif kind == 'assign':
             _, name, value = node
             self.compile_node(value)
             self.emit_byte(OP_STORE)
-            self.emit_var_hash(name)
+            self.emit_name(name)
 
         elif kind == 'emit':
             self.compile_node(node[1])
@@ -555,7 +555,7 @@ class Codegen:
             # Args are pushed left-to-right, so topmost = last param
             for p in reversed(params):
                 self.emit_byte(OP_STORE)
-                self.emit_var_hash(p)
+                self.emit_name(p)
             # Compile body
             self.compile_node(body)
             # Add trailing Ret only if body doesn't end with one
@@ -566,7 +566,7 @@ class Codegen:
             self.patch_i32(body_len_offset, body_end - body_start)
             # Store closure as named variable
             self.emit_byte(OP_STORE)
-            self.emit_var_hash(name)
+            self.emit_name(name)
 
         elif kind == 'block':
             for stmt in node[1]:

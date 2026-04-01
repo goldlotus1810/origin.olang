@@ -9,3 +9,5 @@ __pycache__/
 *.log
 *.dat
 /tmp/nox_*
+old/books/
+old/

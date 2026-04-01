@@ -963,25 +963,38 @@ op_loop:
 
 # ── Variable ops: 0x02, 0x13 ──
 
-# 0x02: Load [hash:4]
+# 0x02: Load [name_len:1][name:N]
 op_load:
-    mov     eax, [r12 + r13]        # 4-byte hash
-    add     r13, 4
-    # Matrix lookup
+    movzx   ecx, byte ptr [r12 + r13]  # name_len
+    inc     r13
+    lea     rdi, [r12 + r13]            # name ptr
+    mov     edx, ecx                    # name len
+    push    rcx
+    call    hash_fnv1a                  # rax = 64-bit hash
+    pop     rcx
+    add     r13, rcx                    # advance PC past name
+    # Use lower 32 bits for matrix lookup
+    mov     eax, eax                    # zero-extend to clear upper 32
     call    var_load_matrix
-    # rax = ptr, rdx = len
     sub     r14, 16
     mov     [r14], rax
     mov     [r14 + 8], rdx
     DISPATCH
 
-# 0x13: Store [hash:4]
+# 0x13: Store [name_len:1][name:N]
 op_store:
-    mov     eax, [r12 + r13]        # 4-byte hash
-    add     r13, 4
-    mov     r8, [r14]               # val.ptr
-    mov     r9, [r14 + 8]           # val.len
-    add     r14, 16                 # pop
+    movzx   ecx, byte ptr [r12 + r13]  # name_len
+    inc     r13
+    lea     rdi, [r12 + r13]            # name ptr
+    mov     edx, ecx                    # name len
+    push    rcx
+    call    hash_fnv1a                  # rax = 64-bit hash
+    pop     rcx
+    add     r13, rcx                    # advance PC past name
+    mov     r8, [r14]                   # val.ptr
+    mov     r9, [r14 + 8]              # val.len
+    add     r14, 16                     # pop
+    mov     eax, eax                    # lower 32 bits
     call    var_store_matrix
     DISPATCH
 
@@ -4573,6 +4586,13 @@ builtin_hash_table:
     mov     r9, [r14+8]             # val len
     mov     rax, [r14+16]           # array heap ptr
     add     r14, 32                 # pop 2
+    # Follow forward pointers
+.bpush_fwd:
+    cmp     qword ptr [rax], -2     # ARRAY_FORWARD?
+    jne     .bpush_nofwd
+    mov     rax, [rax + 8]
+    jmp     .bpush_fwd
+.bpush_nofwd:
     # Array layout: [capacity:8][count:8][entries...]
     mov     rcx, [rax+8]            # count
     mov     rdx, [rax]              # capacity
@@ -4682,6 +4702,13 @@ builtin_hash_table:
     cvttsd2si edi, xmm0
     mov     rax, [r14+32]           # array ptr
     add     r14, 48                 # pop 3
+    # Follow forward pointers
+.bsa_fwd:
+    cmp     qword ptr [rax], -2
+    jne     .bsa_nofwd
+    mov     rax, [rax + 8]
+    jmp     .bsa_fwd
+.bsa_nofwd:
     mov     rcx, [rax+8]            # count
     cmp     edi, ecx
     jge     .bsa_oob
@@ -5217,6 +5244,7 @@ v_history_ptr:  .space 1
 repl_heap_checkpoint: .space 8
 _call_save_hash: .space 8
 _call_save_argc: .space 8
+_push_old_arr: .space 8
 try_depth:      .space 8
 
 # SIMD temp buffer

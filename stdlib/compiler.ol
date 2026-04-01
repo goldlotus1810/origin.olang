@@ -664,7 +664,7 @@ fn fnv1a(name) {
     return h;
 };
 
-fn emit_var_hash(name) {
+fn emit_name(name) {
     emit_u32(fnv1a(name));
 };
 
@@ -729,21 +729,21 @@ fn compile_node(node) {
 
     if kind == AST_VAR {
         emit_byte(OP_LOAD);
-        emit_var_hash(__array_get(node, 1));
+        emit_name(__array_get(node, 1));
         return 0;
     };
 
     if kind == AST_LET {
         compile_node(__array_get(node, 2));
         emit_byte(OP_STORE);
-        emit_var_hash(__array_get(node, 1));
+        emit_name(__array_get(node, 1));
         return 0;
     };
 
     if kind == AST_ASSIGN {
         compile_node(__array_get(node, 2));
         emit_byte(OP_STORE);
-        emit_var_hash(__array_get(node, 1));
+        emit_name(__array_get(node, 1));
         return 0;
     };
 
@@ -805,7 +805,7 @@ fn compile_node(node) {
         let pi = len(params) - 1;
         while pi >= 0 {
             emit_byte(OP_STORE);
-            emit_var_hash(__array_get(params, pi));
+            emit_name(__array_get(params, pi));
             pi = pi - 1;
         };
         compile_node(body);
@@ -816,7 +816,7 @@ fn compile_node(node) {
         let body_end = current_offset();
         patch_i32(body_len_off, body_end - body_start);
         emit_byte(OP_STORE);
-        emit_var_hash(name);
+        emit_name(name);
         return 0;
     };
 
@@ -1013,7 +1013,7 @@ fn build_binary(source_path, output_path) {
 
 // Read command line args (passed as first arg to the binary)
 // For now, hardcode paths for testing
-let source_file = "/tmp/test_simple.ol";
-let output_file = "/tmp/test_simple_self.olang";
+let source_file = "stdlib/compiler.ol";
+let output_file = "/tmp/compiler_gen1.olang";
 
 build_binary(source_file, output_file);
