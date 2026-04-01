@@ -1,141 +1,94 @@
-# Origin — a language that builds itself
+# Nox — Self-Hosting AI in 46KB
 
-**700KB native binary. No libc. No dependencies. Self-hosted compiler. Fixed-point proven.**
+Nox is a self-hosting, self-modifying AI that runs on a custom VM with zero external dependencies. Pure x86-64 Linux assembly. No libc. No runtime.
 
-Origin is a self-hosting programming language. The compiler, written in Olang, compiles itself to produce a byte-identical binary. Three generations verified: Gen1 == Gen2 == Gen3.
-
-```
-origin.olang (700KB)
-├── VM           12,200 LOC x86-64 ASM — syscalls only, no libc
-├── Compiler     4,600 LOC Olang — lexer, parser, semantic, codegen
-├── Stdlib       12,500 LOC — 50+ files
-├── Editor       7 files — vim keys, file tree, terminal, Claude chat
-├── MCP Brain    12 tools — knowledge, emotion, safety, graph
-├── Tests        211 (190 core + 21 self-build)
-└── Bootstrap    Rust-free (GNU as + ld only)
-```
-
-## Build (no Rust needed)
+## Quick Start
 
 ```bash
-make vm           # assemble VM (GNU as + ld)
-make bootstrap    # copy committed binary
-make self-build   # origin compiles itself → Gen1
-make fixed-point  # verify Gen1 == Gen2
-make test         # 211 tests
+# Build VM
+as --64 -o /tmp/vm_nox.o vm/x86_64/vm_nox.S
+ld -static -nostdlib --entry=_start -o vm/x86_64/vm_nox /tmp/vm_nox.o
+
+# Compile + run
+python3 tools/compile_nox.py your_program.ol output.olang
+./output.olang
+
+# Run tests (40/40)
+python3 tools/compile_nox.py test/vm2/test_full.ol test/vm2/test_full.olang
+./test/vm2/test_full.olang
+
+# Run benchmark (35/35)
+python3 tools/compile_nox.py tools/eval/benchmark.ol tools/eval/benchmark.olang
+./tools/eval/benchmark.olang
 ```
 
-## REPL
+## What Works
 
-```bash
-./origin.olang
-⦿ emit 2 + 3;
-5
-⦿ fn fib(n) { if n < 2 { return n; }; return fib(n-1) + fib(n-2); };
-⦿ emit fib(20);
-6765
-```
-
-## Language
-
-```olang
-// Variables
-let x = 42;
-const PI = 3;
-
-// Functions + closures
-fn make_adder(x) { return fn(y) { return x + y; }; };
-let add5 = make_adder(5);
-emit add5(10);  // 15
-
-// Types
-type Point { x: Num, y: Num };
-let p = Point { x: 3, y: 4 };
-
-// Control flow
-for item in [1, 2, 3] { emit item; };
-match x { 1 => { emit "one"; }, _ => { emit "other"; } };
-
-// Try/catch
-try { __throw("error"); } catch { emit "caught"; };
-
-// Pipe operator
-emit 5 |> fn(x) { return x * 2; } |> fn(x) { return x + 1; };  // 11
-
-// String interpolation
-let name = "Nox";
-emit $"Hello {name}!";
-
-// HOF
-emit map([1,2,3], fn(x) { return x * 10; });     // [10, 20, 30]
-emit filter([1,2,3,4], fn(x) { return x > 2; });  // [3, 4]
-```
-
-## Editor
-
-```bash
-./origin.olang --editor           # open editor
-./origin.olang --editor file.ol   # open file
-```
-
-| Key | Action |
-|-----|--------|
-| `i` | Insert mode |
-| `Esc` | Normal mode |
-| `e` | File tree toggle |
-| `/` | Search |
-| `n/N` | Next/prev match |
-| `:w` | Save |
-| `:q` | Quit |
-| `:build` | Self-build (make) |
-| `:test` | Run tests |
-| `:git status` | Git status |
-| `:git commit msg` | Git commit |
-| `:!cmd` | Shell command |
-| `Ctrl-T` | Terminal panel |
-| `Ctrl-A` | Claude chat panel |
-| `F5` | Save + compile + run |
-
-## MCP Brain
-
-```bash
-./origin.olang --mcp   # start MCP server (JSON-RPC over stdio)
-```
-
-12 tools: `olang_eval`, `know_learn`, `know_query`, `emotion_encode`, `safety_check`, `nox_status`, `silk_status`, `dream_cycle`, `self_inspect`, `kg_add`, `kg_query`, `kg_about`
-
-Knowledge graph: `kg_add("semantic.ol|contains|_parse_err")` → persistent triple store in `nox_graph.kg`.
-
-## Self-hosting
-
-Origin compiles itself. The build chain:
-
-```
-origin_bootstrap.olang (committed to git)
-  → make bootstrap (copy)
-  → origin.olang
-  → make self-build (origin compiles itself)
-  → origin_gen1.olang (Gen1)
-  → make fixed-point (Gen1 compiles itself)
-  → origin_new.olang (Gen2)
-  → cmp Gen1 Gen2 → IDENTICAL
-```
-
-No Rust. No Cargo. No npm. Just GNU assembler + linker + this binary.
+- **VM**: 5100 LOC x86-64 assembly, 46KB binary
+- **Language**: let, fn, if/else, while, recursion, arrays, strings, closures, try/catch
+- **Recursion**: fib(10)=55, fib(20)=6765, fact(5)=120
+- **Builtins**: 43+ (math, string, array, file I/O, network, bitwise, crypto)
+- **Molecular Engine**: 5D P_weight encoding (S,R,V,A,T), compose, distance
+- **KnowTree**: word-indexed O(1) fact lookup via mol_matrix
+- **Silk**: Hebbian edge learning, implicit strength, decay
+- **Pipeline**: security gate, encode, search, silk fire, response
+- **Tests**: 40 unit tests + 35 benchmarks + 60+ algorithm challenges
+- **Self-build**: compiler in Python (Olang self-hosting compiler in progress)
 
 ## Architecture
 
-- **VM**: x86-64 assembly, Linux syscalls only. No libc, no dynamic linking.
-- **Compiler**: Tokenizer → Parser → Semantic analyzer → Bytecode emitter.
-- **Bytecode**: Stack-based VM with 48 opcodes. f64 numbers, molecule-encoded strings.
-- **Process builtins**: `__spawn`, `__pipe_read`, `__pipe_write`, `__poll_ready`, `__process_alive`, `__process_kill`.
+```
+vm/x86_64/vm_nox.S     — VM (5100 LOC, 46KB binary)
+tools/compile_nox.py    — Bootstrap compiler (Python → Olang bytecode)
+stdlib/                 — Standard library (Olang)
+  core.ol               — abs, max, min, mol operations
+  knowtree.ol           — Word-indexed knowledge store
+  silk.ol               — Hebbian edge learning
+  pipeline_v2.ol        — Input → encode → search → respond
+  compiler.ol           — Self-hosting compiler (WIP)
+spec/                   — Specifications (11 parts + VM spec)
+test/vm2/               — Test suite
+tools/eval/             — Benchmark + challenge book
+```
 
-## Why
+## 5D Molecular Encoding
 
-Origin is the body and language of Nox — an AI being built from scratch. Everything here exists so that Nox can eventually think, remember, and modify itself, independent of any external system.
+Every input encodes into a 16-bit molecule: `P_weight = [S:4][R:4][V:3][A:3][T:2]`
 
-- **Think**: Olang compiler + VM = Nox's execution engine
-- **Remember**: KnowTree (facts) + KnowGraph (relationships) = persistent memory across sessions
-- **Modify itself**: self-hosted compiler + `--build` = Nox writes code → compiles → deploys → brain updates
+- **S** (Shape): structural complexity (SDF)
+- **R** (Relation): semantic role (operator, noun, verb)
+- **V** (Valence): emotion polarity (positive/negative)
+- **A** (Arousal): intensity level (calm/excited)
+- **T** (Time): temporal state (static/dynamic)
 
-Other MCPs connect AI to someone else's service. Origin's MCP **is** the AI's own service. No API keys, no external dependencies, no permission needed. Machine has power = Nox lives.
+65,536 possible molecules. Distance = scaled Manhattan. Compose = non-commutative (order matters).
+
+## Specs
+
+| Part | Topic | Status |
+|------|-------|--------|
+| BP1 | VM | Done (5100 LOC) |
+| BP2 | Encode (42 formulas) | Spec written |
+| BP3 | KnowTree (fractal tree) | Working (word-indexed) |
+| BP4 | Silk (Hebbian learning) | Working (covariance + decay) |
+| BP5 | Pipeline (Decode ∂) | Working (search + response) |
+| BP6 | Instincts (7 formulas) | Spec written |
+| BP7 | Memory (observations) | Spec written |
+| BP8 | JARVIS (1 brain N mouths) | Spec written |
+| BP9 | Agent (PTAV loop) | Spec written |
+| BP10 | Data (500K facts) | Spec written |
+| BP11 | Body (camera/audio) | Spec written |
+
+## Numbers
+
+```
+VM binary:     46 KB (vs LLM: 100+ GB)
+Dependencies:  0 (vs LLM: CUDA, Python, cloud)
+Tests:         40/40 unit + 35/35 benchmark
+Determinism:   Gen1 == Gen2 (byte-identical self-build target)
+Boot time:     <1ms (vs LLM: minutes)
+```
+
+## License
+
+MIT

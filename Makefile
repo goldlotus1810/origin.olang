@@ -1,84 +1,19 @@
-# HomeOS — origin.olang build system
-# Usage:
-#   make              — self-build (no Rust needed)
-#   make vm           — assemble + link VM only
-#   make bootstrap    — initial build with Rust (first time only)
-#   make test         — run 205 tests
-#   make fixed-point  — verify Gen1 == Gen2
-#   make clean        — remove build artifacts
+# Nox VM v2
 
-AS       = as
-LD       = ld
-VM_SRC   = vm/x86_64/vm_x86_64.S
-VM_OBJ   = /tmp/vm_olang.o
-VM_BIN   = vm/x86_64/vm_x86_64
-STDLIB   = stdlib
-OUTPUT   = origin.olang
-GEN1     = origin_gen1.olang
+.PHONY: vm test benchmark clean
 
-.PHONY: all vm build bootstrap test fixed-point clean self-build
-
-# Default: self-build (requires working origin.olang)
-all: self-build
-
-# Assemble VM (pure GNU as + ld, no Rust)
 vm:
-	$(AS) --64 -o $(VM_OBJ) $(VM_SRC)
-	$(LD) -static -nostdlib --entry=_start -o $(VM_BIN) $(VM_OBJ)
-	@echo "VM: $(VM_BIN) ($$(stat -c%s $(VM_BIN)) bytes)"
+	as --64 -o /tmp/vm_nox.o vm/x86_64/vm_nox.S
+	ld -static -nostdlib --entry=_start -o vm/x86_64/vm_nox /tmp/vm_nox.o
+	@echo "VM: vm/x86_64/vm_nox ($$(wc -c < vm/x86_64/vm_nox) bytes)"
 
-# Self-build: origin.olang compiles itself → Gen1
-self-build: vm
-	@test -x $(OUTPUT) || (echo "ERROR: $(OUTPUT) not found. Run 'make bootstrap' first."; exit 1)
-	./$(OUTPUT) --build
-	mv origin_new.olang $(GEN1)
-	chmod +x $(GEN1)
-	@echo "Gen1: $(GEN1) ($$(stat -c%s $(GEN1)) bytes)"
+test: vm
+	python3 tools/compile_nox.py test/vm2/test_full.ol test/vm2/test_full.olang
+	./test/vm2/test_full.olang
 
-# Fixed-point: Gen1 compiles itself → Gen2, verify Gen1 == Gen2
-fixed-point: self-build
-	./$(GEN1) --build
-	@if cmp -s $(GEN1) origin_new.olang; then \
-		echo "FIXED-POINT: Gen1 == Gen2 ✓"; \
-	else \
-		echo "DIFFER: Gen1 != Gen2 ✗"; exit 1; \
-	fi
-	@rm -f origin_new.olang
+benchmark: vm
+	python3 tools/compile_nox.py tools/eval/benchmark.ol tools/eval/benchmark.olang
+	./tools/eval/benchmark.olang
 
-# Bootstrap: use committed binary (no Rust needed)
-bootstrap: vm
-	@test -f origin_bootstrap.olang || (echo "ERROR: origin_bootstrap.olang not found"; exit 1)
-	cp origin_bootstrap.olang $(OUTPUT)
-	chmod +x $(OUTPUT)
-	@echo "Bootstrap from committed binary: $(OUTPUT)"
-
-# Bootstrap from Rust (only if origin_bootstrap.olang is lost)
-bootstrap-rust: vm
-	@test -d ../Origin_project || (echo "ERROR: ../Origin_project not found"; exit 1)
-	../Origin_project/target/release/builder \
-		--vm $(VM_BIN) --wrap \
-		--stdlib $(STDLIB) --codegen \
-		-o $(OUTPUT)
-	chmod +x $(OUTPUT)
-	@echo "Bootstrap (Rust): $(OUTPUT) ($$(stat -c%s $(OUTPUT)) bytes)"
-
-# Run all tests
-test:
-	bash tests.sh
-
-# Update bootstrap to latest Gen1
-update-bootstrap: self-build
-	cp $(GEN1) origin_bootstrap.olang
-	@echo "Bootstrap updated: $$(md5sum origin_bootstrap.olang | cut -d' ' -f1)"
-
-# Nox autonomous loop: build → test → analyze → fix → repeat
-daemon:
-	bash nox_daemon.sh
-
-# Nox study: read source documents and learn
-study:
-	bash nox_study.sh
-
-# Clean
 clean:
-	rm -f $(VM_OBJ) $(GEN1) origin_new.olang origin_gen2.olang origin_gen3.olang
+	rm -f /tmp/vm_nox.o test/vm2/*.olang tools/eval/*.olang

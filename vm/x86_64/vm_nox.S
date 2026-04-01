@@ -3108,8 +3108,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0xECE98A081C4642C2
+    .quad   .builtin_file_append_bytes
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -4293,6 +4293,80 @@ builtin_hash_table:
 # When compiler emits 0x3A [slot], direct jump. No name hashing at runtime.
 # ═══════════════════════════════════════════════════════════════════════════
 
+# __file_append_bytes(path, byte_array) → write raw bytes to file (append mode)
+.builtin_file_append_bytes:
+    movabs  rdx, 0xECE98A081C4642C2   # hash of __file_append_bytes
+    cmp     rdx, rax
+    jne     .builtin_f64_to_le_bytes
+    # Pop byte_array, then path
+    mov     r8, [r14]                # array ptr
+    # Follow forward pointers
+.bfab_fwd:
+    cmp     qword ptr [r8], -2       # ARRAY_FORWARD?
+    jne     .bfab_nofwd
+    mov     r8, [r8 + 8]
+    jmp     .bfab_fwd
+.bfab_nofwd:
+    mov     rsi, [r14 + 16]          # path ptr
+    mov     rdx, [r14 + 24]          # path mol_count
+    add     r14, 32
+    # Decode path (u16 → bytes)
+    mov     rdi, r15
+    xor     ecx, ecx
+.bfab_dp:
+    cmp     ecx, edx
+    jge     .bfab_open
+    movzx   eax, word ptr [rsi + rcx*2]
+    mov     byte ptr [rdi + rcx], al
+    inc     ecx
+    jmp     .bfab_dp
+.bfab_open:
+    mov     byte ptr [rdi + rcx], 0   # null terminate
+    push    r8                        # save array ptr
+    mov     rdi, r15
+    mov     esi, 0x441                # O_WRONLY|O_CREAT|O_APPEND
+    mov     edx, 0x1ED                # 0755
+    mov     eax, SYS_OPEN
+    syscall
+    test    eax, eax
+    js      .bfab_done
+    mov     edi, eax                  # fd
+    pop     r8                        # array ptr
+    # Get array count
+    mov     rcx, [r8 + 8]            # count (at offset 8 for cap-tracked)
+    # Convert array elements (f64 byte values) to raw bytes
+    lea     rsi, [r15 + 4096]         # output buffer
+    xor     r9d, r9d                  # index
+.bfab_convert:
+    cmp     r9, rcx
+    jge     .bfab_write
+    # Array entry: [ptr:8][len:8] at offset 16 + index*16
+    mov     r10, r9
+    shl     r10, 4                    # index * 16
+    add     r10, 16                   # skip header (cap+count)
+    movsd   xmm0, qword ptr [r8 + r10]  # f64 bits
+    cvttsd2si eax, xmm0              # byte value
+    mov     byte ptr [rsi + r9], al
+    inc     r9
+    jmp     .bfab_convert
+.bfab_write:
+    mov     rdx, r9                   # byte count
+    lea     rsi, [r15 + 4096]
+    mov     eax, SYS_WRITE
+    syscall
+    # Close
+    mov     eax, SYS_CLOSE
+    syscall
+    jmp     .bfab_ret
+.bfab_done:
+    pop     r8
+.bfab_ret:
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
 # __f64_to_le_bytes(f64_value) → array of 8 byte values
 .builtin_f64_to_le_bytes:
     movabs  rdx, 0x7DC336EFBBA1F85B
@@ -4362,6 +4436,13 @@ builtin_hash_table:
     DISPATCH
 .blen_array:
     # rax = array heap ptr (read before branch, not popped yet)
+    # Follow forward pointers
+.blen_fwd:
+    cmp     qword ptr [rax], -2      # ARRAY_FORWARD?
+    jne     .blen_nofwd
+    mov     rax, [rax + 8]
+    jmp     .blen_fwd
+.blen_nofwd:
     add     r14, 16                 # pop now
     mov     rcx, [rax + 8]          # count (at offset 8, after capacity)
     sub     r14, 16
@@ -4511,55 +4592,50 @@ builtin_hash_table:
     DISPATCH
 .bpush_grow:
     # Need to grow: allocate 2× on heap
+    # rax = old array ptr, r8 = val.ptr, r9 = val.len, rdx = old capacity
     shl     rdx, 1                  # new capacity = 2×
     test    rdx, rdx
     jnz     .bpush_have_cap
     mov     rdx, 8                  # minimum capacity
 .bpush_have_cap:
-    push    rax
-    push    r8
-    push    r9
-    push    rdx
-    # Allocate new array on heap (Zone C)
-    mov     rdi, rdx
+    # Save old array ptr for forward pointer
+    mov     [rip + _push_old_arr], rax
+    # Allocate new array on heap
+    mov     rdi, rdx                # new capacity
     shl     rdi, 4
-    add     rdi, 16     # total bytes
-    mov     rsi, r15
+    add     rdi, 16                 # total bytes = cap*16 + 16 (header)
+    mov     rsi, r15                # new array base
     add     r15, rdi                # bump allocate
-    pop     rdx
-    pop     r9
-    pop     r8
-    pop     rax
-    # Copy old data
+    # Initialize new array header
     mov     [rsi], rdx              # new capacity
-    mov     rcx, [rax+8]            # old count
-    mov     [rsi+8], rcx            # same count
-    # Copy entries
+    mov     rax, [rip + _push_old_arr]
+    mov     rcx, [rax + 8]          # old count
+    mov     [rsi + 8], rcx          # copy count
+    # Copy old entries
+    push    rcx
     push    rsi
-    push    rcx
-    lea     rdi, [rsi+16]
-    lea     rax, [rax+16]
-    shl     rcx, 4                  # bytes = count × 16
-    push    r8
-    push    r9
-    mov     ecx, ecx
+    lea     rdi, [rsi + 16]         # dest = new entries start
+    mov     rax, [rip + _push_old_arr]
+    lea     rax, [rax + 16]         # src = old entries start
+    mov     rsi, rax                # rep movsb source
+    shl     ecx, 4                  # byte count = old_count × 16
     rep     movsb
-    pop     r9
-    pop     r8
-    pop     rcx
-    pop     rsi
-    # Now append new element
-    push    rcx
-    shl     rcx, 4
-    lea     rdi, [rsi + 16 + rcx]
-    pop     rcx
-    mov     [rdi], r8
-    mov     [rdi+8], r9
-    inc     qword ptr [rsi+8]
+    pop     rsi                     # rsi = new array base
+    pop     rcx                     # rcx = old count
+    # Append new element at position [count]
+    mov     rax, rcx
+    shl     rax, 4
+    mov     [rsi + 16 + rax], r8    # val.ptr
+    mov     [rsi + 16 + rax + 8], r9 # val.len
+    inc     qword ptr [rsi + 8]     # count++
+    # Write FORWARD POINTER at old array location
+    mov     rax, [rip + _push_old_arr]
+    mov     qword ptr [rax], -2     # ARRAY_FORWARD marker
+    mov     [rax + 8], rsi          # pointer to new array
     # Push new array
     sub     r14, 16
     mov     [r14], rsi
-    mov     qword ptr [r14+8], ARRAY_MARKER
+    mov     qword ptr [r14 + 8], ARRAY_MARKER
     DISPATCH
 
 # __array_get(array, index) → value
@@ -4568,6 +4644,13 @@ builtin_hash_table:
     cvttsd2si edi, xmm0
     mov     rax, [r14+16]           # array ptr
     add     r14, 32                 # pop 2
+    # Follow forward pointers
+.bag_fwd:
+    cmp     qword ptr [rax], -2
+    jne     .bag_nofwd
+    mov     rax, [rax + 8]
+    jmp     .bag_fwd
+.bag_nofwd:
     # Bounds check
     mov     rcx, [rax+8]            # count
     cmp     edi, ecx

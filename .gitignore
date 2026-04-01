@@ -1,25 +1,11 @@
-*.o
-*.core
-/target/
+# Build artifacts
 /tmp/
-*.bak
-*.swp
-*.epub
-*.pdf
-*.mobi
-origin_new1.olang
-old/
-fonts/
-backup_v1_homeos/
-logs/session_*
-*.tar.gz
-UI/
-ui/
-data/test_*.txt
-data/book_*.txt
-data/ml_coban.txt
-data/test_mmap.bin
-json/udc_p_table_old.bin
-json/udc_p_table_full.bin
-Nox_brain.olang
-origin.olang
+*.o
+*.olang
+__pycache__/
+*.pyc
+
+# Runtime
+*.log
+*.dat
+/tmp/nox_*

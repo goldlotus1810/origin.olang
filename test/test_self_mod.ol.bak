@@ -1,0 +1,1 @@
+let ok = 1; if ok == 1 { emit "PASS"; } else { emit "FAIL"; };
