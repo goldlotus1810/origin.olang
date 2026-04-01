@@ -124,13 +124,19 @@ def lex(source):
                 i += 1
             i += 2
             continue
-        # Numbers
+        # Numbers (decimal or 0x hex)
         if c.isdigit() or (c == '-' and i+1 < len(source) and source[i+1].isdigit()):
             start = i
             if c == '-': i += 1
-            while i < len(source) and (source[i].isdigit() or source[i] == '.'):
-                i += 1
-            tokens.append(Token(TK.NUM, float(source[start:i]), line))
+            if i+1 < len(source) and source[i] == '0' and source[i+1] in 'xX':
+                i += 2  # skip 0x
+                while i < len(source) and source[i] in '0123456789abcdefABCDEF':
+                    i += 1
+                tokens.append(Token(TK.NUM, float(int(source[start:i], 16)), line))
+            else:
+                while i < len(source) and (source[i].isdigit() or source[i] == '.'):
+                    i += 1
+                tokens.append(Token(TK.NUM, float(source[start:i]), line))
             continue
         # Strings
         if c == '"':
