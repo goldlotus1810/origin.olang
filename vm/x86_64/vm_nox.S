@@ -2972,8 +2972,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0xE34AF099266AB028  # __mem_read32
+    .quad   .builtin_mem_read32
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3028,8 +3028,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x4A829EA00BA2FE44  # __mem_write8
+    .quad   .builtin_mem_write8
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3088,8 +3088,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0xC8220FDA76231661
     .quad   .builtin_file_write
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0xC60CB074703A7C62  # __fd_open
+    .quad   .builtin_fd_open
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3154,8 +3154,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x31F6E47C4AE5A082
     .quad   .builtin_bit_or
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0xC7FBC9042B95D482  # __fd_read
+    .quad   .builtin_fd_read
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3256,8 +3256,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0xCC77F04E614970B5  # __munmap
     .quad   .builtin_munmap
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x3EE101F3C5E7F2B5  # __mem_write32
+    .quad   .builtin_mem_write32
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3416,8 +3416,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0xA6097EB1CA418D06  # __fd_close
+    .quad   .builtin_fd_close
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3612,8 +3612,8 @@ builtin_hash_table:
     .quad   .builtin_to_string
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x5B523356365EF568  # __syscall
+    .quad   .builtin_syscall
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3786,8 +3786,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x229C6ACCAE3B5DBE
     .quad   .builtin_file_read
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x8436EA7A2C39DBBF  # __mem_read8
+    .quad   .builtin_mem_read8
     .quad   0xAE298C0D45A467C0  # __stm_push
     .quad   .builtin_stm_push
     .quad   0x0000000000000000
@@ -6333,6 +6333,191 @@ builtin_hash_table:
     mov     qword ptr [r14+8], ARRAY_MARKER
     pop     rbp
     pop     rbx
+    DISPATCH
+
+# ═══════════════════════════════════════════════════════════════════════════
+# §18 SYSCALL + RAW MEMORY + FD BUILTINS (SS17 final)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# __syscall(nr, a1, a2, a3, a4, a5, a6) → result
+# Generic Linux syscall gateway — THE key to everything
+.builtin_syscall:
+    # Pop up to 7 args (nr + 6 args), right-to-left
+    # Stack: [a6][a5][a4][a3][a2][a1][nr]  (TOS = a6)
+    movsd   xmm0, [r14]             # a6
+    cvttsd2si r9, xmm0
+    movsd   xmm0, [r14+16]          # a5
+    cvttsd2si r8, xmm0
+    movsd   xmm0, [r14+32]          # a4
+    cvttsd2si r10, xmm0
+    movsd   xmm0, [r14+48]          # a3
+    cvttsd2si rdx, xmm0
+    movsd   xmm0, [r14+64]          # a2
+    cvttsd2si rsi, xmm0
+    movsd   xmm0, [r14+80]         # a1
+    cvttsd2si rdi, xmm0
+    movsd   xmm0, [r14+96]         # nr
+    cvttsd2si rax, xmm0
+    add     r14, 112                 # pop 7
+    syscall
+    cvtsi2sd xmm0, rax
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __fd_open(path, flags) → fd
+.builtin_fd_open:
+    movsd   xmm0, [r14]             # flags
+    cvttsd2si esi, xmm0
+    mov     rdi, [r14+16]            # path ptr (u16 mols)
+    mov     rdx, [r14+24]            # path len
+    add     r14, 32
+    # Decode u16 → bytes for syscall
+    push    rsi
+    mov     rcx, rdx                 # mol count
+    mov     rsi, rdi                 # src = mol ptr
+    mov     rdi, r15                 # dst = heap temp
+.fdo_dec:
+    test    rcx, rcx
+    jz      .fdo_open
+    movzx   eax, word ptr [rsi]
+    mov     byte ptr [rdi], al
+    add     rsi, 2
+    inc     rdi
+    dec     rcx
+    jmp     .fdo_dec
+.fdo_open:
+    mov     byte ptr [rdi], 0        # null terminate
+    mov     rdi, r15                 # path = decoded string
+    pop     rsi                      # flags
+    xor     edx, edx                 # mode = 0
+    mov     eax, 2                   # SYS_OPEN
+    syscall
+    cvtsi2sd xmm0, rax
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __fd_close(fd) → 0 on success
+.builtin_fd_close:
+    movsd   xmm0, [r14]
+    cvttsd2si edi, xmm0
+    add     r14, 16
+    mov     eax, 3                   # SYS_CLOSE
+    syscall
+    cvtsi2sd xmm0, rax
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __fd_read(fd, count) → string (raw bytes as u16 molecules)
+.builtin_fd_read:
+    movsd   xmm0, [r14]             # count
+    cvttsd2si edx, xmm0
+    movsd   xmm0, [r14+16]          # fd
+    cvttsd2si edi, xmm0
+    add     r14, 32
+    # Read into temp buffer on heap
+    mov     rsi, r15                 # buffer = heap
+    push    rdx                      # save count
+    mov     eax, 0                   # SYS_READ
+    syscall
+    pop     rdx
+    # rax = bytes read (or negative error)
+    test    rax, rax
+    js      .fdr_err
+    # Convert bytes → u16 molecules
+    mov     rcx, rax                 # byte count
+    mov     rsi, r15                 # src = raw bytes
+    lea     rdi, [r15 + rcx + 16]    # dst = after raw bytes
+    mov     r8, rdi                  # save start
+    xor     edx, edx
+.fdr_enc:
+    cmp     edx, ecx
+    jge     .fdr_done
+    movzx   eax, byte ptr [rsi + rdx]
+    mov     word ptr [rdi + rdx*2], ax
+    inc     edx
+    jmp     .fdr_enc
+.fdr_done:
+    sub     r14, 16
+    mov     [r14], r8                # ptr to u16 molecules
+    mov     [r14+8], rdx             # mol count = byte count
+    # Bump heap past both buffers
+    lea     r15, [r8 + rdx*2 + 16]
+    DISPATCH
+.fdr_err:
+    sub     r14, 16
+    xor     eax, eax
+    mov     [r14], rax
+    mov     qword ptr [r14+8], 0
+    DISPATCH
+
+# __mem_read8(addr, offset) → byte value (as number)
+.builtin_mem_read8:
+    movsd   xmm0, [r14+16]          # addr
+    cvttsd2si rdi, xmm0
+    movsd   xmm0, [r14]             # offset
+    cvttsd2si rsi, xmm0
+    add     r14, 32
+    add     rdi, rsi
+    movzx   eax, byte ptr [rdi]
+    cvtsi2sd xmm0, eax
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __mem_write8(addr, offset, value)
+.builtin_mem_write8:
+    movsd   xmm0, [r14+32]          # addr
+    cvttsd2si rdi, xmm0
+    movsd   xmm0, [r14+16]          # offset
+    cvttsd2si rsi, xmm0
+    movsd   xmm0, [r14]             # value
+    cvttsd2si eax, xmm0
+    add     r14, 48
+    add     rdi, rsi
+    mov     byte ptr [rdi], al
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __mem_read32(addr, offset) → u32 value (as number)
+.builtin_mem_read32:
+    movsd   xmm0, [r14+16]          # addr
+    cvttsd2si rdi, xmm0
+    movsd   xmm0, [r14]             # offset
+    cvttsd2si rsi, xmm0
+    add     r14, 32
+    add     rdi, rsi
+    mov     eax, [rdi]
+    cvtsi2sd xmm0, rax
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __mem_write32(addr, offset, value)
+.builtin_mem_write32:
+    movsd   xmm0, [r14+32]          # addr
+    cvttsd2si rdi, xmm0
+    movsd   xmm0, [r14+16]          # offset
+    cvttsd2si rsi, xmm0
+    movsd   xmm0, [r14]             # value
+    cvttsd2si eax, xmm0
+    add     r14, 48
+    add     rdi, rsi
+    mov     [rdi], eax
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
     DISPATCH
 
 # ═══════════════════════════════════════════════════════════════════════════
