@@ -105,6 +105,18 @@ fn instinct_analogy(a, b, c) {
     return mol_pack(ds, dr, dv, da, dt);
 };
 
+// ── Instinct: Causality (BP6 §3) — temporal + co-activation + R type ──
+fn instinct_causality(mol_a, mol_b, time_a, time_b, silk_w) {
+    // A must precede B temporally
+    if time_a >= time_b { return 0; };
+    // Need strong co-activation (silk weight > threshold)
+    if silk_w < 400 { return 0; };
+    // R must be in causal range (8-12: Member/Subset/Equiv/Complement/Compose)
+    let r = mol_r(mol_a);
+    if r >= 8 { if r <= 12 { return 1; }; };
+    return 0;
+};
+
 // ── Instinct: Abstraction (BP6 §4) — variance in cluster ──
 fn instinct_abstraction(mols, count) {
     if count < 2 { return 0; };
