@@ -466,10 +466,24 @@ op_emit:
     DISPATCH
 
 .emit_f64:
-    # Convert f64 to string and print
+    # Convert f64 to u16 string, decode to bytes, print
     movq    xmm0, rdi               # f64 bits
-    call    f64_to_string            # returns ptr in rax, len in rdx
-    mov     rsi, rax
+    call    f64_to_string            # rax=ptr (u16 mols), rdx=mol count
+    # Decode u16 → bytes for write
+    mov     rsi, rax                 # u16 mol ptr
+    mov     rcx, rdx                 # mol count
+    lea     rdi, [r15 + 0x1000]      # temp decode buffer
+    xor     r8d, r8d
+.emit_f64_dec:
+    cmp     r8, rcx
+    jge     .emit_f64_write
+    movzx   eax, word ptr [rsi + r8*2]
+    mov     byte ptr [rdi + r8], al
+    inc     r8
+    jmp     .emit_f64_dec
+.emit_f64_write:
+    mov     rdx, r8                  # byte count
+    mov     rsi, rdi                 # decoded buffer
     mov     edi, 1
     mov     eax, SYS_WRITE
     syscall
@@ -2465,24 +2479,25 @@ var_load_matrix:
 # f64_to_string: xmm0=value → rax=ptr, rdx=len (on Zone C heap)
 # Converts f64 to decimal string. Integer part only for now.
 f64_to_string:
+    # Output u16 molecules (not bytes) — VM string format
     push    r15                      # save heap ptr (= output start)
     cvttsd2si rax, xmm0             # integer part
     # Handle negative
     test    rax, rax
     jns     .f2s_pos
-    mov     byte ptr [r15], '-'
-    inc     r15
+    mov     word ptr [r15], '-'      # u16 molecule
+    add     r15, 2
     neg     rax
 .f2s_pos:
     # Handle zero
     test    rax, rax
     jnz     .f2s_nonzero
-    mov     byte ptr [r15], '0'
-    inc     r15
+    mov     word ptr [r15], '0'
+    add     r15, 2
     jmp     .f2s_done
 .f2s_nonzero:
-    # Convert integer to decimal digits (reversed into temp area)
-    lea     rdi, [r15 + 24]          # temp end marker
+    # Convert integer to decimal digits (reversed into temp u16 area)
+    lea     rdi, [r15 + 48]          # temp end (room for 24 u16 digits)
     mov     r8, rdi
 .f2s_digit:
     test    rax, rax
@@ -2491,21 +2506,22 @@ f64_to_string:
     mov     rcx, 10
     div     rcx                      # rax = quotient, rdx = remainder
     add     dl, '0'
-    dec     rdi
-    mov     [rdi], dl
+    sub     rdi, 2                   # back 1 u16
+    mov     word ptr [rdi], dx       # store as u16 molecule
     jmp     .f2s_digit
 .f2s_copy:
-    # Copy digits from temp area to output (they were reversed)
+    # Copy u16 digits from temp to output
     mov     rsi, rdi                 # src = first digit
     mov     rdi, r15                 # dst = output position
     mov     rcx, r8
-    sub     rcx, rsi                 # digit count
+    sub     rcx, rsi                 # byte count
     rep     movsb
-    mov     r15, rdi                 # r15 = past last digit
+    mov     r15, rdi                 # r15 past last digit
 .f2s_done:
     pop     rax                      # rax = output start
     mov     rdx, r15
-    sub     rdx, rax                 # rdx = total length
+    sub     rdx, rax                 # rdx = total bytes
+    shr     rdx, 1                   # rdx = mol count (bytes / 2)
     ret
 
 # ═══════════════════════════════════════════════════════════════════════════
