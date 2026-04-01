@@ -115,6 +115,21 @@ pub fn pipeline(input) {
         let _ri = _ri + 1;
     };
 
+    // STEP 9b: Fire matched facts (maturity lifecycle)
+    let _fi = 0;
+    while _fi < len(_text_results) {
+        if _fi < 3 {
+            // Find fact index by text match and fire it
+            let _fact_text = __array_get(_text_results, _fi);
+            let _fj = 0;
+            while _fj < len(__kt_facts) {
+                if __array_get(__kt_facts, _fj) == _fact_text { kt_fire(_fj); let _fj = len(__kt_facts); };
+                let _fj = _fj + 1;
+            };
+        };
+        let _fi = _fi + 1;
+    };
+
     // STEP 10: Dream + auto-save every 20 turns
     if (__array_get(__v_idx, 0) % 8) == 0 { dream(); };
     if (__array_get(__v_idx, 0) % 20) == 0 { nox_save(); };

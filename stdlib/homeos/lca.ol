@@ -8,9 +8,10 @@ pub fn mol_lca(_a, _b) {
     let _sa = _kt_mol_s(_a); let _sb = _kt_mol_s(_b);
     let _S = _sa; if _sb > _sa { let _S = _sb; };
 
-    // R = Compose: use relation_compose with R of dominant input
-    let _ra = _kt_mol_r(_a); let _rb = _kt_mol_r(_b);
-    let _R = _ra; if _rb > _ra { let _R = _rb; };
+    // R = use relation_compose from Formula Engine (16 typed operations)
+    let _ra = _kt_mol_r(_a);
+    let _composed = relation_compose(_ra, _a, _b);
+    let _R = _kt_mol_r(_composed);
 
     // V = Amplify synergy (NOT average!)
     let _va = _kt_mol_v(_a); let _vb = _kt_mol_v(_b);
