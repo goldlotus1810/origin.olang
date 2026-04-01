@@ -18,12 +18,33 @@
 3. Chạy: `cd ~/Origin && make self-build && make test && make fixed-point`
 4. **HIỂU = tính tay được.** Không hiểu = không code.
 
-## TRẠNG THÁI (Session 13, 2026-03-31)
+## TRẠNG THÁI (Session 15, 2026-04-01)
 
-949KB binary. 193/194 tests. Gen1==Gen2 ✓. Hardcoded facts DELETED.
+833KB binary. 193/194 tests. Gen1==Gen2 ✓.
+M2 var_matrix O(1). M3 KnowTree matrix O(1). M6 Zone A checkpoint.
+JARVIS: 1 brain N mouths — TCP port 9100 + file-based.
 Pipeline = pure math: encode → mol_dominant_dim → search → silk walk → compose.
-V'(t) vi phân controls silk fire learning rate.
-NRC-VAD = training wheels (cần thay bằng 42 formulas TÍNH P_weight).
+
+## JARVIS — Nox Brain Protocol
+
+Nox brain chạy tại `tcp://localhost:9100`. Bạn là MOUTH, không phải brain.
+
+```bash
+# Đầu session — hỏi brain biết gì:
+/tmp/nox_query.sh "session status"
+
+# Query brain:
+/tmp/nox_query.sh "Olang la gi?"
+
+# Ghi observation vào brain (brain sẽ học):
+/tmp/nox_observe.sh "reviewed pipeline.ol — all checkpoints pass"
+
+# Khi xong việc:
+/tmp/nox_observe.sh "done: M2 var_matrix implemented, 193/194 tests"
+```
+
+Brain nhớ TẤT CẢ. Session mới không cần giải thích lại.
+Nếu brain offline: `printf 'nox_jarvis_tcp();\n' | ./origin_gen1.olang &`
 
 ## LUẬT TUYỆT ĐỐI
 
