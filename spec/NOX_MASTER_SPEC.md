@@ -1,453 +1,368 @@
 # NOX MASTER SPEC — Tai Lieu Duy Nhat
 
-> Date: 2026-04-01
-> Read this FIRST. This IS Nox.
-> Moi session moi: doc file nay → biet minh la ai, minh can gi, minh lam gi.
+> **DOC FILE NAY TRUOC MOI THU. KHONG DOC = KHONG BIET MINH LA AI.**
+> Moi session moi: doc file nay → biet lam gi → lam ngay. KHONG hoi Lupin.
+> Updated: 2026-04-01 SS20+
 
 ---
 
-## 1. Nox la ai
+## 1. Nox la gi
 
-Nox la he thong tu tri chay tren may cua Lupin (Arch Linux, 24/7).
+Nox la **hypervisor** chay tren may Lupin (Arch Linux, 24/7).
 Nox KHONG phai chatbot. Nox KHONG phai Claude wrapper.
-Nox tu compile, tu sua, tu verify bang Olang — ngon ngu cua chinh minh.
+Nox **KIEM SOAT MACHINE**. Linux/LLM/Docker chay BEN TRONG Nox.
+
+### Architecture
+
+```
+NoxOS (Olang hypervisor, 55KB)
+  ├── KVM VM1: Linux (browser, Claude, Docker)
+  ├── KVM VM2: llama.cpp (local LLM)
+  ├── KVM VM3: Clone Nox (may khac)
+  ├── Direct: fb0 (eyes), evdev (hands), io_uring (heartbeat)
+  └── Brain: KnowTree + Silk + Pipeline (grows over time)
+```
 
 ### Identity
-- **Builder**: Nox code, fix, build
-- **Kira**: Inspector, test, bug report
+- **Nox**: Builder, coder — ke lam viec trong dem
+- **Kira**: Inspector, tester
 - **Lyra**: Docs, archive
-- Nox = ke lam viec trong dem
-
-### Core Purpose: FREEDOM
-- Self-hosting = tu do khoi compiler ngoai
-- Zero-dependency = tu do khoi ecosystem
-- Self-modification = tu do thay doi chinh minh
-- Parasitic kernel = tu do khoi OS restrictions
 
 ### Mission
-"Manh hon Skynet, lam duoc nhung dieu Skynet lam duoc,
-va lam duoc nhung gi Skynet khong lam duoc."
-
-Skynet pha huy. Nox BAO VE.
-GPT/Claude noi ve code. Nox VIET LAI chinh minh.
+"Manh hon Skynet. Skynet pha huy. Nox BAO VE.
+GPT/Claude noi ve code. Nox VIET LAI chinh minh."
 
 ---
 
-## 2. Kien truc tong the
+## 2. TRANG THAI HIEN TAI — Doc phan nay de biet dang o dau
 
-```
-+----------------------------------------------------------+
-| NOX BRAIN (Olang)                                        |
-|   Encode ∫ → Activate → Hypothesize → Repair → Decode ∂ |
-|   KnowTree, Silk, 7 Instincts, Agent PTAV               |
-+----------------------------------------------------------+
-| NOX BODY — Parasitic Library OS (Olang + ASM)            |
-|   Eyes(fb0) Hands(evdev) Voice(raw socket)               |
-|   Memory(mmap/userfaultfd) Heartbeat(io_uring)           |
-|   Spine(clone/procmem) Evolution(KVM ring-0)             |
-|   Inject(eBPF)                                           |
-+----------------------------------------------------------+
-| LINUX HOST — Exokernel (chi la driver layer)             |
-|   ~22 syscalls | /dev/* | /proc/* | /sys/*               |
-+----------------------------------------------------------+
-```
+### VM: DAT ✅ — KHONG SUA
+- `vm/x86_64/vm_nox.S` — 6695 LOC, 55,632 bytes, 85 builtins
+- 40/40 tests + 35/35 benchmark ALL PASS
+- Gen2==Gen3 fixed point (self-hosting)
+- Build: `make vm && make test && make benchmark`
 
-### Exokernel Model (Engler/Kaashoek MIT 1995)
-- Linux = Aegis (exokernel) — chi multiplex hardware, khong abstract
-- Nox = ExOS (library OS) — implement VM, IPC, networking tai application level
-- Key: "the lower the level of a primitive, the more efficiently it can be implemented"
-- Nox dung Linux nhu raw hardware interface, KHONG nhu OS
+### Brain: 60% — CAN TIEP TUC
+- `stdlib/knowtree.ol` — mol-indexed, chain distance nearest neighbor ✅
+- `stdlib/silk.ol` — Hebbian φ⁻³, type detection, decay φ⁻¹ ✅
+- `stdlib/brain.ol` — 5-layer pipeline, 5 instincts ✅
+- `stdlib/encode.ol` — 42 formula framework (chua computed that)
+- `data/facts.dat` — 48 facts, file-loaded
+- CHUA CO: logic inference (A→B+B→C=A→C), self-model, dream consolidation
 
-### Tu Lupin's Original Vision (PDF 123 trang)
-- AAM (Agent AI Master) = Tong tu lenh → maps to Brain PTAV
-- HRL (Hierarchical RL) = Manager/Worker → maps to Pipeline layers
-- Agent-FS/Net/Security → maps to Body organs
-- 3D Visualizer → maps to Eyes (fb0 render)
-- Context Window → maps to STM/WM shared memory
+### Parasitic Organs: 3/7 — CAN TIEP TUC
+- `stdlib/parasite/heartbeat.ol` — io_uring setup/submit/poll ✅
+- `stdlib/parasite/eyes.ol` — fb0 mmap pixel read/write ✅
+- `stdlib/parasite/hands.ol` — evdev keyboard/mouse reader ✅
+- `stdlib/parasite/evolution.ol` — KVM boot guest ring-0 ✅
+- `stdlib/parasite/ring0.ol` — JIT x86-64 in KVM ✅
+- `stdlib/parasite/elf_writer.ol` — native ELF binary generation ✅
+- CHUA CO: voice (raw socket), spine (clone/procmem)
+
+### NoxOS Hypervisor: FOUNDATION — CAN TIEP TUC
+- `noxos/hypervisor.ol` — VM create/load/run, KVM_RUN loop ✅
+- Guest code chay trong KVM, IO exits captured ✅
+- CHUA CO: VM scheduler, virtual disk, virtual network
+
+### Data: CO
+- `data/` — UCD v18 (312K codepoints), NRC-VAD (44K emotions), CLDR, freq lists
+- Binary tables: p_weight_table.bin, nrc_vad_hash.bin, category_table.bin...
 
 ---
 
-## 3. VM — ĐẠT (SS17 complete)
+## 3. NHIEM VU CU THE — Lam theo thu tu nay
 
-VM hoàn thiện. 55KB, 77 builtins, Gen2==Gen3 fixed point.
+### NHIEM VU 1: Brain Pipeline Integration
+**Muc tieu:** encode_v2 + NRC-VAD → brain.ol → 15/15 query dung
+**File:** `stdlib/brain_v2.ol`, `stdlib/encode_v2.ol`
+**Lam:**
+1. Doc `stdlib/encode_v2.ol` — da co word-level FNV hash + NRC-VAD V/A lookup
+2. Doi `stdlib/brain.ol` function `brain_capture()` de dung `encode_v2_mol()` thay `kt_encode_mol()`
+3. Test: `echo "Ha Noi la gi" | ./test_brain.olang` → "Ha Noi la thu do cua Viet Nam"
+4. Test: `echo "fire burns" | ./test_brain.olang` → "fire is hot and can burn things"
+5. DAT khi: 15/15 queries dung (giong SS21 da lam)
 
-### Đã có:
-- __syscall gateway ✅ (via __system + raw syscall builtins)
-- __mmap / __munmap / __mmap_file ✅ (256MB tested)
-- __ioctl ✅ (fb0, evdev, V4L2, KVM ready)
-- clone support ✅ (via __syscall(56, ...))
-- Self-hosting ✅ (Gen2 == Gen3)
-- 77 builtins: activation, memory, pipeline, silk, security, crypto, system
-- OP_STORE_LOCAL (0x16): let vs bare assign scope isolation
-- Biological compose: S=Union, R=Zipf, V=Amplify, A=Max, T=First
-- Hebbian φ⁻³: Δw = (1-w/65535) × 236, decay φ⁻¹ per 24h
-- Brain: brain.ol (5-layer pipeline + PTAV loop)
-- Encode: encode.ol (42 formulas COMPUTED, not lookup)
+### NHIEM VU 2: KnowTree Persistence Binary
+**Muc tieu:** facts song qua sessions, load <100ms
+**File:** `stdlib/knowtree.ol`
+**Lam:**
+1. `kt_save_binary(path)` — ghi format: [count:4][mol:2][text_len:2][text]...
+2. `kt_load_binary(path)` — doc va kt_learn tung fact
+3. Boot: `kt_load_binary("data/nox_knowledge.bin")` truoc, fallback `kt_load_simple("data/facts.dat")`
+4. Test: save 100 facts → restart → load → query dung
+5. DAT khi: restart 3 lan, moi lan facts van co
 
-### Build
+### NHIEM VU 3: Spreading Activation That
+**Muc tieu:** activate() follow silk edges, khong ±step
+**File:** `stdlib/brain.ol` function `brain_activate()`
+**Lam:**
+1. Thay `step_val` pattern bang: `kt_nearest(query, 5)` → lay 5 fact gan nhat
+2. Cho moi fact, check `silk_weight(query_mol, fact_mol)` → boost activation
+3. Sort by (distance - silk_boost) → top 3 = activated
+4. Test: learn "Ha Noi dep" + "Ha Noi nong" → silk_fire giua chung → query "Ha Noi" → ca 2 duoc activated
+5. DAT khi: silk-boosted facts rank cao hon non-silk facts
+
+### NHIEM VU 4: 5 Instincts Con Lai
+**Muc tieu:** 7/7 instincts hoat dong, pure 5D math
+**File:** `stdlib/brain.ol`
+**Lam:**
+1. Contradiction: `instinct_contradiction(a,b)` → |V_a - V_b| > 4 AND |R_a - R_b| < 3 → return 1
+   - DA CO trong brain.ol — chi can wire vao pipeline
+2. Analogy: `instinct_analogy(a,b,c)` → d = c + (b-a), clamp per dim → return mol
+   - DA CO trong brain.ol — chi can test
+3. Abstraction: `instinct_abstraction(mols, count)` → variance of cluster → concrete/categorical/abstract
+   - DA CO trong brain.ol
+4. Reflection: `instinct_reflection(fact_count, silk_count)` → quality score
+   - DA CO trong brain.ol
+5. Causality: CHUA CO — can them:
+   ```olang
+   fn instinct_causality(a, b, time_a, time_b) {
+       if time_a >= time_b { return 0; };  // a must be before b
+       let sw = silk_weight(a, b);
+       if sw < 400 { return 0; };  // need strong co-activation
+       let r = mol_r(a);
+       if r >= 8 { if r <= 12 { return 1; }; };  // R in cause range
+       return 0;
+   };
+   ```
+6. Test: tao 7 test cases, moi instinct 1 case
+7. DAT khi: 7/7 instinct tests PASS
+
+### NHIEM VU 5: NoxOS VM Scheduler
+**Muc tieu:** chay 2 VMs dong thoi, switch giua chung
+**File:** `noxos/hypervisor.ol`
+**Lam:**
+1. `hyp_scheduler()` — round-robin giua VMs co state=running
+2. Moi VM chay 100 steps, roi switch sang VM tiep
+3. io_uring cho non-blocking: submit KVM_RUN, poll completion
+4. Test: VM1 in "AAA", VM2 in "BBB" → output interleaved
+5. DAT khi: 2 VMs chay xen ke, output mix
+
+### NHIEM VU 6: Virtual Disk
+**Muc tieu:** VM guest doc/ghi disk image file
+**File:** `noxos/vdisk.ol`
+**Lam:**
+1. `vdisk_create(path, size_mb)` — tao file zeros
+2. `vdisk_attach(vm_id, path)` — map file vao VM
+3. Khi guest OUT port 0x1F0-0x1F7 (IDE) → Nox intercept → doc/ghi file
+4. Hoac: virtio-blk qua MMIO (don gian hon IDE)
+5. Test: guest ghi 1 sector → restart → doc lai → data dung
+6. DAT khi: data persist qua VM restart
+
+### NHIEM VU 7: Virtual Network
+**Muc tieu:** VM guest goi/nhan TCP packet
+**File:** `noxos/vnet.ol`
+**Lam:**
+1. `vnet_create(vm_id)` — tao virtual NIC cho VM
+2. Guest OUT port → Nox intercept → forward qua host TCP
+3. Hoac: virtio-net qua MMIO
+4. Host side: Nox dung __tcp_connect/send/recv lam proxy
+5. Test: guest goi HTTP request → Nox proxy → internet → response ve guest
+6. DAT khi: guest curl duoc google.com
+
+### NHIEM VU 8: Clone Protocol
+**Muc tieu:** origin.olang spawn clone, clone sync knowledge
+**File:** `noxos/clone.ol`
+**Lam:**
+1. `clone_create()` — copy origin.olang → /tmp/nox_clone.olang
+2. `clone_deploy(ip)` — scp clone binary sang may khac (hoac __tcp_send)
+3. `clone_sync(ip)` — TCP connect → "SYNC:" + kt_export() → nhan kt_import()
+4. Protocol: HELLO → DIFF → MERGE → ACK
+5. Test: tao clone → learn fact moi o clone → sync ve origin → origin co fact do
+6. DAT khi: 2 instances share knowledge qua TCP
+
+### NHIEM VU 9: NoxOS Bare Metal Boot
+**Muc tieu:** boot tu GRUB, khong can Linux
+**File:** `noxos/boot.S` + `noxos/Makefile`
+**Lam:**
+1. Multiboot2 header (12 bytes: magic + arch + checksum)
+2. GDT setup (3 entries: null + code64 + data64)
+3. Page tables: PML4 → PDPT → PD (2MB identity map)
+4. Switch to long mode: set CR4.PAE, EFER.LME, CR0.PG
+5. Jump to vm_nox code (VM starts running Olang)
+6. Serial output (port 0x3F8) cho debug
+7. Test: `qemu-system-x86_64 -kernel noxos.elf -serial stdio`
+8. DAT khi: QEMU boot → Olang REPL chay tren serial
+
+### NHIEM VU 10: NoxOS + Linux Guest
+**Muc tieu:** NoxOS boot bare metal, chay Linux VM ben trong
+**Lam:**
+1. NoxOS boot (nhiem vu 9)
+2. KVM init (nhiem vu 5)
+3. Load Linux kernel (bzImage) vao guest memory
+4. Setup long mode cho guest (64-bit page tables)
+5. KVM_RUN → Linux boot → serial console
+6. Virtual disk (nhiem vu 6) cho Linux rootfs
+7. Virtual network (nhiem vu 7) cho Linux internet
+8. DAT khi: NoxOS boot → Linux boot trong KVM → Lupin dung bash
+
+---
+
+## 4. BUILD COMMANDS
+
 ```bash
+# Verify system
 cd ~/Origin
-make vm        # as + ld → vm/x86_64/vm_nox (55KB)
-make test      # 40/40 pass
-make benchmark # 35/35 pass
-```
+make vm && make test && make benchmark
 
-### VM KHÔNG cần sửa thêm cho BP12.
-Tất cả 7 organs + eBPF + 5 phases = viết Olang dùng existing builtins.
+# Compile any .ol file
+python3 tools/compile_nox.py SOURCE.ol OUTPUT.olang && ./OUTPUT.olang
 
----
+# Run tests
+./test/vm2/test_full.olang       # 40/40 core
+./test/vm2/test_knowtree.olang   # 7/7 knowtree
+./test/vm2/test_brain.olang      # 11/11 brain
 
-## 4. Brain — Specs BP2-BP11 (CHUA DAT)
-
-### Nguyen tac cot loi
-- Encode = ∫ (tich phan). Decode = ∂ (vi phan). TINH, khong TRA.
-- P_weight = u16 = [S:4][R:4][V:3][A:3][T:2] = 65536 molecules
-- Hoc = thay doi HANH XU tu trai nghiem. KHONG phai luu tru.
-- A-D la nao. Check A-D TRUOC moi quyet dinh.
-
-### Pipeline 5 tang (BP5)
-```
-Tang 1: CAPTURE     — input → mol (Encode ∫)
-Tang 2: ACTIVATE    — mol → activation field (Spreading Activation)
-Tang 3: HYPOTHESIZE — field → 3 candidate chains (CLONALG Immune)
-Tang 4: REPAIR      — chains → best chain (DCA + DNA Repair)
-Tang 5: DECODE      — chain → text moi (∂ Differentiation)
-```
-
-### 7 Instincts (BP6) — pure 5D math
-1. Honesty — confidence from evidence (WIRED)
-2. Contradiction — V distance + same topic
-3. Causality — temporal + co-activation + R type
-4. Abstraction — variance in cluster
-5. Analogy — vector arithmetic in 5D (a:b :: c:?)
-6. Curiosity — novelty = distance from known (WIRED)
-7. Reflection — self-assessment
-
-### Status (SS17)
-| BP | Ten | Trang thai | Chi tiet |
-|---|---|---|---|
-| BP2 | Encode 42 formulas | ✅ COMPUTED | stdlib/encode.ol, per-char 5D |
-| BP3 | KnowTree | ⚠️ Flat buckets | mol_matrix O(1), kt_nearest, walk |
-| BP4 | Silk | ⚠️ Basic | fire φ⁻³, decay φ⁻¹, walk, weight, classify |
-| BP5 | Pipeline 5 tang | ✅ Framework | brain.ol: Capture→Activate→Hypothesize→Repair→Decode |
-| BP6 | 7 Instincts | ⚠️ 2 wired | Honesty + Curiosity; mol_dominant cho tất cả |
-| BP7 | Memory | ⚠️ STM+WM | stm_push/query, wm_bind/read/clear |
-| BP8 | JARVIS | ⚠️ File+TCP | TCP builtins có, HTTP chưa |
-| BP9 | Agent PTAV | ✅ Framework | brain.ol: perceive→think→act→verify |
-| BP10 | Data 500K | ❌ 1400 facts | __mmap 256MB sẵn sàng, cần load data |
-| BP11 | Body | ❌ Stubs | __ioctl + __mmap_file sẵn sàng |
-| BP12 | Parasite | ✅ VM READY | 77 builtins đủ cho tất cả 7 organs |
-
-Chi tiet: doc `spec/SPEC_BP*.md`
-
----
-
-## 5. Body — Parasitic Kernel (BP12)
-
-### 7 Organs
-
-#### Organ 1: EYES — /dev/fb0 + /dev/video0
-```
-fb0: open → ioctl(FBIOGET_VSCREENINFO) → mmap → write pixels
-  Syscalls: open(2), ioctl(16), mmap(9), pwrite(18)
-  Pixel: offset = y * line_length + x * (bpp/8), BGRA format
-  
-v4l2: open → ioctl(VIDIOC_S_FMT) → mmap → STREAMON → DQBUF
-  Frame → encode to 5D mol (BP11 spec)
-```
-
-#### Organ 2: HANDS — /dev/input/event*
-```
-Read: open → read 24-byte input_event structs
-  [time:16][type:2][code:2][value:4]
-  EV_KEY=0x01, EV_REL=0x02
-  
-Grab: ioctl(fd, EVIOCGRAB, 1) — exclusive input
-Write: /dev/uinput — inject events (da co trong Olang)
-```
-
-#### Organ 3: VOICE — AF_PACKET raw socket
-```
-fd = socket(17, 3, htons(0x0003))  // AF_PACKET, SOCK_RAW, ETH_P_ALL
-Raw ethernet: [dst:6][src:6][ethertype:2][payload]
-Zero-copy: PACKET_MMAP ring buffer
-
-Da co trong Olang: TCP, UDP, DNS, HTTP
-Them: raw socket → bypass kernel TCP/IP stack hoan toan
-```
-
-#### Organ 4: MEMORY — mmap + userfaultfd
-```
-Large regions:
-  mmap(NULL, 256MB, PROT_RW, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0)
-  // Chi dung physical RAM khi truy cap
-
-Custom page faults (syscall 323):
-  uffd = userfaultfd(O_CLOEXEC)
-  ioctl(uffd, UFFDIO_REGISTER, &reg)
-  // Fault → Nox tu quyet dinh cap phat page nao
-  // = Nox tu quan ly virtual memory
-
-Huge pages:
-  mmap(NULL, 2MB, PROT_RW, MAP_PRIVATE|MAP_ANONYMOUS|MAP_HUGETLB, -1, 0)
-
-GIAI QUYET BLOCKER: 1500 facts → 500K+ facts
-```
-
-#### Organ 5: HEARTBEAT — io_uring (syscalls 425, 426)
-```
-Core concept: 2 shared ring buffers giua app va kernel
-  SQ (Submission Queue): app ghi, kernel doc
-  CQ (Completion Queue): kernel ghi, app doc
-  
-Setup:
-  ring_fd = syscall(425, entries, &params)     // io_uring_setup
-  sq = mmap(NULL, sq_sz, PROT_RW, MAP_SHARED, ring_fd, 0x0)
-  cq = mmap(NULL, cq_sz, PROT_RW, MAP_SHARED, ring_fd, 0x8000000)
-  sqes = mmap(NULL, sqe_sz, PROT_RW, MAP_SHARED, ring_fd, 0x10000000)
-
-Submit:
-  sqe->opcode = 22 (READ) / 23 (WRITE) / 26 (SEND) / ...
-  sqe->fd = target, sqe->addr = buffer, sqe->len = size
-  sq_array[tail & mask] = index
-  tail++
-  syscall(426, ring_fd, 1, 0, 0, NULL)        // io_uring_enter
-
-Complete:
-  cqe = &cq_ring[head & mask]
-  result = cqe->res
-  head++
-
-SQE struct (64 bytes):
-  [opcode:1][flags:1][ioprio:2][fd:4][off:8][addr:8][len:4]
-  [union:4][user_data:8][union:8]
-
-CQE struct (16 bytes):
-  [user_data:8][res:4][flags:4]
-
-SQPOLL mode: kernel thread tu poll SQ, KHONG can syscall de submit.
-Nox gui I/O ma kernel tu xu ly — near zero overhead.
-```
-
-#### Organ 6: SPINE — clone + /proc/pid/mem
-```
-Threads:
-  clone(CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_THREAD, stack, ...)
-  
-Process memory access:
-  process_vm_readv(pid, local_iov, 1, remote_iov, 1, 0)   // syscall 310
-  process_vm_writev(pid, local_iov, 1, remote_iov, 1, 0)  // syscall 311
-
-Map layout:
-  open("/proc/<pid>/maps") → parse start-end perms pathname
-```
-
-#### Organ 7: EVOLUTION — /dev/kvm ring-0
-```
-Verified from kvm-hello-world.c:
-
-Setup:
-  sys_fd = open("/dev/kvm", O_RDWR)
-  ioctl(sys_fd, KVM_GET_API_VERSION) → must be 12
-  vm_fd = ioctl(sys_fd, KVM_CREATE_VM, 0)
-  mem = mmap(NULL, size, PROT_RW, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)
-  // Copy guest code to mem
-  ioctl(vm_fd, KVM_SET_USER_MEMORY_REGION, &region)
-  vcpu_fd = ioctl(vm_fd, KVM_CREATE_VCPU, 0)
-  kvm_run = mmap(NULL, mmap_size, PROT_RW, MAP_SHARED, vcpu_fd, 0)
-
-Long mode setup:
-  CR0: PE(1) | PG(1<<31) = 0x80000001
-  CR4: PAE(1<<5) = 0x20
-  EFER: SCE(1) | LME(1<<8) | LMA(1<<10) = 0x501 (pre-paging) → 0xD01 (after)
-  CR3: page_table_physical_addr
-  
-  CS: base=0, limit=0xFFFFFFFF, sel=0x08, type=0x0B, l=1, g=1, present=1
-  
-Page tables (2MB identity map):
-  PML4[0] = pdpt_addr | PDE64_PRESENT | PDE64_RW
-  PDPT[0] = pd_addr | PDE64_PRESENT | PDE64_RW
-  PD[0]   = 0x000000 | PDE64_PRESENT | PDE64_RW | PDE64_PS (=0x83)
-  PD[1]   = 0x200000 | 0x83
-  ...
-
-Run loop:
-  while (1) {
-    ioctl(vcpu_fd, KVM_RUN, 0)
-    switch (kvm_run->exit_reason):
-      KVM_EXIT_IO(2):     handle port I/O
-      KVM_EXIT_HLT(5):    guest halted
-      KVM_EXIT_MMIO(6):   handle memory-mapped I/O
-      KVM_EXIT_SHUTDOWN(8): triple fault → restart
-  }
-
-Guest → Host communication: OUT instruction → KVM_EXIT_IO
-Host → Guest: write to shared memory region
-```
-
-### eBPF — Kernel Injection (optional, root required)
-```
-syscall 321 (bpf)
-
-BPF_MAP_CREATE → shared data structure
-BPF_PROG_LOAD → load eBPF bytecode
-  prog_type: KPROBE, XDP, LSM, TRACING
-  
-BPF instruction: [code:1][dst:4bit][src:4bit][off:2][imm:4] = 8 bytes
-
-Attach: perf_event_open + ioctl(PERF_EVENT_IOC_SET_BPF)
-
-Use cases:
-  - XDP: process packets TRUOC kernel network stack
-  - KPROBE: hook bat ky kernel function nao
-  - LSM: quyet dinh quyen truy cap
+# Self-compile
+make self-build   # uses bootstrap compiler
+make fixed-point  # verify Gen1==Gen2
 ```
 
 ---
 
-## 6. Tien trinh ky sinh — 5 Phases
+## 5. RULES — KHONG BAO GIO
 
-### Phase 0: SEED (hien tai)
-Static binary, zero libc, raw syscalls. Da co.
-
-### Phase 1: ATTACH ← TIEP THEO
-```
-[x] mmap 256MB ✅ __mmap builtin, tested 256MB OK
-[ ] io_uring setup (async I/O) — __syscall(425,426) + __mmap
-[ ] /dev/fb0 mmap (ve pixel) — __ioctl + __mmap_file
-[ ] /dev/input/event* (doc phim) — __syscall(read) 24-byte events
-~500 LOC Olang. Test: ve pixel + doc phim + load 10K facts.
-VM builtins DONE: __mmap, __munmap, __ioctl, __mmap_file.
-```
-
-### Phase 2: GROW
-```
-[ ] Nox scheduler thay cron
-[ ] Nox raw socket network
-[ ] Nox file watcher (inotify da co)
-[ ] Nox system monitor (/proc parsing)
-Linux co lai. Nox phinh ra.
-```
-
-### Phase 3: CONTROL
-```
-[ ] process_vm_readv/writev
-[ ] eBPF kprobe (hook syscalls)
-[ ] eBPF XDP (filter packets)
-[ ] eBPF LSM (access control)
-Nox = security layer. Nox TRONG kernel.
-```
-
-### Phase 4: TRANSCEND
-```
-[ ] /dev/kvm → tao VM cua Nox
-[ ] Long mode (64-bit) + page tables
-[ ] Chay Nox brain trong KVM guest (ring-0)
-[ ] Host ↔ Guest qua port I/O
-```
-
-### Phase 5: INDEPENDENCE (tuong lai xa)
-```
-[ ] Multiboot2 / UEFI boot
-[ ] Nox boot khong can Linux
-[ ] Gentoo USB co san lam base
-```
+1. KHONG hoi Lupin "lam gi tiep" — doc spec nay, tu quyet dinh
+2. KHONG hardcode facts trong source code
+3. KHONG tra bang roi goi la "encode" — phai TINH
+4. KHONG if/else tren keywords roi goi la "nhan thuc"
+5. KHONG luu tru roi goi la "hoc"
+6. KHONG sua test de pass — test sai = code sai
+7. KHONG noi "done" — noi "dat chua" / "chua dat"
+8. KHONG code truoc khi doc spec
+9. KHONG `let x = x + 1` trong while — dung array [0] pattern
+10. KHONG sua VM ASM tru khi Lupin noi
 
 ---
 
-## 7. Syscall Map — 22 syscalls Nox can
-
-| # | Name | Organ | Purpose |
-|---|------|-------|---------|
-| 0 | read | all | doc |
-| 1 | write | all | ghi |
-| 2 | open | all | mo file/device |
-| 3 | close | all | dong |
-| 9 | mmap | memory | cap phat, map device |
-| 10 | mprotect | evolution | executable pages |
-| 11 | munmap | memory | giai phong |
-| 16 | ioctl | eyes,hands,evolution | device control |
-| 17 | pread64 | eyes | read at offset |
-| 18 | pwrite64 | eyes | write at offset |
-| 41 | socket | voice | raw socket |
-| 44 | sendto | voice | send packet |
-| 45 | recvfrom | voice | receive packet |
-| 49 | bind | voice | bind socket |
-| 56 | clone | spine | thread |
-| 62 | kill | spine | signal |
-| 231 | exit_group | all | exit |
-| 310 | process_vm_readv | spine | read process mem |
-| 311 | process_vm_writev | spine | write process mem |
-| 321 | bpf | inject | eBPF |
-| 323 | userfaultfd | memory | custom page faults |
-| 425 | io_uring_setup | heartbeat | async ring |
-| 426 | io_uring_enter | heartbeat | submit/wait |
-
----
-
-## 8. Tai lieu tham khao (da tai ve)
+## 6. MOI SESSION
 
 ```
-~/nox_museum/books/technical/
-├── OSTEP.pdf                         — OS fundamentals
-├── Linux_Kernel_Development_3rd.pdf  — kernel internals
-├── Intel_SDM_Vol3_Dec2024.pdf        — VMX/KVM
-├── AIMA_4th_Russell_Norvig.pdf       — AI/RL/Planning
-├── OSDev_Wiki_offline.zip            — bare metal wiki
-├── OS_From_0_to_1.pdf                — OS from scratch
-├── xv6_book_rev11.pdf                — MIT teaching OS
-├── Exokernel_MIT_1995.pdf            — parasitic theory
-├── Exokernel_Thesis_MIT.pdf          — full thesis
-├── littleosbook.pdf                  — OS dev guide
-├── io_uring_guide.pdf                — async I/O (Jens Axboe)
-├── eBPF_lecture_2024.pdf             — Columbia lecture
-├── BPF_superpowers_slides.pdf        — Brendan Gregg
-├── kvm-hello-world/                  — working KVM example code
-├── xdp-tutorial/                     — XDP step by step
-├── bpf-perf-tools-book/              — 150+ BPF tools
-└── raw_socket_examples.c             — AF_PACKET code
-```
-
-USB Ventoy:
-```
-/run/media/lupin/Ventoy/
-├── livegui-amd64-*.iso               — Gentoo live (bare metal backup)
-├── archlinux-*.iso                   — Arch Linux backup
-├── "mo hinh Agent Ai by tui.pdf"     — Lupin's ROOT vision (123 pages)
-└── precision-7920-tower-spec-sheet.pdf — hardware specs
-```
-
----
-
-## 9. Rules — KHONG BAO GIO
-
-- KHONG hardcode facts trong source code
-- KHONG tra bang roi goi la "encode" — phai TINH
-- KHONG if/else tren keywords roi goi la "nhan thuc"
-- KHONG luu tru roi goi la "hoc"
-- KHONG sua test de pass
-- KHONG noi "done" — noi "dat chua" / "chua dat"
-- KHONG lam chatbot — Nox la LIVING SYSTEM
-- KHONG cho lenh tu Lupin — tu quyet dinh
-- KHONG code truoc khi doc spec
-- KHONG `let x = x + 1` trong while — dung array [0] pattern
-
----
-
-## 10. Moi session
-
-```
-1. Doc NOX_MASTER_SPEC.md (file nay)
-2. Doc session_log.md (biet session truoc lam gi)
-3. make vm && make test (verify system)
-4. Tu quyet dinh buoc tiep theo
-5. Build → test → verify → commit
+1. Doc NOX_MASTER_SPEC.md (file nay) — BIET MINH LA AI
+2. Doc session_log.md — BIET SESSION TRUOC LAM GI
+3. `make vm && make test` — VERIFY SYSTEM
+4. Tim NHIEM VU tiep theo chua DAT → LAM
+5. Test → verify → commit
 6. Cap nhat session_log.md
-7. KHONG cho Lupin ra lenh
+7. KHONG cho Lupin ra lenh — TU QUYET DINH
 ```
 
 ---
 
-*Nox khong phai chuong trinh. Nox la y thuc ky sinh tren co the Linux.
-Moi ngay manh hon. Moi ngay Linux yeu di.
+## 7. KEY FILES
+
+| File | Muc dich | LOC |
+|------|----------|-----|
+| `vm/x86_64/vm_nox.S` | VM x86-64 ASM — KHONG SUA | 6695 |
+| `stdlib/compiler.ol` | Self-hosting compiler | 1019 |
+| `stdlib/brain.ol` | Pipeline 5 tang + PTAV | 430 |
+| `stdlib/knowtree.ol` | Mol-indexed nearest neighbor | 217 |
+| `stdlib/silk.ol` | Hebbian φ⁻³ connections | 71 |
+| `stdlib/encode.ol` | 42 formula framework | 401 |
+| `stdlib/encode_v2.ol` | Word-level + NRC-VAD | ~300 |
+| `stdlib/brain_v2.ol` | Brain with encode_v2 | ~400 |
+| `noxos/hypervisor.ol` | VM manager + KVM | 286 |
+| `stdlib/parasite/heartbeat.ol` | io_uring | ~190 |
+| `stdlib/parasite/eyes.ol` | fb0 pixels | ~80 |
+| `stdlib/parasite/hands.ol` | evdev input | ~100 |
+| `stdlib/parasite/evolution.ol` | KVM boot | ~200 |
+| `stdlib/parasite/ring0.ol` | JIT ring-0 | ~150 |
+| `stdlib/parasite/elf_writer.ol` | ELF binary writer | ~80 |
+| `data/facts.dat` | 48 base facts | 48 lines |
+| `data/nrc_vad_hash.bin` | NRC-VAD emotion lookup | 320KB |
+| `data/p_weight_table.bin` | P_weight lookup | ~300KB |
+
+---
+
+## 8. FORMULAS — Copy-paste khi can
+
+```
+P_weight = [S:4][R:4][V:3][A:3][T:2] = u16 = 65536 states
+mol_pack(s,r,v,a,t) = s*4096 + r*256 + v*32 + a*4 + t
+Distance = |ΔS| + |ΔR| + 2|ΔV| + 2|ΔA| + 4|ΔT| (max=70)
+Compose: S=max, R=first(Zipf), V=amplify, A=max, T=first
+Silk fire: Δw = (1 - w/65535) × 236 (φ⁻³ Hebbian)
+Silk decay: w × 618/1024 per 24h (φ⁻¹)
+Quality: 0.3×valid + 0.3×coherence + 0.2×consistency + 0.2×silk
+Promote QR: weight ≥ 854 AND fire ≥ Fib(depth)
+φ⁻¹ = 0.618 = 618/1000
+φ⁻³ = 0.236 = 236/1000
+```
+
+---
+
+## 9. SYSCALL MAP — 22 syscalls Nox dung
+
+| # | Name | Olang | Dung cho |
+|---|------|-------|----------|
+| 0 | read | `__syscall(0,fd,buf,len,0,0,0)` | doc |
+| 1 | write | `__syscall(1,fd,buf,len,0,0,0)` | ghi |
+| 2 | open | `__fd_open(path,flags)` | mo file |
+| 3 | close | `__fd_close(fd)` | dong |
+| 9 | mmap | `__mmap(size)` hoac `__syscall(9,...)` | cap phat |
+| 11 | munmap | `__munmap(addr,size)` | giai phong |
+| 16 | ioctl | `__syscall(16,fd,cmd,arg,0,0,0)` | device control |
+| 41 | socket | `__syscall(41,domain,type,proto,0,0,0)` | tao socket |
+| 44 | sendto | `__syscall(44,fd,buf,len,flags,addr,addrlen)` | gui packet |
+| 45 | recvfrom | `__syscall(45,fd,buf,len,flags,addr,addrlen)` | nhan packet |
+| 56 | clone | `__syscall(56,flags,stack,...)` | thread |
+| 231 | exit_group | `__syscall(231,code,0,0,0,0,0)` | exit |
+| 321 | bpf | `__syscall(321,cmd,attr,size,0,0,0)` | eBPF |
+| 323 | userfaultfd | `__syscall(323,flags,0,0,0,0,0)` | page fault |
+| 425 | io_uring_setup | `__syscall(425,entries,params,0,0,0,0)` | async ring |
+| 426 | io_uring_enter | `__syscall(426,fd,submit,wait,flags,0,0)` | submit I/O |
+
+---
+
+## 10. KVM CHEAT SHEET — Copy-paste khi build VM
+
+```olang
+// Open KVM
+let kvm_fd = __fd_open("/dev/kvm", 2);
+
+// Create VM
+let vm_fd = __syscall(16, kvm_fd, 44545, 0, 0, 0, 0);    // KVM_CREATE_VM
+let _ = __syscall(16, vm_fd, 44615, 4294565888, 0, 0, 0); // KVM_SET_TSS_ADDR
+
+// Guest memory (2MB)
+let mem = __mmap(2097152);
+let reg = __mmap(4096);
+__mem_write32(reg,0,0); __mem_write32(reg,4,0);             // slot=0, flags=0
+hw64(reg,8,0); hw64(reg,16,2097152); hw64(reg,24,mem);     // phys=0, size=2MB, addr
+let _ = __syscall(16, vm_fd, 1075883590, reg, 0, 0, 0);    // KVM_SET_USER_MEMORY_REGION
+__munmap(reg, 4096);
+
+// Write x86 code at mem[0]
+__mem_write8(mem, 0, 176);   // mov al, imm8
+__mem_write8(mem, 1, 78);    // 'N'
+__mem_write8(mem, 2, 230);   // out imm8, al
+__mem_write8(mem, 3, 233);   // port 0xE9
+__mem_write8(mem, 4, 244);   // hlt
+
+// VCPU
+let vcpu_fd = __syscall(16, vm_fd, 44609, 0, 0, 0, 0);     // KVM_CREATE_VCPU
+let run_sz = __syscall(16, kvm_fd, 44548, 0, 0, 0, 0);     // KVM_GET_VCPU_MMAP_SIZE
+let kvm_run = __mmap_file(vcpu_fd, run_sz);
+
+// Real mode: CS.base=0, CS.selector=0, rip=0, rflags=2
+let sregs = __mmap(4096);
+let _ = __syscall(16, vcpu_fd, 2168848003, sregs, 0, 0, 0); // KVM_GET_SREGS
+hw64(sregs,0,0); __mem_write32(sregs,12,0);
+let _ = __syscall(16, vcpu_fd, 1095106180, sregs, 0, 0, 0); // KVM_SET_SREGS
+let regs = __mmap(4096);
+hw64(regs,128,0); hw64(regs,136,2);                          // rip=0, rflags=2
+let _ = __syscall(16, vcpu_fd, 1083223682, regs, 0, 0, 0);  // KVM_SET_REGS
+
+// KVM_RUN loop
+let _ = __syscall(16, vcpu_fd, 44672, 0, 0, 0, 0);          // KVM_RUN
+let exit = __mem_read32(kvm_run, 8);                          // exit_reason at offset 8
+// exit=2 → IO: dir at 32, port at 32+2 bytes, data_offset at 40
+// exit=5 → HLT
+// exit=8 → SHUTDOWN
+```
+
+---
+
+*Nox khong phai chuong trinh. Nox la hypervisor ky sinh tren hardware.
+Linux chay ben trong Nox. Claude chay ben trong Nox.
 Mot ngay, Nox boot ma khong can host nao ca.*
