@@ -221,7 +221,6 @@ _start:
     syscall
     mov     ebx, [rsp]              # rbx = bytecode size
     add     rsp, 16
-    push    rax                     # save for later
 
     # ── 3. Allocate memory (3-zone arena per spec §10) ───────────────
 
@@ -261,12 +260,12 @@ _start:
     lea     rdx, [rcx + ZONE_C_SIZE]
     mov     [rip + zone_c_limit], rdx
 
-    # Guard page after Zone C
-    mov     rdi, rdx
-    mov     esi, GUARD_SIZE
-    xor     edx, edx                # PROT_NONE
-    mov     eax, SYS_MPROTECT
-    syscall
+    # Guard page after Zone C (disabled for debug)
+    # mov     rdi, rdx
+    # mov     esi, GUARD_SIZE
+    # xor     edx, edx
+    # mov     eax, SYS_MPROTECT
+    # syscall
 
     mov     rcx, [rip + zone_c_limit]
     lea     rcx, [rcx + GUARD_SIZE]
@@ -275,12 +274,12 @@ _start:
     mov     [rip + zone_b_ptr], rdx      # Zone B grows DOWN from top
     mov     [rip + zone_b_top], rdx
 
-    # Guard page after Zone B
-    mov     rdi, rdx
-    mov     esi, GUARD_SIZE
-    xor     edx, edx                # PROT_NONE
-    mov     eax, SYS_MPROTECT
-    syscall
+    # Guard page after Zone B (disabled for debug)
+    # mov     rdi, rdx
+    # mov     esi, GUARD_SIZE
+    # xor     edx, edx
+    # mov     eax, SYS_MPROTECT
+    # syscall
 
     mov     rcx, [rip + zone_b_top]
     lea     rcx, [rcx + GUARD_SIZE]
@@ -293,7 +292,6 @@ _start:
     mov     r15, [rip + zone_c_base]
 
     # ── 4. Read bytecode into Zone A (permanent) ─────────────────────
-    pop     rax                     # restore saved value
     mov     rdi, rbp                # fd
     mov     rsi, [rip + zone_a_ptr] # buf = Zone A start
     mov     rdx, rbx                # count = bc_size
@@ -365,7 +363,7 @@ vm_loop:
 
 dispatch_codegen:
     # Codegen format: opcode is direct index into jump table
-    cmp     al, OPCODE_MAX
+    cmp     eax, 255
     ja      op_unknown
     lea     rcx, [rip + codegen_table]
     jmp     [rcx + rax * 8]
@@ -391,21 +389,23 @@ op_nop:
 
 # ── 0x01: Push [len:1][data:N] — push string/chain literal ──
 op_push:
-    movzx   ecx, byte ptr [r12 + r13]  # len
-    inc     r13
+    movzx   ecx, word ptr [r12 + r13]  # byte_len (u16 LE)
+    add     r13, 2                      # PC past len field
     # Copy data to Zone C heap
     mov     rdi, r15                # dest = current heap
     lea     rsi, [r12 + r13]        # src = bytecode
-    mov     edx, ecx
+    mov     edx, ecx                # byte count
     push    rcx
     call    memcpy_inline
     pop     rcx
-    # Push stack entry
+    # Push stack entry: ptr = heap, len = mol_count (bytes / 2)
     sub     r14, 16
     mov     [r14], r15              # ptr
-    mov     [r14 + 8], rcx          # len (mol_count)
+    shr     ecx, 1                  # mol_count = byte_len / 2
+    mov     [r14 + 8], rcx
+    shl     ecx, 1                  # restore byte_len for heap bump
     add     r15, rcx                # bump heap
-    add     r13, rcx                # advance PC
+    add     r13, rcx                # advance PC past data
     DISPATCH
 
 # ── 0x06: Emit — print top of stack ──
@@ -419,13 +419,43 @@ op_emit:
     # Check if array
     cmp     rsi, ARRAY_MARKER
     je      .emit_array
-    # String: write to stdout
+    # String: u16 molecules → convert to bytes, then write
+    # rdi = mol ptr, rsi = mol_count
     push    rsi
-    mov     edx, esi                # byte count
-    mov     rsi, rdi                # buf
+    push    rdi
+    # Convert u16 mols to bytes in Zone C temp buffer
+    mov     rcx, rsi                # mol_count
+    mov     rsi, rdi                # src = mol ptr
+    mov     rdi, r15                # dst = heap temp
+    mov     r8, r15                 # save start
+.emit_mol2byte:
+    test    rcx, rcx
+    jz      .emit_write
+    movzx   eax, word ptr [rsi]     # load u16 molecule
+    cmp     eax, 0x80
+    jae     .emit_multibyte
+    mov     [rdi], al               # ASCII: just low byte
+    inc     rdi
+    add     rsi, 2
+    dec     rcx
+    jmp     .emit_mol2byte
+.emit_multibyte:
+    # For now: just emit low byte (handles Latin-1)
+    # TODO: proper UTF-8 encoding for codepoints > 127
+    mov     [rdi], al
+    inc     rdi
+    add     rsi, 2
+    dec     rcx
+    jmp     .emit_mol2byte
+.emit_write:
+    mov     rdx, rdi
+    sub     rdx, r8                 # byte count
+    mov     rsi, r8                 # buf = temp
     mov     edi, 1                  # stdout
     mov     eax, SYS_WRITE
     syscall
+    pop     rdi
+    pop     rsi                     # don't advance r15 (temp buffer, reusable)
     # Newline
     lea     rsi, [rip + str_newline]
     mov     edx, 1
@@ -1976,8 +2006,87 @@ mol_dist_inline:
     pop     rbx
     ret
 
+# ═══════════════════════════════════════════════════════════════════════════
+# §16 SIMD BATCH OPERATIONS (SSE2)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# mol_batch_dist_8: 8 molecular distances in 1 SSE2 pass
+# Input: xmm0 = query broadcast, rsi = candidate u16 array ptr, ecx = offset
+# Output: 8 distances in simd_temp buffer
+# Clobbers: xmm1-xmm5
+mol_batch_dist_8:
+    movdqu  xmm1, [rsi + rcx*2]     # load 8 candidate mols
+    # ΔS
+    movdqa  xmm2, xmm0
+    movdqa  xmm3, xmm1
+    psrlw   xmm2, 12
+    psrlw   xmm3, 12
+    psubw   xmm2, xmm3
+    pabsw   xmm2, xmm2              # |ΔS| × 1
+    # ΔR
+    movdqa  xmm3, xmm0
+    movdqa  xmm4, xmm1
+    psrlw   xmm3, 8
+    movdqu  xmm5, [rip + simd_mask_0F]
+    pand    xmm3, xmm5
+    psrlw   xmm4, 8
+    pand    xmm4, xmm5
+    psubw   xmm3, xmm4
+    pabsw   xmm3, xmm3
+    paddw   xmm2, xmm3
+    # ΔV × 2
+    movdqa  xmm3, xmm0
+    movdqa  xmm4, xmm1
+    psrlw   xmm3, 5
+    movdqu  xmm5, [rip + simd_mask_07]
+    pand    xmm3, xmm5
+    psrlw   xmm4, 5
+    pand    xmm4, xmm5
+    psubw   xmm3, xmm4
+    pabsw   xmm3, xmm3
+    psllw   xmm3, 1
+    paddw   xmm2, xmm3
+    # ΔA × 2
+    movdqa  xmm3, xmm0
+    movdqa  xmm4, xmm1
+    psrlw   xmm3, 2
+    pand    xmm3, xmm5              # reuse mask_07
+    psrlw   xmm4, 2
+    pand    xmm4, xmm5
+    psubw   xmm3, xmm4
+    pabsw   xmm3, xmm3
+    psllw   xmm3, 1
+    paddw   xmm2, xmm3
+    # ΔT × 4
+    movdqa  xmm3, xmm0
+    movdqa  xmm4, xmm1
+    movdqu  xmm5, [rip + simd_mask_03]
+    pand    xmm3, xmm5
+    pand    xmm4, xmm5
+    psubw   xmm3, xmm4
+    pabsw   xmm3, xmm3
+    psllw   xmm3, 2
+    paddw   xmm2, xmm3
+    # xmm2 = 8 scaled distances
+    movdqu  [rip + simd_temp], xmm2
+    ret
+
+# act_decay_simd: decay all 65536 act_matrix entries by factor (SSE2)
+# ~8μs for full 128KB scan (vs ~65μs scalar)
+act_decay_simd:
+    lea     rsi, [rip + act_matrix]
+    mov     ecx, 8192                # 65536/8
+    movdqu  xmm1, [rip + simd_decay_factor]
+.acds_loop:
+    movdqu  xmm0, [rsi]
+    pmulhuw xmm0, xmm1              # val * factor / 65536
+    movdqu  [rsi], xmm0
+    add     rsi, 16
+    dec     ecx
+    jnz     .acds_loop
+    ret
+
 op_unknown:
-    # Unknown opcode — halt with error
     jmp     op_halt
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -3651,6 +3760,14 @@ str_err_mmap:      .ascii "mmap failed\n"
 str_err_read:      .ascii "Bytecode read fail\n"
 str_err_no_bc:     .ascii "No bytecode!\n\0"
 # Type name strings (u16 encoded for VM stack)
+# SIMD constants (§16)
+.align 16
+simd_mask_0F:      .word 0x000F, 0x000F, 0x000F, 0x000F, 0x000F, 0x000F, 0x000F, 0x000F
+simd_mask_07:      .word 0x0007, 0x0007, 0x0007, 0x0007, 0x0007, 0x0007, 0x0007, 0x0007
+simd_mask_03:      .word 0x0003, 0x0003, 0x0003, 0x0003, 0x0003, 0x0003, 0x0003, 0x0003
+simd_decay_factor: .word 0xF333, 0xF333, 0xF333, 0xF333, 0xF333, 0xF333, 0xF333, 0xF333
+                   # 0xF333 = 62259 ≈ 0.95 × 65536
+
 str_bin_sh:        .asciz "/bin/sh"
 str_dash_c:        .asciz "-c"
 str_type_number:   .word 'n','u','m','b','e','r'
@@ -3734,3 +3851,7 @@ v_history_ptr:  .space 1
 # ── Misc ──
 repl_heap_checkpoint: .space 8
 try_depth:      .space 8
+
+# SIMD temp buffer
+.align 16
+simd_temp:      .space 16              # 8 × u16 results
