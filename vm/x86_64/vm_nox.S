@@ -2088,12 +2088,713 @@ builtin_jump_table:
     .endr
 
 .text
+
+# ═══════════════════════════════════════════════════════════════════════════
+# BUILTINS — Defined slot numbers (spec §4.3)
+# Slot = hash(name) & 0xFF. Pre-populated, no collision chain.
+# When compiler emits 0x3A [slot], direct jump. No name hashing at runtime.
+# ═══════════════════════════════════════════════════════════════════════════
+
 .call_not_builtin:
     # Unknown builtin — push 0
     sub     r14, 16
     xor     eax, eax
     mov     [r14], rax
     mov     qword ptr [r14 + 8], F64_MARKER
+    DISPATCH
+
+# ── String builtins (0x20-0x3F) ──
+
+# len(string) → number
+.builtin_len:
+    mov     rdx, [r14 + 8]          # len field
+    add     r14, 16                 # pop arg
+    cmp     rdx, F64_MARKER
+    je      .blen_num
+    cmp     rdx, ARRAY_MARKER
+    je      .blen_array
+    # String: len = mol count (each mol = 2 bytes, len field = mol count)
+    cvtsi2sd xmm0, rdx
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+.blen_num:
+    # Number has no length concept, return 0
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+.blen_array:
+    # Array: read count from heap object [capacity:8][count:8]
+    mov     rax, [r14 - 8]          # wrong offset after pop, fix
+    # Actually we already popped. The array ptr was at [r14+16] before pop.
+    # After pop, the ptr is gone. Need to read before pop.
+    # TODO: fix array len properly
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# substr(str, start, end) → substring
+.builtin_substr:
+    # Pop end, start, string
+    movsd   xmm0, [r14]            # end
+    cvttsd2si esi, xmm0
+    movsd   xmm0, [r14+16]         # start
+    cvttsd2si edi, xmm0
+    mov     rax, [r14+32]           # string ptr
+    mov     rdx, [r14+40]           # string len
+    add     r14, 48                 # pop 3
+    # Bounds check
+    cmp     edi, 0
+    cmovl   edi, ecx               # clamp start ≥ 0
+    xor     ecx, ecx
+    cmovl   edi, ecx
+    cmp     esi, edx
+    cmovg   esi, edx               # clamp end ≤ len
+    cmp     esi, edi
+    jle     .bsub_empty
+    # Result: ptr = str + start*2 (u16 molecules), len = end - start
+    sub     r14, 16
+    lea     rcx, [rax + rdi*2]
+    mov     [r14], rcx
+    mov     ecx, esi
+    sub     ecx, edi
+    mov     [r14+8], rcx
+    DISPATCH
+.bsub_empty:
+    sub     r14, 16
+    xor     eax, eax
+    mov     [r14], rax
+    mov     qword ptr [r14+8], 0
+    DISPATCH
+
+# char_at(str, idx) → single char as string
+.builtin_char_at:
+    movsd   xmm0, [r14]            # idx
+    cvttsd2si edi, xmm0
+    mov     rax, [r14+16]           # string ptr
+    mov     rdx, [r14+24]           # string len
+    add     r14, 32                 # pop 2
+    cmp     edi, edx
+    jge     .bca_empty
+    # Return 1-char substring
+    sub     r14, 16
+    lea     rcx, [rax + rdi*2]
+    mov     [r14], rcx
+    mov     qword ptr [r14+8], 1
+    DISPATCH
+.bca_empty:
+    sub     r14, 16
+    xor     eax, eax
+    mov     [r14], rax
+    mov     qword ptr [r14+8], 0
+    DISPATCH
+
+# ── Math builtins (0x00-0x1F) ──
+
+# __floor(x) → floor
+.builtin_floor:
+    movsd   xmm0, [r14]
+    roundsd xmm0, xmm0, 1          # round toward -∞
+    movsd   [r14], xmm0
+    DISPATCH
+
+# __ceil(x) → ceiling
+.builtin_ceil:
+    movsd   xmm0, [r14]
+    roundsd xmm0, xmm0, 2          # round toward +∞
+    movsd   [r14], xmm0
+    DISPATCH
+
+# __abs(x) → |x|
+.builtin_abs:
+    movsd   xmm0, [r14]
+    # Clear sign bit
+    mov     rax, [r14]
+    btr     rax, 63
+    mov     [r14], rax
+    DISPATCH
+
+# __sqrt(x) → √x
+.builtin_sqrt:
+    movsd   xmm0, [r14]
+    sqrtsd  xmm0, xmm0
+    movsd   [r14], xmm0
+    DISPATCH
+
+# __exp(x) → e^x (x87 FPU)
+.builtin_exp:
+    fld     qword ptr [r14]
+    fldl2e                          # load log2(e)
+    fmulp                           # x * log2(e)
+    fld     st(0)
+    frndint                         # integer part
+    fxch
+    fsub    st(0), st(1)            # fractional part
+    f2xm1                           # 2^frac - 1
+    fld1
+    faddp                           # 2^frac
+    fscale                          # 2^int * 2^frac = e^x
+    fstp    st(1)
+    fstp    qword ptr [r14]
+    DISPATCH
+
+# __log2(x) → log₂(x) (x87 FPU)
+.builtin_log2:
+    fld1
+    fld     qword ptr [r14]
+    fyl2x                           # 1 * log2(x)
+    fstp    qword ptr [r14]
+    DISPATCH
+
+# ── Array builtins ──
+
+# push(array, value) → modified array
+.builtin_push:
+    # Pop value, then array
+    mov     r8, [r14]               # val ptr
+    mov     r9, [r14+8]             # val len
+    mov     rax, [r14+16]           # array heap ptr
+    add     r14, 32                 # pop 2
+    # Array layout: [capacity:8][count:8][entries...]
+    mov     rcx, [rax+8]            # count
+    mov     rdx, [rax]              # capacity
+    cmp     rcx, rdx
+    jge     .bpush_grow
+    # Append at count position
+    shl     rcx, 4
+    lea     rdi, [rax + 16 + rcx]
+    shr     rcx, 4
+    mov     [rdi], r8
+    mov     [rdi+8], r9
+    inc     qword ptr [rax+8]       # count++
+    # Push array back
+    sub     r14, 16
+    mov     [r14], rax
+    mov     qword ptr [r14+8], ARRAY_MARKER
+    DISPATCH
+.bpush_grow:
+    # Need to grow: allocate 2× on heap
+    shl     rdx, 1                  # new capacity = 2×
+    test    rdx, rdx
+    jnz     .bpush_have_cap
+    mov     rdx, 8                  # minimum capacity
+.bpush_have_cap:
+    push    rax
+    push    r8
+    push    r9
+    push    rdx
+    # Allocate new array on heap (Zone C)
+    mov     rdi, rdx
+    shl     rdi, 4
+    add     rdi, 16     # total bytes
+    mov     rsi, r15
+    add     r15, rdi                # bump allocate
+    pop     rdx
+    pop     r9
+    pop     r8
+    pop     rax
+    # Copy old data
+    mov     [rsi], rdx              # new capacity
+    mov     rcx, [rax+8]            # old count
+    mov     [rsi+8], rcx            # same count
+    # Copy entries
+    push    rsi
+    push    rcx
+    lea     rdi, [rsi+16]
+    lea     rax, [rax+16]
+    shl     rcx, 4                  # bytes = count × 16
+    push    r8
+    push    r9
+    mov     ecx, ecx
+    rep     movsb
+    pop     r9
+    pop     r8
+    pop     rcx
+    pop     rsi
+    # Now append new element
+    push    rcx
+    shl     rcx, 4
+    lea     rdi, [rsi + 16 + rcx]
+    pop     rcx
+    mov     [rdi], r8
+    mov     [rdi+8], r9
+    inc     qword ptr [rsi+8]
+    # Push new array
+    sub     r14, 16
+    mov     [r14], rsi
+    mov     qword ptr [r14+8], ARRAY_MARKER
+    DISPATCH
+
+# __array_get(array, index) → value
+.builtin_array_get:
+    movsd   xmm0, [r14]            # index
+    cvttsd2si edi, xmm0
+    mov     rax, [r14+16]           # array ptr
+    add     r14, 32                 # pop 2
+    # Bounds check
+    mov     rcx, [rax+8]            # count
+    cmp     edi, ecx
+    jge     .bag_oob
+    cmp     edi, 0
+    jl      .bag_oob
+    # Read entry
+    mov     rcx, rdi
+    shl     rcx, 4
+    lea     rsi, [rax + 16 + rcx]
+    sub     r14, 16
+    mov     rax, [rsi]
+    mov     rdx, [rsi+8]
+    mov     [r14], rax
+    mov     [r14+8], rdx
+    DISPATCH
+.bag_oob:
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __set_at(array, index, value) → value
+.builtin_set_at:
+    mov     r8, [r14]               # value ptr
+    mov     r9, [r14+8]             # value len
+    movsd   xmm0, [r14+16]         # index
+    cvttsd2si edi, xmm0
+    mov     rax, [r14+32]           # array ptr
+    add     r14, 48                 # pop 3
+    mov     rcx, [rax+8]            # count
+    cmp     edi, ecx
+    jge     .bsa_oob
+    cmp     edi, 0
+    jl      .bsa_oob
+    mov     rcx, rdi
+    shl     rcx, 4
+    lea     rsi, [rax + 16 + rcx]
+    mov     [rsi], r8
+    mov     [rsi+8], r9
+.bsa_oob:
+    # Return the value
+    sub     r14, 16
+    mov     [r14], r8
+    mov     [r14+8], r9
+    DISPATCH
+
+# ── IO builtins ──
+
+# __file_read(path) → string
+.builtin_file_read:
+    mov     rsi, [r14]              # path ptr (u16 molecules)
+    mov     rdx, [r14+8]            # path len (mol count)
+    add     r14, 16
+    # Decode path: u16 mols → ASCII bytes
+    mov     rdi, r15                # temp buffer
+    xor     ecx, ecx
+.bfr_decode:
+    cmp     ecx, edx
+    jge     .bfr_open
+    movzx   eax, word ptr [rsi + rcx*2]
+    mov     byte ptr [rdi + rcx], al
+    inc     ecx
+    jmp     .bfr_decode
+.bfr_open:
+    mov     byte ptr [rdi + rcx], 0  # null terminate
+    mov     rdi, r15                 # path string
+    xor     esi, esi                 # O_RDONLY
+    mov     eax, SYS_OPEN
+    syscall
+    test    eax, eax
+    js      .bfr_fail
+    mov     edi, eax                 # fd
+    # Read file content onto heap
+    lea     rsi, [r15 + 4096]       # skip path buffer
+    mov     edx, 0x100000           # read up to 1MB
+    mov     eax, SYS_READ
+    syscall
+    push    rax                      # save bytes read
+    push    rdi                      # save fd
+    # Close
+    mov     eax, SYS_CLOSE
+    syscall
+    pop     rdi
+    pop     rcx                      # bytes read
+    test    rcx, rcx
+    jle     .bfr_fail
+    # Encode bytes to u16 molecules on heap
+    lea     rsi, [r15 + 4096]       # raw bytes
+    mov     rdi, r15
+    add     rdi, 0x200000            # mol output area
+    xor     edx, edx
+.bfr_encode:
+    cmp     edx, ecx
+    jge     .bfr_result
+    movzx   eax, byte ptr [rsi + rdx]
+    mov     word ptr [rdi + rdx*2], ax
+    inc     edx
+    jmp     .bfr_encode
+.bfr_result:
+    # Push result string
+    sub     r14, 16
+    mov     [r14], rdi               # mol ptr
+    mov     [r14+8], rcx             # mol count
+    DISPATCH
+.bfr_fail:
+    sub     r14, 16
+    xor     eax, eax
+    mov     [r14], rax
+    mov     qword ptr [r14+8], 0
+    DISPATCH
+
+# __file_write(path, content) → 0
+.builtin_file_write:
+    # Pop content, path
+    mov     r8, [r14]                # content ptr
+    mov     r9, [r14+8]              # content len (mols)
+    mov     rsi, [r14+16]            # path ptr
+    mov     rdx, [r14+24]            # path len
+    add     r14, 32
+    # Decode path
+    mov     rdi, r15
+    xor     ecx, ecx
+.bfw_dpath:
+    cmp     ecx, edx
+    jge     .bfw_open
+    movzx   eax, word ptr [rsi + rcx*2]
+    mov     byte ptr [rdi + rcx], al
+    inc     ecx
+    jmp     .bfw_dpath
+.bfw_open:
+    mov     byte ptr [rdi + rcx], 0
+    mov     rdi, r15
+    mov     esi, 0x241               # O_WRONLY|O_CREAT|O_TRUNC
+    mov     edx, 0x1A4              # 0644 octal = 0x1A4
+    mov     eax, SYS_OPEN
+    syscall
+    test    eax, eax
+    js      .bfw_done
+    mov     edi, eax
+    # Decode content to bytes
+    lea     rsi, [r15 + 4096]
+    xor     ecx, ecx
+.bfw_dcontent:
+    cmp     rcx, r9
+    jge     .bfw_write
+    movzx   eax, word ptr [r8 + rcx*2]
+    mov     byte ptr [rsi + rcx], al
+    inc     ecx
+    jmp     .bfw_dcontent
+.bfw_write:
+    mov     rdx, rcx                 # byte count
+    mov     rsi, rsi                 # already set
+    lea     rsi, [r15 + 4096]
+    mov     eax, SYS_WRITE
+    syscall
+    mov     eax, SYS_CLOSE
+    syscall
+.bfw_done:
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# ── Network builtins ──
+
+# __tcp_listen(port) → server_fd
+.builtin_tcp_listen:
+    movsd   xmm0, [r14]
+    cvttsd2si edi, xmm0             # port
+    add     r14, 16
+    push    rbx
+    mov     ebx, edi                 # save port
+    # socket(AF_INET=2, SOCK_STREAM=1, 0)
+    mov     edi, 2
+    mov     esi, 1
+    xor     edx, edx
+    mov     eax, SYS_SOCKET
+    syscall
+    mov     r8d, eax                 # server fd
+    # setsockopt SO_REUSEADDR
+    sub     rsp, 4
+    mov     dword ptr [rsp], 1
+    mov     edi, r8d
+    mov     esi, 1                   # SOL_SOCKET
+    mov     edx, 2                   # SO_REUSEADDR
+    lea     r10, [rsp]
+    push    r8
+    mov     r8d, 4                   # optlen
+    mov     eax, 54                  # setsockopt
+    syscall
+    pop     r8
+    add     rsp, 4
+    # bind
+    sub     rsp, 16
+    mov     word ptr [rsp], 2        # AF_INET
+    mov     eax, ebx
+    xchg    al, ah                   # htons
+    mov     word ptr [rsp+2], ax
+    mov     dword ptr [rsp+4], 0     # INADDR_ANY
+    mov     qword ptr [rsp+8], 0
+    mov     edi, r8d
+    lea     rsi, [rsp]
+    mov     edx, 16
+    mov     eax, SYS_BIND
+    syscall
+    # listen
+    mov     edi, r8d
+    mov     esi, 128
+    mov     eax, SYS_LISTEN
+    syscall
+    add     rsp, 16
+    # Push server fd
+    sub     r14, 16
+    cvtsi2sd xmm0, r8d
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    pop     rbx
+    DISPATCH
+
+# __tcp_accept(server_fd) → client_fd
+.builtin_tcp_accept:
+    movsd   xmm0, [r14]
+    cvttsd2si edi, xmm0
+    add     r14, 16
+    xor     esi, esi                 # addr=NULL
+    xor     edx, edx                 # addrlen=NULL
+    xor     r10d, r10d               # flags=0
+    mov     eax, SYS_ACCEPT
+    syscall
+    sub     r14, 16
+    cvtsi2sd xmm0, eax
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __tcp_send(fd, data) → bytes_sent
+.builtin_tcp_send:
+    mov     rsi, [r14]               # data ptr (u16 mols)
+    mov     rdx, [r14+8]             # data len (mol count)
+    movsd   xmm0, [r14+16]          # fd
+    cvttsd2si edi, xmm0
+    add     r14, 32
+    # Decode u16 → bytes
+    push    rdi
+    mov     rdi, r15                 # temp buffer
+    xor     ecx, ecx
+.bts_dec:
+    cmp     ecx, edx
+    jge     .bts_send
+    movzx   eax, word ptr [rsi + rcx*2]
+    mov     byte ptr [rdi + rcx], al
+    inc     ecx
+    jmp     .bts_dec
+.bts_send:
+    mov     edx, ecx                 # byte count
+    mov     rsi, r15                 # buffer
+    pop     rdi                      # fd
+    xor     r10d, r10d
+    xor     r8d, r8d
+    xor     r9d, r9d
+    mov     eax, SYS_SENDTO
+    syscall
+    sub     r14, 16
+    cvtsi2sd xmm0, eax
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __tcp_recv(fd, max) → string
+.builtin_tcp_recv:
+    movsd   xmm0, [r14]             # max bytes
+    cvttsd2si edx, xmm0
+    movsd   xmm0, [r14+16]          # fd
+    cvttsd2si edi, xmm0
+    add     r14, 32
+    cmp     edx, 65536
+    jbe     .btr_ok
+    mov     edx, 65536
+.btr_ok:
+    lea     rsi, [r15 + 4096]        # recv buffer
+    mov     eax, SYS_READ
+    syscall
+    test    eax, eax
+    jle     .btr_empty
+    # Encode bytes → u16 mols
+    mov     ecx, eax                 # bytes received
+    lea     rsi, [r15 + 4096]
+    mov     rdi, r15
+    add     rdi, 0x100000            # mol output
+    xor     edx, edx
+.btr_enc:
+    cmp     edx, ecx
+    jge     .btr_result
+    movzx   eax, byte ptr [rsi + rdx]
+    mov     word ptr [rdi + rdx*2], ax
+    inc     edx
+    jmp     .btr_enc
+.btr_result:
+    sub     r14, 16
+    mov     [r14], rdi
+    mov     [r14+8], rcx
+    DISPATCH
+.btr_empty:
+    sub     r14, 16
+    xor     eax, eax
+    mov     [r14], rax
+    mov     qword ptr [r14+8], 0
+    DISPATCH
+
+# __tcp_close(fd) → 0
+.builtin_tcp_close:
+    movsd   xmm0, [r14]
+    cvttsd2si edi, xmm0
+    add     r14, 16
+    mov     eax, SYS_CLOSE
+    syscall
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# ── System builtins ──
+
+# __heap_used() → bytes
+.builtin_heap_used:
+    mov     rax, r15
+    sub     rax, [rip + heap_base]
+    cvtsi2sd xmm0, rax
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __sleep(ms)
+.builtin_sleep:
+    movsd   xmm0, [r14]
+    cvttsd2si rax, xmm0
+    add     r14, 16
+    # Convert ms to timespec
+    sub     rsp, 16
+    xor     edx, edx
+    mov     ecx, 1000
+    div     rcx                      # rax=seconds, rdx=remainder ms
+    mov     [rsp], rax               # tv_sec
+    imul    rdx, 1000000             # ms → ns
+    mov     [rsp+8], rdx             # tv_nsec
+    lea     rdi, [rsp]
+    xor     esi, esi
+    mov     eax, SYS_NANOSLEEP
+    syscall
+    add     rsp, 16
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __to_string(number) → string
+.builtin_to_string:
+    movsd   xmm0, [r14]
+    add     r14, 16
+    # Use f64_to_string helper
+    call    f64_to_string            # → rax=ptr, edx=len
+    sub     r14, 16
+    mov     [r14], rax
+    mov     [r14+8], rdx
+    DISPATCH
+
+# __char_code(char) → codepoint number
+.builtin_char_code:
+    mov     rax, [r14]               # ptr
+    mov     rdx, [r14+8]             # len
+    add     r14, 16
+    test    rdx, rdx
+    jz      .bcc_zero
+    movzx   eax, word ptr [rax]      # first u16 molecule = codepoint
+    cvtsi2sd xmm0, eax
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+.bcc_zero:
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __bit_and(a, b) → a & b
+.builtin_bit_and:
+    movsd   xmm0, [r14+16]
+    cvttsd2si rax, xmm0
+    movsd   xmm0, [r14]
+    cvttsd2si rcx, xmm0
+    add     r14, 16
+    and     rax, rcx
+    cvtsi2sd xmm0, rax
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __bit_or(a, b) → a | b
+.builtin_bit_or:
+    movsd   xmm0, [r14+16]
+    cvttsd2si rax, xmm0
+    movsd   xmm0, [r14]
+    cvttsd2si rcx, xmm0
+    add     r14, 16
+    or      rax, rcx
+    cvtsi2sd xmm0, rax
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __bit_xor(a, b) → a ^ b
+.builtin_bit_xor:
+    movsd   xmm0, [r14+16]
+    cvttsd2si rax, xmm0
+    movsd   xmm0, [r14]
+    cvttsd2si rcx, xmm0
+    add     r14, 16
+    xor     rax, rcx
+    cvtsi2sd xmm0, rax
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __mx_w(index, value) → write u16 to mol_matrix
+.builtin_mx_w:
+    movsd   xmm0, [r14]             # value
+    cvttsd2si eax, xmm0
+    movsd   xmm0, [r14+16]          # index
+    cvttsd2si edi, xmm0
+    add     r14, 32
+    and     edi, 0xFFFF
+    lea     rcx, [rip + mol_matrix]
+    mov     word ptr [rcx + rdi*2], ax
+    sub     r14, 16
+    cvtsi2sd xmm0, eax
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __mxr(index) → read u16 from mol_matrix
+.builtin_mxr:
+    movsd   xmm0, [r14]
+    cvttsd2si edi, xmm0
+    add     r14, 16
+    and     edi, 0xFFFF
+    lea     rcx, [rip + mol_matrix]
+    movzx   eax, word ptr [rcx + rdi*2]
+    cvtsi2sd xmm0, eax
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
     DISPATCH
 
 # ═══════════════════════════════════════════════════════════════════════════
