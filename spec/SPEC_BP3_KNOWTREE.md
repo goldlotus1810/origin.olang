@@ -116,3 +116,13 @@ VM_SPEC_COMPLETE.md §8 (KnowTree Engine)
 Menzerath-Altmann law (quantitative linguistics)
 Bentley 1975 (KD-tree)
 ```
+
+---
+
+## Related Specs
+- [VM Spec §8 KnowTree Engine](VM_SPEC_COMPLETE.md) — kt_matrix, mol_matrix
+- [BP2 Encode](SPEC_BP2_ENCODE.md) — mol encoding quality affects search
+- [BP4 Silk](SPEC_BP4_SILK.md) — silk walk uses KnowTree nodes
+- [BP5 Pipeline](SPEC_BP5_PIPELINE_EN.md) — pipeline searches KnowTree
+- [BP10 Data](SPEC_BP10_DATA.md) — data loading into KnowTree
+- [SPEC_B Structure](../docs/SPEC_B_STRUCTURE.md) — fractal tree design

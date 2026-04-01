@@ -66,3 +66,10 @@ json/ directory (94MB raw data)
 docs/RUST_CRATE_ANALYSIS_ORIGINAL.md — ucd crate
 NOX_ROADMAP_FINAL.md Phase 2
 ```
+
+---
+
+## Related Specs
+- [BP2 Encode](SPEC_BP2_ENCODE.md) — NRC-VAD for V/A scores
+- [BP3 KnowTree](SPEC_BP3_KNOWTREE.md) — data loads into KnowTree
+- [Rust Analysis](../docs/RUST_CRATE_ANALYSIS_ORIGINAL.md) — UCD data sources

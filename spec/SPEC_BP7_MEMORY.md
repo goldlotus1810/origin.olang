@@ -81,3 +81,11 @@ A-MEM (2025): Zettelkasten agent memory
 docs/For_Nox/SPEC_MEM_MEMORY.md
 SPEC_G_COMPLETE.md §G7, §G19, §G26
 ```
+
+---
+
+## Related Specs
+- [BP3 KnowTree](SPEC_BP3_KNOWTREE.md) — facts stored in KnowTree
+- [BP5 Pipeline](SPEC_BP5_PIPELINE_EN.md) — STM updated after response
+- [BP9 Agent](SPEC_BP9_AGENT.md) — agent uses memory for goals
+- [SPEC_MEM](../docs/For_Nox/SPEC_MEM_MEMORY.md) — memory system design

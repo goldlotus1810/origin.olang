@@ -98,3 +98,12 @@ Chung et al. (2023): Life-Inspired Interoceptive AI
 Kelkar (2021): Cognitive Homeostatic Agents
 docs/reference/SDF_QUILEZ_COMPLETE.md
 ```
+
+---
+
+## Related Specs
+- [BP2 Encode](SPEC_BP2_ENCODE.md) — camera/audio encode to P_weight
+- [BP5 Pipeline](SPEC_BP5_PIPELINE_EN.md) — multimodal input
+- [BP9 Agent](SPEC_BP9_AGENT.md) — interoception drives homeostasis
+- [VM Spec §37](VM_SPEC_COMPLETE.md) — multi-modal capture
+- [SPEC_E Organism §E1](../docs/SPEC_E_ORGANISM.md) — capture design

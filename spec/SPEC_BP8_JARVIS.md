@@ -55,3 +55,11 @@ docs/For_Nox/SPEC_JARVIS.md §J1-J10
 stdlib/homeos/jarvis.ol
 stdlib/homeos/server.ol
 ```
+
+---
+
+## Related Specs
+- [BP5 Pipeline](SPEC_BP5_PIPELINE_EN.md) — brain processes queries via pipeline
+- [BP7 Memory](SPEC_BP7_MEMORY.md) — observations persist across sessions
+- [BP9 Agent](SPEC_BP9_AGENT.md) — agent runs as daemon
+- [SPEC_JARVIS](../docs/For_Nox/SPEC_JARVIS.md) — full JARVIS design

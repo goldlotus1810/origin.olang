@@ -94,3 +94,12 @@ SPEC_D_PIPELINE.md §D2 (7 instincts)
 SPEC_G_COMPLETE.md §G9 (formulas)
 instinct.ol (current implementation)
 ```
+
+---
+
+## Related Specs
+- [BP5 Pipeline](SPEC_BP5_PIPELINE_EN.md) — instincts wired into pipeline
+- [BP4 Silk](SPEC_BP4_SILK.md) — honesty uses silk weights
+- [BP3 KnowTree](SPEC_BP3_KNOWTREE.md) — curiosity checks KnowTree distance
+- [SPEC_D Pipeline §D2](../docs/SPEC_D_PIPELINE.md) — 7 instinct formulas
+- [SPEC_G §G9](../docs/SPEC_G_COMPLETE.md) — instinct formulas detail

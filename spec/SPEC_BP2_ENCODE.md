@@ -106,3 +106,13 @@ SPEC_A_FOUNDATION.md §A1-A6
 VM_SPEC_COMPLETE.md §7 (Molecular Engine)
 docs/tailieu_nghiencuu/UDC_DOC/ — 13 formula files
 ```
+
+---
+
+## Related Specs
+- [VM Spec §7 Molecular Engine](VM_SPEC_COMPLETE.md) — P_weight format, pack/unpack
+- [BP3 KnowTree](SPEC_BP3_KNOWTREE.md) — uses encoded mols for indexing
+- [BP4 Silk](SPEC_BP4_SILK.md) — silk strength depends on mol quality
+- [BP5 Pipeline](SPEC_BP5_PIPELINE_EN.md) — encode is Step 1
+- [SPEC_A Foundation](../docs/SPEC_A_FOUNDATION.md) — 42 formula definition
+- [UDC Formulas](../docs/tailieu_nghiencuu/UDC_DOC/UDC_formulas.md) — formula details

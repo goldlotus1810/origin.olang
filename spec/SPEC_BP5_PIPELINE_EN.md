@@ -836,3 +836,14 @@ P8: Integrate Homeostasis F(t)
 P9: Fix ConversationCurve rate limit
 P10: Implement mol-level decode (instead of string overlap)
 ```
+
+---
+
+## Related Specs
+- [VM Spec §45-§50](VM_SPEC_COMPLETE.md) — activation matrix, CLONALG, DCA
+- [BP2 Encode](SPEC_BP2_ENCODE.md) — Layer 1 (Capture)
+- [BP3 KnowTree](SPEC_BP3_KNOWTREE.md) — search + nearest
+- [BP4 Silk](SPEC_BP4_SILK.md) — Layer 2 (Activate) uses silk edges
+- [BP6 Instincts](SPEC_BP6_INSTINCTS.md) — honesty gate, curiosity
+- [SPEC_D Pipeline](../docs/SPEC_D_PIPELINE.md) — 14 mechanisms, 5 checkpoints
+- [NOX Complete Reference](../docs/NOX_COMPLETE_REFERENCE.md) — all algorithms

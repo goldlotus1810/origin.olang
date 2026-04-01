@@ -70,3 +70,12 @@ Test 4: Modify fails fixed-point → rollback
 SPEC_F_AGENT.md (agent hierarchy, PTAV)
 SPEC_G_COMPLETE.md §G17, §G22, §G27
 ```
+
+---
+
+## Related Specs
+- [BP5 Pipeline](SPEC_BP5_PIPELINE_EN.md) — PTAV Think step = pipeline
+- [BP7 Memory](SPEC_BP7_MEMORY.md) — agent stores observations
+- [BP8 JARVIS](SPEC_BP8_JARVIS.md) — agent runs as JARVIS daemon
+- [BP6 Instincts](SPEC_BP6_INSTINCTS.md) — agent uses instincts
+- [SPEC_F Agent](../docs/SPEC_F_AGENT.md) — agent hierarchy

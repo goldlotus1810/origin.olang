@@ -649,3 +649,10 @@ Bienenstock, E. et al. (1982). BCM theory.
 ---
 
 *Bộ phận 5 CHƯA ĐẠT. Spec này là bản đồ. Mỗi session tiếp: đọc spec → implement 1 giai đoạn → test → đạt/chưa đạt.*
+
+---
+
+## Related Specs
+- [BP5 English version](SPEC_BP5_PIPELINE_EN.md) — same content, English
+- [VM Spec §45-§50](VM_SPEC_COMPLETE.md) — VM support for pipeline
+- [SPEC_D Pipeline](../docs/SPEC_D_PIPELINE.md) — brain spec

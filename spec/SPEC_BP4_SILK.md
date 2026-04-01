@@ -243,3 +243,13 @@ Sejnowski 1977: covariance learning rule
 Pfister & Gerstner 2006: triplet STDP
 Intrator & Cooper 1992: BCM initialization
 ```
+
+---
+
+## Related Specs
+- [VM Spec §9 Silk Engine](VM_SPEC_COMPLETE.md) — silk_matrix, 3 types
+- [BP2 Encode](SPEC_BP2_ENCODE.md) — mol quality affects silk
+- [BP3 KnowTree](SPEC_BP3_KNOWTREE.md) — silk connects KnowTree nodes
+- [BP5 Pipeline](SPEC_BP5_PIPELINE_EN.md) — spreading activation uses silk
+- [BP6 Instincts](SPEC_BP6_INSTINCTS.md) — instincts check silk weights
+- [SPEC_B Structure §B3](../docs/SPEC_B_STRUCTURE.md) — 9200 silk types
