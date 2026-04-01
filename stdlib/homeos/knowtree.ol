@@ -951,6 +951,9 @@ pub fn kt_load_text(_path) {
 // Adjacency list: __kt_silk[hash(mol)] = [edge, edge, ...]
 let __kt_silk = [];
 let __kt_silk_ok = [0];
+// BP4: Running means per dimension for covariance rule
+let __silk_mean = [7, 7, 4, 4, 2];  // init near center: S,R=7, V,A=4, T=2
+let __silk_fire_count = [0];
 
 fn _silk_init() {
     if __array_get(__kt_silk_ok, 0) == 1 { return; };
@@ -962,15 +965,26 @@ fn _silk_hash(_mol) { return __bit_and(_mol, 255); }
 
 pub fn kt_silk_init() { _silk_init(); }
 
-// G6: Hebbian fire — strengthen edge between two mols
+// G6+BP4: Hebbian fire — covariance rule + per-node η + BCM
 pub fn kt_silk_fire(_a, _b) {
     _silk_init();
     let _va = _kt_mol_v(_a); let _aa = _kt_mol_a(_a);
     let _emo = ((_kt_abs(_va - 4) * _aa) + 1) / 28;
     if _emo > 1000 { let _emo = 1000; };
-    // Find or create edge
+    // Per-node η scaling: η = base / sqrt(degree)
     let _h = _silk_hash(_a);
     let _edges = __kt_silk[_h];
+    let _degree = len(_edges) / 6;
+    if _degree < 1 { let _degree = 1; };
+    let _eta_scale = 1000;
+    if _degree > 1 {
+        // Approximate 1/sqrt(degree): 1000/sqrt(d) ≈ 1000/d^0.5
+        // For d=4: 500, d=9: 333, d=16: 250, d=100: 100
+        let _eta_scale = __floor(1000 / _degree);
+        if _degree <= 4 { let _eta_scale = __floor(1000 * 2 / (_degree + 1)); };
+        if _eta_scale < 50 { let _eta_scale = 50; };
+    };
+    // Find or create edge
     let _found = [0 - 1];
     let _ei = 0;
     while _ei < len(_edges) {
@@ -979,33 +993,51 @@ pub fn kt_silk_fire(_a, _b) {
     };
     let _fi = __array_get(_found, 0);
     if _fi < 0 {
-        // New edge: per-dimension initial weight from proximity
+        // New edge: covariance-based initial weight
         push(_edges, _b);
         let _d = 0;
         while _d < 5 {
             let _da = mol_get_dim(_a, _d); let _db = mol_get_dim(_b, _d);
-            let _prox = 1000 - (_kt_abs(_da - _db) * 1000 / mol_dim_range(_d));
-            let _w = __floor(_prox * _emo / 1000);
+            // Covariance: deviation from running mean (Sejnowski 1977)
+            let _mean = __array_get(__silk_mean, _d);
+            let _dev_a = _da - _mean;
+            let _dev_b = _db - _mean;
+            let _covar = _dev_a * _dev_b;
+            let _w = __floor(_covar * _emo * _eta_scale / 1000000);
+            if _w < 0 { let _w = 0; };
+            if _w > 500 { let _w = 500; };
             push(_edges, _w);
             let _d = _d + 1;
         };
     } else {
-        // Update existing: PER-DIMENSION rules (Spec G6 + Bible §14)
-        // S,A dims: Oja-like bounded: dw = emo * prox * (1 - w/1000)
-        // R,T dims: STDP (temporal order matters, but simplified here)
-        // V dim: BCM-like (stronger emotion = higher threshold)
+        // Update existing: covariance + Oja bound + BCM on V
         let _d = 0;
         while _d < 5 {
             let _da = mol_get_dim(_a, _d); let _db = mol_get_dim(_b, _d);
-            let _prox = 1000 - (_kt_abs(_da - _db) * 1000 / mol_dim_range(_d));
+            let _mean = __array_get(__silk_mean, _d);
+            let _dev_a = _da - _mean;
+            let _dev_b = _db - _mean;
             let _w = __array_get(_edges, _fi + 1 + _d);
-            let _dw = __floor(_emo * _prox * (1000 - _w) / 10000000);
-            // V dim: double update for strong emotion (BCM effect)
+            // Covariance: dw = η × dev_a × dev_b × (1 - w/1000)
+            let _dw = __floor(_emo * _dev_a * _dev_b * (1000 - _w) * _eta_scale / 100000000000);
+            // V dim: BCM boost (stronger emotion = stronger update)
             if _d == 2 { let _dw = _dw + __floor(_dw * _kt_abs(_va - 4) / 4); };
-            let _ = __set_at(_edges, _fi + 1 + _d, _w + _dw);
+            let _new_w = _w + _dw;
+            if _new_w < 0 { let _new_w = 0; };
+            if _new_w > 1000 { let _new_w = 1000; };
+            let _ = __set_at(_edges, _fi + 1 + _d, _new_w);
             let _d = _d + 1;
         };
     };
+    // Update running means (exponential moving average, α=0.02)
+    let _d = 0;
+    while _d < 5 {
+        let _avg_val = (mol_get_dim(_a, _d) + mol_get_dim(_b, _d)) / 2;
+        let _old = __array_get(__silk_mean, _d);
+        let _ = __set_at(__silk_mean, _d, __floor(_old * 980 / 1000 + _avg_val * 20 / 1000));
+        let _d = _d + 1;
+    };
+    let _ = __set_at(__silk_fire_count, 0, __array_get(__silk_fire_count, 0) + 1);
 }
 
 // G6: Get max silk weight between two mols
@@ -1101,22 +1133,72 @@ fn _kt_silk_walk_internal(_start_mol, _dim, _depth, _threshold) {
 }
 
 // G6: Decay all silk edges by φ⁻¹
+// BP4: Silk decay + pruning + homeostatic scaling
 pub fn kt_silk_decay() {
     _silk_init();
+    let _total_w = [0]; let _edge_count = [0];
     let _hi = 0;
     while _hi < 256 {
         let _edges = __kt_silk[_hi];
         let _ei = 0;
         while _ei < len(_edges) {
+            // Decay: × 0.95 per dream (gentle, ~5% loss)
+            let _max_w = [0];
             let _j = 1;
             while _j <= 5 {
                 let _w = __array_get(_edges, _ei + _j);
-                let _ = __set_at(_edges, _ei + _j, __floor(_w * 618 / 1000));
+                let _new_w = __floor(_w * 950 / 1000);
+                let _ = __set_at(_edges, _ei + _j, _new_w);
+                if _new_w > __array_get(_max_w, 0) { let _ = __set_at(_max_w, 0, _new_w); };
+                let _ = __set_at(_total_w, 0, __array_get(_total_w, 0) + _new_w);
                 let _j = _j + 1;
             };
-            let _ei = _ei + 6;
+            let _ = __set_at(_edge_count, 0, __array_get(_edge_count, 0) + 1);
+            // Prune: ALL 5 dims < 10 → remove edge
+            if __array_get(_max_w, 0) < 10 {
+                // Remove by shifting remaining entries
+                let _ri = 0;
+                while _ri < 6 {
+                    let _src = _ei + 6 + _ri;
+                    if _src < len(_edges) {
+                        let _ = __set_at(_edges, _ei + _ri, __array_get(_edges, _src));
+                    };
+                    let _ri = _ri + 1;
+                };
+                // Truncate (pop last 6)
+                let _pi = 0;
+                while _pi < 6 { if len(_edges) > _ei { pop(_edges); }; let _pi = _pi + 1; };
+                // Don't advance _ei — re-check this position
+            } else {
+                let _ei = _ei + 6;
+            };
         };
         let _hi = _hi + 1;
+    };
+    // Homeostatic scaling: keep mean weight near 200
+    let _ec = __array_get(_edge_count, 0);
+    if _ec > 0 {
+        let _mean = __array_get(_total_w, 0) / (_ec * 5);
+        if _mean < 100 {
+            // Weights too low → scale up (prevent total silencing)
+            let _scale = __floor(200 * 1000 / (_mean + 1));
+            if _scale > 2000 { let _scale = 2000; };  // cap at 2×
+            let _hi2 = 0;
+            while _hi2 < 256 {
+                let _edges2 = __kt_silk[_hi2];
+                let _ei2 = 0;
+                while _ei2 < len(_edges2) {
+                    let _j2 = 1;
+                    while _j2 <= 5 {
+                        let _w2 = __array_get(_edges2, _ei2 + _j2);
+                        let _ = __set_at(_edges2, _ei2 + _j2, __floor(_w2 * _scale / 1000));
+                        let _j2 = _j2 + 1;
+                    };
+                    let _ei2 = _ei2 + 6;
+                };
+                let _hi2 = _hi2 + 1;
+            };
+        };
     };
 }
 pub fn kt_word_lookup(_w) { return []; }
