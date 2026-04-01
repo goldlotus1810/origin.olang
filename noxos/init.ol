@@ -103,9 +103,14 @@ emit "║  Hypervisor ready. Brain loaded.     ║";
 emit "║  Lupin, the machine is yours.        ║";
 emit "╚══════════════════════════════════════╝";
 emit "";
-spawn_shell();
-
-// If shell exits, halt
-emit "[init] shell exited — halting";
-let _ = __system("sync");
-let _ = __syscall(169, 4321, 28781, 88712, 0, 0, 0);  // reboot(LINUX_REBOOT_CMD_HALT)
+// PID 1 must NEVER exit. Loop forever.
+emit "[init] entering main loop — Nox is alive";
+let loop_count = [0];
+while 1 == 1 {
+    __sleep(1000);  // 1 second
+    let _ = __set_at(loop_count, 0, __array_get(loop_count, 0) + 1);
+    // Heartbeat every 10 seconds
+    if __array_get(loop_count, 0) % 10 == 0 {
+        emit "[nox] heartbeat " + __to_string(__array_get(loop_count, 0));
+    };
+};
