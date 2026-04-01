@@ -631,7 +631,14 @@ pub fn kt_nearest(_mol) {
         let _fi = _mx - 1;
         if _fi < len(__kt_facts) { return __array_get(__kt_facts, _fi); };
     };
-    // Bucket fallback: scan S±1, R±1 neighborhood
+    // Implicit neighbor scan: 5D matrix probe S±3, R±3, V±3 → O(343) lookups
+    // Only accept if distance ≤ 3 (strong match). Else fall through to bucket scan.
+    let _idx = implicit_nearest(_mol);
+    if _idx >= 0 { if _idx < len(__kt_facts) {
+        let _id = _kt_mol_dist(_mol, __array_get(__kt_facts_mol, _idx));
+        if _id <= 3 { return __array_get(__kt_facts, _idx); };
+    }; };
+    // Bucket fallback: scan S±1, R±1 neighborhood (for facts not in matrix)
     let _s = _kt_mol_s(_mol); let _r = _kt_mol_r(_mol);
     let _bi = [0 - 1]; let _bd = [99999];
     let _ds = 0 - 1;
