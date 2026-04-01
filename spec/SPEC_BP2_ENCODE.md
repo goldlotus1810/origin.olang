@@ -107,6 +107,58 @@ VM_SPEC_COMPLETE.md §7 (Molecular Engine)
 docs/tailieu_nghiencuu/UDC_DOC/ — 13 formula files
 ```
 
+## Implementation Strategy (from research)
+
+### 1. Unicode Name Parsing (practical algorithm)
+
+Every Unicode codepoint has a name string (e.g., "LATIN SMALL LETTER A WITH ACUTE").
+Split on spaces, extract structured features:
+
+- **Script**: LATIN / GREEK / CJK / ARABIC / HANGUL / HIRAGANA / etc. → S dimension (13 blocks)
+- **Case**: SMALL / CAPITAL → structural feature within S
+- **Category**: LETTER / DIGIT / SIGN / SYMBOL → R dimension (operator, punctuation, letter, etc.)
+- **Modifier**: WITH / AND → relation modifier within R
+
+This is PURE STRING PARSING — no ML, fully deterministic, novel approach.
+No one has mapped Unicode name parsing to a 5D molecular space before.
+
+Reference: Gibbon, Hughes & Trippel 2005 — Semantic Decomposition of Character Encodings.
+
+### 2. Decomposition Mapping → R dimension
+
+Unicode canonical decomposition reveals base+combining relationships:
+```
+é = e + COMBINING ACUTE ACCENT → R encodes "modified by"
+fi = f + i (compatibility decomposition) → R encodes "composed of"
+```
+Can be extracted from UCD data already in `~/Origin/json/`.
+Decomposition IS the R (Relation) dimension: how components relate to their base.
+
+### 3. Cold Start vs Warm
+
+- **Cold**: NRC-VAD lookup for V/A (already have 44K words in `json/`).
+  Word → float V/A → quantize to 3-bit fields.
+- **Warm**: compose + silk learning replaces lookup over time.
+  Encode fires silk between codepoint mols and context mols.
+  After enough fires, the learned weights ARE the encoding — lookup becomes redundant.
+- **Goal**: lookup is SCAFFOLDING, not permanent. The 42 formulas must eventually
+  replace all lookups with pure computation from glyph/structural features.
+
+### 4. P_weight bit layout reminder
+
+```
+u16 = [S:4][R:4][V:3][A:3][T:2] = 65536 possible molecules
+
+pack(S, R, V, A, T) = (S << 12) | (R << 8) | (V << 5) | (A << 2) | T
+
+unpack:
+  S = (mol >> 12) & 0xF     // 0-15
+  R = (mol >> 8)  & 0xF     // 0-15
+  V = (mol >> 5)  & 0x7     // 0-7
+  A = (mol >> 2)  & 0x7     // 0-7
+  T = mol         & 0x3     // 0-3
+```
+
 ---
 
 ## Related Specs

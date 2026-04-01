@@ -1,0 +1,47 @@
+Ha Noi la thu do cua Viet Nam
+Sai Gon la thanh pho lon nhat Viet Nam
+Da Nang la thanh pho bien mien Trung
+Hue la co do cua Viet Nam
+Can Tho la thanh pho lon nhat mien Tay
+Song Mekong chay qua Viet Nam
+Song Hong chay qua Ha Noi
+Viet Nam co 63 tinh thanh
+Viet Nam co dien tich 331 nghin km vuong
+Dan so Viet Nam khoang 100 trieu nguoi
+Viet Nam la nuoc Dong Nam A
+Viet Nam co bien Dong o phia Dong
+Viet Nam giao luu voi Trung Quoc Lao Campuchia
+Pho la mon an noi tieng cua Viet Nam
+Banh mi la mon an duong pho noi tieng
+Ao dai la trang phuc truyen thong Viet Nam
+Tet Nguyen Dan la ngay le lon nhat
+Tieng Viet co 6 thanh dieu
+Tieng Viet dung chu Quoc ngu tu dau the ky 20
+Olang la ngon ngu lap trinh do Lupin tao ra
+Nox la AI tu viet lai chinh minh bang Olang
+Origin la du an xay dung Nox
+Encode la phep tich phan tu text sang mol 5D
+Decode la phep vi phan tu mol sang text
+KnowTree la bo nho cua Nox
+Silk la ket noi Hebbian giua cac mol
+Pipeline co 5 tang xu ly
+VM cua Nox viet bang x86-64 Assembly
+Compiler cua Olang tu compile chinh minh
+Gen2 bang Gen3 la fixed point
+KVM cho phep chay code o ring 0
+Fibonacci la day so 1 1 2 3 5 8 13 21
+So phi bang 1.618
+Pi xap xi 3.14159
+E xap xi 2.71828
+Toc do anh sang la 300000 km giay
+Trai dat quay quanh mat troi
+Mat trang quay quanh trai dat
+Nuoc soi o 100 do C
+Nuoc dong da o 0 do C
+DNA co 4 base A T C G
+Neuron la te bao than kinh
+Synapse la diem noi giua cac neuron
+Hebbian learning la fire together wire together
+Unicode v18 co 312430 codepoints
+Linux la he dieu hanh ma nguon mo
+x86-64 la kien truc CPU cua Intel va AMD

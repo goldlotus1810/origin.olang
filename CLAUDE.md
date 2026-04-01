@@ -139,6 +139,9 @@ Security: 0xB0-0xB4 CapCheck/Create/Delegate/Revoke/SecGate
 - [BP11 Body](spec/SPEC_BP11_BODY.md) — camera, audio, interoception
 - [BP12 Parasite](spec/SPEC_BP12_PARASITE.md) — 7 organs, 5 phases
 
+### Reference Library — [docs/references/INDEX.md](docs/references/INDEX.md)
+196MB: Exokernel, Intel SDM, AMD APM, OSTEP, xv6, io_uring, eBPF, KVM, AIMA, OSDev Wiki, kernel headers
+
 ### From Rust (reference only — verify against A-D before using)
 - [Formula Engine](spec/PLAN_FORMULA_ENGINE.md) — R/V/A/T dispatch (2114 LOC)
 - [ref/rust_mol/](ref/rust_mol/) — 9 key Rust files for reference

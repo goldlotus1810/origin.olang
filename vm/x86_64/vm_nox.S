@@ -6246,14 +6246,14 @@ builtin_hash_table:
 .builtin_ioctl:
     movsd   xmm0, [r14+32]          # fd
     cvttsd2si edi, xmm0
-    movsd   xmm0, [r14+16]          # cmd
-    cvttsd2si esi, xmm0
-    movsd   xmm0, [r14]             # arg
-    cvttsd2si edx, xmm0
+    movsd   xmm0, [r14+16]          # cmd (may be > 2^31, treat as u32)
+    cvttsd2si rsi, xmm0
+    movsd   xmm0, [r14]             # arg (can be 64-bit pointer)
+    cvttsd2si rdx, xmm0
     add     r14, 48
     mov     eax, 16                  # SYS_IOCTL
     syscall
-    cvtsi2sd xmm0, eax
+    cvtsi2sd xmm0, rax
     sub     r14, 16
     movsd   [r14], xmm0
     mov     qword ptr [r14+8], F64_MARKER

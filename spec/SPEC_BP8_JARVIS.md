@@ -56,6 +56,36 @@ stdlib/homeos/jarvis.ol
 stdlib/homeos/server.ol
 ```
 
+## Integration with Parasitic Kernel (BP12)
+
+### 1. io_uring for multi-mouth
+
+```
+Current: single-threaded accept loop
+New: io_uring IORING_OP_ACCEPT for non-blocking accept
+     io_uring IORING_OP_RECV for non-blocking read from each client
+     All I/O multiplexed through single ring — handles 100+ simultaneous clients
+     No threads needed
+```
+
+### 2. Framebuffer dashboard
+
+```
+/dev/fb0 mmap → render status directly on screen
+No web browser needed, no HTTP overhead
+Layout: fact count, silk edges, STM contents, last query, CPU/RAM
+Update every second via io_uring timer
+```
+
+### 3. Raw socket communication
+
+```
+Phase 2+: JARVIS listens on raw socket
+Custom protocol: [magic:4][type:1][len:2][payload]
+Types: QUERY=1, RESPONSE=2, OBSERVE=3, STATUS=4
+Faster than TCP for LAN communication
+```
+
 ---
 
 ## Related Specs

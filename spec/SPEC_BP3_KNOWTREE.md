@@ -117,6 +117,65 @@ Menzerath-Altmann law (quantitative linguistics)
 Bentley 1975 (KD-tree)
 ```
 
+## Implementation Strategy (from research)
+
+### 1. KD-tree for 5D u16 (from AIMA + Bentley 1975)
+
+5 dimensions = low dimensional. KD-tree is optimal (not HNSW).
+
+- **Split cycle**: S → R → V → A → T per level (repeat)
+- **Leaf size**: 32 (integer comparisons are cheap — no float overhead)
+- **Distance**: L1 Manhattan = |dS| + |dR| + |dV| + |dA| + |dT| — no multiply needed
+- **Expected performance**: ~17 node visits at 100K facts
+- **Build complexity**: O(n log n)
+- **Query complexity**: O(n^(1-1/d) + k) = O(n^0.8) for d=5, k nearest neighbors
+
+Why NOT HNSW:
+- HNSW is designed for D>20, approximate results
+- KD-tree gives EXACT nearest neighbor in 5D
+- Integer comparisons = branch-prediction friendly on x86_64
+
+### 2. Morton Z-order for cache locality
+
+Interleave bits of all 5 dimensions to produce a single Z-order key:
+```
+For P_weight u16 with [S:4][R:4][V:3][A:3][T:2] = 16 bits total:
+  morton(S,R,V,A,T) = interleave bits of each dimension
+
+Since 4+4+3+3+2 = 16 bits, the Morton code fits in a u16!
+```
+Sort facts by Morton code before building KD-tree.
+Result: spatially nearby facts are also nearby in memory → cache-friendly range queries.
+This eliminates most cache misses during KD-tree traversal.
+
+### 3. mmap for scale (from BP12)
+
+Current bottleneck: heap bump allocator, max ~1500 facts at boot.
+
+Solution:
+```
+mmap(NULL, 256MB, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE|MAP_NORESERVE, -1, 0)
+```
+- Physical pages only allocated on first access (demand paging)
+- 256MB virtual = ~16M facts capacity, but only used pages consume RAM
+- Solves boot heap blocker immediately — no arena allocator needed
+- VM syscall: mmap is syscall 9 on x86_64 Linux
+
+### 4. Binary persistence format
+
+```
+Header:    [magic:4="NOXT"][version:2][fact_count:4][mol_offset:4][text_offset:4]
+Mol array: [mol:2] x fact_count
+Text blob: [len:2][utf8_bytes:len] x fact_count
+Index:     [mol:2][text_offset:4] x fact_count (sorted by mol for binary search)
+```
+
+Benefits over current TSV:
+- Load = mmap entire file + cast pointers (zero parsing)
+- Save = write arrays directly (no formatting)
+- Binary search on sorted index: O(log n) lookup by mol
+- Estimated: 500K facts = ~50MB file, loads in <100ms via mmap
+
 ---
 
 ## Related Specs

@@ -535,19 +535,43 @@ memory.ol la QUAN TRONG NHAT vi no giai quyet blocker hien tai
 
 ## Tai lieu tham khao
 
-```
-Engler & Kaashoek (1995): Exokernel — MIT
-MirageOS, IncludeOS, Unikraft — unikernel implementations
-Linux KVM API: /usr/include/linux/kvm.h
-Linux io_uring: /usr/include/linux/io_uring.h
-Linux eBPF: /usr/include/linux/bpf.h
-Linux userfaultfd: /usr/include/linux/userfaultfd.h
-Linux V4L2: /usr/include/linux/videodev2.h
-Linux input: /usr/include/linux/input-event-codes.h
-Linux framebuffer: /usr/include/linux/fb.h
-Intel SDM Vol 3: VMX (hardware virtualization)
-AMD APM Vol 2: SVM (AMD virtualization)
-```
+Tat ca da tai ve `docs/references/` — xem [INDEX](../docs/references/INDEX.md).
+
+### Theory
+- [Exokernel paper (Engler/Kaashoek 1995)](../docs/references/Exokernel_MIT_1995.pdf) — parasitic foundation
+- [Exokernel thesis (MIT)](../docs/references/Exokernel_Thesis_MIT.pdf) — full design
+- [Unikraft paper 2021](../docs/references/Unikraft_paper_2021.pdf) — unikernel reference
+
+### Virtualization / Hardware
+- [Intel SDM Vol 3 (Dec 2024)](../docs/references/Intel_SDM_Vol3_Dec2024.pdf) — VMX, Ch.23-33
+- [AMD64 APM Vol 2](../docs/references/AMD64_APM_Vol2.pdf) — SVM, system programming
+- [KVM API deep dive (LWN)](../docs/references/LWN_KVM_API.html)
+- [KVM in few lines](../docs/references/KVM_host_few_lines.html)
+- [kvm-hello-world (working C code)](../docs/references/kvm-hello-world/)
+
+### io_uring / Async I/O
+- [io_uring guide (Jens Axboe)](../docs/references/io_uring_guide.pdf)
+
+### eBPF / XDP
+- [BPF superpowers (Brendan Gregg)](../docs/references/BPF_superpowers_slides.pdf)
+- [eBPF lecture 2024 (Columbia)](../docs/references/eBPF_lecture_2024.pdf)
+- [XDP tutorial (step by step)](../docs/references/xdp-tutorial/)
+- [BPF perf tools (150+ examples)](../docs/references/bpf-perf-tools-book/)
+
+### Memory / Networking
+- [userfaultfd hello world](../docs/references/userfaultfd_hello_world.html)
+- [AF_PACKET raw socket examples](../docs/references/raw_socket_examples.c)
+
+### OS Development
+- [OSTEP](../docs/references/OSTEP.pdf) — OS fundamentals
+- [Linux Kernel Development (Robert Love)](../docs/references/Linux_Kernel_Development_3rd_Robert_Love.pdf)
+- [xv6 book](../docs/references/xv6_book_rev11.pdf) + [source](../docs/references/xv6_source_rev5.pdf)
+- [OSDev Wiki offline](../docs/references/OSDev_Wiki_offline.zip)
+
+### Linux Kernel Headers (copied to docs/references/)
+- [kvm.h](../docs/references/kvm.h), [io_uring.h](../docs/references/io_uring.h), [bpf.h](../docs/references/bpf.h)
+- [userfaultfd.h](../docs/references/userfaultfd.h), [fb.h](../docs/references/fb.h)
+- [V4L2_videodev2.h](../docs/references/V4L2_videodev2.h), [input-event-codes.h](../docs/references/input-event-codes.h)
 
 ---
 

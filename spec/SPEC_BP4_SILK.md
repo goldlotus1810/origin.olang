@@ -244,6 +244,97 @@ Pfister & Gerstner 2006: triplet STDP
 Intrator & Cooper 1992: BCM initialization
 ```
 
+## Implementation Strategy (from research)
+
+### 1. Adaptive Decay (Pavlik & Anderson 2008)
+
+Make decay rate depend on how often the edge has been used:
+```
+beta_k = beta_0 * fire_count^(-0.35)
+
+fire 1x   → beta = 0.50 (fast decay — barely learned)
+fire 10x  → beta = 0.22 (slow decay — well practiced)
+fire 100x → beta = 0.10 (near permanent — deeply known)
+```
+This is the spacing effect: frequently accessed edges decay slower.
+Implement in `dream()` cycle — replace flat 0.9 multiplier with adaptive beta per edge.
+
+In Olang (integer math, no float):
+```
+// Approximate fire_count^(-0.35) with lookup table for [1..256]
+// Or: beta = 500 / (fire_count * 350 / 1000 + 500)
+// This gives beta ~0.50 at fire=1, ~0.22 at fire=10, ~0.10 at fire=100
+```
+
+### 2. Homeostatic Scaling (Krotov & Hopfield 2020)
+
+Without this: Hebbian + decay leads to either weight explosion or total silence.
+Both failure modes are catastrophic for learning.
+
+```
+Every ~100 fires (or every dream cycle):
+  actual_mean = sum(all_weights) / edge_count
+  scale = target_mean / actual_mean    // target ~ 200
+  all_weights *= scale
+```
+
+In Olang integer math:
+```
+// scale = target * 1000 / actual  (fixed-point ×1000)
+// new_w = w * scale / 1000
+let target_mean = 200
+let actual_sum = 0
+// ... sum all weights ...
+let actual_mean = actual_sum / edge_count
+let scale_k = target_mean * 1000 / actual_mean
+// ... apply: w = w * scale_k / 1000 for all edges ...
+```
+
+CRITICAL: must be in `dream()` alongside decay. Without homeostatic scaling,
+the network will either explode (all weights → max) or go silent (all → 0).
+
+### 3. Per-Node Learning Rate
+
+Hub nodes (like "the", "is", "a") have high degree and would connect to everything
+without rate limiting:
+
+```
+eta_node = eta_0 / sqrt(degree(node))
+
+degree=1     → eta = eta_0     (full learning rate)
+degree=100   → eta = eta_0/10  (10x slower per edge)
+degree=10000 → eta = eta_0/100 (100x slower per edge)
+```
+
+In Olang (integer sqrt approximation):
+```
+// isqrt(n): integer square root via Newton's method
+// eta = eta_0 * 1000 / isqrt(degree * 1000000)
+// Or simpler: eta = eta_0 * 100 / (isqrt(degree) * 100)
+```
+
+This prevents "the" from having silk to every node in the tree.
+Combined with covariance (Section 2 above), hub suppression is double-gated.
+
+### 4. Integration with io_uring (from BP12)
+
+Current silk save/load timeouts on large data (~244 edges OK, but 10K+ will fail).
+
+Solution: io_uring async write for periodic silk persistence.
+```
+// During dream():
+//   1. Serialize silk edges to buffer (synchronous, fast)
+//   2. Submit io_uring SQE for write (non-blocking)
+//   3. Brain continues processing
+//   4. Next dream(): check CQE for completion before new write
+```
+
+Benefits:
+- Non-blocking: brain continues while disk writes complete
+- Batched: one syscall for many write operations
+- Linux 5.1+ (available on Arch Linux)
+- VM syscall: io_uring_setup=425, io_uring_enter=426
+
 ---
 
 ## Related Specs

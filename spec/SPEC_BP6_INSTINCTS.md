@@ -97,6 +97,72 @@ instinct.ol (current implementation)
 
 ---
 
+## Verified Formulas (from AIMA + research)
+
+### 1. ⑤ Analogy — Vector Arithmetic (verified from AIMA Ch.12)
+
+```
+a:b :: c:? → d = c + (b - a)
+
+In 5D P_weight space:
+d_S = c_S + (b_S - a_S), clamped to [0,15]
+d_R = c_R + (b_R - a_R), clamped to [0,15]
+d_V = c_V + (b_V - a_V), clamped to [0,7]
+d_A = c_A + (b_A - a_A), clamped to [0,7]
+d_T = c_T + (b_T - a_T), clamped to [0,3]
+
+result_mol = pack(d_S, d_R, d_V, d_A, d_T)
+answer = kt_nearest(result_mol)
+```
+
+### 2. ④ Abstraction — Cluster Variance
+
+```
+Given cluster C of mols:
+center = compose_union(C)  // average of all mols
+variance = Σ manhattan_dist(mol_i, center)² / |C|
+max_variance = (15² + 15² + 7² + 7² + 3²) = 553
+
+abstraction_level = variance / max_variance
+< 0.3 → concrete (specific fact)
+< 0.7 → categorical (group)
+≥ 0.7 → abstract (concept)
+```
+
+### 3. ⑦ Reflection — Self-Assessment
+
+```
+quality = 0.6 × knowledge_density + 0.4 × connectivity
+
+knowledge_density = QR_count / total_facts
+connectivity = avg_silk_weight × edge_count / node_count
+
+Track over time: quality(t) - quality(t-1) = growth_rate
+growth_rate > 0 → learning working
+growth_rate ≤ 0 → something wrong, trigger self-diagnosis
+```
+
+### 4. Instinct Wiring into Pipeline
+
+```
+After CAPTURE:
+  ① Honesty < 0.40 → silence (DONE)
+  ⑥ Curiosity > 0.50 → learn_mode boost (DONE)
+
+After ACTIVATE:
+  ② Contradiction detected → flag for dream review
+  ③ Causality → annotate temporal chains
+
+After DECODE:
+  ⑤ Analogy → "X is like Y" enrichment
+  ⑦ Reflection → compare predicted vs actual quality
+
+In DREAM:
+  ④ Abstraction → auto-create concept nodes for high-variance clusters
+```
+
+---
+
 ## Related Specs
 - [BP5 Pipeline](SPEC_BP5_PIPELINE_EN.md) — instincts wired into pipeline
 - [BP4 Silk](SPEC_BP4_SILK.md) — honesty uses silk weights

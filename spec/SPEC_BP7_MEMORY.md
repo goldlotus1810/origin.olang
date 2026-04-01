@@ -84,6 +84,51 @@ SPEC_G_COMPLETE.md §G7, §G19, §G26
 
 ---
 
+## Persistence via Parasitic Kernel (BP12)
+
+### 1. mmap-backed persistence
+
+```
+observations_fd = open("nox_observations.dat", O_RDWR | O_CREAT)
+ftruncate(observations_fd, MAX_OBS_SIZE)
+obs_map = mmap(NULL, MAX_OBS_SIZE, PROT_RW, MAP_SHARED, observations_fd, 0)
+
+// Writes go directly to file via page cache
+// No explicit save needed — kernel flushes automatically
+// msync() for critical data
+```
+
+### 2. io_uring for async persistence
+
+- Use IORING_OP_WRITE for non-critical saves
+- Use IORING_OP_FSYNC for critical saves (QR promotion)
+- Brain never blocks on disk I/O
+
+### 3. Retrieval scoring (Park et al. 2023, Generative Agents)
+
+```
+score = w_r × recency + w_i × importance + w_s × relevance
+
+recency = 0.995 ^ hours_since_access  (half-life ~6 days)
+importance = access_count / max_access_count
+relevance = 1 - manhattan_dist(query_mol, obs_mol) / 70
+
+w_r = w_i = w_s = 1.0 (equal weights, tunable)
+```
+
+### 4. Session summary compression
+
+```
+Before session end:
+1. Collect all STM mols from this session
+2. compose_union(all_mols) → session_mol
+3. Top-3 most fired facts = session highlights
+4. Store as observation type="summary"
+5. Next session: inject summaries as context (budget=500 tokens)
+```
+
+---
+
 ## Related Specs
 - [BP3 KnowTree](SPEC_BP3_KNOWTREE.md) — facts stored in KnowTree
 - [BP5 Pipeline](SPEC_BP5_PIPELINE_EN.md) — STM updated after response

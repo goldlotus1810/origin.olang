@@ -1,0 +1,1824 @@
+        <!DOCTYPE html>
+        <html lang="en">
+        <head><title>Using the KVM API [LWN.net]</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="Using the KVM API">
+<meta property="og:site_name" content="LWN.net">
+<meta property="og:type" content="article">
+<meta property="og:description" content="Many developers, users, and entire industries rely on virtualization, as provided by software l [...]">
+<meta HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="robots" CONTENT="noai, noimageai">
+        <link rel="icon" href="https://static.lwn.net/images/favicon.png"
+              type="image/png">
+        <link rel="alternate" type="application/rss+xml" title="LWN.net headlines" href="https://lwn.net/headlines/rss">
+        <link rel="stylesheet" href="/CSS/lwn">
+<link rel="stylesheet" href="/CSS/nosub">
+
+        
+        </head>
+        <body>
+        <a name="t"></a>
+<div id="menu"><a href="/"><img src="https://static.lwn.net/images/logo/barepenguin-70.png" class="logo"
+                 border="0" alt="LWN.net Logo">
+           <span class="logo">LWN<br>.net</span>
+           <span class="logobl">News from the source</span></a>
+           <a href="/"><img src="https://static.lwn.net/images/lcorner-ss.png" class="sslogo"
+                 border="0" alt="LWN"></a><div class="navmenu-container">
+           <ul class="navmenu">
+        <li><a class="navmenu" href="#t"><b>Content</b></a><ul><li><a href="/current/">Weekly Edition</a></li><li><a href="/Archives/">Archives</a></li><li><a href="/Search/">Search</a></li><li><a href="/Kernel/">Kernel</a></li><li><a href="/Security/">Security</a></li><li><a href="/Calendar/">Events calendar</a></li><li><a href="/Comments/unread">Unread comments</a></li><li><hr></li><li><a href="/op/FAQ.lwn">LWN FAQ</a></li><li><a href="/op/AuthorGuide.lwn">Write for us</a></li></ul></li>
+<li><a class="navmenu" href="#t"><b>Edition</b></a><ul><li><a href="/Articles/658288/">Return to the Kernel page</a></li></ul></li>
+</ul></div>
+</div> <!-- menu -->
+<div class="topnav-spacer"></div>
+<div class="top-banner not-print"><ins data-revive-zoneid="12072" 
+data-revive-id="fa8c6c9da7f33852f7097c4a94da1070"></ins>
+<script async src="//servedby.aqua-adserver.com/asyncjs.php"></script></div>
+<div class="topnav-container">
+<div class="not-handset"><form action="https://lwn.net/Login/" method="post" name="loginform"
+                 class="loginform">
+        <label><b>User:</b> <input type="text" name="uname" value="" size="8" id="uc" /></label> 
+		<label><b>Password:</b> <input type="password" name="pword" size="8" id="pc" /></label> <input type="hidden" name="target" value="/Articles/658511/" /> <input type="submit" name="submit" value="Log in" /></form> |
+           <form action="https://lwn.net/subscribe/" method="post" class="loginform">
+           <input type="submit" name="submit" value="Subscribe" />
+           </form> |
+           <form action="https://lwn.net/Login/newaccount" method="post" class="loginform">
+           <input type="submit" name="submit" value="Register" />
+           </form>
+        </div>
+               <div class="handset-only">
+               <a href="/Login/"><b>Log in</b></a> /
+               <a href="/subscribe/"><b>Subscribe</b></a> /
+               <a href="/Login/newaccount"><b>Register</b></a>
+               </div>
+               </div><div class="maincolumn flexcol">
+<div class="middlecolumn">
+<div class="PageHeadline">
+<h1>Using the KVM API</h1>
+</div>
+<div class="ArticleText">
+<div class="GAByline">
+           <p>September 29, 2015</p>
+           <p>This article was contributed by Josh Triplett</p>
+           </div>
+<p>Many developers, users, and entire industries rely on virtualization, as
+provided by software like <a href="http://xenproject.org/">Xen</a>,
+<a href="http://qemu.org/">QEMU/KVM</a>, or
+<a href="https://git.kernel.org/cgit/linux/kernel/git/will/kvmtool.git/">kvmtool</a>.
+While QEMU can run a software-based virtual machine, and Xen can run
+cooperating paravirtualized OSes without hardware support, most current uses
+and deployments of virtualization rely on hardware-accelerated virtualization,
+as provided on many modern hardware platforms.  Linux supports hardware
+virtualization via the Kernel Virtual Machine (KVM) API.  In this article,
+we'll take a closer look at the KVM API, using it to directly set up a virtual
+machine without using any existing virtual machine implementation.</p>
+
+<p>A virtual machine using KVM need not run a complete operating system or
+emulate a full 
+suite of hardware devices.  Using the KVM API, a program can run
+code inside a sandbox and provide arbitrary virtual hardware interfaces to
+that sandbox.  If you want to emulate anything other than standard hardware, or
+run anything other than a standard operating system, you'll need to work with 
+the KVM API used by virtual machine implementations.  As a
+demonstration that KVM can run more (or less) than just a complete operating
+system, we'll instead run a small handful of instructions that simply compute
+2+2 and print the result to an emulated serial port.</p>
+
+<p>The KVM API provides an abstraction over the hardware-virtualization features
+of various platforms.  However, any software making use of the KVM API still
+needs to handle certain machine-specific details, such as processor registers
+and expected hardware devices.  For the purposes of this article, we'll set up
+an x86 virtual machine using <a href="https://en.wikipedia.org/wiki/X86_virtualization#Intel_virtualization_.28VT-x.29">Intel
+VT</a>.
+For another platform, you'd need to handle different registers, different
+virtual hardware, and different expectations about memory layout and initial
+state.</p>
+
+<p>The Linux kernel includes documentation of the KVM API in
+<a href="https://kernel.org/doc/Documentation/virtual/kvm/api.txt"><tt>Documentation/virtual/kvm/api.txt</tt></a>
+and other files in the
+<a
+href="https://kernel.org/doc/Documentation/virtual/kvm/"><tt>Documentation/virtual/kvm/</tt></a>
+directory.</p>
+
+<p>This article includes snippets of sample code from a <a href="/Articles/658512/">fully functional sample
+program</a> (MIT licensed).  The
+program makes extensive use of the <a href="http://man7.org/linux/man-pages/man3/err.3.html"><tt>err()</tt> and <tt>errx()</tt>
+functions</a> for error handling;
+however, the snippets quoted in the article only include non-trivial error
+handling.</p>
+
+<h4>Definition of the sample virtual machine</h4>
+
+<p>A full virtual machine using KVM typically emulates a variety of virtual
+hardware devices and firmware functionality, as well as a potentially complex
+initial state and initial memory contents.  For our sample virtual machine,
+we'll run the following 16-bit x86 code:</p>
+
+<pre>
+    mov $0x3f8, %dx
+    add %bl, %al
+    add $'0', %al
+    out %al, (%dx)
+    mov $'\n', %al
+    out %al, (%dx)
+    hlt
+</pre>
+
+<p>These instructions will add the initial contents of the <tt>al</tt> and <tt>bl</tt> registers
+(which we will pre-initialize to 2), convert the resulting sum (4) to ASCII by
+adding '0', output it to a serial port at 0x3f8 followed by a newline, and then
+halt.</p>
+
+<p>Rather than reading code from an object file or executable, we'll pre-assemble
+these instructions (via <tt>gcc</tt> and <tt>objdump</tt>) into machine code stored in a static
+array:</p>
+
+<pre>
+    const uint8_t code[] = {
+	0xba, 0xf8, 0x03, /* mov $0x3f8, %dx */
+	0x00, 0xd8,       /* add %bl, %al */
+	0x04, '0',        /* add $'0', %al */
+	0xee,             /* out %al, (%dx) */
+	0xb0, '\n',       /* mov $'\n', %al */
+	0xee,             /* out %al, (%dx) */
+	0xf4,             /* hlt */
+    };
+</pre>
+
+<p>For our initial state, we will preload this code into the second page of guest
+"physical" memory (to avoid conflicting with a non-existent <a href="https://en.wikipedia.org/wiki/Interrupt_descriptor_table">real-mode
+interrupt descriptor
+table</a> at address 0).  <tt>al</tt>
+and <tt>bl</tt> will contain 2, the code segment (<tt>cs</tt>) will have a base of 0, and the
+instruction pointer (<tt>ip</tt>) will point to the start of the second page at
+0x1000.</p>
+
+<p>Rather than the extensive set of virtual hardware typically provided by a
+virtual machine, we'll emulate only a trivial serial port on port 0x3f8.</p>
+
+<p>Finally, note that running 16-bit real-mode code with hardware VT support
+requires a processor with "unrestricted guest" support.  The original VT
+implementations only supported protected mode with paging enabled; emulators
+like QEMU thus had to handle virtualization in software until reaching a paged
+protected mode (typically after OS boot), then feed the virtual system state
+into KVM to start doing hardware emulation.  However, processors from the
+"Westmere" generation and newer support "unrestricted guest" mode, which adds
+hardware support for emulating 16-bit real mode, "big real mode", and protected
+mode without paging.  The Linux KVM subsystem has supported the <a href="https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=3a624e29c7587b79abab60e279f9d1a62a3d4716">"unrestricted
+guest" feature</a> since Linux 2.6.32 in June&nbsp;2009.</p>
+
+<h4>Building a virtual machine</h4>
+
+<p>First, we'll need to open <tt>/dev/kvm</tt>:</p>
+
+<pre>
+    kvm = open("/dev/kvm", O_RDWR | O_CLOEXEC);
+</pre>
+
+<p>We need read-write access to the device to set up a virtual machine, and all
+opens not explicitly intended for inheritance across <tt><a href="http://man7.org/linux/man-pages/man3/exec.3.html">exec</a></tt> should use
+<tt>O_CLOEXEC</tt>.</p>
+
+<p>Depending on your system, you likely have access to <tt>/dev/kvm</tt> either via a
+group named "kvm" or via an access control list (ACL) granting access to
+users logged in at the 
+console.</p>
+
+<p>Before you use the KVM API, you should make sure you have a version you can
+work with.  Early versions of KVM had an unstable API with an
+increasing version number, but the <tt>KVM_API_VERSION</tt> last <a href="https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=2ff81f70b56dc1cdd3bf2f08414608069db6ef1a">changed to 12</a> with
+Linux 2.6.22 in April&nbsp;2007,
+and got <a href="https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=dea8caee7b6971ae90e9d303b5d98dbf2dafed53">locked to that as a stable interface</a> in
+2.6.24;
+since then, KVM API changes occur only via backward-compatible extensions (like
+all other kernel APIs).  So, your application should first confirm that it has
+version 12, via the <tt>KVM_GET_API_VERSION</tt> <tt>ioctl()</tt>:</p>
+
+<pre>
+    ret = ioctl(kvm, KVM_GET_API_VERSION, NULL);
+    if (ret == -1)
+	err(1, "KVM_GET_API_VERSION");
+    if (ret != 12)
+	errx(1, "KVM_GET_API_VERSION %d, expected 12", ret);
+</pre>
+
+<p>After checking the version, you may want to check for any extensions you use,
+using the <tt>KVM_CHECK_EXTENSION</tt> <tt>ioctl()</tt>.  However, for extensions that add new
+<tt>ioctl()</tt> calls, you can generally just call the <tt>ioctl()</tt>, which will fail with an
+error (<tt>ENOTTY</tt>) if it does not exist.</p>
+
+<p>If we wanted to check for the one extension we use in this sample program,
+<tt>KVM_CAP_USER_MEM</tt> (required to set up guest memory via the
+<tt>KVM_SET_USER_MEMORY_REGION</tt> <tt>ioctl()</tt>), that check would look like this:</p>
+
+<pre>
+    ret = ioctl(kvm, KVM_CHECK_EXTENSION, KVM_CAP_USER_MEMORY);
+    if (ret == -1)
+	err(1, "KVM_CHECK_EXTENSION");
+    if (!ret)
+	errx(1, "Required extension KVM_CAP_USER_MEM not available");
+</pre>
+
+<p>Next, we need to create a virtual machine (VM), which represents
+everything associated with one emulated system, including memory and one or
+more CPUs.  KVM gives us a handle to this VM in the form of a file descriptor:</p>
+
+<pre>
+    vmfd = ioctl(kvm, KVM_CREATE_VM, (unsigned long)0);
+</pre>
+
+<p>The VM will need some memory, which we provide in pages.  This
+corresponds to the "physical" address space as seen by the VM.  For
+performance, we wouldn't want to trap every memory access and emulate it by
+returning the corresponding data; instead, when a virtual CPU attempts to
+access memory, the hardware virtualization for that CPU will first try to
+satisfy that access via the memory pages we've configured.  If that fails (due
+to the VM accessing a "physical" address without memory mapped to it), the
+kernel will then let the user of the KVM API handle the access, such as by
+emulating a memory-mapped I/O device or generating a fault.</p>
+
+<p>For our simple example, we'll allocate a single page of memory to hold our
+code, using <a href="http://man7.org/linux/man-pages/man2/mmap.2.html"><tt>mmap()</tt></a> directly
+to obtain page-aligned zero-initialized memory:</p>
+
+<pre>
+    mem = mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+</pre>
+
+<p>We then need to copy our machine code into it:</p>
+
+<pre>
+    memcpy(mem, code, sizeof(code));
+</pre>
+
+<p>And finally tell the KVM virtual machine about its spacious new 4096-byte
+memory:</p>
+
+<pre>
+    struct kvm_userspace_memory_region region = {
+	.slot = 0,
+	.guest_phys_addr = 0x1000,
+	.memory_size = 0x1000,
+	.userspace_addr = (uint64_t)mem,
+    };
+    ioctl(vmfd, KVM_SET_USER_MEMORY_REGION, &amp;region);
+</pre>
+
+<p>The <tt>slot</tt> field provides an integer index identifying each region of memory we
+hand to KVM; calling <tt>KVM_SET_USER_MEMORY_REGION</tt> again with the same <tt>slot</tt>
+will replace this mapping, while calling it with a new <tt>slot</tt> will create a
+separate mapping.  <tt>guest_phys_addr</tt> specifies the base "physical" address as
+seen from the guest, and <tt>userspace_addr</tt> points to the backing memory in our
+process that we allocated with <tt>mmap()</tt>; note that these always use 64-bit
+values, even on 32-bit platforms.  <tt>memory_size</tt> specifies how much memory to
+map: one page, 0x1000 bytes.</p>
+
+<p>Now that we have a VM, with memory containing code to run, we need
+to create a virtual CPU to run that code.  A KVM virtual CPU represents the
+state of one emulated CPU, including processor registers and other execution
+state.  Again, KVM gives us a handle to this VCPU in the form of a file
+descriptor:</p>
+
+<pre>
+    vcpufd = ioctl(vmfd, KVM_CREATE_VCPU, (unsigned long)0);
+</pre>
+
+<p>The 0 here represents a sequential virtual CPU index.  A VM with
+multiple CPUs would assign a series of small identifiers here, from 0 to a
+system-specific limit (obtainable by checking the <tt>KVM_CAP_MAX_VCPUS</tt>
+capability with <tt>KVM_CHECK_EXTENSION</tt>).</p>
+
+<p>Each virtual CPU has an associated <tt>struct kvm_run</tt> data structure, used to
+communicate information about the CPU between the kernel and user space.  In
+particular, whenever hardware virtualization stops (called a "vmexit"), such as
+to emulate some virtual hardware, the <tt>kvm_run</tt> structure will contain
+information about why it stopped.  We map this structure into user space using
+<tt>mmap()</tt>, but first, we need to know how much memory to map, which KVM tells us
+with the <tt>KVM_GET_VCPU_MMAP_SIZE</tt> <tt>ioctl()</tt>:</p>
+
+<pre>
+    mmap_size = ioctl(kvm, KVM_GET_VCPU_MMAP_SIZE, NULL);
+</pre>
+
+<p>Note that the mmap size typically exceeds that of the <tt>kvm_run</tt> structure, as
+the kernel will also use that space to store other transient structures that
+<tt>kvm_run</tt> may point to.</p>
+
+<p>Now that we have the size, we can <tt>mmap()</tt> the <tt>kvm_run</tt> structure:</p>
+
+<pre>
+    run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, vcpufd, 0);
+</pre>
+
+<p>The VCPU also includes the processor's register state, broken into two sets of
+registers: standard registers and "special" registers.  These correspond to two
+architecture-specific data structures: <tt>struct kvm_regs</tt> and <tt>struct
+kvm_sregs</tt>, respectively.  On x86, the standard registers include
+general-purpose registers, as well as the instruction pointer and flags; the
+"special" registers primarily include segment registers and control registers.</p>
+
+<p>Before we can run code, we need to set up the initial states of these sets of
+registers.  Of the "special" registers, we only need to change the code segment
+(<tt>cs</tt>); its default state (along with the initial instruction pointer) points
+to the <a href="https://en.wikipedia.org/wiki/Reset_vector">reset vector</a> at 16 bytes
+below the top of memory, but we want <tt>cs</tt> to point to 0 instead.
+Each segment 
+in <tt>kvm_sregs</tt> includes a full <a href="https://en.wikipedia.org/wiki/Segment_descriptor">segment
+descriptor</a>; we don't need to
+change the various flags or the limit, but we zero the <tt>base</tt> and <tt>selector</tt>
+fields which together determine what address in memory the segment points to.
+To avoid changing any of the other initial "special" register states, we read
+them out, change <tt>cs</tt>, and write them back:</p>
+
+<pre>
+    ioctl(vcpufd, KVM_GET_SREGS, &amp;sregs);
+    sregs.cs.base = 0;
+    sregs.cs.selector = 0;
+    ioctl(vcpufd, KVM_SET_SREGS, &amp;sregs);
+</pre>
+
+<p>For the standard registers, we set most of them to 0, other than our initial
+instruction pointer (pointing to our code at 0x1000, relative to
+<tt>cs</tt> at 0), our 
+addends (2 and 2), and the initial state of the flags (specified as 0x2 by the
+x86 architecture; starting the VM will fail with this not set):</p>
+
+<pre>
+    struct kvm_regs regs = {
+	.rip = 0x1000,
+	.rax = 2,
+	.rbx = 2,
+	.rflags = 0x2,
+    };
+    ioctl(vcpufd, KVM_SET_REGS, &amp;regs);
+</pre>
+
+<p>With our VM and VCPU created, our memory mapped and initialized, and our
+initial register states set, we can now start running instructions with the
+VCPU, 
+using the <tt>KVM_RUN</tt> <tt>ioctl()</tt>.  That will return successfully
+each time 
+virtualization stops, such as for us to emulate hardware, so we'll run it in a
+loop:</p>
+
+<pre>
+    while (1) {
+	ioctl(vcpufd, KVM_RUN, NULL);
+	switch (run-&gt;exit_reason) {
+	/* Handle exit */
+	}
+    }
+</pre>
+
+<p>Note that <tt>KVM_RUN</tt> runs the VM in the context of the current
+thread and doesn't return until emulation stops.  To run a multi-CPU VM, the
+user-space process must spawn multiple threads, and call <tt>KVM_RUN</tt> for different
+virtual CPUs in different threads.</p>
+
+<p>To handle the exit, we check <tt>run-&gt;exit_reason</tt> to see why we exited.  This can
+contain any of several dozen exit reasons, which correspond to different
+branches of the union in <tt>kvm_run</tt>.  For this simple VM, we'll just handle a
+few of them, and treat any other <tt>exit_reason</tt> as an error.</p>
+
+<p>We treat a <tt>hlt</tt> instruction as a sign that we're done, since we have nothing
+to ever wake us back up:</p>
+
+<pre>
+	case KVM_EXIT_HLT:
+	    puts("KVM_EXIT_HLT");
+	    return 0;
+</pre>
+
+<p>To let the virtualized code output its result, we emulate a serial port
+on I/O 
+port 0x3f8.  Fields in <tt>run-&gt;io</tt> indicate the direction (input or output), the
+size (1, 2, or 4), the port, and the number of values.  To pass the actual
+data, the kernel uses a buffer mapped after the <tt>kvm_run</tt> structure, and
+<tt>run-&gt;io.data_offset</tt> provides the offset from the start of that mapping.</p>
+
+<pre>
+	case KVM_EXIT_IO:
+	    if (run-&gt;io.direction == KVM_EXIT_IO_OUT &amp;&amp;
+		    run-&gt;io.size == 1 &amp;&amp;
+		    run-&gt;io.port == 0x3f8 &amp;&amp;
+		    run-&gt;io.count == 1)
+		putchar(*(((char *)run) + run-&gt;io.data_offset));
+	    else
+		errx(1, "unhandled KVM_EXIT_IO");
+	    break;
+</pre>
+
+<p>To make it easier to debug the process of setting up and running the VM,
+we handle a few 
+common 
+kinds of errors.  <tt>KVM_EXIT_FAIL_ENTRY</tt>, in particular, shows up often when
+changing the initial conditions of the VM; it indicates that the underlying
+hardware virtualization mechanism (VT in this case) can't start the VM because
+the initial conditions don't match its requirements.  (Among other reasons,
+this error will occur if the flags register does not have bit 0x2 set, or if
+the initial values of the segment or task-switching registers fail various
+setup criteria.) The <tt>hardware_entry_failure_reason</tt> does not actually
+distinguish many of those cases, so an error of this type typically
+requires a careful 
+read through the hardware documentation.</p>
+
+<pre>
+	case KVM_EXIT_FAIL_ENTRY:
+	    errx(1, "KVM_EXIT_FAIL_ENTRY: hardware_entry_failure_reason = 0x%llx",
+		 (unsigned long long)run-&gt;fail_entry.hardware_entry_failure_reason);
+</pre>
+
+<p><tt>KVM_EXIT_INTERNAL_ERROR</tt> indicates an error from the Linux KVM subsystem
+rather than from the hardware.  In particular, under various circumstances,
+the KVM 
+subsystem will emulate one or more instructions in the kernel rather than via
+hardware, such as for performance reasons (to coalesce a series of vmexits for
+I/O).  The <tt>run-&gt;internal.suberror</tt> value <tt>KVM_INTERNAL_ERROR_EMULATION</tt>
+indicates that the VM encountered an instruction it doesn't know how to
+emulate, which most commonly indicates an invalid instruction.</p>
+
+<pre>
+	case KVM_EXIT_INTERNAL_ERROR:
+	    errx(1, "KVM_EXIT_INTERNAL_ERROR: suberror = 0x%x",
+	         run-&gt;internal.suberror);
+</pre>
+
+<p>When we put all of this together into the sample code, build it, and
+run it, we get the following:</p>
+
+<pre>
+    $ ./kvmtest
+    4
+    KVM_EXIT_HLT
+</pre>
+
+<p>Success!  We ran our machine code, which added 2+2, turned it into an ASCII
+<tt>4</tt>, and wrote it to port 0x3f8.  This caused the <tt>KVM_RUN</tt> <tt>ioctl()</tt> to stop
+with <tt>KVM_EXIT_IO</tt>, which we emulated by printing the <tt>4</tt>.  We then looped and
+re-entered <tt>KVM_RUN</tt>, which stops with <tt>KVM_EXIT_IO</tt> again for the <tt>\n</tt>.  On
+the third and final loop, <tt>KVM_RUN</tt> stops with <tt>KVM_EXIT_HLT</tt>, so we print a
+message and quit.</p>
+
+<h4>Additional KVM API features</h4>
+
+<p>This sample virtual machine demonstrates the core of the KVM API, but ignores
+several other major areas that many non-trivial virtual machines will care
+about.</p>
+
+<p>Prospective implementers of memory-mapped I/O devices will want to look at the
+<tt>exit_reason</tt> <tt>KVM_EXIT_MMIO</tt>, as well as the <tt>KVM_CAP_COALESCED_MMIO</tt>
+extension to reduce vmexits, and the <tt>ioeventfd</tt> mechanism to process I/O
+asynchronously without a vmexit.</p>
+
+<p>For hardware interrupts, see the <tt>irqfd</tt> mechanism, using the <tt>KVM_CAP_IRQFD</tt>
+extension capability.  This provides a file descriptor that can inject a
+hardware interrupt into the KVM virtual machine without stopping it first.  A
+virtual machine may thus write to this from a separate event loop or device-handling thread, and threads running <tt>KVM_RUN</tt> for a virtual CPU will process
+that interrupt at the next available opportunity.</p>
+
+<p>x86 virtual machines will likely want to support
+<a href="https://en.wikipedia.org/wiki/CPUID">CPUID</a> and <a href="https://en.wikipedia.org/wiki/Model-specific_register">model-specific registers
+(MSRs)</a>, both of which
+have architecture-specific <tt>ioctl()</tt>s that minimize vmexits.</p>
+
+<h4>Applications of the KVM API</h4>
+
+<p>Other than learning, debugging a virtual machine implementation, or as a party
+trick, why use <tt>/dev/kvm</tt> directly?</p>
+
+<p>Virtual machines like <tt>qemu-kvm</tt> or <tt>kvmtool</tt> typically emulate the standard
+hardware of the target architecture; for instance, a standard x86 PC.  While
+they can support other devices and <a href="/Articles/580186/">virtio</a>
+hardware, if you want to emulate a completely different type of system that
+shares little more than the instruction set architecture, you might want to
+implement a new VM instead.  And even within an existing virtual machine
+implementation, authors of a new class of virtio hardware device will want a
+clear understanding of the KVM API.</p>
+
+<p>Efforts like <a href="https://github.com/google/novm">novm</a> and
+<a href="https://git.kernel.org/cgit/linux/kernel/git/will/kvmtool.git/">kvmtool</a> use
+the KVM API to construct a lightweight VM, dedicated to running Linux rather
+than an arbitrary OS.  More recently, the Clear Containers project uses kvmtool
+to <a href="/Articles/644675/">run containers using hardware
+virtualization</a>.</p>
+
+<p>Alternatively, a VM need not run an OS at all.  A KVM-based VM could instead
+implement a hardware-assisted sandbox with no virtual hardware devices and no
+OS, providing arbitrary virtual "hardware" devices as the API between the
+sandbox and the sandboxing VM.</p>
+
+<p>While running a full virtual machine remains the primary use case for hardware
+virtualization, we've seen many innovative uses of the KVM API recently, and we
+can certainly expect more in the future.</p><br clear="all"><table class="IndexEntries">
+           <tr><th colspan=2>Index entries for this article</th></tr>
+           <tr><td><a href="/Archives/GuestIndex/">GuestArticles</a></td><td><a href="/Archives/GuestIndex/#Triplett_Josh">Triplett, Josh</a></td></tr>
+            </table><br clear="all">
+<hr width="60%%" align="left">
+            <form action="/Login/" method="post">
+            <input type="hidden" name="target" value="/Articles/658511/" />
+            <input type="submit" name="login" value="Log in" /> to post comments
+            <p>
+        <p><a name="Comments"></a>
+<a name="CommAnchor658731"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 29, 2015 18:30 UTC (Tue)
+                               by <b>flewellyn</b> (subscriber, #5047)
+                              [<a href="/Articles/658731/">Link</a>] (2 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+Interesting and powerful tool, this KVM.  <br>
+<p>
+The kernel API looks pretty low-level. I can see why something like libvirt would be needed to abstract it a bit.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658731/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658732"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 29, 2015 18:38 UTC (Tue)
+                               by <b>luto</b> (subscriber, #39314)
+                              [<a href="/Articles/658732/">Link</a>] (1 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+Libvirt isn't really abstracting KVM -- it's abstracting QEMU, which uses KVM to implement something that looks like a real computer.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658732/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658733"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 29, 2015 18:45 UTC (Tue)
+                               by <b>josh</b> (subscriber, #17465)
+                              [<a href="/Articles/658733/">Link</a>] 
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+Right.  Much of libvirt's configuration has to do with disk images, memory, network, and many other peripherals that depend on the VM implementation like qemu-kvm.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658733/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    </details>
+</details>
+</details>
+<a name="CommAnchor658736"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 29, 2015 19:15 UTC (Tue)
+                               by <b>eru</b> (subscriber, #2753)
+                              [<a href="/Articles/658736/">Link</a>] (23 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+Wonder if it would be too much work to make dosemu use kvm? Originally dosemu was written to take advantage of the VM86 mode of 386, but this is not available on the x86_68 in 64-bit mode, so dosemu currently runs quite slowly there, because it falls back to software emulation.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658736/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658743"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 29, 2015 19:40 UTC (Tue)
+                               by <b>josh</b> (subscriber, #17465)
+                              [<a href="/Articles/658743/">Link</a>] (22 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+Both dosemu and dosbox should be able to use the KVM API, as long as the system has "unrestricted guest" mode available to run real-mode code.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658743/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658747"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 29, 2015 21:18 UTC (Tue)
+                               by <b>pbonzini</b> (subscriber, #60935)
+                              [<a href="/Articles/658747/">Link</a>] (21 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+Note that KVM used QEMU to handle the boot phase only in the very beginning; nowadays it uses vm86 mode or an in-kernel interpreter if unrestricted guest mode is unavailable.  This avoids duplicating the emulation code between the kernel and userspace.  Userspace doesn't know if you're running on a &gt;=Westmere processor (or AMD, which has always had the equivalent of unrestricted mode--they called it "paged real mode"), or if you need to work around the limitations of the processor.<br>
+<p>
+But KVM is not really needed in this case: on one hand you don't need near bare-metal performance that KVM provides, because dosemu/dosbox only need to emulate a 100 MHz machine or so, and a simple interpreter or a JIT compiler like QEMU's can handle it (QEMU is known as slowish for a JIT translator, but there's some work being done on that side as well).  On the other hand KVM's performance comes with some fine print, which you cannot really afford in the case of dosemu/dosbox.  A KVM_EXIT_IO exit is very slow, on the order of a few thousand cycles on the newest processors.  By comparison, QEMU can dispatch a single memory-mapped I/O operation in about 100 clock cycles, so 60-150 times faster than KVM.  Hence running demos like Unreal (<a href="https://www.youtube.com/watch?v=VjYQeMExIwk#t=7m">https://www.youtube.com/watch?v=VjYQeMExIwk#t=7m</a>) doesn't work too well on QEMU with KVM because they do an insane number of such exits.<br>
+<p>
+To play old games (man, I should send those Jazz Jackrabbit patches upstream...) I typically use QEMU without KVM.<br>
+<p>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658747/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658748"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 29, 2015 21:26 UTC (Tue)
+                               by <b>josh</b> (subscriber, #17465)
+                              [<a href="/Articles/658748/">Link</a>] (5 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+<font class="QuotedText">&gt; Note that KVM used QEMU to handle the boot phase only in the very beginning; nowadays it uses vm86 mode or an in-kernel interpreter if unrestricted guest mode is unavailable. This avoids duplicating the emulation code between the kernel and userspace.</font><br>
+<p>
+True.  Out of curiosity, does any means exist to turn that *off*?  I have some interest in compiling out most or all of the in-kernel instruction emulation, to reduce attack surface area.<br>
+<p>
+<font class="QuotedText">&gt; A KVM_EXIT_IO exit is very slow, on the order of a few thousand cycles on the newest processors. By comparison, QEMU can dispatch a single memory-mapped I/O operation in about 100 clock cycles, so 60-150 times faster than KVM.</font><br>
+<p>
+What about with coalesced or fd-ed I/O?<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658748/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658798"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 30, 2015 13:45 UTC (Wed)
+                               by <b>pbonzini</b> (subscriber, #60935)
+                              [<a href="/Articles/658798/">Link</a>] (4 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+<font class="QuotedText">&gt; True. Out of curiosity, does any means exist to turn that *off*? I have some interest</font><br>
+<font class="QuotedText">&gt; in compiling out most or all of the in-kernel instruction emulation, to reduce attack</font><br>
+<font class="QuotedText">&gt; surface area.</font><br>
+<p>
+With unrestricted_guest=1 you only exit to the emulator for a few privileged instructions (where for simplicity KVM emulates them instead of having a mini-interpreter in vmx.c/svm.c) and for I/O.  But unfortunately, thanks to the x86 ISA's read-modify-write instructions that's still a _lot_ of different instructions that you can emulate.<br>
+<p>
+So there's not much that you can compile out.  You could simply modify KVM to refuse loading if unrestricted_guest=0, but you can still trigger any bit of emulator code by setting up a race between two VCPUs.  One triggers I/O continuously, the other races against the emulator changing the opcodes of the I/O instruction into something else.  This actually used to be a vulnerability, but it's been patched for several years and the emulator is now considered a security sensitive component.<br>
+<p>
+<font class="QuotedText">&gt; &gt; A KVM_EXIT_IO exit is very slow, on the order of a few thousand cycles on the</font><br>
+<font class="QuotedText">&gt; &gt; newest processors. By comparison, QEMU can dispatch a single memory-mapped I/O</font><br>
+<font class="QuotedText">&gt; &gt; operation in about 100 clock cycles, so 60-150 times faster than KVM.</font><br>
+&gt;<br>
+<font class="QuotedText">&gt; What about with coalesced or fd-ed I/O?</font><br>
+<p>
+Still around 1500-2000 cycles.  For ioeventfd you have to add the latency of waking up the I/O thread if it's sleeping (but if the fd is really busy, e.g. running fio in the guest, it won't have time to go to sleep).<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658798/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658832"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 30, 2015 17:53 UTC (Wed)
+                               by <b>josh</b> (subscriber, #17465)
+                              [<a href="/Articles/658832/">Link</a>] (3 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+<font class="QuotedText">&gt; For ioeventfd you have to add the latency of waking up the I/O thread if it's sleeping (but if the fd is really busy, e.g. running fio in the guest, it won't have time to go to sleep).</font><br>
+<p>
+How much *minimum* latency comes from the vmexit, and how much gets added by the path from the in-kernel vmexit handling and whatever mechanism it uses to contact the I/O thread?  If much of it comes from the latter, perhaps we could find a way to accelerate that via another (latency-optimized) interface.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658832/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658881"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 1, 2015 7:17 UTC (Thu)
+                               by <b>pbonzini</b> (subscriber, #60935)
+                              [<a href="/Articles/658881/">Link</a>] (2 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+It's about 50-50.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658881/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658940"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 1, 2015 15:50 UTC (Thu)
+                               by <b>josh</b> (subscriber, #17465)
+                              [<a href="/Articles/658940/">Link</a>] (1 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+Ouch.  That really limits how much faster it can get, then, short of implementing the backend in the kernel.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658940/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658947"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 1, 2015 16:02 UTC (Thu)
+                               by <b>pbonzini</b> (subscriber, #60935)
+                              [<a href="/Articles/658947/">Link</a>] 
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+Even if you implement in the kernel, it's hard to bypass all the stuff that KVM does at vmexit.  The processor doesn't restore the whole host state at vmexit time, but KVM must restore at least whatever is needed to run Linux (e.g. the %fs base to access per_cpu variables).<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658947/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    </details>
+</details>
+</details>
+</details>
+</details>
+</details>
+<a name="CommAnchor658770"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 30, 2015 3:42 UTC (Wed)
+                               by <b>voltagex</b> (guest, #86296)
+                              [<a href="/Articles/658770/">Link</a>] (1 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+<font class="QuotedText">&gt; (man, I should send those Jazz Jackrabbit patches upstream...)</font><br>
+<p>
+Yes, yes you should. By the way, can you still buy that game? That and OMF 2097 are my favourites of all time.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658770/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658799"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 30, 2015 13:46 UTC (Wed)
+                               by <b>pbonzini</b> (subscriber, #60935)
+                              [<a href="/Articles/658799/">Link</a>] 
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+I don't know, I play the shareware version. :)<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658799/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    </details>
+</details>
+<a name="CommAnchor658772"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 30, 2015 6:17 UTC (Wed)
+                               by <b>eru</b> (subscriber, #2753)
+                              [<a href="/Articles/658772/">Link</a>] (7 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <i>on one hand you don't need near bare-metal performance that KVM provides, because dosemu/dosbox only need to emulate a 100 MHz machine or so, and a simple interpreter or a JIT compiler like QEMU's can handle it </i>
+<p>
+Probably true for old games, but the situation I am thinking of involves using ancient cross-compilers to compiler large masses of legacy code for a weird environment that still has to be maintained. One would think (and I did think) this is an I/O-bound operation, but it turned out the speed difference between dosemu with VM86 and dosemu on x86_86 with emulation is very noticeable (order of magnitude for large inputs). On the other hand, dosemu also has advantages, because it can run "headless", can easily access native files, and starts up quickly. These are important features, because the ancient compilers are wrapped in layers that hide their MS-DOS internals, so from the Linux user's point of view they act like normal command-line tools.
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658772/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658800"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 30, 2015 13:46 UTC (Wed)
+                               by <b>pbonzini</b> (subscriber, #60935)
+                              [<a href="/Articles/658800/">Link</a>] (6 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+What makes you use dosemu or dosbox instead of QEMU (with or without KVM)?<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658800/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658804"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 30, 2015 15:28 UTC (Wed)
+                               by <b>eru</b> (subscriber, #2753)
+                              [<a href="/Articles/658804/">Link</a>] (5 responses)
+      </p>
+      
+      </div>
+      </summary>
+      I probably should look into qemu again some day. One problem is file system access. As noted, I want the MS-DOS compilers to transparently compile sources in the Linux file system and write the objects there, and preferably without having to install any network support in the emulated MS-DOS or FreeDOS, so to leave maximum "real" memory for the compilers. Both dosemu and dosbox handle this requirement.
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658804/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658822"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 30, 2015 17:15 UTC (Wed)
+                               by <b>felix.s</b> (guest, #104710)
+                              [<a href="/Articles/658822/">Link</a>] (4 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+There's vvfat, but QEMU people say it's deprecated, and writing (which has to be manually enabled) currently seems broken. I found a virtio-9p driver for DOS: &lt;<a rel="nofollow" href="http://www.zytor.com/pub/git/dos/virtio9p.git/">http://www.zytor.com/pub/git/dos/virtio9p.git/</a>&gt;, but it's half-done, seems abandoned, and doesn't even compile properly as of now (binutils' fault though; bug 18963). On the other hand, the missing part is mostly the "boring" stuff, which is actually translating DOS file system accesses into 9P protocol exchanges (including file name translation). Maybe you can persuade hpa to get back to it :)<br>
+<p>
+Also, funnily enough, some time ago I've been working on a DOS/BIOS ABI layer based on KVM (I tried to make backends interchangeable, but I'm not sure how well I've succeeded), and I think it would be ideal for the use case you describe. I even managed to include a simplistic packet driver, so I can use the FDNPKG package manager to download programs to test. However, the code is currently such a mess that I'm too embarrassed to publish it. Maybe some day...<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658822/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658830"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 30, 2015 17:34 UTC (Wed)
+                               by <b>josh</b> (subscriber, #17465)
+                              [<a href="/Articles/658830/">Link</a>] (3 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+I've been thinking about using the KVM API to prototype a new virtio filesystem, both for simplicity (this shouldn't need a full network filesystem) and to improve on 9p's very high access latency.  (Try building a kernel under virtio-9p, and compare to host performance building the same kernel.)  9p provides reasonable throughput, but not reasonable latency.  Given the ability to map guest memory, file data access could occur by mmap()ing the file on the host and then handing that memory to the guest; however, that doesn't address the performance of calls like stat(), which need to run absurdly fast and absurdly often.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658830/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658833"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 30, 2015 17:49 UTC (Wed)
+                               by <b>kvaneesh</b> (subscriber, #45646)
+                              [<a href="/Articles/658833/">Link</a>] (2 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+With cache=loose, we should used the cached value in the inode in getattr (v9fs_vfs_getattr_dotl). So stat should be fast. <br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658833/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658878"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 1, 2015 6:29 UTC (Thu)
+                               by <b>kleptog</b> (subscriber, #1183)
+                              [<a href="/Articles/658878/">Link</a>] (1 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+I set up a system locally to run programs under a VM in qemu-kvm with shared folders and it was insanely slow, especially git and find. Stracing on the host showed that for each stat() in the guest, the host was doing a stat() on each directory component. So a stat() of a complete directory tree went O(N^2) on the directory depth.<br>
+<p>
+Now, I get that it's probably a configuration issue since it clearly wasn't caching anything, but I found it really hard to find documentation about qemu that explained this behaviour. On top of that I'm managing them via libvirt, so even if I find a command-line option to deal with something, if libvirt doesn't support it I'm still SOL.<br>
+<p>
+Overall, it hasn't been a great experience, next time I'll probably do what other people do, use VirtualBox or VMWare.<br>
+<p>
+But back to the article, it's a pretty nice interface actually. Hopefully I'll find some reason to use it sometime :)<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658878/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor659978"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 8, 2015 16:48 UTC (Thu)
+                               by <b>LightDot</b> (guest, #73140)
+                              [<a href="/Articles/659978/">Link</a>] 
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+You can pass raw qemu command line in the libvirt XML. This is an equivalent of '-vnc :30,tls -k fr -no-fd-bootchk':<br>
+<p>
+&lt;domain type='kvm' xmlns:qemu='<a rel="nofollow" href="http://libvirt.org/schemas/domain/qemu/1.0">http://libvirt.org/schemas/domain/qemu/1.0</a>'&gt;<br>
+...<br>
+  &lt;qemu:commandline&gt;<br>
+    &lt;qemu:arg value='-vnc'/&gt;<br>
+    &lt;qemu:arg value=':30,tls'/&gt;<br>
+    &lt;qemu:arg value='-k'/&gt;<br>
+    &lt;qemu:arg value='fr'/&gt;<br>
+    &lt;qemu:arg value='-no-fd-bootchk'/&gt;<br>
+  &lt;/qemu:commandline&gt;<br>
+&lt;/domain&gt;<br>
+<p>
+The VNC option doesn't need to be presented as a command line, I just left it as an example.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/659978/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    </details>
+</details>
+</details>
+</details>
+</details>
+</details>
+</details>
+</details>
+<a name="CommAnchor658856"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 30, 2015 21:16 UTC (Wed)
+                               by <b>luto</b> (subscriber, #39314)
+                              [<a href="/Articles/658856/">Link</a>] (1 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+<font class="QuotedText">&gt; Note that KVM used QEMU to handle the boot phase only in the very beginning; nowadays it uses vm86 mode or an in-kernel interpreter if unrestricted guest mode is unavailable. This avoids duplicating the emulation code between the kernel and userspace. Userspace doesn't know if you're running on a &gt;=Westmere processor (or AMD, which has always had the equivalent of unrestricted mode--they called it "paged real mode"), or if you need to work around the limitations of the processor.</font><br>
+<p>
+Please tell me that this is at least *guest* vm86 mode and not host vm86 mode.<br>
+<p>
+Also, why does it care how the guest-&gt;host physical mappings are set up?<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658856/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658882"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 1, 2015 7:21 UTC (Thu)
+                               by <b>pbonzini</b> (subscriber, #60935)
+                              [<a href="/Articles/658882/">Link</a>] 
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+Yes, it's still VMX, but the guest has CR0.PE=1 and EFLAGS.VM=1.<br>
+<p>
+<font class="QuotedText">&gt; Also, why does it care how the guest-&gt;host physical mappings are set up?</font><br>
+<p>
+Can you explain your question better? Who is the subject?<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658882/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    </details>
+</details>
+<a name="CommAnchor658863"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 30, 2015 23:04 UTC (Wed)
+                               by <b>josh</b> (subscriber, #17465)
+                              [<a href="/Articles/658863/">Link</a>] (2 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+Incidentally, with your background in qemu and kvm, perhaps you could explain (or point to documentation explaining) the purpose of KVM_SET_TSS_ADDR and KVM_SET_IDENTITY_MAP_ADDR, and what cases need them?  A simple VM works without them, but the documentation lists them both as required for x86 VM setup.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658863/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658883"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 1, 2015 8:21 UTC (Thu)
+                               by <b>pbonzini</b> (subscriber, #60935)
+                              [<a href="/Articles/658883/">Link</a>] (1 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+They are needed for unrestricted_guest=0.  Remember that, in that case, the VM always runs in protected mode and with paging enabled.  In order to emulate real mode you put the guest in a vm86 task, so you need some place for a TSS and for a page table, and they must be in guest RAM because the guest's TR and CR3 points to it.  They are invisible to the guest, because the STR and MOV-from-CR instructions are invalid in vm86 mode, but it must be there.<br>
+<p>
+If you don't call KVM_SET_TSS_ADDR you actually get a complaint in dmesg, and the TR stays at 0.  I am not really sure what kind of bad things can happen with unrestricted_guest=0, probably you just get a VM Entry failure.  The TSS takes 3 pages of memory.  An interesting point is that you actually don't need to set the TR selector to a valid value (as you would do when running in "normal" vm86 mode), you can simply set the base and limit registers that are hidden in the processor, and generally inaccessible except through VMREAD/VMWRITE or system management mode.  So KVM needs to set up a TSS but not a GDT.<br>
+<p>
+For paging, instead, 1 page is enough because we have only 4GB of memory to address.  KVM disables CR4.PAE (page address extensions, aka 8-byte entries in each page directory or page table) and enables CR4.PSE (page size extensions, aka 4MB huge pages support with 4-byte page directory entries).  One page then fits 1024 4-byte page directory entries, each for a 4MB huge pages, totaling exactly 4GB.  Here if you don't set it the page table is at address 0xFFFBC000.  QEMU changes it to 0xFEFFC000 so that the BIOS can be up to 16MB in size (the default only allows 256k between 0xFFFC0000 and 0xFFFFFFFF).<br>
+<p>
+The different handling, where only the page table has a default, is unfortunate, but so goes life...<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658883/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658942"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 1, 2015 15:54 UTC (Thu)
+                               by <b>josh</b> (subscriber, #17465)
+                              [<a href="/Articles/658942/">Link</a>] 
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+<font class="QuotedText">&gt; They are needed for unrestricted_guest=0. Remember that, in that case, the VM always runs in protected mode and with paging enabled. In order to emulate real mode you put the guest in a vm86 task, so you need some place for a TSS and for a page table, and they must be in guest RAM because the guest's TR and CR3 points to it.</font><br>
+<p>
+Ah, I see.<br>
+<p>
+<font class="QuotedText">&gt; If you don't call KVM_SET_TSS_ADDR you actually get a complaint in dmesg, and the TR stays at 0.</font><br>
+<p>
+While I saw the mention of that message in a few places, I don't actually get that message at any point.  Presumably that only happens with unrestricted_guest=0?<br>
+<p>
+Please consider documenting the use of these two ioctls and the data they point to, as well as what circumstances require them; the current KVM documentation doesn't mention any of that.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658942/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    </details>
+</details>
+</details>
+</details>
+</details>
+</details>
+<a name="CommAnchor658739"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 29, 2015 19:16 UTC (Tue)
+                               by <b>Cyberax</b> (<b>&#x272D; supporter &#x272D;</b>, #52523)
+                              [<a href="/Articles/658739/">Link</a>] (2 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+Wow! This API is actually easy and straightforward. Far, far easier than I'd expect from a system emulator.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658739/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658744"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Sep 29, 2015 20:17 UTC (Tue)
+                               by <b>drag</b> (guest, #31333)
+                              [<a href="/Articles/658744/">Link</a>] 
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+Well if you look at what KVM does... all it ultimately does is allow you to execute ring0 code in ring2 on a x86 cpu. That way you don't have to modify the OS kernel to be able to execute it as a application. The alternative is to do what Xen did with Linux and patch it so that you can run the Linux kernel more like a regular application.<br>
+<p>
+Previously you had kernel mode and then you had usermode ways to execute code. Now you have a third way, the kvm way.  There isn't much to emulate because it's not using emulation at all. It's just executing the code directly on your processor. The only really magic/complicated stuff that happens is to deal with memory addressing for the guest OS.<br>
+<p>
+Qemu does all the heavy lifting as far as 'system emulator' goes. <br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658744/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    </details>
+<a name="CommAnchor658867"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 1, 2015 0:22 UTC (Thu)
+                               by <b>rahvin</b> (guest, #16953)
+                              [<a href="/Articles/658867/">Link</a>] 
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+If you think about it, this is probably the very reason most of the KVM internals were already in the Linux Kernel when Xen and VmWare were arguing over the "standard" for the changes to the Linux Kernel they needed. It pretty obvious that this is the reason why to me. The changes are straightforward and simple. <br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658867/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    </details>
+</details>
+<a name="CommAnchor658938"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">novm / kvmtool still alive?</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 1, 2015 15:39 UTC (Thu)
+                               by <b>sjj</b> (guest, #2020)
+                              [<a href="/Articles/658938/">Link</a>] (2 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+Last novm commit on github is 8 months old. kvmtool that I found doesn't seem all that active either. Is there something shinier out there that is actively being developed? <br>
+<p>
+I generally don't run non-linux VMs, so these would be nice. Everytime I see a cloud image pull in some firmware packages I cry a little inside.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658938/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor658945"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">novm / kvmtool still alive?</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 1, 2015 15:58 UTC (Thu)
+                               by <b>josh</b> (subscriber, #17465)
+                              [<a href="/Articles/658945/">Link</a>] (1 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+<font class="QuotedText">&gt; Last novm commit on github is 8 months old.</font><br>
+<p>
+True, novm appears somewhat stale, and I don't know if it sees active use.  I mentioned it only as an example of an interesting project using KVM directly.<br>
+<p>
+<font class="QuotedText">&gt; kvmtool that I found doesn't seem all that active either.</font><br>
+<p>
+It does most of what people using it want; it tend to grow new features as the KVM API does, grow new architectures when KVM supports them and someone wants to run kvmtool on them, and occasionally gain new drivers.  I'd recommend trying kvmtool in its current state; it works quite well.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658945/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor659106"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">novm / kvmtool still alive?</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 4, 2015 4:10 UTC (Sun)
+                               by <b>sjj</b> (guest, #2020)
+                              [<a href="/Articles/659106/">Link</a>] 
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+Thanks, I'll play with kvmtool a bit. I guess <a href="https://git.kernel.org/pub/scm/linux/kernel/git/will/kvmtool.git">https://git.kernel.org/pub/scm/linux/kernel/git/will/kvmt...</a> is the current canonical source?<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/659106/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    </details>
+</details>
+</details>
+<a name="CommAnchor658999"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 2, 2015 10:13 UTC (Fri)
+                               by <b>lkundrak</b> (subscriber, #43452)
+                              [<a href="/Articles/658999/">Link</a>] 
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+An excellent article. Thank you!<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/658999/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    </details>
+<a name="CommAnchor659012"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 2, 2015 14:36 UTC (Fri)
+                               by <b>kjp</b> (guest, #39639)
+                              [<a href="/Articles/659012/">Link</a>] (1 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+This is pretty cool. Is there any way to tell if a given process has created a KVM/VCPU?  Is there a limit as to how many can be created on the system total, and how to enumerate all of the existing ones?<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/659012/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor659055"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 2, 2015 18:54 UTC (Fri)
+                               by <b>josh</b> (subscriber, #17465)
+                              [<a href="/Articles/659055/">Link</a>] 
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+<font class="QuotedText">&gt; Is there any way to tell if a given process has created a KVM/VCPU?</font><br>
+<p>
+Nothing better than lsof or equivalent.<br>
+<p>
+<font class="QuotedText">&gt; Is there a limit as to how many can be created on the system total,</font><br>
+<p>
+As far as I know, no limit on the number of VMs other than available memory, but at the moment some limits exist on the number of VCPUs per VM.  Those limits seem fixable, not inherent, though.<br>
+<p>
+<font class="QuotedText">&gt; and how to enumerate all of the existing ones?</font><br>
+<p>
+Not as far as I know.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/659055/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    </details>
+</details>
+<a name="CommAnchor660277"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API with ARM?</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 10, 2015 21:00 UTC (Sat)
+                               by <b>alison</b> (subscriber, #63752)
+                              [<a href="/Articles/660277/">Link</a>] (2 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+<font class="QuotedText">&gt; we'll set up an x86 virtual machine using Intel VT. For another platform, you'd need to handle </font><br>
+<font class="QuotedText">&gt; different registers, different virtual hardware, and different expectations about memory layout </font><br>
+<font class="QuotedText">&gt; and initial state.</font><br>
+<p>
+Is anyone among the readers familiar enough with ARM to comment on how similar an implementation of a simple VM there would be?    Obviously an ARM version would not employ Intel VT, and ARM ISA has its own notion of privilege levels, to begin with.<br>
+<p>
+<font class="QuotedText">&gt; Other than learning, debugging a virtual machine implementation, or as a party trick, why use </font><br>
+<font class="QuotedText">&gt; /dev/kvm directly?</font><br>
+<p>
+Please invite me to your parties.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/660277/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor662339"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API with ARM?</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 29, 2015 2:52 UTC (Thu)
+                               by <b>yehuday</b> (guest, #93707)
+                              [<a href="/Articles/662339/">Link</a>] (1 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+<font class="QuotedText">&gt; Is anyone among the readers familiar enough with ARM to comment on how similar an implementation of a simple VM there would be? Obviously an ARM version would not employ Intel VT, </font><br>
+<font class="QuotedText">&gt; and ARM ISA has its own notion of privilege levels, to begin with.</font><br>
+ARM added support for virtualization as an extension to ARMv7 architecture which later become part of ARMv8.<br>
+Hardware support for virtualization on ARM is a achieved by:<br>
+ 1. introducing a new CPU privellege level for hypervisors called Hyp or Excpetion Level 2 (EL2).<br>
+ 2. Adding 2nd stage translation to the CPUs MMU<br>
+ 3. Adding support for virtual interrupts to the generic interrupt controller (GIC)<br>
+ 4, Adding support for virtual timer in the ARM architected timer<br>
+<p>
+there is a great article from Christopher Dall et all explaining how KVM was ported to ARM<br>
+<a rel="nofollow" href="http://systems.cs.columbia.edu/files/wpid-asplos2014-kvm.pdf">http://systems.cs.columbia.edu/files/wpid-asplos2014-kvm.pdf</a><br>
+<p>
+<p>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/662339/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor665093"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API with ARM?</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Nov 19, 2015 23:00 UTC (Thu)
+                               by <b>marcH</b> (subscriber, #57642)
+                              [<a href="/Articles/665093/">Link</a>] 
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+<font class="QuotedText">&gt; <a href="http://systems.cs.columbia.edu/files/wpid-asplos2014-kvm.pdf">http://systems.cs.columbia.edu/files/wpid-asplos2014-kvm.pdf</a></font><br>
+<p>
+1972, 2005, 2014,...<br>
+<p>
+In some respects computers can be quite depressing: mostly re-inventing the old <a href="https://en.wikipedia.org/wiki/Hardware-assisted_virtualization#History">https://en.wikipedia.org/wiki/Hardware-assisted_virtualiz...</a><br>
+<p>
+Sure, they're now much faster... to crash.<br>
+<p>
+<p>
+(on a more positive note the article is really good)<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/665093/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    </details>
+</details>
+</details>
+<a name="CommAnchor702499"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 4, 2016 2:24 UTC (Tue)
+                               by <b>sahil</b> (guest, #100553)
+                              [<a href="/Articles/702499/">Link</a>] (4 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+Why is 0x3f8 chosen for serial port?<br>
+Is this related to the guest physical address range, in which we have mapped the memory?<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/702499/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor702501"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 4, 2016 4:15 UTC (Tue)
+                               by <b>zlynx</b> (guest, #2285)
+                              [<a href="/Articles/702501/">Link</a>] (3 responses)
+      </p>
+      
+      </div>
+      </summary>
+      As far back as I can remember that was the serial port address. It's historical. 
+<p>
+See <a href="https://en.wikipedia.org/wiki/COM_(hardware_interface)">COM</a> on Wikipedia.
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/702501/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor702502"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 4, 2016 6:28 UTC (Tue)
+                               by <b>sahil</b> (guest, #100553)
+                              [<a href="/Articles/702502/">Link</a>] (2 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+I searched the Intel software developer manual, didn't find any reference to it. Seems, to have a purely historical meaning.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/702502/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor702503"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 4, 2016 7:01 UTC (Tue)
+                               by <b>jem</b> (subscriber, #24231)
+                              [<a href="/Articles/702503/">Link</a>] (1 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+<font class="QuotedText">&gt; I searched the Intel software developer manual, didn't find any reference to it. Seems, to have a purely historical meaning.</font><br>
+<p>
+You should search the IBM PC reference manual instead.<br>
+<p>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/702503/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor702558"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Oct 4, 2016 16:51 UTC (Tue)
+                               by <b>sahil</b> (guest, #100553)
+                              [<a href="/Articles/702558/">Link</a>] 
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+I initially thought that this number '0x3f8' has a special significance for kvm api, as in, kvm would recognize this address as an memory mapped I/O or some other special address. The truth is that KVM exits due to 'out' opcode, and not because of the address. In the host, we then check the 1st operand of this 'out' opcode matches the value we gave, '0x3f8' in this case. We can have any other number (as long as it is 1 byte long) as operand, thus even 'out 0x4000, al', or 'out 0x0000, al' (intel syntax) would work just fine.<br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/702558/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    </details>
+</details>
+</details>
+</details>
+</details>
+<a name="CommAnchor805131"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Nov 19, 2019 11:00 UTC (Tue)
+                               by <b>dizz</b> (guest, #134779)
+                              [<a href="/Articles/805131/">Link</a>] (1 responses)
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+This is a very helpful article (including the comments). Thanks for the time in putting it together. If folks are interested a recent rust-related development in coding against KVM is the rust-vmm project [1]. It aims to create a common base line of libraries (crates) to ease the development of VMMs/Hypervisors. One of the related projects to rust-vmm is Intel's cloud-hypervisor [2] and while looking through its code base I found the article's sample code implemented [3] in rust using parts of rust-vmm.<br>
+<p>
+[1] <a rel="nofollow" href="https://github.com/rust-vmm">https://github.com/rust-vmm</a><br>
+[2] <a rel="nofollow" href="https://github.com/intel/cloud-hypervisor">https://github.com/intel/cloud-hypervisor</a><br>
+[3] <a rel="nofollow" href="https://github.com/intel/cloud-hypervisor/blob/master/vmm/src/vm.rs#L756-L854">https://github.com/intel/cloud-hypervisor/blob/master/vmm...</a><br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/805131/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    <a name="CommAnchor812765"></a>
+    <details class="CommentBox" open>
+      <summary><h3 class="CommentTitle">Using the KVM API</h3>
+      <div class="AnnLine">
+      <p class="CommentPoster"> Posted Feb 18, 2020 16:31 UTC (Tue)
+                               by <b>josh</b> (subscriber, #17465)
+                              [<a href="/Articles/812765/">Link</a>] 
+      </p>
+      
+      </div>
+      </summary>
+      <div class="FormattedComment">
+Yes, rust-vmm is extremely satisfying, and I highly recommend it. I've experimented with it, and it makes simple VMs quite straightforward to write.<br>
+<p>
+I gave a talk on the /dev/kvm API, Rust, and rust-vmm, at BangBangCon: <a href="https://www.youtube.com/watch?v=A_diEEpAfpM">https://www.youtube.com/watch?v=A_diEEpAfpM</a><br>
+</div>
+
+      
+          <div class="CommentReplyButton">
+            <form action="/Articles/812765/comment" method="post">
+            <input type="submit" value="Reply to this comment">
+            </form>
+          </div>
+        
+     <p>
+     
+    </details>
+</details>
+
+</div> <!-- ArticleText -->
+</div> <!-- middlecolumn -->
+<div class="rightcol not-print">
+<ins data-revive-zoneid="12085" 
+data-revive-id="fa8c6c9da7f33852f7097c4a94da1070"></ins>
+<script async src="//servedby.aqua-adserver.com/asyncjs.php"></script>
+</div>
+</div> <!-- maincolumn -->
+
+            <br clear="all">
+            <center>
+            <P>
+            <span class="ReallySmall">
+            Copyright &copy; 2015, Eklektix, Inc.<BR>
+            
+            Comments and public postings are copyrighted by their creators.<br>
+            Linux  is a registered trademark of Linus Torvalds<br>
+            </span>
+            </center>
+            
+            </body></html>

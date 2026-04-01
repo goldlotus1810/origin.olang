@@ -839,6 +839,37 @@ P10: Implement mol-level decode (instead of string overlap)
 
 ---
 
+## Integration with Parasitic Kernel (BP12)
+
+### 1. PERCEIVE via io_uring
+
+- All input sources (keyboard, network, camera, file) through single io_uring ring
+- SQE per source: IORING_OP_READ for evdev, IORING_OP_RECV for socket
+- Non-blocking: pipeline never waits for I/O
+- SQPOLL mode: kernel thread polls, zero syscall overhead for submission
+
+### 2. ACT via framebuffer
+
+- Response rendering directly to /dev/fb0 mmap'd buffer
+- Pixel-level control: draw text, graphs, status indicators
+- No X11/Wayland dependency
+
+### 3. ACTIVATE via mmap'd KnowTree
+
+- Spreading activation runs on mmap'd 256MB fact store
+- Only accessed pages loaded into physical RAM (MAP_NORESERVE)
+- Activation field: second mmap region for temporary values
+
+### 4. HRL Integration (from Lupin's Agent AI PDF)
+
+- Pipeline = Low-Level Policy (Worker) in HRL
+- Agent PTAV = High-Level Policy (Manager)
+- Manager decides WHAT to process, Worker decides HOW
+- Options Framework (Sutton 1999): each pipeline run = one "option"
+- Option = (initiation set, policy, termination condition)
+
+---
+
 ## Related Specs
 - [VM Spec §45-§50](VM_SPEC_COMPLETE.md) — activation matrix, CLONALG, DCA
 - [BP2 Encode](SPEC_BP2_ENCODE.md) — Layer 1 (Capture)

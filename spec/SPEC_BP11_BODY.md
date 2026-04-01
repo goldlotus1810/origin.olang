@@ -99,6 +99,90 @@ Kelkar (2021): Cognitive Homeostatic Agents
 docs/reference/SDF_QUILEZ_COMPLETE.md
 ```
 
+## Parasitic Kernel Integration (BP12)
+
+### 1. Camera → P_weight (via V4L2)
+
+```
+Syscalls (all via __syscall in Olang):
+fd = open("/dev/video0", O_RDWR)                         // syscall 2
+ioctl(fd, VIDIOC_S_FMT, &fmt)                            // syscall 16
+ioctl(fd, VIDIOC_REQBUFS, &req)
+buf_ptr = mmap(NULL, buf.length, PROT_RW, MAP_SHARED, fd, buf.m.offset)
+ioctl(fd, VIDIOC_STREAMON, &type)
+ioctl(fd, VIDIOC_DQBUF, &buf)  // dequeue frame
+// Process frame pixels at buf_ptr
+ioctl(fd, VIDIOC_QBUF, &buf)   // return buffer
+
+Frame → mol:
+S = edge_density (Sobel filter on pixel grid)
+R = symmetry (compare left/right halves)
+V = warmth (sum red pixels / sum blue pixels)
+A = saturation (max(RGB) - min(RGB) per pixel, average)
+T = motion (pixel diff between frames)
+```
+
+### 2. Screen → P_weight (via framebuffer)
+
+```
+fd = open("/dev/fb0", O_RDONLY)
+ioctl(fd, 0x4600, &var_info)  // FBIOGET_VSCREENINFO
+ioctl(fd, 0x4602, &fix_info)  // FBIOGET_FSCREENINFO  
+fb = mmap(NULL, fix_info.smem_len, PROT_READ, MAP_SHARED, fd, 0)
+
+// Read what's on screen — Nox sees its own output and other programs
+// Same encoding as camera: edge density, color, motion
+```
+
+### 3. Keyboard → P_weight (via evdev)
+
+```
+fd = open("/dev/input/event0", O_RDONLY)
+read(fd, &ev, 24)  // input_event struct
+
+Key → mol:
+S = key_category (letter=1, number=2, symbol=3, modifier=4, function=5)
+R = key_position (row on keyboard, 0-3)
+V = sentiment_bias (exclamation=high, question=mid, period=low)
+A = typing_speed (time between keypresses)
+T = sequence_position (first key in burst vs continuation)
+```
+
+### 4. Interoception → P_weight (via /proc)
+
+```
+Already available via __file_read:
+/proc/loadavg → cpu load
+/proc/meminfo → memory usage
+/proc/self/status → Nox's own memory/threads
+__heap_used() → Nox's heap state
+
+System → mol:
+S = 0 (no shape for internal state)
+R = process_count / 256 (how busy)
+V = 1 - error_rate (health)
+A = cpu_load (activity)
+T = uptime_bucket (time phase)
+
+Homeostatic drive (Kelkar 2021):
+drive(var) = |current - setpoint| / tolerance
+drive > 1.0 → prioritize restoring that variable
+Highest drive wins attention (hunger vs thirst analogy)
+```
+
+### 5. Audio → P_weight (future, needs ALSA)
+
+```
+fd = open("/dev/snd/pcmC0D0c", O_RDONLY)  // or ALSA via ioctl
+
+Audio → mol:
+S = 1 - stability (spectral flux)
+R = stability (spectral centroid consistency)
+V = zcr × 0.6 + rms × 0.4 (zero-crossing + volume)
+A = rms (volume/energy)
+T = zcr (pitch indicator)
+```
+
 ---
 
 ## Related Specs

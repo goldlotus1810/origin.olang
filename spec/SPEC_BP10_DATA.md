@@ -67,6 +67,45 @@ docs/RUST_CRATE_ANALYSIS_ORIGINAL.md — ucd crate
 NOX_ROADMAP_FINAL.md Phase 2
 ```
 
+## Loading Strategy with mmap (BP12)
+
+### 1. mmap-based fact loading
+
+```
+Problem: boot heap exhaustion at ~1500 facts
+Solution: mmap(256MB, MAP_ANONYMOUS|MAP_NORESERVE)
+
+Binary format on disk:
+  nox_facts.bin = [header][mol_array][text_blob][index]
+  header: [magic:4="NOXF"][count:4][mol_off:4][text_off:4]
+
+Load: mmap the file directly (MAP_SHARED, read-only)
+  facts = mmap(NULL, file_size, PROT_READ, MAP_SHARED, fd, 0)
+  // Zero copy — kernel maps file pages directly
+  // Only pages accessed are loaded into RAM
+
+Result: 500K facts loadable, ~0ms boot (lazy load)
+```
+
+### 2. Data cleanup priorities
+
+```
+1. Remove NRC-VAD training sentences from KnowTree (they're not knowledge)
+2. Keep NRC-VAD V/A scores as lookup table (for cold-start encoding)
+3. Load Vietnamese facts (88 existing + expand to 500)
+4. Self-knowledge: Nox reads own source → learns architecture
+5. UDC 41K aliases: word → codepoint mapping (improves encoding)
+```
+
+### 3. Incremental learning
+
+```
+Boot: load base facts from nox_facts.bin (mmap, lazy)
+Runtime: new facts go to separate mmap region (nox_learned.bin)
+Dream: merge learned into base periodically
+Never lose runtime learning — append-only
+```
+
 ---
 
 ## Related Specs

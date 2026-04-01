@@ -1,0 +1,30 @@
+#!/bin/bash
+# nox_compile — Compile Olang without Python
+# Usage: ./nox_compile source.ol [output.olang]
+#
+# Uses Olang self-hosted compiler (compiler.ol on VM)
+# Falls back to Python if self-compile fails
+
+SOURCE="$1"
+OUTPUT="${2:-${SOURCE%.ol}.olang}"
+
+if [ -z "$SOURCE" ]; then
+    echo "Usage: ./nox_compile source.ol [output.olang]"
+    exit 1
+fi
+
+# Write args for Olang to read
+echo "$SOURCE
+$OUTPUT" > /tmp/.nox_args
+
+# Try self-compile first
+if [ -f /tmp/nox_compile.olang ]; then
+    /tmp/nox_compile.olang 2>/dev/null
+    if [ -f "$OUTPUT" ] && [ -x "$OUTPUT" ]; then
+        echo "Compiled (Olang native): $SOURCE → $OUTPUT"
+        exit 0
+    fi
+fi
+
+# Fallback: Python
+python3 tools/compile_nox.py "$SOURCE" "$OUTPUT"

@@ -61,6 +61,7 @@ let OP_POP = 0x0C;
 let OP_LOOP = 0x0E;
 let OP_HALT = 0x0F;
 let OP_STORE = 0x13;
+let OP_STORE_LOCAL = 0x16;
 let OP_PUSH_NUM = 0x15;
 let OP_CLOSURE = 0x25;
 let OP_ADD = 0x2A;
@@ -735,7 +736,7 @@ fn compile_node(node) {
 
     if kind == AST_LET {
         compile_node(__array_get(node, 2));
-        emit_byte(OP_STORE);
+        emit_byte(OP_STORE_LOCAL);
         emit_name(__array_get(node, 1));
         return 0;
     };
@@ -801,10 +802,10 @@ fn compile_node(node) {
         let body_len_off = current_offset();
         emit_u32(0);  // placeholder
         let body_start = current_offset();
-        // Store params (reversed)
+        // Store params (reversed) — local bindings
         let pi = len(params) - 1;
         while pi >= 0 {
-            emit_byte(OP_STORE);
+            emit_byte(OP_STORE_LOCAL);
             emit_name(__array_get(params, pi));
             pi = pi - 1;
         };
@@ -815,7 +816,7 @@ fn compile_node(node) {
         };
         let body_end = current_offset();
         patch_i32(body_len_off, body_end - body_start);
-        emit_byte(OP_STORE);
+        emit_byte(OP_STORE_LOCAL);
         emit_name(name);
         return 0;
     };

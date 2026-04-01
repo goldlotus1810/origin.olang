@@ -17,3 +17,8 @@ benchmark: vm
 
 clean:
 	rm -f /tmp/vm_nox.o test/vm2/*.olang tools/eval/*.olang
+
+# Python-free compilation (uses self-hosted compiler)
+compile: vm
+	@echo 'Usage: echo "source.ol\noutput.olang" > /tmp/.nox_args && tools/nox_compile.olang'
+
