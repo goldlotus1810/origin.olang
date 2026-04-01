@@ -12563,7 +12563,7 @@ builtin_jump_table:
     .quad   .call_not_builtin
     .quad   .builtin_slot_41
     .quad   .call_not_builtin
-    .quad   .call_not_builtin
+    .quad   .builtin_slot_59
     .quad   .builtin_slot_44
     .quad   .builtin_slot_45
     .quad   .call_not_builtin
@@ -12588,7 +12588,7 @@ builtin_jump_table:
     .quad   .call_not_builtin
     .quad   .builtin_slot_66
     .quad   .builtin_slot_67
-    .quad   .call_not_builtin
+    .quad   .builtin_mx_w
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .call_not_builtin
@@ -12596,7 +12596,7 @@ builtin_jump_table:
     .quad   .call_not_builtin
     .quad   .builtin_slot_74
     .quad   .call_not_builtin
-    .quad   .call_not_builtin
+    .quad   .builtin_mxr
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .builtin_slot_79
@@ -12604,7 +12604,7 @@ builtin_jump_table:
     .quad   .call_not_builtin
     .quad   .builtin_ktrd
     .quad   .call_not_builtin
-    .quad   .call_not_builtin
+    .quad   .builtin_mx_w
     .quad   .call_not_builtin
     .quad   .builtin_slot_86
     .quad   .builtin_slot_87
@@ -12906,8 +12906,52 @@ builtin_jump_table:
     movq    $F64_MARKER, 8(%r14)
     jmp     vm_loop
 
+# ═══ Matrix builtins: 65536 u16 entries in BSS (zero-init, 128KB) ═══
+
+# __mx_w(index, value) → store u16 at mol_matrix[index]
+.builtin_mx_w:
+    movabs  $0x2103FCFE38826C54, %rdx
+    cmp     %rdx, %rax
+    jne     .call_not_builtin
+    add     %rcx, %r13
+    movsd   (%r14), %xmm1              # value
+    movsd   16(%r14), %xmm0            # index
+    add     $32, %r14
+    cvttsd2siq %xmm0, %rdi            # index
+    cvttsd2siq %xmm1, %rax            # value
+    and     $0xFFFF, %edi              # clamp to 0-65535
+    lea     mol_matrix(%rip), %rcx
+    movw    %ax, (%rcx, %rdi, 2)       # store u16
+    sub     $16, %r14
+    movsd   %xmm1, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
+# __mx_r(index) → read u16 from mol_matrix[index]
+.builtin_mxr:
+    movabs  $0x1B7AE5F6946EB14C, %rdx
+    cmp     %rdx, %rax
+    jne     .call_not_builtin
+    add     %rcx, %r13
+    movsd   (%r14), %xmm0              # index
+    add     $16, %r14
+    cvttsd2siq %xmm0, %rdi            # index
+    and     $0xFFFF, %edi              # clamp to 0-65535
+    lea     mol_matrix(%rip), %rcx
+    movzwl  (%rcx, %rdi, 2), %eax     # load u16
+    sub     $16, %r14
+    cvtsi2sdq %rax, %xmm0
+    movsd   %xmm0, (%r14)
+    movq    $F64_MARKER, 8(%r14)
+    jmp     vm_loop
+
 # ── BSS (writable, zero-initialized) ────────────────────────────────────
 .section .bss
+
+# 65536 u16 matrix — direct P_weight → fact_index lookup. 128KB. O(1).
+mol_matrix:
+    .space 131072                       # 65536 × 2 bytes = 128KB
+
 var_table_base:
     .space 8                            # pointer to variable table on heap
 bc_format:
