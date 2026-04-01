@@ -516,14 +516,38 @@ pub fn pipeline(input) {
         let _wi = _wi + 1;
     };
 
+    // ═══ STEP 6: Instincts (G9) — pure 5D math ═══
+    // Test 8: Honesty gate — silence when confidence too low
+    // Text search (word match) = strong evidence. Mol nearest alone = weak.
+    let _has_text_match = len(_text_results);  // from word search (step 3a)
+    let _confidence = instinct_honesty_with_results(_mol, _has_text_match);
+    if _confidence < 400 {
+        // No word matches AND confidence low → check if mol nearest is too far
+        let _near_check = kt_nearest(_mol);
+        if len(_near_check) > 0 {
+            let _dist = _kt_mol_dist(_mol, _kt_real_mol(_near_check));
+            if _dist > 5 {
+                // Nearest fact is far in 5D → we truly don't know
+                wm_set(0, 0); wm_set(1, 0); wm_set(2, 0); wm_set(3, 0);
+                return "";
+            };
+        } else {
+            // Nothing at all → silence
+            wm_set(0, 0); wm_set(1, 0); wm_set(2, 0); wm_set(3, 0);
+            return "";
+        };
+    };
+    // Curiosity → learn mode boost
+    let _curiosity = instinct_curiosity(_mol);
+
     // STEP 4: Homeostasis — surprise drives learning rate
     let _nearest_mol = 0;
     if len(_text_results) > 0 { let _nearest_mol = _kt_real_mol(__array_get(_text_results, 0)); };
     wm_set(1, _nearest_mol);
     let _surprise = _homeostasis(_mol, _nearest_mol);
-    // λ: surprise > φ⁻¹ → learn mode, else → act mode
     let _learn_mode = 0;
     if _surprise > _phi_inv { let _learn_mode = 1; };
+    if _curiosity > 500 { let _learn_mode = 1; };
 
     // STEP 9: Hebbian fire — MODULATED by V'(t) (vi phân)
     // V'(t) > 0 → conversation improving → fire STRONGER (reinforce)
