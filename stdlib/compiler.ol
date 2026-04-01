@@ -536,7 +536,7 @@ fn parse_primary() {
         let val = advance();
         let node = [];
         push(node, AST_NUM);
-        push(node, parse_number(val));
+        push(node, val);  // already a number from lexer
         return node;
     };
     if t == TK_STR {
@@ -1013,7 +1013,7 @@ fn build_binary(source_path, output_path) {
 
 // Read command line args (passed as first arg to the binary)
 // For now, hardcode paths for testing
-let source_file = "/tmp/test_all.ol";
-let output_file = "/tmp/test_all_self.olang";
+let source_file = "/tmp/test_simple.ol";
+let output_file = "/tmp/test_simple_self.olang";
 
 build_binary(source_file, output_file);

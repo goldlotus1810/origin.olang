@@ -15,12 +15,20 @@
 ## OPEN (1 bug)
 11. **Recursive functions** — `fib(10)` = -80 (should be 55). Recursive calls overwrite parent's `n` in var_matrix. Needs scope save/restore (undo stack). SS15 domain.
 
-## WORKING
-- PushNum, Push (strings), Emit (f64 + strings)
-- Variables: let, assign, load/store via var_matrix
-- Arithmetic: +, -, *, /, %
-- Comparisons: ==, !=, <, >, <=, >=
-- Control flow: if/else, while (with backward jumps)
-- Functions: definition, call, return (non-recursive OK)
-- Functions shadow builtins correctly
-- 12/13 test cases pass
+## FIXED (continued)
+12. **.rodata section bug** — builtin handlers after jump table assembled into .rodata (non-executable). Fix: add `.text` before first handler.
+13. **builtin_jump_table renamed** — SS15 renamed to builtin_hash_table. Fix: update references.
+14. **len(array) bug** — popped array ptr before reading count. Fix: read ptr before pop.
+
+## OPEN
+15. **Self-hosting compiler parse error** — compiler.ol compiled by Python, runs on VM v2, fails parsing even `emit 42;`. Lexer logic verified correct in isolation. Likely: CPU stack overflow from deep function nesting (600 lines, many nested calls), or VM corruption under heavy closure recursion. Needs investigation.
+16. **f64_to_string truncation** — `__to_string(101)` prints "11" not "101". The emit f64 path works but to_string conversion loses digits.
+
+## WORKING (13/13 + arrays + file I/O)
+- All arithmetic, comparisons, control flow
+- Functions with recursion (fib(10)=55)
+- Arrays: create, push, get, len
+- File I/O: __file_read works
+- String operations: len, substr, char_at, __char_code
+- Self-hosting compiler: lexer, parser, codegen written (stdlib/compiler.ol)
+- Python compiler: fully working (tools/compile_nox.py)
