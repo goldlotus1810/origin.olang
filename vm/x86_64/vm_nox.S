@@ -2007,8 +2007,185 @@ mol_dist_inline:
     ret
 
 # ═══════════════════════════════════════════════════════════════════════════
-# §16 SIMD BATCH OPERATIONS (SSE2)
+# §29 CAPABILITY-BASED SECURITY
 # ═══════════════════════════════════════════════════════════════════════════
+
+# 0xB0: CapCheck — pop (slot, required_perms) → push 1/0
+op_cap_check:
+    movsd   xmm0, [r14]
+    cvttsd2si esi, xmm0              # required perms
+    movsd   xmm0, [r14+16]
+    cvttsd2si edi, xmm0              # slot
+    add     r14, 32
+    and     edi, 0xFF
+    lea     rcx, [rip + cap_table]
+    shl     edi, 3                   # × 8 bytes
+    movzx   eax, word ptr [rcx + rdi + 5]
+    and     eax, esi
+    cmp     eax, esi
+    je      .cpc_allow
+    xor     eax, eax
+    jmp     .cpc_push
+.cpc_allow:
+    mov     eax, 1
+.cpc_push:
+    sub     r14, 16
+    cvtsi2sd xmm0, eax
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# 0xB1: CapCreate — pop (type, id, perms) → push slot
+op_cap_create:
+    movsd   xmm0, [r14]
+    cvttsd2si esi, xmm0              # perms
+    movsd   xmm0, [r14+16]
+    cvttsd2si edx, xmm0              # id
+    movsd   xmm0, [r14+32]
+    cvttsd2si ecx, xmm0              # type
+    add     r14, 48
+    lea     rdi, [rip + cap_table]
+    xor     eax, eax
+.cc2_find:
+    cmp     eax, 256
+    jge     .cc2_full
+    cmp     byte ptr [rdi + rax*8], 0
+    je      .cc2_write
+    inc     eax
+    jmp     .cc2_find
+.cc2_write:
+    mov     byte ptr [rdi + rax*8], cl
+    mov     dword ptr [rdi + rax*8 + 1], edx
+    mov     word ptr [rdi + rax*8 + 5], si
+    mov     byte ptr [rdi + rax*8 + 7], 0
+    cvtsi2sd xmm0, eax
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+.cc2_full:
+    sub     r14, 16
+    mov     eax, -1
+    cvtsi2sd xmm0, eax
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# 0xB2: CapDelegate — pop (slot, child_perms) → push child_slot
+op_cap_delegate:
+    movsd   xmm0, [r14]
+    cvttsd2si esi, xmm0
+    movsd   xmm0, [r14+16]
+    cvttsd2si edi, xmm0
+    add     r14, 32
+    and     edi, 0xFF
+    lea     rcx, [rip + cap_table]
+    movzx   eax, word ptr [rcx + rdi*8 + 5]
+    test    eax, 8                   # DELEGATE bit
+    jz      .cd2_fail
+    and     esi, eax                 # reduce permissions
+    mov     cl, [rcx + rdi*8]        # type
+    mov     edx, [rcx + rdi*8 + 1]  # id
+    lea     rdi, [rip + cap_table]
+    xor     eax, eax
+.cd2_find:
+    cmp     eax, 256
+    jge     .cd2_fail
+    cmp     byte ptr [rdi + rax*8], 0
+    je      .cd2_create
+    inc     eax
+    jmp     .cd2_find
+.cd2_create:
+    mov     byte ptr [rdi + rax*8], cl
+    mov     dword ptr [rdi + rax*8 + 1], edx
+    mov     word ptr [rdi + rax*8 + 5], si
+    cvtsi2sd xmm0, eax
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+.cd2_fail:
+    sub     r14, 16
+    mov     eax, -1
+    cvtsi2sd xmm0, eax
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# 0xB3: CapRevoke — pop slot → revoke
+op_cap_revoke:
+    movsd   xmm0, [r14]
+    cvttsd2si edi, xmm0
+    add     r14, 16
+    and     edi, 0xFF
+    lea     rcx, [rip + cap_table]
+    mov     qword ptr [rcx + rdi*8], 0
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# 0xB4: SecGate — SecurityGate check V/A
+op_sec_gate:
+    mov     ecx, [r14]               # mol
+    add     r14, 16
+    mov     edx, ecx
+    shr     edx, 5
+    and     edx, 0x7                 # V
+    mov     esi, ecx
+    shr     esi, 2
+    and     esi, 0x7                 # A
+    sub     r14, 16
+    cmp     edx, 1                   # V ≤ 1?
+    jg      .sg2_safe
+    cmp     esi, 6                   # A ≥ 6?
+    jl      .sg2_safe
+    mov     eax, 1                   # CRISIS
+    cvtsi2sd xmm0, eax
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+.sg2_safe:
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# ═══════════════════════════════════════════════════════════════════════════
+# §17 SELF-MODIFICATION SUPPORT
+# ═══════════════════════════════════════════════════════════════════════════
+
+# hot_reload_check: verify new bytecode header
+# Input: rdi=ptr, rsi=size → eax=1 valid, 0 invalid
+hot_reload_check:
+    cmp     esi, 48
+    jl      .hrc_fail
+    cmp     dword ptr [rdi], 0x474E4C4F   # "OLNG" little-endian
+    jne     .hrc_fail
+    cmp     byte ptr [rdi+4], 2       # version 2
+    jne     .hrc_fail
+    mov     eax, 1
+    ret
+.hrc_fail:
+    xor     eax, eax
+    ret
+
+# self_define_builtin: register runtime builtin
+# edi=name_hash, esi=bytecode_offset → installs in table
+self_define_builtin:
+    mov     eax, edi
+    and     eax, 0x1FF
+    cmp     eax, 0x100
+    jl      .sdb_skip                # reserved range
+    lea     rcx, [rip + builtin_jump_table]
+    lea     rdx, [r12 + rsi]
+    mov     [rcx + rax*8], rdx
+.sdb_skip:
+    ret
+
+# ═══════════════════════════════════════════════════════════════════════════
+# §16 SIMD BATCH OPERATIONS (SSE2)
 
 # mol_batch_dist_8: 8 molecular distances in 1 SSE2 pass
 # Input: xmm0 = query broadcast, rsi = candidate u16 array ptr, ecx = offset
@@ -2175,43 +2352,50 @@ var_load_matrix:
     xor     edx, edx
     ret
 
-# f64_to_string: xmm0=value → rax=ptr, edx=len (on Zone C heap)
+# f64_to_string: xmm0=value → rax=ptr, rdx=len (on Zone C heap)
+# Converts f64 to decimal string. Integer part only for now.
 f64_to_string:
-    # Simple integer conversion for now
-    mov     rax, r15                 # output buffer
-    cvttsd2si rcx, xmm0             # integer part
+    push    r15                      # save heap ptr (= output start)
+    cvttsd2si rax, xmm0             # integer part
     # Handle negative
-    test    rcx, rcx
+    test    rax, rax
     jns     .f2s_pos
     mov     byte ptr [r15], '-'
     inc     r15
-    neg     rcx
+    neg     rax
 .f2s_pos:
-    # Convert integer to decimal digits
-    mov     rdi, r15
-    add     rdi, 20                  # temp end
-    mov     r8, rdi                  # save end
+    # Handle zero
+    test    rax, rax
+    jnz     .f2s_nonzero
+    mov     byte ptr [r15], '0'
+    inc     r15
+    jmp     .f2s_done
+.f2s_nonzero:
+    # Convert integer to decimal digits (reversed into temp area)
+    lea     rdi, [r15 + 24]          # temp end marker
+    mov     r8, rdi
 .f2s_digit:
+    test    rax, rax
+    jz      .f2s_copy
     xor     edx, edx
-    mov     rsi, 10
-    div     rsi                      # rcx/10, remainder in rdx
+    mov     rcx, 10
+    div     rcx                      # rax = quotient, rdx = remainder
     add     dl, '0'
     dec     rdi
     mov     [rdi], dl
-    mov     rcx, rax
-    test    rcx, rcx
-    jnz     .f2s_digit
-    # Copy digits to output
-    mov     rsi, rdi
-    mov     rdi, r15
+    jmp     .f2s_digit
+.f2s_copy:
+    # Copy digits from temp area to output (they were reversed)
+    mov     rsi, rdi                 # src = first digit
+    mov     rdi, r15                 # dst = output position
     mov     rcx, r8
     sub     rcx, rsi                 # digit count
-    push    rcx
     rep     movsb
-    pop     rdx
-    add     rdx, r15
-    sub     rdx, rax                 # total len = digits + possible '-'
-    mov     r15, rdi                 # bump heap
+    mov     r15, rdi                 # r15 = past last digit
+.f2s_done:
+    pop     rax                      # rax = output start
+    mov     rdx, r15
+    sub     rdx, rax                 # rdx = total length
     ret
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -2375,8 +2559,8 @@ codegen_table:
     .rept 16
     .quad   op_nop          # TODO: fused instructions
     .endr
-    # 0xB0-0xB4: Security
-    .quad   op_nop, op_nop, op_nop, op_nop, op_nop
+    # 0xB0-0xB4: Security (§29)
+    .quad   op_cap_check, op_cap_create, op_cap_delegate, op_cap_revoke, op_sec_gate
     # 0xB5-0xBF: reserved
     .quad   op_nop, op_nop, op_nop, op_nop, op_nop, op_nop, op_nop
     .quad   op_nop, op_nop, op_nop, op_nop
@@ -3855,3 +4039,8 @@ try_depth:      .space 8
 # SIMD temp buffer
 .align 16
 simd_temp:      .space 16              # 8 × u16 results
+
+# §29: Capability table — 256 × 8 bytes = 2KB
+# Entry: [type:1][id:4][perms:2][owner:1]
+.align 8
+cap_table:      .space 2048
