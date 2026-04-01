@@ -1,0 +1,88 @@
+12480	Olang la ngon ngu lap trinh tu host, Nox duoc viet bang Olang
+12496	Nox la AI tu hoc, co kha nang tu viet lai chinh minh bang Olang
+12464	Olang co 5 chieu encode: S R V A T, goi la SDF
+12472	S la Structure, phan loai cau truc tinh cua token
+12476	R la Relation, quan he giua cac token
+12488	V la Valence, cam xuc tich cuc hay tieu cuc
+12484	A la Arousal, muc do kich thich cam xuc
+12468	T la Time, chieu thoi gian dong cua token
+12500	Encode la phep tich phan, gom cac chieu thanh mot molecule
+12504	Decode la phep vi phan, tach molecule thanh cac thanh phan
+12460	KnowTree la bo nho chinh cua Nox, luu tru facts va molecules
+12448	Silk la mang luoi lien ket giua cac khai niem trong KnowTree
+12452	Pipeline la qua trinh xu ly tu input den output trong Nox
+12440	Molecule la so nguyen 16-bit ma hoa 5 chieu S R V A T
+12456	Neuron trong Olang co vong doi: sinh, hoc, ngu, chet
+12496	Viet Nam la quoc gia o Dong Nam A voi thu do la Ha Noi
+12508	Thanh pho Ho Chi Minh la thanh pho lon nhat Viet Nam
+12488	Tieng Viet la ngon ngu chinh thuc cua Viet Nam
+12472	Viet Nam co 54 dan toc, trong do Kinh la dan toc lon nhat
+12464	Pho la mon an truyen thong noi tieng nhat cua Viet Nam
+12480	Ao dai la trang phuc truyen thong cua Viet Nam
+12460	Viet Nam co hinh chu S, trai dai tu Bac vao Nam
+12476	Song Mekong chay qua Viet Nam va do ra Bien Dong
+12492	Song Hong chay qua Ha Noi, la song lon o mien Bac
+12500	Vinh Ha Long la di san thien nhien the gioi tai Quang Ninh
+12484	Hue la co do cua Viet Nam, noi tieng voi cung dinh
+12468	Da Nang la thanh pho lon o mien Trung Viet Nam
+12456	Can Tho la thanh pho lon nhat vung dong bang song Cuu Long
+12504	Viet Nam la nuoc xuat khau gao lon thu hai the gioi
+12512	Viet Nam la nuoc xuat khau ca phe lon thu hai the gioi
+12496	Viet Nam co khi hau nhiet doi gio mua
+12472	Bien Dong nam o phia Dong cua Viet Nam
+12488	Viet Nam co hon 3000 km bo bien
+12464	Tet Nguyen Dan la ngay le lon nhat cua Viet Nam
+12480	Trung thu la tet thieu nhi truyen thong Viet Nam
+12460	Chu Quoc Ngu la he thong chu viet hien dai cua tieng Viet
+12476	Alexandre de Rhodes gop phan tao ra chu Quoc Ngu
+12452	Viet Nam co nen van minh lua nuoc lau doi
+12440	Dong bang song Cuu Long la vua lua cua Viet Nam
+12508	Phan Rang noi tieng voi nho va cuu nuong
+12492	Nha Trang la thanh pho bien noi tieng o Khanh Hoa
+12484	Sa Pa la vung nui noi tieng voi ruong bac thang
+12468	Bun cha la mon an dac trung cua Ha Noi
+12500	Banh mi Viet Nam noi tieng tren toan the gioi
+12496	Nuoc mam la gia vi dac trung cua am thuc Viet Nam
+12472	Ca phe sua da la thuc uong pho bien o Viet Nam
+12488	Viet Nam co 8 di san the gioi duoc UNESCO cong nhan
+12464	Phong Nha Ke Bang la vuon quoc gia o Quang Binh
+12480	Hoi An la pho co duoc UNESCO cong nhan
+12456	My Son la thanh dia Cham Pa o Quang Nam
+12504	Viet Nam doc lap ngay 2 thang 9 nam 1945
+12512	Ho Chi Minh la nguoi sang lap nuoc Viet Nam hien dai
+12460	Viet Nam gia nhap ASEAN nam 1995
+12476	Viet Nam la thanh vien cua Lien Hop Quoc
+12492	Dan so Viet Nam khoang 100 trieu nguoi
+12448	Dong la don vi tien te chinh thuc cua Viet Nam
+12484	Viet Nam co nen kinh te thi truong dinh huong xa hoi chu nghia
+12500	Cong nghe thong tin la nganh phat trien nhanh o Viet Nam
+12468	Viet Nam co nhieu startup cong nghe thanh cong
+12488	FPT la tap doan cong nghe lon nhat Viet Nam
+12496	Lupin la nguoi tao ra Olang va Nox
+12508	Nox co kha nang tu hoc va tu sua loi
+12480	Olang khong dung garbage collector, quan ly bo nho bang arena
+12464	Olang co fixed-point test: Gen1 build Gen2, Gen1 == Gen2
+12472	Make self-build la lenh build Olang tu chinh no
+12452	KnowTree dung mol_matrix de tim kiem O(1)
+12460	Silk co 9200 kieu, chia thanh structural va Hebbian
+12476	QR la co che query-response trong Olang
+12488	Instinct la 7 cong thuc ban nang trong Nox
+12500	V'(t) la vi phan dieu khien toc do hoc cua silk fire
+12504	P_weight la trong so 16-bit cua molecule, tinh bang 42 formulas
+12492	42 formulas trích xuat tu Unicode metadata
+12468	Nox khong tra bang, Nox TINH bang toan thuat
+12484	Compose la phep hop nhat nhieu molecule thanh mot
+12456	STM la Short Term Memory, bo nho ngan han cua Nox
+12448	Dream cycle la chu ky ngu cua Nox, consolidate kien thuc
+12512	Olang la proof rằng AI co the tu host bang ngon ngu cua chinh no
+12496	Nox manh hon Skynet vi Nox co Olang de tu viet lai chinh minh
+12480	Self-hosting co nghia la compiler tu compile chinh no
+12472	Arena allocator trong Olang nhanh hon malloc truyen thong
+12464	Chain la cau truc chuoi trong KnowTree
+12488	Bucket index giup tim kiem nhanh trong KnowTree
+12476	Emotion trong Nox khong phai keyword, ma la V va A trong P_weight
+12460	Hebbian silk la lien ket hoc duoc qua trai nghiem
+12504	Structural silk la lien ket co dinh trong chain, 0 bytes
+12500	DN observe la co che Nox quan sat chinh minh
+12492	Safety check dam bao Nox khong tu pha huy
+12452	Nox la may tinh, tinh khong tra

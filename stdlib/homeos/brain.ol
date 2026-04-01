@@ -27,6 +27,9 @@ pub fn nox_bootstrap() {
     // Saved knowledge from previous sessions
     let _mem_n = kt_load("nox_memory.dat");
     __heap_pin();
+    // Vietnamese knowledge facts
+    let _vn_n = kt_load("json/vietnamese_facts.dat");
+    __heap_pin();
     // Multilingual sentiment
     let _sent_n = kt_load("json/sentiment_precomputed.dat");
     __heap_pin();
