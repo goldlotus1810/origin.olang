@@ -710,10 +710,8 @@ cg_closure_cap:
 op_enter_frame:
     movzbl  (%r12, %r13), %eax         # num_slots
     inc     %r13
-    # Save on CPU stack: [var_table_count, old_cur_frame, old_frame_ptr]
-    lea     var_table_base(%rip), %rcx
-    mov     (%rcx), %rcx
-    push    (%rcx)                      # save var_table.count for scope restore
+    # Save on CPU stack: [dummy, old_cur_frame, old_frame_ptr]
+    pushq   $0                          # dummy (was var_table.count — matrix needs no count)
     lea     reg_cur_frame(%rip), %rcx
     push    (%rcx)                      # save old cur_frame
     lea     reg_frame_ptr(%rip), %rdx
@@ -2132,18 +2130,17 @@ op_call:
     cmpq    $0, (%rsi)
     je      .fnr_skip_scope
 .fnr_do_scope:
-    lea     closure_depth(%rip), %rax
-    mov     (%rax), %rcx
+    # Push MARKER to undo stack + depth++
     push    %rdi
-    lea     var_table_base(%rip), %rsi
-    mov     (%rsi), %rsi
-    mov     (%rsi), %rdx
-    lea     scope_frame_ptrs(%rip), %rax
-    mov     %rdx, (%rax, %rcx, 8)
-    lea     closure_depth(%rip), %rax
-    incq    (%rax)
-    lea     scope_gen(%rip), %rax
-    incq    (%rax)
+    push    %rcx
+    lea     var_save_top(%rip), %rcx
+    mov     (%rcx), %rdi
+    movq    $-1, (%rdi)                # MARKER (slot_off = -1)
+    add     $40, %rdi
+    mov     %rdi, (%rcx)
+    lea     closure_depth(%rip), %rcx
+    incq    (%rcx)
+    pop     %rcx
     pop     %rdi
 .fnr_skip_scope:
     bt      $63, %rdi
@@ -2317,18 +2314,17 @@ op_call:
     cmpq    $0, (%rsi)
     je      .cc_skip_scope2
 .cc_do_scope2:
-    lea     closure_depth(%rip), %rax
-    mov     (%rax), %rcx
+    # Push MARKER to undo stack + depth++
     push    %rdi
-    lea     var_table_base(%rip), %rsi
-    mov     (%rsi), %rsi
-    mov     (%rsi), %rdx
-    lea     scope_frame_ptrs(%rip), %rax
-    mov     %rdx, (%rax, %rcx, 8)
-    lea     closure_depth(%rip), %rax
-    incq    (%rax)
-    lea     scope_gen(%rip), %rax
-    incq    (%rax)
+    push    %rcx
+    lea     var_save_top(%rip), %rcx
+    mov     (%rcx), %rdi
+    movq    $-1, (%rdi)                # MARKER (slot_off = -1)
+    add     $40, %rdi
+    mov     %rdi, (%rcx)
+    lea     closure_depth(%rip), %rcx
+    incq    (%rcx)
+    pop     %rcx
     pop     %rdi
 .cc_skip_scope2:
     # NOW restore captures (in current frame)
@@ -2374,21 +2370,17 @@ op_call:
     cmpq    $0, (%rsi)
     je      .closure_skip_scope         # boot + depth==0 → skip
 .closure_do_scope:
-
-    # FAST scope save: just save var_table count (NO memcpy!)
-    # depth_stack[depth] = current count → 1 store, 8 bytes
-    lea     closure_depth(%rip), %rax
-    mov     (%rax), %rcx               # current depth
+    # Push MARKER to undo stack + depth++
     push    %rdi                        # save body_pc
-    lea     var_table_base(%rip), %rsi
-    mov     (%rsi), %rsi
-    mov     (%rsi), %rdx               # current var_table count
-    lea     scope_frame_ptrs(%rip), %rax
-    mov     %rdx, (%rax, %rcx, 8)     # depth_stack[depth] = count
-    lea     closure_depth(%rip), %rax
-    incq    (%rax)                      # depth++
-    lea     scope_gen(%rip), %rax
-    incq    (%rax)                      # scope generation++ (invalidate var cache)
+    push    %rcx
+    lea     var_save_top(%rip), %rcx
+    mov     (%rcx), %rdi               # current top
+    movq    $-1, (%rdi)                # MARKER (slot_off = -1)
+    add     $40, %rdi                  # advance past full entry
+    mov     %rdi, (%rcx)               # update top
+    lea     closure_depth(%rip), %rcx
+    incq    (%rcx)                      # depth++
+    pop     %rcx
     pop     %rdi                        # restore body_pc
 
 .closure_skip_scope:
@@ -6455,57 +6447,42 @@ op_ret:
     pop     %rax                        # saved PC
     pop     %r12                        # saved bytecode base
     mov     %eax, %r13d                 # PC = return address
-    # Scope restore: truncate var_table if depth > 0
+    # Scope restore: pop undo stack if depth > 0
     lea     closure_depth(%rip), %rsi
     cmpq    $0, (%rsi)
-    je      vm_loop                     # depth==0 → no scope (LeaveFrame handles it)
+    je      vm_loop                     # depth==0 → no scope
     decq    (%rsi)                      # depth--
-    push    %rsi
-    lea     scope_gen(%rip), %rdi
-    incq    (%rdi)                      # scope generation++ (invalidate var cache)
-    pop     %rsi
     # Check skip_scope_restore flag (module loading)
     lea     skip_scope_restore(%rip), %rax
     cmpq    $0, (%rax)
     je      .do_scope_restore
-    decq    (%rax)                      # skip-- (don't truncate)
+    decq    (%rax)                      # skip-- (don't restore)
     jmp     vm_loop
 .do_scope_restore:
-    mov     (%rsi), %rcx               # new depth
-    # Restore count from depth_stack[depth]
-    lea     scope_frame_ptrs(%rip), %rax
-    mov     (%rax, %rcx, 8), %rdx      # saved_count
-    lea     var_table_base(%rip), %rdi
-    mov     (%rdi), %rdi
-    # Zero-fill dead entries (saved_count..old_count) to prevent ghost lookups
-    push    %rdx
-    push    %rdi
-    mov     (%rdi), %rcx               # old_count
-    sub     %rdx, %rcx                 # entries to clear = old - saved
-    jle     .scope_zero_done
-    imul    $24, %rdx, %rax            # byte offset of saved_count entry
-    lea     8(%rdi, %rax), %rdi        # ptr to first dead entry
-    xor     %eax, %eax
-.scope_zero_loop:
-    mov     %rax, (%rdi)               # zero hash (prevents matching)
-    add     $24, %rdi
-    dec     %rcx
-    jnz     .scope_zero_loop
-.scope_zero_done:
-    pop     %rdi
-    pop     %rdx
-    mov     %rdx, (%rdi)               # truncate: var_table.count = saved_count
-    # Invalidate var_cache after scope restore (entry pointers may be stale)
-    push    %rdi
-    push    %rcx
-    push    %rax
-    lea     var_cache(%rip), %rdi
-    xor     %eax, %eax
-    mov     $768, %ecx              # 6144/8 = 768 qwords
-    rep     stosq
-    pop     %rax
-    pop     %rcx
-    pop     %rdi
+    # Pop undo stack until MARKER, restoring matrix slots
+    push    %rbx
+    lea     var_save_top(%rip), %rdi
+    mov     (%rdi), %rsi              # current undo top
+    lea     var_matrix(%rip), %rbx
+.undo_pop:
+    sub     $40, %rsi                  # back up one entry
+    cmpq    $-1, (%rsi)               # marker?
+    je      .undo_done
+    # Restore slot: [slot_off:8][hash:8][depth:8][ptr:8][len:8]
+    mov     (%rsi), %rcx              # slot byte offset
+    mov     8(%rsi), %rax             # old hash
+    mov     %rax, (%rbx, %rcx)
+    mov     16(%rsi), %rax            # old depth
+    mov     %rax, 8(%rbx, %rcx)
+    mov     24(%rsi), %rax            # old ptr
+    mov     %rax, 16(%rbx, %rcx)
+    mov     32(%rsi), %rax            # old len
+    mov     %rax, 24(%rbx, %rcx)
+    jmp     .undo_pop
+.undo_done:
+    lea     var_save_top(%rip), %rdi
+    mov     %rsi, (%rdi)              # consume marker
+    pop     %rbx
     jmp     vm_loop
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -10425,25 +10402,16 @@ f64_to_ascii:
 
 .equ VAR_TABLE_MAX, 1024
 
-# Initialize variable table — called once from _start
-# Uses r15 (heap bump), stores table base in var_table_base
+# Initialize variable system — called once from _start
+# var_matrix is in BSS (zero-initialized, 512KB) — no heap alloc needed.
+# var_save_stack is in BSS (256KB) — no heap alloc needed.
 var_table_init:
-    mov     %r15, %rax
-    lea     var_table_base(%rip), %rcx
-    mov     %rax, (%rcx)               # save table base address
-    movq    $0, (%r15)                  # count = 0
-    # Reserve 16384 entries × 24 bytes + 8 header = 393224 bytes
-    add     $393224, %r15
-    # Initialize var shadow stack (for closure scoping)
-    mov     %r15, %rax
-    lea     var_shadow_base(%rip), %rcx
-    mov     %rax, (%rcx)
-    lea     var_shadow_top(%rip), %rcx
+    # Set undo stack pointer to base of BSS save stack
+    lea     var_save_stack(%rip), %rax
+    lea     var_save_top(%rip), %rcx
     mov     %rax, (%rcx)
     lea     closure_depth(%rip), %rcx
     movq    $0, (%rcx)
-    # Reserve 4MB for shadow stack (deep recursion snapshots)
-    add     $0x400000, %r15
     # Initialize register frame stack (4MB on heap)
     mov     %r15, %rax
     lea     reg_frame_base(%rip), %rcx
@@ -10531,49 +10499,63 @@ fn_reg_lookup:
     ret
 
 # var_store_global: rax=hash, r8=val_ptr, r9=val_len
-# Like var_store_hash but searches ENTIRE table (frame_start=0).
+# MATRIX STORE (global): no scope save. Just find or create slot, overwrite.
 # Used by StoreUpdate (x = val) — Julia-style global variable update.
 var_store_global:
     push    %rbx
-    lea     var_table_base(%rip), %rbx
-    mov     (%rbx), %rbx               # table base
-    mov     (%rbx), %rcx               # total count
-    test    %rcx, %rcx
-    jle     .vsg_new
-    # Reverse search — update most recent entry (consistent with var_load_hash)
-    lea     -1(%rcx), %rdx
-    imul    $24, %rdx
-    lea     8(%rbx, %rdx), %rdi
-    mov     %rcx, %rdx
-.vsg_search:
-    cmp     (%rdi), %rax
-    jne     .vsg_next
-    mov     %r8, 8(%rdi)
-    mov     %r9, 16(%rdi)
-    pop     %rbx
-    ret
-.vsg_next:
-    sub     $24, %rdi
-    dec     %rdx
-    jnz     .vsg_search
-.vsg_new:
-    # Not found anywhere — append as new entry
-    lea     var_table_base(%rip), %rbx
-    mov     (%rbx), %rbx
-    mov     (%rbx), %rcx
-    imul    $24, %rcx, %rdx
-    lea     8(%rbx, %rdx), %rdi
-    mov     %rax, (%rdi)
-    mov     %r8, 8(%rdi)
-    mov     %r9, 16(%rdi)
-    incq    (%rbx)
+    mov     %eax, %ecx
+    and     $0x3FFF, %ecx
+    shl     $5, %ecx                    # slot byte offset
+    lea     var_matrix(%rip), %rbx
+
+.vsg_probe:
+    cmpq    $0, (%rbx, %rcx)           # empty?
+    je      .vsg_write
+    cmp     %rax, (%rbx, %rcx)         # our hash?
+    je      .vsg_update
+    add     $32, %ecx
+    cmp     $524288, %ecx
+    jb      .vsg_probe
+    xor     %ecx, %ecx
+    jmp     .vsg_probe
+
+.vsg_update:
+    # Found existing — update val_ptr and val_len only (keep hash, depth)
+    mov     %r8, 16(%rbx, %rcx)
+    mov     %r9, 24(%rbx, %rcx)
     pop     %rbx
     ret
 
-# ── Hash-based variable table ──
-# Table layout: [count:8][entries...]
-# Entry: [name_hash:8][val_ptr:8][val_len:8] = 24 bytes
-# Simple, no string comparison needed.
+.vsg_write:
+    # Not found — create new entry. Push undo if inside scope.
+    lea     closure_depth(%rip), %rdx
+    cmpq    $0, (%rdx)
+    je      .vsg_write_now
+    # Push undo: restore empty slot on scope leave
+    push    %rax
+    push    %rdi
+    lea     var_save_top(%rip), %rdi
+    mov     (%rdi), %rax
+    mov     %rcx, (%rax)              # slot byte offset
+    movq    $0, 8(%rax)               # old hash = 0 (empty)
+    movq    $0, 16(%rax)
+    movq    $0, 24(%rax)
+    movq    $0, 32(%rax)
+    add     $40, %rax
+    mov     %rax, (%rdi)
+    pop     %rdi
+    pop     %rax
+.vsg_write_now:
+    mov     %rax, (%rbx, %rcx)         # hash
+    lea     closure_depth(%rip), %rdx
+    mov     (%rdx), %rdx
+    mov     %rdx, 8(%rbx, %rcx)        # depth = current
+    mov     %r8, 16(%rbx, %rcx)        # val_ptr
+    mov     %r9, 24(%rbx, %rcx)        # val_len
+    pop     %rbx
+    ret
+
+# ── Hash name + matrix variable functions ──
 
 # hash_name: rdi=name ptr, edx=name len → rax=hash
 # DIRECT-MAPPED CACHE: 256 entries indexed by (ptr & 0xFF)
@@ -10614,161 +10596,100 @@ hash_name:
     ret
 
 # var_store_hash: rax=hash, r8=val_ptr, r9=val_len
-# FRAME-AWARE: only search within current frame (depth_stack[depth-1]..count)
-# This ensures inner function "n" SHADOWS outer "n" instead of overwriting
+# MATRIX STORE: O(1) with linear probe. Scope-aware undo via var_save_stack.
+# Slot layout: [hash:8][depth:8][val_ptr:8][val_len:8] = 32 bytes.
 var_store_hash:
     push    %rbx
-    lea     var_table_base(%rip), %rbx
-    mov     (%rbx), %rbx               # table base
-    mov     (%rbx), %rcx               # total count
+    # Compute slot byte offset: (hash & 0x3FFF) * 32
+    mov     %eax, %ecx
+    and     $0x3FFF, %ecx
+    shl     $5, %ecx                    # × 32 bytes per slot
+    lea     var_matrix(%rip), %rbx
 
-    # Get frame_start: if depth > 0, start from depth_stack[depth-1]
-    push    %rax                        # save hash
-    lea     closure_depth(%rip), %rdi
-    mov     (%rdi), %rdi               # depth
-    xor     %r10d, %r10d               # frame_start = 0 (default: search all)
-    test    %rdi, %rdi
-    jz      .vsh_have_start
-    dec     %rdi
-    lea     scope_frame_ptrs(%rip), %r10
-    mov     (%r10, %rdi, 8), %r10d    # frame_start = depth_stack[depth-1]
-.vsh_have_start:
-    pop     %rax                        # restore hash
+.vsh_probe:
+    cmpq    $0, (%rbx, %rcx)           # slot.hash == 0? (empty)
+    je      .vsh_empty
+    cmp     %rax, (%rbx, %rcx)         # slot.hash == our hash?
+    je      .vsh_found
+    add     $32, %ecx
+    cmp     $524288, %ecx
+    jb      .vsh_probe
+    xor     %ecx, %ecx                 # wrap to slot 0
+    jmp     .vsh_probe
 
-    # entries_in_frame = count - frame_start
-    mov     %rcx, %rdi                 # total count
-    sub     %r10, %rdi                  # entries to search
-    test    %rdi, %rdi
-    jle     .vsh_new                    # no entries in frame → append
+.vsh_found:
+    # Same hash. If same depth → just overwrite (same scope re-assignment).
+    lea     closure_depth(%rip), %rdx
+    mov     (%rdx), %rdx
+    cmp     %rdx, 8(%rbx, %rcx)        # slot.depth == closure_depth?
+    je      .vsh_write                  # same scope → overwrite, no save
+    # Different scope → save old slot to undo stack, then overwrite
+    jmp     .vsh_save_and_write
 
-    # Reverse search from LAST entry to frame_start
-    lea     -1(%rcx), %rdx
-    imul    $24, %rdx
-    lea     8(%rbx, %rdx), %rdi        # last entry ptr
-    mov     %rcx, %rdx
-    sub     %r10, %rdx                  # loop count = entries in frame
+.vsh_empty:
+    # Empty slot. If depth == 0, just write. Else save empty state for undo.
+    lea     closure_depth(%rip), %rdx
+    cmpq    $0, (%rdx)
+    je      .vsh_write_new
 
-.vsh_search:
-    cmp     (%rdi), %rax
-    jne     .vsh_next
-    # Found in current frame — update
-    mov     %r8, 8(%rdi)
-    mov     %r9, 16(%rdi)
-    pop     %rbx
-    ret
-.vsh_next:
-    sub     $24, %rdi
-    dec     %rdx
-    jnz     .vsh_search
-    # Not found in frame → append as shadow
+.vsh_save_and_write:
+    # Push current slot to undo stack: [slot_off:8][hash:8][depth:8][ptr:8][len:8]
+    push    %rax
+    push    %rdi
+    lea     var_save_top(%rip), %rdi
+    mov     (%rdi), %rax               # current top
+    mov     %rcx, (%rax)               # slot byte offset
+    mov     (%rbx, %rcx), %rdx
+    mov     %rdx, 8(%rax)              # old hash
+    mov     8(%rbx, %rcx), %rdx
+    mov     %rdx, 16(%rax)             # old depth
+    mov     16(%rbx, %rcx), %rdx
+    mov     %rdx, 24(%rax)             # old ptr
+    mov     24(%rbx, %rcx), %rdx
+    mov     %rdx, 32(%rax)             # old len
+    add     $40, %rax
+    mov     %rax, (%rdi)               # update top
+    pop     %rdi
+    pop     %rax
 
-.vsh_new:
-    # Append new entry at end
-    lea     var_table_base(%rip), %rbx
-    mov     (%rbx), %rbx
-    mov     (%rbx), %rcx
-    imul    $24, %rcx, %rdx
-    lea     8(%rbx, %rdx), %rdi
-    mov     %rax, (%rdi)
-    mov     %r8, 8(%rdi)
-    mov     %r9, 16(%rdi)
-    incq    (%rbx)                     # count++
+.vsh_write_new:
+    lea     closure_depth(%rip), %rdx
+    mov     (%rdx), %rdx
+.vsh_write:
+    mov     %rax, (%rbx, %rcx)         # hash
+    mov     %rdx, 8(%rbx, %rcx)        # depth (rdx set by caller or .vsh_write_new)
+    mov     %r8, 16(%rbx, %rcx)        # val_ptr
+    mov     %r9, 24(%rbx, %rcx)        # val_len
     pop     %rbx
     ret
 
 # var_load_hash: rax=hash → rax=val_ptr, rdx=val_len
-# REVERSE search with 4-entry direct-mapped cache (count-validated)
+# MATRIX LOAD: O(1) with linear probe. No cache needed.
 var_load_hash:
-    # Check cache: 256 entries × [hash:8, entry_ptr:8, vt_count:8] = 24 bytes each
-    lea     var_cache(%rip), %rcx
-    mov     %rax, %rdx
-    and     $0xFF, %edx
-    imul    $24, %edx                   # × 24 bytes per entry
-    cmp     %rax, (%rcx, %rdx)          # hash match?
-    jne     .vlh_cache_miss
-    # Check var_table count + scope_gen (scope change detection)
-    lea     var_table_base(%rip), %rsi
-    mov     (%rsi), %rsi
-    mov     (%rsi), %rsi                # current count
-    lea     scope_gen(%rip), %rdi
-    add     (%rdi), %rsi                # count + scope_gen
-    cmp     %rsi, 16(%rcx, %rdx)        # match?
-    jne     .vlh_cache_miss
-    mov     8(%rcx, %rdx), %rcx         # entry_ptr
-    mov     8(%rcx), %rax               # val_ptr
-    mov     16(%rcx), %rdx              # val_len
+    mov     %eax, %ecx
+    and     $0x3FFF, %ecx
+    shl     $5, %ecx                    # slot byte offset = (hash & 0x3FFF) * 32
+    lea     var_matrix(%rip), %rdx
+
+.vlh_probe:
+    cmpq    $0, (%rdx, %rcx)           # slot.hash == 0? (empty → not found)
+    je      .vlh_not_found
+    cmp     %rax, (%rdx, %rcx)         # slot.hash == our hash?
+    je      .vlh_found
+    add     $32, %ecx
+    cmp     $524288, %ecx
+    jb      .vlh_probe
+    xor     %ecx, %ecx                 # wrap to slot 0
+    jmp     .vlh_probe
+
+.vlh_found:
+    mov     16(%rdx, %rcx), %rax        # val_ptr
+    mov     24(%rdx, %rcx), %rdx        # val_len
     ret
-.vlh_cache_miss:
-
-    push    %rbx
-    lea     var_table_base(%rip), %rbx
-    mov     (%rbx), %rbx
-    mov     (%rbx), %rcx
-    test    %rcx, %rcx
-    jz      .vlh_not_found
-
-    # FRAME-AWARE search: search current frame first, then fall back to full table
-    # This prevents finding ghost entries from sibling scopes
-    push    %rax                        # save hash
-    lea     closure_depth(%rip), %rdi
-    mov     (%rdi), %rdi               # depth
-    xor     %r10d, %r10d               # frame_start = 0
-    test    %rdi, %rdi
-    jz      .vlh_have_start
-    dec     %rdi
-    lea     scope_frame_ptrs(%rip), %r10
-    mov     (%r10, %rdi, 8), %r10d     # frame_start = depth_stack[depth-1]
-.vlh_have_start:
-    pop     %rax                        # restore hash
-    # Search from count-1 down to frame_start first
-    lea     -1(%rcx), %rdx
-    imul    $24, %rdx
-    lea     8(%rbx, %rdx), %rdi
-    mov     %rcx, %rdx
-    sub     %r10, %rdx                  # entries in current frame
-
-.vlh_search:
-    cmp     (%rdi), %rax
-    jne     .vlh_next
-    # Found — update cache (256 slots)
-    push    %rax
-    lea     var_cache(%rip), %rcx
-    mov     %rax, %rdx
-    and     $0xFF, %edx
-    imul    $24, %edx
-    mov     %rax, (%rcx, %rdx)          # store hash
-    mov     %rdi, 8(%rcx, %rdx)         # store entry pointer
-    # Store current var_table count + scope_gen for validation
-    lea     var_table_base(%rip), %rax
-    mov     (%rax), %rax
-    mov     (%rax), %rax
-    push    %rsi
-    lea     scope_gen(%rip), %rsi
-    add     (%rsi), %rax                # count + scope_gen
-    pop     %rsi
-    mov     %rax, 16(%rcx, %rdx)        # store count+gen
-    pop     %rax
-    mov     8(%rdi), %rax
-    mov     16(%rdi), %rdx
-    pop     %rbx
-    ret
-.vlh_next:
-    sub     $24, %rdi
-    dec     %rdx
-    jnz     .vlh_search
-    # Not found in current frame — fall back to searching below frame_start
-    test    %r10d, %r10d
-    jz      .vlh_not_found              # frame_start==0 → already searched all
-    mov     %r10, %rdx                  # entries below frame_start
-    test    %rdx, %rdx
-    jz      .vlh_not_found
-    xor     %r10d, %r10d               # prevent second fallback
-    jmp     .vlh_search
 
 .vlh_not_found:
     xor     %eax, %eax
     xor     %edx, %edx
-    pop     %rbx
     ret
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -11366,23 +11287,20 @@ op_halt:
     lea     (%rsi, %r8), %rdi           # word ptr
     mov     %ecx, %r9d
     sub     %r8d, %r9d                  # word len
-    # Scan var_table for prefix match
-    mov     var_table_base(%rip), %rbx
-    mov     (%rbx), %r10               # entry count
-    lea     8(%rbx), %rbx               # skip count header
-    xor     %r11d, %r11d               # match count
+    # Scan var_matrix for prefix match
+    lea     var_matrix(%rip), %rbx
+    xor     %r11d, %r11d               # slot byte offset = 0
     # First match ptr saved in repl_tab_match
     movq    $0, repl_tab_match(%rip)
     movq    $0, repl_tab_match_len(%rip)
 .repl_tab_scan:
-    cmp     %r10, %r11
+    cmp     $524288, %r11d             # 16384 × 32 = 512KB
     jge     .repl_tab_done
-    # Entry: [hash:8, ptr:8, len+flags:8] = 24 bytes
-    lea     (%rbx, %r11, 8), %rax
-    lea     (%rax, %r11, 8), %rax
-    lea     (%rax, %r11, 8), %rax       # entry = base + i*24
-    mov     8(%rax), %r12               # name ptr (molecules)
-    movzwl  16(%rax), %r13d             # name len (lower 16 bits)
+    # Slot: [hash:8][depth:8][val_ptr:8][val_len:8] = 32 bytes
+    cmpq    $0, (%rbx, %r11)          # empty slot?
+    je      .repl_tab_scan_next
+    mov     16(%rbx, %r11), %r12       # val_ptr (used as name ptr for molecules)
+    movzwl  24(%rbx, %r11), %r13d      # val_len low 16 bits (name len)
     and     $0xFFFF, %r13d
     # Compare prefix: word[0..r9] vs name[0..r9]
     cmp     %r9d, %r13d
@@ -11414,7 +11332,7 @@ op_halt:
     mov     %r13, repl_tab_match_len(%rip)
 .repl_tab_has_match:
 .repl_tab_scan_next:
-    inc     %r11
+    add     $32, %r11d                  # next matrix slot (32 bytes each)
     jmp     .repl_tab_scan
 .repl_tab_done:
     # If we found a match, complete the word
@@ -12180,30 +12098,30 @@ jit_fib_code:
 
 .section .text
 # ═══════════════════════════════════════════════════════════════════════════
-# var_find_addr: find address of value field in var_table entry
+# var_find_addr: find address of value field in var_matrix slot
 # Input: rax = hash
-# Output: rax = address of val_ptr field (8 bytes into entry), 0 if not found
+# Output: rax = address of val_ptr field (16 bytes into slot), 0 if not found
 # ═══════════════════════════════════════════════════════════════════════════
 var_find_addr:
-    lea     var_table_base(%rip), %rcx
-    mov     (%rcx), %rcx
-    mov     (%rcx), %rdx
-    test    %rdx, %rdx
-    jz      .vfa_fail
-    lea     -1(%rdx), %rsi
-    imul    $24, %rsi
-    lea     8(%rcx, %rsi), %rdi
-.vfa_search:
-    cmp     (%rdi), %rax
+    mov     %eax, %ecx
+    and     $0x3FFF, %ecx
+    shl     $5, %ecx                    # slot byte offset
+    lea     var_matrix(%rip), %rdx
+.vfa_probe:
+    cmpq    $0, (%rdx, %rcx)
+    je      .vfa_fail
+    cmp     %rax, (%rdx, %rcx)
     je      .vfa_found
-    sub     $24, %rdi
-    dec     %rdx
-    jnz     .vfa_search
+    add     $32, %ecx
+    cmp     $524288, %ecx
+    jb      .vfa_probe
+    xor     %ecx, %ecx
+    jmp     .vfa_probe
 .vfa_fail:
     xor     %eax, %eax
     ret
 .vfa_found:
-    lea     8(%rdi), %rax               # address of val_ptr field
+    lea     16(%rdx, %rcx), %rax        # address of val_ptr field
     ret
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -12952,8 +12870,12 @@ builtin_jump_table:
 mol_matrix:
     .space 131072                       # 65536 × 2 bytes = 128KB
 
-var_table_base:
-    .space 8                            # pointer to variable table on heap
+# ── var_matrix: O(1) variable store ──
+# 16384 slots × 32 bytes = 512KB. Each slot: [hash:8][depth:8][val_ptr:8][val_len:8]
+# Index = hash & 0x3FFF, linear probe on collision. Zero = empty.
+    .align 32
+var_matrix:
+    .space 524288                       # 16384 × 32 bytes = 512KB
 bc_format:
     .space 1                            # 0 = ir.rs format, 1 = codegen.ol format
     .align 8
@@ -12973,28 +12895,24 @@ repl_heap_checkpoint:
 jz_did_pop:
     .space 1                            # 1 = Jz already popped, next Pop is no-op
     .align 8
-# Var shadow stack: saves [hash, old_ptr, old_len] per modified var in closure.
-# Marker entry: hash=0 separates call frames.
-var_shadow_base:
-    .space 8                            # pointer to shadow stack on heap
-var_shadow_top:
-    .space 8                            # current top of shadow stack
+# Var undo stack (BSS): [slot_offset:8][old_hash:8][old_depth:8][old_ptr:8][old_len:8]
+# per shadowed/created var. Marker entry: slot_offset=-1 separates call frames.
+# 40 bytes per entry, uniform size. ~6500 entries max.
+    .align 8
+var_save_stack:
+    .space 262144                       # 256KB undo stack for scope save/restore
+var_save_top:
+    .space 8                            # pointer into var_save_stack
 closure_depth:
     .space 8                            # nesting depth (0 = not in closure)
 skip_scope_restore:
     .space 8                            # >0 → skip N scope restores (for module loading)
-var_cache:
-    .space 6144                         # 256 × [hash:8, entry_ptr:8, vt_count:8] = 24 bytes each
 loop_counters:
     .space 1024                         # 256 × 4-byte backward jump counters
 loop_jit_cache:
     .space 512                          # 32 × [start_pc:8, native_ptr:8] = 16 bytes each
 _save_rbx:
     .space 8                            # temp save for rbx
-scope_gen:
-    .space 8                            # scope generation counter (for cache invalidation)
-scope_frame_ptrs:
-    .space 131072                       # 16384 frame pointers × 8 bytes (max recursion depth)
     .align 8
 # ── Register frame stack ──
 reg_frame_base:
