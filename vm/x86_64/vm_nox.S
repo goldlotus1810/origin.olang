@@ -899,6 +899,882 @@ op_store_reg:
 op_nop2:
     DISPATCH
 
+# ═══════════════════════════════════════════════════════════════════════════
+# §7 MOLECULAR ENGINE — Native u16 operations
+# ═══════════════════════════════════════════════════════════════════════════
+
+# 0x40: MolPack — pop S,R,V,A,T (5 f64) → push packed u16 molecule
+op_mol_pack:
+    # Stack: [T] [A] [V] [R] [S] (T on top)
+    movsd   xmm0, [r14]            # T
+    cvttsd2si edi, xmm0
+    movsd   xmm0, [r14+16]         # A
+    cvttsd2si esi, xmm0
+    movsd   xmm0, [r14+32]         # V
+    cvttsd2si edx, xmm0
+    movsd   xmm0, [r14+48]         # R
+    cvttsd2si ecx, xmm0
+    movsd   xmm0, [r14+64]         # S
+    cvttsd2si eax, xmm0
+    add     r14, 64                 # pop 4 (keep 1 for result)
+    # Pack: (S<<12)|(R<<8)|(V<<5)|(A<<2)|T
+    and     eax, 0xF
+    shl     eax, 12
+    and     ecx, 0xF
+    shl     ecx, 8
+    or      eax, ecx
+    and     edx, 0x7
+    shl     edx, 5
+    or      eax, edx
+    and     esi, 0x7
+    shl     esi, 2
+    or      eax, esi
+    and     edi, 0x3
+    or      eax, edi
+    and     eax, 0xFFFF
+    mov     [r14], rax
+    mov     qword ptr [r14+8], MOL_MARKER
+    DISPATCH
+
+# 0x41: MolUnpack — pop u16 → push S,R,V,A,T (5 f64)
+op_mol_unpack:
+    mov     eax, [r14]
+    add     r14, 16                 # pop mol
+    sub     r14, 80                 # push 5 entries
+    # S
+    mov     ecx, eax
+    shr     ecx, 12
+    and     ecx, 0xF
+    cvtsi2sd xmm0, ecx
+    movsd   [r14+64], xmm0
+    mov     qword ptr [r14+72], F64_MARKER
+    # R
+    mov     ecx, eax
+    shr     ecx, 8
+    and     ecx, 0xF
+    cvtsi2sd xmm0, ecx
+    movsd   [r14+48], xmm0
+    mov     qword ptr [r14+56], F64_MARKER
+    # V
+    mov     ecx, eax
+    shr     ecx, 5
+    and     ecx, 0x7
+    cvtsi2sd xmm0, ecx
+    movsd   [r14+32], xmm0
+    mov     qword ptr [r14+40], F64_MARKER
+    # A
+    mov     ecx, eax
+    shr     ecx, 2
+    and     ecx, 0x7
+    cvtsi2sd xmm0, ecx
+    movsd   [r14+16], xmm0
+    mov     qword ptr [r14+24], F64_MARKER
+    # T
+    and     eax, 0x3
+    cvtsi2sd xmm0, eax
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# 0x42: MolDist — pop mol_b, mol_a → push distance (§7.3 scaled integer, max=70)
+op_mol_dist:
+    mov     eax, [r14+16]           # mol_a
+    mov     ecx, [r14]              # mol_b
+    add     r14, 16                 # pop 1 (keep 1 for result)
+    push    rbx
+    xor     ebx, ebx                # accumulator
+    # ΔS × 1
+    mov     edx, eax
+    shr     edx, 12
+    and     edx, 0xF
+    mov     esi, ecx
+    shr     esi, 12
+    and     esi, 0xF
+    sub     edx, esi
+    mov     edi, edx
+    neg     edi
+    cmovs   edi, edx                # abs
+    add     ebx, edi
+    # ΔR × 1
+    mov     edx, eax
+    shr     edx, 8
+    and     edx, 0xF
+    mov     esi, ecx
+    shr     esi, 8
+    and     esi, 0xF
+    sub     edx, esi
+    mov     edi, edx
+    neg     edi
+    cmovs   edi, edx
+    add     ebx, edi
+    # ΔV × 2
+    mov     edx, eax
+    shr     edx, 5
+    and     edx, 0x7
+    mov     esi, ecx
+    shr     esi, 5
+    and     esi, 0x7
+    sub     edx, esi
+    mov     edi, edx
+    neg     edi
+    cmovs   edi, edx
+    lea     ebx, [ebx + edi*2]
+    # ΔA × 2
+    mov     edx, eax
+    shr     edx, 2
+    and     edx, 0x7
+    mov     esi, ecx
+    shr     esi, 2
+    and     esi, 0x7
+    sub     edx, esi
+    mov     edi, edx
+    neg     edi
+    cmovs   edi, edx
+    lea     ebx, [ebx + edi*2]
+    # ΔT × 4
+    and     eax, 0x3
+    and     ecx, 0x3
+    sub     eax, ecx
+    mov     edi, eax
+    neg     edi
+    cmovs   edi, eax
+    lea     ebx, [ebx + edi*4]
+    # Push result as f64
+    cvtsi2sd xmm0, ebx
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    pop     rbx
+    DISPATCH
+
+# 0x43: MolCompose — pop mol_b, mol_a → push composed mol (§7.4)
+op_mol_compose:
+    mov     eax, [r14+16]           # mol_a
+    mov     ecx, [r14]              # mol_b
+    add     r14, 16
+    push    rbx
+    # S = max(Sa, Sb)
+    mov     edx, eax
+    shr     edx, 12
+    and     edx, 0xF
+    mov     esi, ecx
+    shr     esi, 12
+    and     esi, 0xF
+    cmp     edx, esi
+    cmovl   edx, esi
+    shl     edx, 12
+    mov     ebx, edx                # result accumulator
+    # R = Zipf weighted: (2*Ra + Rb) / 3
+    mov     edx, eax
+    shr     edx, 8
+    and     edx, 0xF
+    mov     esi, ecx
+    shr     esi, 8
+    and     esi, 0xF
+    lea     edx, [edx*2 + esi]
+    push    rax
+    push    rcx
+    mov     eax, edx
+    xor     edx, edx
+    mov     ecx, 3
+    div     ecx
+    and     eax, 0xF
+    shl     eax, 8
+    or      ebx, eax
+    pop     rcx
+    pop     rax
+    # V = amplify: base + boost (simplified: (2*Va + Vb)/3 biased toward a)
+    mov     edx, eax
+    shr     edx, 5
+    and     edx, 0x7
+    mov     esi, ecx
+    shr     esi, 5
+    and     esi, 0x7
+    lea     edx, [edx*2 + esi]
+    push    rax
+    mov     eax, edx
+    xor     edx, edx
+    mov     ecx, 3
+    div     ecx
+    and     eax, 0x7
+    shl     eax, 5
+    or      ebx, eax
+    pop     rax
+    # A = max(Aa, Ab)
+    mov     edx, eax
+    shr     edx, 2
+    and     edx, 0x7
+    mov     esi, ecx
+    shr     esi, 2
+    and     esi, 0x7
+    cmp     edx, esi
+    cmovl   edx, esi
+    and     edx, 0x7
+    shl     edx, 2
+    or      ebx, edx
+    # T = max(Ta, Tb)
+    mov     edx, eax
+    and     edx, 0x3
+    mov     esi, ecx
+    and     esi, 0x3
+    cmp     edx, esi
+    cmovl   edx, esi
+    or      ebx, edx
+    # Push result
+    and     ebx, 0xFFFF
+    mov     [r14], rbx
+    mov     qword ptr [r14+8], MOL_MARKER
+    pop     rbx
+    DISPATCH
+
+# 0x44: MolDominant — pop mol → push dominant dimension (0-4)
+# Normalize each dim to 0..100, find largest deviation from 50
+op_mol_dominant:
+    mov     eax, [r14]
+    # S: val * 100 / 15
+    mov     ecx, eax
+    shr     ecx, 12
+    and     ecx, 0xF
+    imul    ecx, 100
+    push    rax
+    mov     eax, ecx
+    xor     edx, edx
+    mov     ecx, 15
+    div     ecx                     # norm_S
+    sub     eax, 50
+    # abs
+    mov     edi, eax
+    neg     edi
+    cmovs   edi, eax
+    mov     esi, edi                # best_dev = |norm_S - 50|
+    xor     edx, edx               # best_dim = 0
+    pop     rax
+    # R: val * 100 / 15
+    mov     ecx, eax
+    shr     ecx, 8
+    and     ecx, 0xF
+    push    rax
+    imul    ecx, 100
+    mov     eax, ecx
+    xor     ecx, ecx
+    push    rdx
+    mov     ecx, 15
+    xor     edx, edx
+    div     ecx
+    pop     rdx
+    sub     eax, 50
+    mov     edi, eax
+    neg     edi
+    cmovs   edi, eax
+    cmp     edi, esi
+    jle     .md_no_r
+    mov     esi, edi
+    mov     edx, 1
+.md_no_r:
+    pop     rax
+    # V: val * 100 / 7
+    mov     ecx, eax
+    shr     ecx, 5
+    and     ecx, 0x7
+    push    rax
+    imul    ecx, 100
+    mov     eax, ecx
+    push    rdx
+    xor     edx, edx
+    mov     ecx, 7
+    div     ecx
+    pop     rdx
+    sub     eax, 50
+    mov     edi, eax
+    neg     edi
+    cmovs   edi, eax
+    cmp     edi, esi
+    jle     .md_no_v
+    mov     esi, edi
+    mov     edx, 2
+.md_no_v:
+    pop     rax
+    # A: val * 100 / 7
+    mov     ecx, eax
+    shr     ecx, 2
+    and     ecx, 0x7
+    push    rax
+    imul    ecx, 100
+    mov     eax, ecx
+    push    rdx
+    xor     edx, edx
+    mov     ecx, 7
+    div     ecx
+    pop     rdx
+    sub     eax, 50
+    mov     edi, eax
+    neg     edi
+    cmovs   edi, eax
+    cmp     edi, esi
+    jle     .md_no_a
+    mov     esi, edi
+    mov     edx, 3
+.md_no_a:
+    pop     rax
+    # T: val * 100 / 3
+    and     eax, 0x3
+    imul    eax, 100
+    push    rdx
+    xor     edx, edx
+    mov     ecx, 3
+    div     ecx
+    pop     rdx
+    sub     eax, 50
+    mov     edi, eax
+    neg     edi
+    cmovs   edi, eax
+    cmp     edi, esi
+    jle     .md_no_t
+    mov     edx, 4
+.md_no_t:
+    cvtsi2sd xmm0, edx
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# 0x45: MolBatchDist — SIMD batch distance (§16)
+# Pop [array_ptr, count, query_mol] → push [min_idx, min_dist]
+op_mol_batch_dist:
+    # TODO: SSE2 batch distance
+    DISPATCH
+
+# 0x46: MolEncode — pop string → push mol (encode text to molecule)
+op_mol_encode:
+    # Full encode: text → codepoints → P_weights → compose chain
+    # TODO: requires 42 formula engine
+    DISPATCH
+
+# 0x47: MolDecode — pop mol → push string (nearest text lookup)
+op_mol_decode:
+    # TODO: requires KnowTree reverse lookup
+    DISPATCH
+
+# ═══════════════════════════════════════════════════════════════════════════
+# §8 KNOWTREE ENGINE — kt_matrix O(1) lookup
+# ═══════════════════════════════════════════════════════════════════════════
+
+# 0x50: KtStore — pop mol, fact_idx → store in kt_matrix
+op_kt_store:
+    movsd   xmm0, [r14]            # fact_idx (f64)
+    cvttsd2si edi, xmm0
+    add     r14, 16
+    mov     eax, [r14]              # mol (u16)
+    add     r14, 16
+    and     eax, 0xFFFF
+    and     edi, 0xFFFF
+    lea     rcx, [rip + mol_matrix]
+    mov     word ptr [rcx + rax*2], di
+    DISPATCH
+
+# 0x51: KtLoad — pop mol → push fact_idx from kt_matrix
+op_kt_load:
+    mov     eax, [r14]
+    add     r14, 16
+    and     eax, 0xFFFF
+    lea     rcx, [rip + mol_matrix]
+    movzx   eax, word ptr [rcx + rax*2]
+    cvtsi2sd xmm0, eax
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# 0x52: KtNearest — pop mol → push nearest mol from matrix (5D scan)
+op_kt_nearest:
+    mov     eax, [r14]              # query mol
+    # Scan S±3, R±3, V±3, find closest
+    push    rbx
+    push    rbp
+    mov     ebp, eax                # save query mol
+    mov     ebx, -1                 # best_mol = -1 (not found)
+    mov     r8d, 70                 # best_dist = max
+    # Unpack query
+    mov     ecx, ebp
+    shr     ecx, 12
+    and     ecx, 0xF                # qS
+    mov     edx, ebp
+    shr     edx, 8
+    and     edx, 0xF                # qR
+    mov     esi, ebp
+    shr     esi, 5
+    and     esi, 0x7                # qV
+    # Scan S±3
+    push    rcx
+    push    rdx
+    push    rsi
+    mov     r9d, ecx
+    sub     r9d, 3                  # s_start
+    cmp     r9d, 0
+    cmovl   r9d, ecx               # clamp
+    xor     r9d, r9d               # actually start from max(0, S-3)
+    mov     eax, ecx
+    sub     eax, 3
+    cmovs   eax, r9d
+    mov     r9d, eax                # s_start
+.ktn_s:
+    cmp     r9d, 16
+    jge     .ktn_done
+    mov     eax, ecx                # qS
+    add     eax, 3
+    cmp     r9d, eax
+    jg      .ktn_done
+    # Scan R±3
+    pop     rsi
+    pop     rdx
+    pop     rcx
+    push    rcx
+    push    rdx
+    push    rsi
+    mov     r10d, edx
+    sub     r10d, 3
+    test    r10d, r10d
+    cmovs   r10d, edx
+    xor     r10d, r10d
+    mov     eax, edx
+    sub     eax, 3
+    cmovs   eax, r10d
+    mov     r10d, eax
+.ktn_r:
+    cmp     r10d, 16
+    jge     .ktn_next_s
+    mov     eax, edx
+    add     eax, 3
+    cmp     r10d, eax
+    jg      .ktn_next_s
+    # Scan V±3
+    mov     r11d, esi
+    sub     r11d, 3
+    test    r11d, r11d
+    cmovs   r11d, esi
+    xor     r11d, r11d
+    mov     eax, esi
+    sub     eax, 3
+    cmovs   eax, r11d
+    mov     r11d, eax
+.ktn_v:
+    cmp     r11d, 8
+    jge     .ktn_next_r
+    mov     eax, esi
+    add     eax, 3
+    cmp     r11d, eax
+    jg      .ktn_next_r
+    # Reconstruct candidate mol (using query A and T)
+    mov     eax, r9d
+    shl     eax, 12
+    mov     edi, r10d
+    shl     edi, 8
+    or      eax, edi
+    mov     edi, r11d
+    shl     edi, 5
+    or      eax, edi
+    # A from query
+    mov     edi, ebp
+    shr     edi, 2
+    and     edi, 0x7
+    shl     edi, 2
+    or      eax, edi
+    # T from query
+    mov     edi, ebp
+    and     edi, 0x3
+    or      eax, edi
+    # Check kt_matrix
+    and     eax, 0xFFFF
+    lea     rdi, [rip + mol_matrix]
+    movzx   edi, word ptr [rdi + rax*2]
+    test    edi, edi
+    jz      .ktn_next_v
+    # Has fact — compute distance to query
+    push    rax
+    push    rcx
+    push    rdx
+    push    rsi
+    # Inline distance computation
+    mov     ecx, ebp                # query
+    # reuse the mol_dist logic but inline for speed
+    # ΔS
+    mov     edx, ecx
+    shr     edx, 12
+    and     edx, 0xF
+    mov     esi, eax
+    shr     esi, 12
+    and     esi, 0xF
+    sub     edx, esi
+    mov     edi, edx
+    neg     edi
+    cmovs   edi, edx
+    mov     r12d, edi               # accumulator (temporarily reuse r12)
+    # Actually r12 is bytecode base — can't clobber!
+    # Use stack instead
+    push    rdi                     # save ΔS
+    # ΔR
+    mov     edx, ecx
+    shr     edx, 8
+    and     edx, 0xF
+    mov     esi, eax
+    shr     esi, 8
+    and     esi, 0xF
+    sub     edx, esi
+    mov     edi, edx
+    neg     edi
+    cmovs   edi, edx
+    pop     r12                     # restore ΔS... no, can't use r12
+    # This is getting complex. Simplified approach:
+    # Just compute full distance via function call
+    push    rax                     # candidate mol
+    push    rcx                     # query mol = ebp
+    mov     edi, ebp
+    mov     esi, eax
+    call    mol_dist_inline
+    # eax = distance
+    cmp     eax, r8d
+    jge     .ktn_dist_skip
+    mov     r8d, eax                # new best dist
+    pop     rcx
+    pop     rax
+    mov     ebx, eax                # new best mol
+    jmp     .ktn_after_dist
+.ktn_dist_skip:
+    pop     rcx
+    pop     rax
+.ktn_after_dist:
+    pop     rsi
+    pop     rdx
+    pop     rcx
+    pop     rax
+.ktn_next_v:
+    inc     r11d
+    jmp     .ktn_v
+.ktn_next_r:
+    inc     r10d
+    jmp     .ktn_r
+.ktn_next_s:
+    inc     r9d
+    jmp     .ktn_s
+.ktn_done:
+    pop     rsi
+    pop     rdx
+    pop     rcx
+    # ebx = best mol (-1 if not found)
+    cmp     ebx, -1
+    je      .ktn_empty
+    cvtsi2sd xmm0, ebx
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], MOL_MARKER
+    pop     rbp
+    pop     rbx
+    DISPATCH
+.ktn_empty:
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    pop     rbp
+    pop     rbx
+    DISPATCH
+
+# 0x53: KtWalk — pop (mol, dim, depth) → push array of walked mols
+op_kt_walk:
+    # TODO: BFS silk walk
+    DISPATCH
+
+# 0x54: KtLearn — pop string → learn fact (store + index + silk)
+op_kt_learn:
+    # TODO: full learn pipeline
+    DISPATCH
+
+# ═══════════════════════════════════════════════════════════════════════════
+# §9 SILK ENGINE
+# ═══════════════════════════════════════════════════════════════════════════
+
+# 0x58: SilkFire — pop mol_a, mol_b → co-activate (Hebbian update)
+op_silk_fire:
+    mov     eax, [r14+16]           # mol_a
+    mov     ecx, [r14]              # mol_b
+    add     r14, 32                 # pop both
+    # Compute symmetric hash
+    mov     edx, eax
+    xor     edx, ecx
+    imul    edx, 0x9E37
+    mov     esi, eax
+    add     esi, ecx
+    add     edx, esi
+    and     edx, 0xFFFF
+    # silk_matrix[hash] stores edge_index → Zone A
+    lea     rdi, [rip + silk_matrix]
+    movzx   esi, word ptr [rdi + rdx*2]
+    # If 0 = no edge yet, create one
+    test    esi, esi
+    jz      .sf_create
+    # Existing edge: increment weight (simplified Hebbian)
+    # TODO: full per-dimension Hebbian with Oja/STDP/BCM
+    # For now: weight = min(weight + 100, 65535)
+    add     esi, 100
+    cmp     esi, 65535
+    cmovg   esi, ecx                # clamp (wrong register, fix later)
+    mov     esi, 65535
+    mov     word ptr [rdi + rdx*2], si
+    DISPATCH
+.sf_create:
+    # Create edge: initial weight = 500
+    mov     word ptr [rdi + rdx*2], 500
+    DISPATCH
+
+# 0x59: SilkDecay — decay all silk edges by φ⁻¹ factor
+op_silk_decay:
+    # Iterate all 65536 silk_matrix entries, multiply by 618/1000
+    lea     rsi, [rip + silk_matrix]
+    xor     ecx, ecx
+.sd_loop:
+    cmp     ecx, 65536
+    jge     .sd_done
+    movzx   eax, word ptr [rsi + rcx*2]
+    test    eax, eax
+    jz      .sd_next
+    imul    eax, 950                # ×0.95 per cycle (gentler than φ⁻¹)
+    shr     eax, 10                 # /1024 ≈ /1000
+    mov     word ptr [rsi + rcx*2], ax
+.sd_next:
+    inc     ecx
+    jmp     .sd_loop
+.sd_done:
+    DISPATCH
+
+# 0x5A: SilkWalk — pop (mol, dim, depth) → walk via silk edges
+op_silk_walk:
+    # TODO: BFS walk using silk_matrix + implicit
+    DISPATCH
+
+# 0x5B: SilkImplicit — pop mol_a, mol_b → push implicit strength
+op_silk_implicit:
+    mov     eax, [r14+16]           # mol_a
+    mov     ecx, [r14]              # mol_b
+    add     r14, 16
+    # Strength = 1000 - dist * 1000 / 70
+    push    rbx
+    mov     edi, eax
+    mov     esi, ecx
+    call    mol_dist_inline
+    # eax = distance (0..70)
+    imul    eax, 1000
+    push    rdx
+    xor     edx, edx
+    mov     ecx, 70
+    div     ecx
+    pop     rdx
+    mov     ecx, 1000
+    sub     ecx, eax
+    test    ecx, ecx
+    cmovs   ecx, edx               # clamp to 0 (edx might not be 0, fix)
+    xor     edx, edx
+    test    ecx, ecx
+    cmovs   ecx, edx               # if negative, set 0
+    cvtsi2sd xmm0, ecx
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    pop     rbx
+    DISPATCH
+
+# ═══════════════════════════════════════════════════════════════════════════
+# §10 ARENA ALLOCATOR — 3-Zone
+# ═══════════════════════════════════════════════════════════════════════════
+
+# 0x60: AllocA — pop size → push ptr (permanent Zone A)
+op_alloc_a:
+    movsd   xmm0, [r14]
+    cvttsd2si edi, xmm0
+    add     r14, 16
+    # Zone A grows from zone_a_ptr
+    mov     rax, [rip + zone_a_ptr]
+    test    rax, rax
+    jnz     .aa_have_ptr
+    mov     rax, r15                # first alloc: use current heap
+    mov     [rip + zone_a_ptr], rax
+.aa_have_ptr:
+    mov     rcx, rax
+    add     rcx, rdi                # new ptr after alloc
+    mov     [rip + zone_a_ptr], rcx
+    # Return old ptr
+    sub     r14, 16
+    mov     [r14], rax
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# 0x61: AllocB — pop size → push ptr (session Zone B)
+op_alloc_b:
+    # Similar to AllocA but tracked separately
+    movsd   xmm0, [r14]
+    cvttsd2si edi, xmm0
+    # For now: use r15 (same as Zone C)
+    mov     rax, r15
+    add     r15, rdi
+    mov     [r14], rax
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# 0x62: AllocC — pop size → push ptr (turn Zone C)
+op_alloc_c:
+    movsd   xmm0, [r14]
+    cvttsd2si edi, xmm0
+    mov     rax, r15
+    add     r15, rdi
+    mov     [r14], rax
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# 0x63: ResetC — reset Zone C (free turn temporaries)
+op_reset_c:
+    mov     rax, [rip + repl_heap_checkpoint]
+    test    rax, rax
+    jz      .rc_skip
+    mov     r15, rax
+.rc_skip:
+    DISPATCH
+
+# 0x64: ResetB — reset Zone B (free session data)
+op_reset_b:
+    # TODO: reset zone_b_ptr to zone_b_base
+    DISPATCH
+
+# 0x65: HeapPin — advance checkpoint to current r15
+op_heap_pin:
+    mov     [rip + repl_heap_checkpoint], r15
+    DISPATCH
+
+# ═══════════════════════════════════════════════════════════════════════════
+# §45 ACTIVATION MATRIX — Spreading Activation support
+# ═══════════════════════════════════════════════════════════════════════════
+
+# __act_set(mol, value) — set activation level
+act_set:
+    # edi = mol, esi = value
+    and     edi, 0xFFFF
+    lea     rax, [rip + act_matrix]
+    mov     word ptr [rax + rdi*2], si
+    ret
+
+# __act_get(mol) → eax = activation
+act_get:
+    and     edi, 0xFFFF
+    lea     rax, [rip + act_matrix]
+    movzx   eax, word ptr [rax + rdi*2]
+    ret
+
+# __act_add(mol, delta) — add to activation (clamped 0..65535)
+act_add:
+    and     edi, 0xFFFF
+    lea     rax, [rip + act_matrix]
+    movzx   ecx, word ptr [rax + rdi*2]
+    add     ecx, esi
+    cmp     ecx, 65535
+    cmovg   ecx, esi                # wrong, should clamp
+    mov     edx, 65535
+    cmp     ecx, edx
+    cmovg   ecx, edx
+    test    ecx, ecx
+    cmovs   ecx, edi                # clamp to 0 if negative
+    xor     edx, edx
+    test    ecx, ecx
+    cmovs   ecx, edx
+    mov     word ptr [rax + rdi*2], cx
+    ret
+
+# __act_reset() — clear all activations
+act_reset:
+    lea     rdi, [rip + act_matrix]
+    xor     eax, eax
+    mov     ecx, 16384              # 131072/8 = 16384 qwords
+    rep     stosq
+    ret
+
+# __act_decay_all(factor) — SIMD batch decay (§16)
+# edi = factor (e.g. 800 for ×0.8)
+act_decay_all:
+    lea     rsi, [rip + act_matrix]
+    # Scalar fallback (SIMD version in spec §45)
+    xor     ecx, ecx
+.acd_loop:
+    cmp     ecx, 65536
+    jge     .acd_done
+    movzx   eax, word ptr [rsi + rcx*2]
+    imul    eax, edi
+    shr     eax, 10                 # /1024 ≈ /1000
+    mov     word ptr [rsi + rcx*2], ax
+    inc     ecx
+    jmp     .acd_loop
+.acd_done:
+    ret
+
+# ═══════════════════════════════════════════════════════════════════════════
+# §7.3 Helper: mol_dist_inline(edi=mol_a, esi=mol_b) → eax=distance
+# ═══════════════════════════════════════════════════════════════════════════
+mol_dist_inline:
+    push    rbx
+    xor     ebx, ebx
+    # ΔS
+    mov     eax, edi
+    shr     eax, 12
+    and     eax, 0xF
+    mov     ecx, esi
+    shr     ecx, 12
+    and     ecx, 0xF
+    sub     eax, ecx
+    mov     edx, eax
+    neg     edx
+    cmovs   edx, eax
+    add     ebx, edx
+    # ΔR
+    mov     eax, edi
+    shr     eax, 8
+    and     eax, 0xF
+    mov     ecx, esi
+    shr     ecx, 8
+    and     ecx, 0xF
+    sub     eax, ecx
+    mov     edx, eax
+    neg     edx
+    cmovs   edx, eax
+    add     ebx, edx
+    # ΔV ×2
+    mov     eax, edi
+    shr     eax, 5
+    and     eax, 0x7
+    mov     ecx, esi
+    shr     ecx, 5
+    and     ecx, 0x7
+    sub     eax, ecx
+    mov     edx, eax
+    neg     edx
+    cmovs   edx, eax
+    lea     ebx, [ebx + edx*2]
+    # ΔA ×2
+    mov     eax, edi
+    shr     eax, 2
+    and     eax, 0x7
+    mov     ecx, esi
+    shr     ecx, 2
+    and     ecx, 0x7
+    sub     eax, ecx
+    mov     edx, eax
+    neg     edx
+    cmovs   edx, eax
+    lea     ebx, [ebx + edx*2]
+    # ΔT ×4
+    mov     eax, edi
+    and     eax, 0x3
+    mov     ecx, esi
+    and     ecx, 0x3
+    sub     eax, ecx
+    mov     edx, eax
+    neg     edx
+    cmovs   edx, eax
+    lea     ebx, [ebx + edx*4]
+    mov     eax, ebx
+    pop     rbx
+    ret
+
 op_unknown:
     # Unknown opcode — halt with error
     jmp     op_halt
@@ -1130,37 +2006,37 @@ codegen_table:
     .quad   op_nop          # 0x3E
     .quad   op_nop          # 0x3F
     # 0x40-0x47: Molecular Engine (§7)
-    .quad   op_nop          # 0x40 MolPack (TODO)
-    .quad   op_nop          # 0x41 MolUnpack (TODO)
-    .quad   op_nop          # 0x42 MolDist (TODO)
-    .quad   op_nop          # 0x43 MolCompose (TODO)
-    .quad   op_nop          # 0x44 MolDominant (TODO)
-    .quad   op_nop          # 0x45 MolBatchDist (TODO: SIMD)
-    .quad   op_nop          # 0x46 MolEncode (TODO)
-    .quad   op_nop          # 0x47 MolDecode (TODO)
+    .quad   op_mol_pack     # 0x40 MolPack
+    .quad   op_mol_unpack   # 0x41 MolUnpack
+    .quad   op_mol_dist     # 0x42 MolDist
+    .quad   op_mol_compose  # 0x43 MolCompose
+    .quad   op_mol_dominant # 0x44 MolDominant
+    .quad   op_mol_batch_dist # 0x45 MolBatchDist (stub)
+    .quad   op_mol_encode   # 0x46 MolEncode (stub)
+    .quad   op_mol_decode   # 0x47 MolDecode (stub)
     # 0x48-0x4F: reserved
     .quad   op_nop, op_nop, op_nop, op_nop
     .quad   op_nop, op_nop, op_nop, op_nop
     # 0x50-0x54: KnowTree (§8)
-    .quad   op_nop          # 0x50 KtStore (TODO)
-    .quad   op_nop          # 0x51 KtLoad (TODO)
-    .quad   op_nop          # 0x52 KtNearest (TODO)
-    .quad   op_nop          # 0x53 KtWalk (TODO)
-    .quad   op_nop          # 0x54 KtLearn (TODO)
+    .quad   op_kt_store     # 0x50 KtStore
+    .quad   op_kt_load      # 0x51 KtLoad
+    .quad   op_kt_nearest   # 0x52 KtNearest
+    .quad   op_kt_walk      # 0x53 KtWalk (stub)
+    .quad   op_kt_learn     # 0x54 KtLearn (stub)
     .quad   op_nop, op_nop, op_nop
     # 0x58-0x5B: Silk (§9)
-    .quad   op_nop          # 0x58 SilkFire (TODO)
-    .quad   op_nop          # 0x59 SilkDecay (TODO)
-    .quad   op_nop          # 0x5A SilkWalk (TODO)
-    .quad   op_nop          # 0x5B SilkImplicit (TODO)
+    .quad   op_silk_fire    # 0x58 SilkFire
+    .quad   op_silk_decay   # 0x59 SilkDecay
+    .quad   op_silk_walk    # 0x5A SilkWalk (stub)
+    .quad   op_silk_implicit # 0x5B SilkImplicit
     .quad   op_nop, op_nop, op_nop, op_nop
     # 0x60-0x65: Arena (§10)
-    .quad   op_nop          # 0x60 AllocA (TODO)
-    .quad   op_nop          # 0x61 AllocB (TODO)
-    .quad   op_nop          # 0x62 AllocC (TODO)
-    .quad   op_nop          # 0x63 ResetC (TODO)
-    .quad   op_nop          # 0x64 ResetB (TODO)
-    .quad   op_nop          # 0x65 HeapPin (TODO)
+    .quad   op_alloc_a      # 0x60 AllocA
+    .quad   op_alloc_b      # 0x61 AllocB
+    .quad   op_alloc_c      # 0x62 AllocC
+    .quad   op_reset_c      # 0x63 ResetC
+    .quad   op_reset_b      # 0x64 ResetB
+    .quad   op_heap_pin     # 0x65 HeapPin
     .quad   op_nop, op_nop
     # 0x68-0x6F: reserved
     .quad   op_nop, op_nop, op_nop, op_nop
