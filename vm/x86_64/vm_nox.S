@@ -744,30 +744,69 @@ op_ge:
 
 # 0x07: Call [name_len:1][name_bytes:N][arg_count:1]
 op_call:
-    # Read name length
+    # Read name length + name + argc
     movzx   ecx, byte ptr [r12 + r13]
     inc     r13
-    # Read name, compute hash
     lea     rdi, [r12 + r13]        # name ptr
     mov     edx, ecx                # name len
+    push    rcx                      # save name len
+    call    hash_fnv1a              # → rax = hash
+    pop     rcx
     add     r13, rcx                # advance PC past name
-    # Read arg count
-    movzx   ecx, byte ptr [r12 + r13]
+    movzx   ecx, byte ptr [r12 + r13]  # argc
     inc     r13
-    # Hash the name (FNV-1a)
-    call    hash_fnv1a              # rdi=ptr, edx=len → rax=hash
-    # Dispatch to builtin via 512-slot table (spec §4.3)
-    mov     rcx, rax                 # save full hash
-    and     eax, 0x1FF               # slot = hash & 511
+    # Try builtin table first
+    push    rax                      # save hash
+    push    rcx                      # save argc
+    mov     esi, eax
+    and     esi, 0x1FF
     lea     rdx, [rip + builtin_jump_table]
-    jmp     [rdx + rax * 8]
+    lea     rdx, [rdx + rsi*8]
+    lea     rdi, [rip + .call_not_builtin]
+    cmp     [rdx], rdi               # is it .call_not_builtin?
+    pop     rcx
+    pop     rax
+    jne     .call_is_builtin
+    # Not a builtin → look up in var_matrix (user-defined closure)
+    push    rcx                      # save argc
+    call    var_load_matrix          # rax=ptr, rdx=len
+    pop     rcx
+    test    rax, rax
+    jz      .call_skip               # not found → skip
+    # Check if closure (len == CLOSURE_MARKER or CAPTURED_CLOSURE_MARKER)
+    cmp     rdx, CLOSURE_MARKER
+    je      .call_closure
+    jmp     .call_skip
+.call_is_builtin:
+    jmp     [rdx]                    # jump to builtin handler
+.call_closure:
+    # rax = body_pc, call it
+    push    r12                      # save bytecode base
+    push    r13                      # save return PC
+    push    rbx                      # save bc_size
+    # Scope: gen++
+    inc     qword ptr [rip + closure_depth]
+    # Jump to closure body
+    mov     r13d, eax                # PC = body_pc
+    DISPATCH
+.call_skip:
+    # Function not found — push 0
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
 
 # 0x08: Ret
 op_ret:
-    # Restore caller state from CPU stack
-    pop     r13                     # restore PC
-    pop     rbx                     # restore bc_size
-    pop     r12                     # restore bc_base
+    pop     rbx                      # restore bc_size
+    pop     r13                      # restore return PC
+    pop     r12                      # restore bytecode base
+    # Scope: gen--
+    cmp     qword ptr [rip + closure_depth], 0
+    je      .ret_no_scope
+    dec     qword ptr [rip + closure_depth]
+.ret_no_scope:
     DISPATCH
 
 # 0x09: Jmp [offset:4]
@@ -897,6 +936,183 @@ op_store_reg:
 
 # 0x12: Nop (explicit)
 op_nop2:
+    DISPATCH
+
+# ═══════════════════════════════════════════════════════════════════════════
+# §13 CLOSURES
+# ═══════════════════════════════════════════════════════════════════════════
+
+# 0x24: CallClosure [name_len:1][name:N][argc:1]
+op_call_closure:
+    movzx   ecx, byte ptr [r12 + r13]
+    inc     r13
+    lea     rdi, [r12 + r13]
+    mov     edx, ecx
+    push    rcx
+    call    hash_fnv1a
+    pop     rcx
+    add     r13, rcx
+    movzx   ecx, byte ptr [r12 + r13]
+    inc     r13
+    push    rcx
+    call    var_load_matrix
+    pop     rcx
+    test    rax, rax
+    jz      .ccl_notfound
+    push    r12
+    push    r13
+    push    rbx
+    inc     qword ptr [rip + closure_depth]
+    mov     r13d, eax
+    DISPATCH
+.ccl_notfound:
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# 0x25: Closure [param_count:1][body_len:4][body...]
+op_closure:
+    movzx   ecx, byte ptr [r12 + r13]   # param_count (unused for now)
+    inc     r13
+    mov     eax, dword ptr [r12 + r13]            # body_len (u32 LE)
+    add     r13, 4
+    mov     edx, r13d                    # body_pc = current PC
+    add     r13d, eax                    # skip body bytes
+    sub     r14, 16
+    mov     [r14], rdx                   # push body_pc
+    mov     qword ptr [r14+8], CLOSURE_MARKER
+    DISPATCH
+
+# 0x30: ClosureCapture [param_count:1][capture_count:1][cap_names...][body_len:4][body...]
+op_closure_cap:
+    movzx   ecx, byte ptr [r12 + r13]   # param_count
+    inc     r13
+    movzx   edx, byte ptr [r12 + r13]   # capture_count
+    inc     r13
+    # Allocate heap object: [body_pc:8][capture_count:8][(hash:8,ptr:8,len:8)×N]
+    mov     rbp, r15
+    add     r15, 16                      # header space
+    push    rcx
+    push    rdx
+    mov     ecx, edx
+    test    ecx, ecx
+    jz      .ccc_done
+.ccc_loop:
+    push    rcx
+    movzx   ecx, byte ptr [r12 + r13]   # cap name len
+    inc     r13
+    lea     rdi, [r12 + r13]
+    mov     edx, ecx
+    push    rcx
+    call    hash_fnv1a
+    pop     rcx
+    add     r13, rcx
+    push    rax
+    call    var_load_matrix
+    mov     r8, rax
+    mov     r9, rdx
+    pop     rax
+    mov     [r15], rax                   # hash
+    mov     [r15+8], r8                  # ptr
+    mov     [r15+16], r9                 # len
+    add     r15, 24
+    pop     rcx
+    dec     ecx
+    jnz     .ccc_loop
+.ccc_done:
+    pop     rdx                          # capture_count
+    pop     rcx                          # param_count
+    mov     eax, dword ptr [r12 + r13]            # body_len
+    add     r13, 4
+    mov     edi, r13d                    # body_pc
+    add     r13d, eax                    # skip body
+    mov     [rbp], rdi                   # store body_pc
+    mov     [rbp+8], rdx                 # store capture_count
+    sub     r14, 16
+    mov     [r14], rbp                   # push heap object ptr
+    mov     qword ptr [r14+8], CLOSURE_MARKER
+    DISPATCH
+
+# ═══════════════════════════════════════════════════════════════════════════
+# §14 EXCEPTION HANDLING
+# ═══════════════════════════════════════════════════════════════════════════
+
+# 0x1A: TryBegin [catch_offset:4]
+op_try_begin:
+    mov     eax, dword ptr [r12 + r13]            # catch offset
+    add     r13, 4
+    # Push try frame on CPU stack: [catch_pc:8][saved_r14:8][saved_r15:8]
+    push    r15                          # save heap
+    push    r14                          # save VM stack
+    push    rax                          # catch PC
+    inc     qword ptr [rip + try_depth]
+    DISPATCH
+
+# 0x1B: CatchEnd — end of catch block, pop try frame
+op_catch_end:
+    cmp     qword ptr [rip + try_depth], 0
+    je      .ce_skip
+    pop     rax                          # discard catch_pc
+    pop     r14                          # discard saved stack (we're past the try now)
+    pop     r15                          # discard saved heap
+    dec     qword ptr [rip + try_depth]
+.ce_skip:
+    DISPATCH
+
+# 0x78: Throw — jump to catch handler
+op_throw:
+    cmp     qword ptr [rip + try_depth], 0
+    je      op_halt                      # uncaught → halt
+    pop     rax                          # catch_pc
+    pop     r14                          # restore VM stack
+    pop     r15                          # restore heap
+    dec     qword ptr [rip + try_depth]
+    mov     r13d, eax                    # jump to catch
+    DISPATCH
+
+# ═══════════════════════════════════════════════════════════════════════════
+# STRING CONCAT (Add on strings)
+# ═══════════════════════════════════════════════════════════════════════════
+# The op_add handler needs to detect string + string and concat.
+# We modify op_add to check types:
+
+string_concat:
+    # rax=ptr_a, rdx=len_a (from caller), r8=ptr_b, r9=len_b
+    # Allocate new string on heap: len_a + len_b u16 molecules
+    mov     rdi, r15                     # dest
+    mov     rcx, rdx                     # len_a mol count
+    shl     rcx, 1                       # × 2 bytes
+    mov     rsi, rax                     # src_a
+    push    rdx
+    push    r8
+    push    r9
+    mov     edx, ecx
+    call    memcpy_inline                # copy a
+    pop     r9
+    pop     r8
+    pop     rdx
+    # Copy b after a
+    lea     rdi, [r15 + rdx*2]          # dest = after a
+    mov     rsi, r8                      # src_b
+    mov     ecx, r9d
+    shl     ecx, 1
+    push    rdx
+    push    r9
+    mov     edx, ecx
+    call    memcpy_inline
+    pop     r9
+    pop     rdx
+    # Result
+    mov     rax, r15                     # new ptr
+    add     rdx, r9                      # total len = len_a + len_b
+    lea     rcx, [rdx*2]
+    add     r15, rcx                     # bump heap
+    # Push result
+    sub     r14, 16
+    mov     [r14], rax
+    mov     [r14+8], rdx
     DISPATCH
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1967,8 +2183,8 @@ codegen_table:
     .quad   op_nop          # 0x17 (ScopeBegin stub)
     .quad   op_nop          # 0x18 (ScopeEnd stub)
     .quad   op_push_mol     # 0x19
-    .quad   op_nop          # 0x1A (TryBegin — TODO)
-    .quad   op_nop          # 0x1B (CatchEnd — TODO)
+    .quad   op_try_begin    # 0x1A TryBegin
+    .quad   op_catch_end    # 0x1B CatchEnd
     .quad   op_store        # 0x1C (StoreUpdate = Store)
     .quad   op_nop          # 0x1D (Trace)
     .quad   op_nop          # 0x1E (Inspect)
@@ -1977,8 +2193,8 @@ codegen_table:
     .quad   op_nop          # 0x21 (Why)
     .quad   op_nop          # 0x22 (Explain)
     .quad   op_nop          # 0x23 (Ffi)
-    .quad   op_call         # 0x24 (CallClosure — TODO proper)
-    .quad   op_nop          # 0x25 (Closure — TODO)
+    .quad   op_call_closure  # 0x24 CallClosure
+    .quad   op_closure      # 0x25 Closure
     .quad   op_load_reg     # 0x26
     .quad   op_store_reg    # 0x27
     .quad   op_enter_frame  # 0x28
@@ -1989,7 +2205,7 @@ codegen_table:
     .quad   op_div          # 0x2D
     .quad   op_mod          # 0x2E
     .quad   op_nop          # 0x2F (Neg)
-    .quad   op_nop          # 0x30 (ClosureCapture)
+    .quad   op_closure_cap  # 0x30 ClosureCapture
     .quad   op_eq           # 0x31
     .quad   op_ne           # 0x32
     .quad   op_lt           # 0x33
@@ -3037,3 +3253,4 @@ v_history_ptr:  .space 1
 
 # ── Misc ──
 repl_heap_checkpoint: .space 8
+try_depth:      .space 8
