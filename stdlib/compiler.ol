@@ -957,6 +957,12 @@ fn build_binary(source_path, output_path) {
     g_pos = 0;
     g_code = [];
     lex(source);
+    emit "Lex done, tokens:";
+    emit g_tok_count;
+    emit "TK_EMIT val:";
+    emit TK_EMIT;
+    emit "First token:";
+    emit __array_get(g_tok_types, 0);
 
     // Parse
     let ast = parse_program();

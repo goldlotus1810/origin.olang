@@ -2419,12 +2419,19 @@ var_store_matrix:
 .vsm_write:
     # Save old value to undo stack if inside closure scope
     cmp     qword ptr [rip + closure_depth], 0
-    je      .vsm_no_save
+    je      .vsm_no_save              # global scope → no save
     # Check if same depth → same scope update, no save needed
     mov     rdx, [rip + closure_depth]
     cmp     [rbx + rcx + 8], rdx
-    je      .vsm_no_save
-    # Different scope or empty → save old slot
+    je      .vsm_no_save              # same depth → overwrite
+    # Check if slot is EMPTY → new local, must save (so it can be removed on return)
+    cmp     qword ptr [rbx + rcx], 0
+    je      .vsm_do_save              # empty slot → save empty state
+    # Check if existing var is from GLOBAL scope (depth 0) → DON'T save, it's mutation
+    cmp     qword ptr [rbx + rcx + 8], 0
+    je      .vsm_no_save              # depth 0 → global mutation, don't undo
+    # Different non-zero depth → save for undo (shadowing a local from different scope)
+.vsm_do_save:
     push    rax
     push    rdi
     lea     rdi, [rip + var_save_top]
@@ -2444,8 +2451,12 @@ var_store_matrix:
     pop     rax
 .vsm_no_save:
     mov     [rbx + rcx], eax         # hash
+    # Keep depth 0 for globals (don't overwrite depth if currently 0)
+    cmp     qword ptr [rbx + rcx + 8], 0
+    je      .vsm_keep_depth           # slot depth == 0 → keep it 0
     mov     rdx, [rip + closure_depth]
-    mov     [rbx + rcx + 8], rdx     # depth
+    mov     [rbx + rcx + 8], rdx     # depth = current
+.vsm_keep_depth:
     mov     [rbx + rcx + 16], r8     # val.ptr
     mov     [rbx + rcx + 24], r9     # val.len
     pop     rbx
