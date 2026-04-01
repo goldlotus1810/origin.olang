@@ -359,16 +359,9 @@ vm_loop:
     cmp     r13, rbx
     jae     op_halt                 # PC >= bc_size → done
 
-    # Fetch opcode
+    # Fetch opcode + dispatch (always codegen format)
     movzx   eax, byte ptr [r12 + r13]
     inc     r13                     # PC++
-
-    # Check format
-    cmp     byte ptr [rip + bc_format], 1
-    je      dispatch_codegen
-
-    # ir.rs format — TODO: implement when needed
-    jmp     op_halt
 
 dispatch_codegen:
     # Codegen format: opcode is direct index into jump table
@@ -2838,7 +2831,86 @@ builtin_jump_table:
     mov     qword ptr [r14+8], 8
     DISPATCH
 
-# Stub builtins not yet implemented
+# ── Additional builtins ──
+
+# pop(array) → removed last element
+.builtin_pop_arr:
+    mov     rax, [r14]
+    mov     rdx, [r14+8]
+    add     r14, 16
+    cmp     rdx, ARRAY_MARKER
+    jne     .bpop_nop
+    mov     rcx, [rax+8]
+    test    rcx, rcx
+    jz      .bpop_nop
+    dec     rcx
+    mov     [rax+8], rcx
+    push    rcx
+    shl     rcx, 4
+    lea     rsi, [rax + 16 + rcx]
+    pop     rcx
+    sub     r14, 16
+    mov     rdx, [rsi]
+    mov     rdi, [rsi+8]
+    mov     [r14], rdx
+    mov     [r14+8], rdi
+    DISPATCH
+.bpop_nop:
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# range(start, end) → array
+.builtin_range:
+    movsd   xmm0, [r14]
+    cvttsd2si esi, xmm0
+    movsd   xmm0, [r14+16]
+    cvttsd2si edi, xmm0
+    add     r14, 32
+    mov     ecx, esi
+    sub     ecx, edi
+    test    ecx, ecx
+    jle     .brange_empty
+    mov     rax, r15
+    mov     [r15], rcx
+    mov     [r15+8], rcx
+    add     r15, 16
+    xor     edx, edx
+.brange_fill:
+    cmp     edx, ecx
+    jge     .brange_done
+    mov     eax, edi
+    add     eax, edx
+    cvtsi2sd xmm0, eax
+    movsd   [r15], xmm0
+    mov     qword ptr [r15+8], F64_MARKER
+    add     r15, 16
+    inc     edx
+    jmp     .brange_fill
+.brange_done:
+    mov     ecx, esi
+    sub     ecx, edi
+    shl     ecx, 4
+    add     ecx, 16
+    mov     rax, r15
+    sub     rax, rcx
+    sub     r14, 16
+    mov     [r14], rax
+    mov     qword ptr [r14+8], ARRAY_MARKER
+    DISPATCH
+.brange_empty:
+    mov     rax, r15
+    mov     qword ptr [r15], 0
+    mov     qword ptr [r15+8], 0
+    add     r15, 16
+    sub     r14, 16
+    mov     [r14], rax
+    mov     qword ptr [r14+8], ARRAY_MARKER
+    DISPATCH
+
+# Stub builtins
 .text
 .builtin_str_find:
     add     r14, 32                  # pop 2 args
