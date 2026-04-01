@@ -2450,13 +2450,17 @@ var_store_matrix:
     pop     rdi
     pop     rax
 .vsm_no_save:
-    mov     [rbx + rcx], eax         # hash
-    # Keep depth 0 for globals (don't overwrite depth if currently 0)
-    cmp     qword ptr [rbx + rcx + 8], 0
-    je      .vsm_keep_depth           # slot depth == 0 → keep it 0
+    # Keep depth 0 ONLY if slot had an existing value at depth 0 (true global)
+    # If slot was empty (hash == 0), this is a NEW local → set depth to current
+    cmp     qword ptr [rbx + rcx], 0  # was slot empty before?
+    je      .vsm_set_depth            # empty → new local, set current depth
+    cmp     qword ptr [rbx + rcx + 8], 0 # existing value at depth 0?
+    je      .vsm_write_val            # yes → keep depth 0 (global mutation)
+.vsm_set_depth:
     mov     rdx, [rip + closure_depth]
     mov     [rbx + rcx + 8], rdx     # depth = current
-.vsm_keep_depth:
+.vsm_write_val:
+    mov     [rbx + rcx], eax         # hash
     mov     [rbx + rcx + 16], r8     # val.ptr
     mov     [rbx + rcx + 24], r9     # val.len
     pop     rbx
@@ -2898,8 +2902,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x7DC336EFBBA1F85B
+    .quad   .builtin_f64_to_le_bytes
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -4288,6 +4292,41 @@ builtin_hash_table:
 # Slot = hash(name) & 0xFF. Pre-populated, no collision chain.
 # When compiler emits 0x3A [slot], direct jump. No name hashing at runtime.
 # ═══════════════════════════════════════════════════════════════════════════
+
+# __f64_to_le_bytes(f64_value) → array of 8 byte values
+.builtin_f64_to_le_bytes:
+    movabs  rdx, 0x7DC336EFBBA1F85B
+    cmp     rdx, rax
+    jne     .call_not_builtin
+    # Pop f64 value
+    mov     rax, [r14]               # f64 bits (stored as ptr)
+    add     r14, 16
+    # Build array: [capacity:8][count:8][byte0:16][byte1:16]...[byte7:16]
+    mov     rdi, r15                 # array base
+    mov     qword ptr [r15], 8      # capacity = 8
+    mov     qword ptr [r15 + 8], 8  # count = 8
+    add     r15, 16
+    # Extract each byte from f64 bits (little-endian)
+    mov     rcx, 8
+.f2b_loop:
+    movzx   edx, al                  # low byte
+    # Store as f64 value in array entry [ptr:8][len:8]
+    sub     rsp, 8
+    cvtsi2sd xmm0, rdx
+    movsd   [rsp], xmm0
+    mov     rdx, [rsp]
+    add     rsp, 8
+    mov     [r15], rdx               # f64 bits of byte value
+    mov     qword ptr [r15 + 8], F64_MARKER
+    add     r15, 16
+    shr     rax, 8                   # next byte
+    dec     rcx
+    jnz     .f2b_loop
+    # Push array
+    sub     r14, 16
+    mov     [r14], rdi
+    mov     qword ptr [r14 + 8], ARRAY_MARKER
+    DISPATCH
 
 .call_not_builtin:
     # Unknown builtin — push 0

@@ -957,55 +957,49 @@ fn build_binary(source_path, output_path) {
     g_pos = 0;
     g_code = [];
     lex(source);
-    emit "Lex done, tokens:";
-    emit g_tok_count;
-    emit "TK_EMIT val:";
-    emit TK_EMIT;
-    emit "First token:";
-    emit __array_get(g_tok_types, 0);
 
     // Parse
     let ast = parse_program();
+    emit "Parse OK!";
 
     // Codegen
     compile_node(ast);
+    emit "Codegen OK!";
 
-    // Read VM binary
+    // Step 1: Copy VM binary to output
+    __system("cp vm/x86_64/vm_nox " + output_path);
+
+    // Step 2: Get VM size
     let vm = __file_read("vm/x86_64/vm_nox");
     let vm_len = len(vm);
+    emit "VM size: " + __to_string(vm_len);
 
-    // Build output: [VM bytes][bc_size:4 LE][bytecode][trailer:8 LE]
-    let out = [];
-    // Copy VM bytes
-    let i = 0;
-    while i < vm_len {
-        push(out, __char_code(char_at(vm, i)));
-        i = i + 1;
-    };
-    // BC size (4 bytes LE)
+    // Step 3: Build tail bytes: bc_size(4) + bytecode + trailer(8)
     let bc_len = len(g_code);
-    push(out, __bit_and(bc_len, 255));
-    push(out, __bit_and(__bit_shr(bc_len, 8), 255));
-    push(out, __bit_and(__bit_shr(bc_len, 16), 255));
-    push(out, __bit_and(__bit_shr(bc_len, 24), 255));
-    // Bytecode bytes
-    i = 0;
+    let tail = [];
+    // BC size (4 bytes LE)
+    push(tail, __bit_and(bc_len, 255));
+    push(tail, __bit_and(__bit_shr(bc_len, 8), 255));
+    push(tail, __bit_and(__bit_shr(bc_len, 16), 255));
+    push(tail, __bit_and(__bit_shr(bc_len, 24), 255));
+    // Bytecode
+    let i = 0;
     while i < bc_len {
-        push(out, __array_get(g_code, i));
+        push(tail, __array_get(g_code, i));
         i = i + 1;
     };
-    // Trailer (8 bytes LE = offset of bc_size = vm_len)
-    push(out, __bit_and(vm_len, 255));
-    push(out, __bit_and(__bit_shr(vm_len, 8), 255));
-    push(out, __bit_and(__bit_shr(vm_len, 16), 255));
-    push(out, __bit_and(__bit_shr(vm_len, 24), 255));
-    push(out, 0);
-    push(out, 0);
-    push(out, 0);
-    push(out, 0);
+    // Trailer (8 bytes LE = vm_len as offset to bc_size)
+    push(tail, __bit_and(vm_len, 255));
+    push(tail, __bit_and(__bit_shr(vm_len, 8), 255));
+    push(tail, __bit_and(__bit_shr(vm_len, 16), 255));
+    push(tail, __bit_and(__bit_shr(vm_len, 24), 255));
+    push(tail, 0);
+    push(tail, 0);
+    push(tail, 0);
+    push(tail, 0);
 
-    // Write binary
-    __file_write_bytes(output_path, out);
+    // Step 4: Append tail to output file
+    __file_append_bytes(output_path, tail);
 
     emit "Compiled: " + source_path;
     emit "  Bytecode: " + __to_string(bc_len) + " bytes";
