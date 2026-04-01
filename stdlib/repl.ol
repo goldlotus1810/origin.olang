@@ -10,11 +10,11 @@
 // REPL eval — main entry point
 // ════════════════════════════════════════════════════════
 
-let __boot_learned = 0;
+let __boot_learned = [0];
 
 fn _boot_learn() {
-    if __boot_learned == 1 { return; };
-    let __boot_learned = 1;
+    if __array_get(__boot_learned, 0) == 1 { return; };
+    let _ = __set_at(__boot_learned, 0, 1);
     _kt_boot_tree();
     _boot_embedded_kt();
     // Load ALL data: L0 registry + saved memory + pre-built knowledge

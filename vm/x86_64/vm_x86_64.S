@@ -10866,6 +10866,10 @@ op_halt:
 
 .halt_boot:
     # Not nested — this is the boot completion.
+    # Zone A checkpoint: protect ALL boot data (permanent).
+    # r15 = end of boot allocations. Everything below = Zone A (never freed).
+    lea     repl_heap_checkpoint(%rip), %rax
+    mov     %r15, (%rax)
 
     # Check eval_mode: if set, process stdin and exit (no REPL)
     cmpb    $1, eval_mode(%rip)
