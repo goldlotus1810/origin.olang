@@ -2664,174 +2664,527 @@ codegen_table:
 # BUILTIN JUMP TABLE (256 slots)
 # ═══════════════════════════════════════════════════════════════════════════
 
-# ═══ Builtin Jump Table (512 slots, spec §4.3) ═══
-# Index = FNV-1a(name) & 0x1FF
-# Populated with known builtins, rest = .call_not_builtin
+# ═══ Builtin Jump Table (512 slots, auto-generated) ═══
+# Index = FNV-1a(name) & 0x1FF. Collisions: linear probe.
+.align 8
+# ═══ Builtin Jump Table (512 slots, auto-generated) ═══
 .align 8
 builtin_jump_table:
-    .quad   .builtin_substr      # 0x000 (substr)
-    .quad   .call_not_builtin    # 0x001
-    .quad   .call_not_builtin    # 0x002
-    .quad   .builtin_char_at     # 0x003 (char_at)
-    .rept   9
-    .quad   .call_not_builtin    # 0x004-0x00C
-    .endr
-    .quad   .builtin_abs         # 0x00D (__abs)
-    .quad   .call_not_builtin    # 0x00E
-    .quad   .builtin_set_at      # 0x00F (__set_at)
-    .rept   7
-    .quad   .call_not_builtin    # 0x010-0x016
-    .endr
-    .quad   .builtin_tcp_recv    # 0x017 (__tcp_recv)
-    .rept   12
-    .quad   .call_not_builtin    # 0x018-0x023
-    .endr
-    .quad   .builtin_str_find    # 0x024 (__str_find) — stub for now
-    .rept   16
-    .quad   .call_not_builtin    # 0x025-0x034
-    .endr
-    .quad   .builtin_heap_pin    # 0x035 (__heap_pin) — stub
-    .rept   13
-    .quad   .call_not_builtin    # 0x036-0x042
-    .endr
-    .quad   .builtin_log2        # 0x043 (__log2)
-    .rept   8
-    .quad   .call_not_builtin    # 0x044-0x04B
-    .endr
-    .quad   .builtin_len         # 0x04C (len — collision with __mxr, len wins by order)
-    .rept   3
-    .quad   .call_not_builtin    # 0x04D-0x04F
-    .endr
-    .quad   .call_not_builtin    # 0x050 (pop — TODO)
-    .rept   3
-    .quad   .call_not_builtin    # 0x051-0x053
-    .endr
-    .quad   .builtin_mx_w        # 0x054 (__mx_w)
-    .rept   2
-    .quad   .call_not_builtin    # 0x055-0x056
-    .endr
-    .quad   .builtin_array_get   # 0x057 (__array_get)
-    .rept   8
-    .quad   .call_not_builtin    # 0x058-0x05F
-    .endr
-    .quad   .call_not_builtin    # 0x060
-    .quad   .builtin_file_write  # 0x061 (__file_write)
-    .rept   4
-    .quad   .call_not_builtin    # 0x062-0x065
-    .endr
-    .quad   .builtin_to_string   # 0x066 (__to_string)
-    .rept   3
-    .quad   .call_not_builtin    # 0x067-0x069
-    .endr
-    .quad   .builtin_ceil        # 0x06A (__ceil — collision with __system, ceil wins)
-    .rept   6
-    .quad   .call_not_builtin    # 0x06B-0x070
-    .endr
-    .quad   .builtin_tcp_close   # 0x071 (__tcp_close)
-    .rept   15
-    .quad   .call_not_builtin    # 0x072-0x080
-    .endr
-    .quad   .call_not_builtin    # 0x081
-    .quad   .builtin_bit_or      # 0x082 (__bit_or)
-    .rept   3
-    .quad   .call_not_builtin    # 0x083-0x085
-    .endr
-    .quad   .builtin_sleep       # 0x086 (__sleep)
-    .rept   3
-    .quad   .builtin_type_of     # 0x087 (type_of)-0x089
-    .endr
-    .quad   .builtin_exp         # 0x08A (__exp)
-    .rept   7
-    .quad   .call_not_builtin    # 0x08B-0x091
-    .endr
-    .quad   .builtin_array_with_cap # 0x092 (__array_with_cap)
-    .rept   6
-    .quad   .call_not_builtin    # 0x093-0x098
-    .endr
-    .quad   .builtin_char_code   # 0x099 (__char_code)
-    .rept   3
-    .quad   .call_not_builtin    # 0x09A-0x09C
-    .endr
-    .quad   .builtin_push        # 0x09D (push)
-    .rept   7
-    .quad   .call_not_builtin    # 0x09E-0x0A4
-    .endr
-    .quad   .builtin_sqrt        # 0x0A5 (__sqrt)
-    .quad   .call_not_builtin    # 0x0A6
-    .quad   .call_not_builtin    # 0x0A7 (__str_trim — TODO)
-    .rept   5
-    .quad   .call_not_builtin    # 0x0A8-0x0AC
-    .endr
-    .quad   .builtin_tcp_send    # 0x0AD (__tcp_send)
-    .quad   .call_not_builtin    # 0x0AE
-    .quad   .builtin_floor       # 0x0AF (__floor)
-    .rept   20
-    .quad   .call_not_builtin    # 0x0B0-0x0C3
-    .endr
-    .quad   .builtin_tcp_listen  # 0x0C4 (__tcp_listen)
-    .rept   2
-    .quad   .call_not_builtin    # 0x0C5-0x0C6
-    .endr
-    .quad   .builtin_heap_used   # 0x0C7 (__heap_used)
-    .quad   .builtin_bit_xor     # 0x0C8 (__bit_xor)
-    .rept   6
-    .quad   .call_not_builtin    # 0x0C9-0x0CE
-    .endr
-    .quad   .builtin_tcp_accept  # 0x0CF (__tcp_accept)
-    .quad   .call_not_builtin    # 0x0D0 (p_weight — TODO)
-    .rept   3
-    .quad   .call_not_builtin    # 0x0D1-0x0D3
-    .endr
-    .quad   .builtin_bit_and     # 0x0D4 (__bit_and)
-    .rept   30
-    .quad   .call_not_builtin    # 0x0D5-0x0F2
-    .endr
-    .quad   .call_not_builtin    # 0x0F3 (compose — TODO)
-    .rept   12
-    .quad   .call_not_builtin    # 0x0F4-0x0FF
-    .endr
-    # 0x100-0x14B: collisions / overflow
-    .quad   .builtin_mxr         # 0x100 (__mxr)
-    .rept   23
-    .quad   .call_not_builtin    # 0x101-0x117
-    .endr
-    .quad   .call_not_builtin    # 0x118
-    .quad   .call_not_builtin    # 0x119
-    .quad   .call_not_builtin    # 0x11A
-    .quad   .call_not_builtin    # 0x11B
-    .quad   .call_not_builtin    # 0x11C
-    .quad   .call_not_builtin    # 0x11D
-    .quad   .builtin_file_read   # 0x11E (__file_read)
-    .rept   28
-    .quad   .call_not_builtin    # 0x11F-0x13A
-    .endr
-    .quad   .builtin_write_raw   # 0x13B (__write_raw)
-    .rept   17
-    .quad   .call_not_builtin    # 0x13C-0x14C
-    .endr
-    .quad   .call_not_builtin    # 0x14D
-    .quad   .call_not_builtin    # 0x14E
-    .quad   .call_not_builtin    # 0x14F
-    .quad   .call_not_builtin    # 0x150 (pop — TODO)
-    .rept   14
-    .quad   .call_not_builtin    # 0x151-0x15E
-    .endr
-    .rept   8
-    .quad   .call_not_builtin    # 0x15F-0x166
-    .endr
-    .quad   .builtin_str_trim    # 0x1A7 (__str_trim) — need to fill gap
-    # Actually table is linear, can't jump. Fill to 0x1A7:
-    .rept   64
-    .quad   .call_not_builtin    # fill gap
-    .endr
-    .quad   .builtin_str_trim    # slot for __str_trim
-    .rept   30
-    .quad   .call_not_builtin    # rest
-    .endr
-    .quad   .builtin_file_append # 0x0D2 — already past, need different approach
-    .rept   50
     .quad   .call_not_builtin
-    .endr
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_str_find              # 0x024 (__str_find)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_heap_pin              # 0x035 (__heap_pin)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_mx_w                  # 0x054 (__mx_w)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_array_get             # 0x057 (__array_get)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_file_write            # 0x061 (__file_write)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_ceil                  # 0x06A (__ceil)
+    .quad   .builtin_system                # 0x06B (__system)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_bit_shr               # 0x06E (__bit_shr)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_tcp_close             # 0x071 (__tcp_close)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_bit_or                # 0x082 (__bit_or)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_type_of               # 0x087 (type_of)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_exp                   # 0x08A (__exp)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_array_with_cap        # 0x092 (__array_with_cap)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_char_code             # 0x099 (__char_code)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_sqrt                  # 0x0A5 (__sqrt)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_tcp_send              # 0x0AD (__tcp_send)
+    .quad   .call_not_builtin
+    .quad   .builtin_str_index_of          # 0x0AF (__str_index_of)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_range                 # 0x0B2 (range)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_file_append           # 0x0D2 (__file_append)
+    .quad   .call_not_builtin
+    .quad   .builtin_bit_and               # 0x0D4 (__bit_and)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_substr                # 0x100 (substr)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_char_at               # 0x103 (char_at)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_bit_shl               # 0x10C (__bit_shl)
+    .quad   .builtin_abs                   # 0x10D (__abs)
+    .quad   .call_not_builtin
+    .quad   .builtin_set_at                # 0x10F (__set_at)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_tcp_recv              # 0x117 (__tcp_recv)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_write_raw             # 0x13B (__write_raw)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_log2                  # 0x143 (__log2)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_len                   # 0x14C (len)
+    .quad   .builtin_mxr                   # 0x14D (__mxr)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_pop_arr               # 0x150 (pop)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_to_string             # 0x166 (__to_string)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_sleep                 # 0x186 (__sleep)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_push                  # 0x19D (push)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_str_trim              # 0x1A7 (__str_trim)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_floor                 # 0x1AF (__floor)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_file_read             # 0x1BE (__file_read)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_tcp_listen            # 0x1C4 (__tcp_listen)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_heap_used             # 0x1C7 (__heap_used)
+    .quad   .builtin_bit_xor               # 0x1C8 (__bit_xor)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .builtin_tcp_accept            # 0x1CF (__tcp_accept)
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+    .quad   .call_not_builtin
+
+# COLLISION: __mxr wanted 0x14C, placed at 0x14D
+# COLLISION: __system wanted 0x06A, placed at 0x06B
 
 # ── More builtins ──
 
