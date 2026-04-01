@@ -18,38 +18,29 @@ fn kt_mol_dist(a, b) {
     return ds + dr + dv * 2 + da * 2 + dt * 4;
 };
 
-// ── Encode char (computed from codepoint) ──
-fn kt_enc_char(cp) {
-    let s = 1; let r = 4; let v = 4; let a = 3; let t = 2;
-    if cp >= 97 { if cp <= 122 { let s = __bit_and(cp * 7, 15); let r = 8; let a = 3; }; };
-    if cp >= 65 { if cp <= 90 { let s = __bit_and(cp * 7 + 3, 15); let r = 8; let a = 5; }; };
-    if cp >= 48 { if cp <= 57 { let s = __bit_and(cp * 3, 15); let r = 3; let v = 4; let a = 2; let t = 1; }; };
-    if cp == 32 { let s = 0; let r = 0; let v = 3; let a = 1; let t = 0; };
-    if cp == 33 { let v = 2; let a = 6; };
-    if cp == 63 { let v = 4; let a = 5; };
-    return kt_mol_pack(s, r, v, a, t);
-};
-
-// ── Compose (biological: S=max, R=first, V=amplify, A=max, T=first) ──
-fn kt_compose(a, b) {
-    let sa = kt_mol_s(a); let sb = kt_mol_s(b); let s = sa; if sb > sa { let s = sb; };
-    let va = kt_mol_v(a); let vb = kt_mol_v(b);
-    let vbase = __floor((va + vb) / 2); let v = vbase;
-    if va + vb > 6 { let v = vbase + 1; if v > 7 { let v = 7; }; };
-    if va + vb < 6 { let v = vbase - 1; if v < 0 { let v = 0; }; };
-    let aa = kt_mol_a(a); let ab = kt_mol_a(b); let ar = aa; if ab > aa { let ar = ab; };
-    return kt_mol_pack(s, kt_mol_r(a), v, ar, kt_mol_t(a));
-};
-
-// ── Encode word (start..end in text) ──
+// ── Encode word: hash-mix all chars across 5D ──
+// Each char contributes to all dimensions via position-dependent hashing.
+// Same word → same mol. Different word → different mol.
+// COMPUTED from codepoints, not lookup table.
 fn kt_enc_word(text, ws, we) {
-    let r = [0]; let i = ws;
+    let hs = [0]; let hr = [0]; let hv = [0]; let ha = [0]; let ht = [0];
+    let i = ws; let p = [0];
     while i < we {
-        let m = kt_enc_char(__char_code(char_at(text, i)));
-        if i == ws { let _ = __set_at(r, 0, m); } else { let _ = __set_at(r, 0, kt_compose(__array_get(r, 0), m)); };
+        let c = __char_code(char_at(text, i));
+        let pp = __array_get(p, 0);
+        let _ = __set_at(hs, 0, __bit_and(__array_get(hs, 0) * 31 + c, 65535));
+        let _ = __set_at(hr, 0, __bit_and(__array_get(hr, 0) * 37 + c + pp * 7, 65535));
+        let _ = __set_at(hv, 0, __bit_and(__array_get(hv, 0) * 41 + c + pp * 13, 65535));
+        let _ = __set_at(ha, 0, __bit_and(__array_get(ha, 0) * 43 + c + pp * 17, 65535));
+        let _ = __set_at(ht, 0, __bit_and(__array_get(ht, 0) * 47 + c + pp * 23, 65535));
+        let _ = __set_at(p, 0, pp + 1);
         let i = i + 1;
     };
-    return __array_get(r, 0);
+    return kt_mol_pack(
+        __array_get(hs, 0) % 16, __array_get(hr, 0) % 16,
+        __array_get(hv, 0) % 8, __array_get(ha, 0) % 8,
+        __array_get(ht, 0) % 4
+    );
 };
 
 // ── Build chain: array of per-word mols ──
@@ -65,13 +56,10 @@ fn kt_build_chain(text) {
     return chain;
 };
 
-// ── Chain → sentence mol ──
+// ── Chain → sentence mol (first word mol as representative) ──
 fn kt_chain_mol(chain) {
     if len(chain) == 0 { return 0; };
-    let r = __array_get(chain, 0);
-    let i = 1;
-    while i < len(chain) { let r = kt_compose(r, __array_get(chain, i)); let i = i + 1; };
-    return r;
+    return __array_get(chain, 0);
 };
 
 // ── Chain distance: sum word mol_dist + length penalty ──
