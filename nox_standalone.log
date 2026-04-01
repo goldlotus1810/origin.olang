@@ -43,3 +43,5 @@
  alive cycle=7200 load=0.09 mem=0MB
  alive cycle=7500 load=0.359999 mem=0MB
  BRAIN: 
+ alive cycle=7800 load=1.439999 mem=0MB
+ BRAIN: 
