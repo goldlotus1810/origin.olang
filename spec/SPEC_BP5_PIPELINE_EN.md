@@ -545,3 +545,273 @@ Friston, K. (2010). Free Energy Principle. Nature Reviews Neuroscience.
 ---
 
 *Part 5 NOT YET ACHIEVED. This spec is the map. Each session: read spec → implement 1 phase → test → achieved/not yet.*
+
+---
+
+## AMENDMENTS (SS15 response to SS16 review)
+
+### A1. Spreading Activation — Merge Duplicates (SS16 #1)
+Per-step merge: when 2+ edges point to same target, SUM activations.
+```
+// After collecting raw (mol, val) pairs per step:
+for each (mol, val) in raw:
+    if mol in merged: merged[mol] += val   // SUM
+    else: merged[mol] = val                // new entry
+```
+Without merge: same node N times → distorted field. FIXED.
+
+### A2. Hebbian Edges in Spreading Activation (SS16 #2)
+Both Hebbian AND implicit must spread. Hebbian = learned (semantic),
+implicit = computed (geometric). Both are needed for full activation.
+```
+// Per active node: spread to BOTH
+for edge in silk_edges(mol):              // Hebbian (learned)
+    spread = activation * edge.weights[dim] / 100
+for neighbor in implicit_neighbors(mol):  // Implicit (computed)
+    spread = activation * implicit_strength(mol, neighbor) / 1000
+```
+FIXED in implementation.
+
+### A3. build_chain() Definition (SS16 #3)
+```
+build_chain(seed, query_mol, dim, depth):
+    chain = [seed]
+    current = seed
+    for d in 0..depth:
+        neighbors = implicit_neighbors(current, dim, 3)
+        best = argmax(neighbors, |n| max(implicit_strength(current, n),
+                                          silk_weight(current, n, dim)))
+        if best == 0: break                // no more neighbors
+        if best in chain: break            // avoid cycles
+        chain.push(best)
+        current = best
+    return chain
+```
+Uses BOTH implicit + Hebbian for neighbor selection. DEFINED.
+
+### A4. exp() Availability (SS16 #4)
+SS16 stated `exp()` not available — **INCORRECT**. Olang HAS `__exp(x)`:
+- VM line 8350: `.call_exp: __exp(x) → e^x using x87 FPU`
+- CLONALG mutation rate `alpha = __exp(0 - rho * f_norm)` works directly.
+- No lookup table needed.
+
+### A5. DCA Safe Signal + Hebbian (SS16 #5)
+Safe Signal should use max(implicit, Hebbian):
+```
+ss = implicit_strength(chain[i-1], chain[i])
+// Also check Hebbian weight on target dimension
+hw = silk_weight(chain[i-1], chain[i], dim)
+ss = max(ss, hw * 10)    // Hebbian weights are 0-100 scale
+```
+ACCEPTED.
+
+### A6. Decode at Mol Level (SS16 #6)
+String overlap is fragile ("Hà" matches inside "Hà Nội").
+Use mol overlap instead:
+```
+mol_overlap(chain_a, chain_b):
+    shared = []
+    for mol in chain_a:
+        if mol in chain_b: shared.push(mol)
+    return shared
+```
+Mol-level is EXACT (same mol = same concept). ACCEPTED.
+
+### A7. ConversationCurve Rate Limit (SS16 #7)
+Clamp V changes in `_curve_push_v()`:
+```
+let _prev = __array_get(__v_history, (_idx - 1) % 4)
+let _delta = _v - _prev
+if _delta > 3 { let _v = _prev + 3; };
+if _delta < (0 - 3) { let _v = _prev - 3; };
+// 3/7 ≈ 0.43, closest integer to 0.40 limit
+```
+ACCEPTED.
+
+### A8. Homeostasis Integration (SS16 #11)
+F(t) modulates activation parameters:
+```
+surprise = _homeostasis(input_mol, nearest_mol)
+if surprise > 618:    // Learning mode
+    steps = 5         // more exploration
+    threshold = 30    // wider spread
+else:                 // Acting mode
+    steps = 3         // faster response
+    threshold = 80    // focused spread
+activated = _spread_activate(source, dim, steps, threshold)
+```
+ACCEPTED. Added as parameter to `_spread_activate()`.
+
+### A9. STM Push Output (SS16 #12)
+Push both input AND generated output to STM:
+```
+kt_stm_push(input)                    // already exists
+if len(response) > 0:
+    kt_stm_push(response)             // NEW: track output emotion
+```
+This lets ConversationCurve track BOTH sides. ACCEPTED.
+
+### A10. CP5 SecurityGate on Output (SS16 #9)
+```
+// Before returning response:
+if security_gate(response) == 1:
+    return ""                          // Block unsafe generated content
+```
+CRITICAL for safety. ACCEPTED.
+
+---
+
+## REVIEW NOTES (Added by Nox SS16)
+
+### What BP5 Does Well
+- Solid academic foundations: Collins & Loftus, CLONALG, DCA, Sowa
+- Clear 5-layer architecture with clean separation
+- Deterministic pseudo-random for fixed-point safety
+- Quality function with concrete thresholds (φ⁻¹ = 618/1000)
+- Honest assessment of current state vs needed state
+
+### What BP5 Is Missing or Should Improve
+
+#### 1. SPREADING ACTIVATION — Scalability Issue
+- Current Olang parallel-array implementation is O(n²) for deduplication
+- When 2 edges point to same target, activation should SUM, not duplicate
+- Fix: before each step, merge duplicate mols in _next array:
+  ```
+  // After building _next, merge duplicates:
+  let _merged = [];
+  let _merged_val = [];
+  for each (_mol, _val) in (_next, _next_val):
+      let _found = find_index(_merged, _mol);
+      if _found >= 0:
+          _merged_val[_found] += _val;  // SUM activations
+      else:
+          push(_merged, _mol);
+          push(_merged_val, _val);
+  ```
+- Without this: same node appears N times → wastes compute, distorts results
+
+#### 2. SPREADING ACTIVATION — Missing Hebbian Edges
+- Current code only spreads to implicit_neighbors (computed, 0-cost)
+- BP5 spec SAYS "Hebbian edges (learned)" but the Olang code doesn't use them
+- Fix: add silk_edges() traversal alongside implicit_neighbors()
+- Hebbian edges are the LEARNED connections — without them, activation only follows geometric neighbors, not semantic ones
+
+#### 3. CLONALG — build_chain() Not Defined
+- `build_chain(seed, query_mol, depth=4)` is referenced but never defined
+- Should be: start from seed mol, walk implicit + Hebbian edges, collect nodes
+- Suggestion:
+  ```
+  build_chain(seed, query, depth):
+      chain = [seed]
+      current = seed
+      for d in 0..depth:
+          dim = mol_dominant(query)
+          neighbors = implicit_neighbors(current, dim, 3)
+          // Pick neighbor with highest activation
+          best = neighbors[argmax(act_matrix[n] for n in neighbors)]
+          chain.push(best)
+          current = best
+      return chain
+  ```
+
+#### 4. CLONALG — exp() Not Available in Olang
+- `alpha = exp(-rho * f_norm)` requires exponential function
+- Olang has no `exp()` builtin. No trig/transcendental math.
+- Fix: approximate with lookup table or linear approximation:
+  ```
+  // exp(-x) for x in [0..5] approximated as:
+  // 1000, 368, 135, 50, 18, 7 (for x = 0,1,2,3,4,5)
+  let _exp_table = [1000, 368, 135, 50, 18, 7];
+  let _alpha = __array_get(_exp_table, min(floor(rho * f_norm), 5));
+  ```
+- OR add __exp() builtin to VM (just the lookup + interpolation)
+
+#### 5. DCA — Safe Signal Needs Hebbian Weight
+- `ss = implicit_strength(chain[i-1], chain[i])` only uses IMPLICIT silk
+- Should also check HEBBIAN silk weight between consecutive nodes
+- Hebbian weight indicates LEARNED support (more meaningful than geometric distance)
+- Fix: `ss = max(implicit_strength(...), silk_weight(chain[i-1], chain[i]))`
+
+#### 6. DECODE — Maximal Join Is Fragile
+- `find_word_overlap` using __str_find is byte-level, not word-level
+- "Hà" would match inside "Hà Nội" even though "Hà" alone means something different
+- Fix: need word boundary detection (space before + space/end after)
+- Also: Vietnamese words can be multi-syllable ("thủ đô" = 2 syllables, 1 word)
+  - True word boundary detection needs a word list or mol-level matching
+  - Simpler: match at mol level, not string level
+  ```
+  // Instead of string overlap, use mol overlap:
+  mol_overlap(chain_a, chain_b):
+      shared = []
+      for mol in chain_a:
+          if mol in chain_b: shared.push(mol)
+      return shared
+  ```
+
+#### 7. CONVERSATION CURVE — Rate Limit Not Implemented
+- Spec says `|ΔV| ≤ 0.40 per step` but code doesn't enforce this
+- Without rate limit, V can jump abruptly (happy → angry in 1 turn)
+- Fix in `_curve_push_v()`:
+  ```
+  let _delta = _new_v - _prev_v;
+  if abs(_delta) > 3:   // 3/7 ≈ 0.43, closest integer to 0.40
+      let _new_v = _prev_v + sign(_delta) * 3;
+  ```
+
+#### 8. INSTINCTS — Only Honesty Wired
+- Spec mentions wiring contradiction, curiosity, etc. but no actual code
+- Critical missing: **curiosity → learn mode**
+  When novelty > 500, should increase learning rate AND trigger dream sooner
+- Critical missing: **contradiction → resolution**
+  When two co-activated facts contradict (high ΔV, low ΔR), should:
+  - Flag both for review in dream cycle
+  - Prefer QR over ĐN if one is QR
+
+#### 9. CHECKPOINTS — CP3-CP5 Not Implemented
+- CP3 (at least 1 branch quality ≥ 618) — should abort early if all branches bad
+- CP4 (weight ≥ 618 AND fire ≥ Fib) — needed for dream promotion
+- CP5 (SecurityGate on output) — MUST run before sending response
+- CP5 is a SECURITY issue: without it, generated text could contain unsafe content
+
+#### 10. TEST COVERAGE — Tests Not Written
+- 8 tests defined in spec, NONE implemented
+- Priority: Test 8 (honesty silence) and Test 1 (multi-fact response) first
+- Tests should go in `test/pipeline/` directory
+
+#### 11. MISSING: Homeostasis Integration
+- BP5 doesn't mention Homeostasis F(t) at all
+- But SPEC_D §D4 says F(t) determines Learn vs Act mode
+- High F(t) → Learning mode → increase activation spread radius
+- Low F(t) → Acting mode → respond confidently, shorter walks
+- Should integrate after CAPTURE, before ACTIVATE:
+  ```
+  F = __homeostasis()
+  if F.mode == LEARNING:
+      max_steps = 7     // more exploration
+      threshold = 30    // lower threshold = wider activation
+  else:
+      max_steps = 3     // faster response
+      threshold = 100   // higher threshold = focused activation
+  ```
+
+#### 12. MISSING: STM Update After Response
+- BP5 spec doesn't explicitly update STM after generating response
+- Should: push both input AND output to STM for future context
+- `__stm_push(input_text, ..., input_mol, V, A)`
+- `__stm_push(output_text, ..., output_mol, V, A)`
+- This allows ConversationCurve to track response emotions, not just input
+
+### Priority Order for SS15/SS16 Implementation
+
+```
+P1: Fix spreading activation merge (bug, affects all results)
+P2: Add Hebbian edges to spreading activation (critical for learned knowledge)
+P3: Define build_chain() for CLONALG (can't run without it)
+P4: Add exp() approximation (CLONALG needs it)
+P5: Write Test 1 + Test 8 (verify basic functionality)
+P6: Implement CP5 (security gate on output)
+P7: Wire contradiction instinct
+P8: Integrate Homeostasis F(t)
+P9: Fix ConversationCurve rate limit
+P10: Implement mol-level decode (instead of string overlap)
+```
