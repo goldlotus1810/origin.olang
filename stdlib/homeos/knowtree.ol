@@ -1003,7 +1003,7 @@ pub fn kt_silk_fire(_a, _b) {
             let _dev_a = _da - _mean;
             let _dev_b = _db - _mean;
             let _covar = _dev_a * _dev_b;
-            let _w = __floor(_covar * _emo * _eta_scale / 1000000);
+            let _w = __floor(_covar * _emo * _eta_scale / 100000);
             if _w < 0 { let _w = 0; };
             if _w > 500 { let _w = 500; };
             push(_edges, _w);
@@ -1019,7 +1019,7 @@ pub fn kt_silk_fire(_a, _b) {
             let _dev_b = _db - _mean;
             let _w = __array_get(_edges, _fi + 1 + _d);
             // Covariance: dw = η × dev_a × dev_b × (1 - w/1000)
-            let _dw = __floor(_emo * _dev_a * _dev_b * (1000 - _w) * _eta_scale / 100000000000);
+            let _dw = __floor(_emo * _dev_a * _dev_b * (1000 - _w) * _eta_scale / 10000000000);
             // V dim: BCM boost (stronger emotion = stronger update)
             if _d == 2 { let _dw = _dw + __floor(_dw * _kt_abs(_va - 4) / 4); };
             let _new_w = _w + _dw;
