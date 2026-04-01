@@ -2182,7 +2182,13 @@ act_decay_all:
     jge     .acd_done
     movzx   eax, word ptr [rsi + rcx*2]
     imul    eax, edi
-    shr     eax, 10                 # /1024 ≈ /1000
+    push    rdx
+    xor     edx, edx
+    push    rcx
+    mov     ecx, 1000
+    div     ecx                      # exact /1000
+    pop     rcx
+    pop     rdx
     mov     word ptr [rsi + rcx*2], ax
     inc     ecx
     jmp     .acd_loop
@@ -5972,40 +5978,76 @@ builtin_hash_table:
 # ── String/Chain builtins ──
 
 # __str_split(text, delim_char) → array of strings
+# Splits u16 molecule string by delimiter codepoint
 .builtin_str_split:
     movsd   xmm0, [r14]             # delim (as char code)
     cvttsd2si r8d, xmm0
     mov     rsi, [r14+16]            # text ptr
     mov     rdx, [r14+24]            # text len (mol count)
     add     r14, 32
+    push    rbx
+    push    rbp
+    mov     ebp, r8d                 # ebp = delimiter (preserved)
     # Allocate result array
     mov     r10, r15
     mov     qword ptr [r15], 32
     mov     qword ptr [r15+8], 0
     lea     r15, [r15 + 16 + 32*16]
-    xor     ecx, ecx                 # start
-    xor     r9d, r9d                 # count
+    xor     ecx, ecx                 # i = 0
+    xor     r11d, r11d               # start = 0
+    xor     r9d, r9d                 # count = 0
 .ss_loop:
     cmp     ecx, edx
     jg      .ss_done
-    je      .ss_emit                 # end of string
+    je      .ss_emit_last
     movzx   eax, word ptr [rsi + rcx*2]
-    cmp     eax, r8d
-    jne     .ss_cont
-.ss_emit:
-    # Found delimiter or end — emit segment [start..i)
-    cmp     ecx, r11d                # r11d = start (need to track)
-    je      .ss_skip
-    # Can't easily track start without another register...
-    # Simplified: store as [ptr+start*2, len=i-start]
-.ss_skip:
-.ss_cont:
+    cmp     eax, ebp                 # compare with delimiter (in ebp)
+    je      .ss_emit
     inc     ecx
     jmp     .ss_loop
+.ss_emit:
+    # Emit segment [start..i)
+    mov     eax, ecx
+    sub     eax, r11d                # seg_len = i - start
+    test    eax, eax
+    jz      .ss_advance
+    cmp     r9d, 32
+    jge     .ss_advance
+    mov     edi, r9d
+    shl     edi, 4
+    mov     ebx, r11d
+    shl     ebx, 1                   # byte offset = start * 2
+    lea     r8, [rsi + rbx]          # segment ptr
+    mov     [r10 + 16 + rdi], r8
+    mov     [r10 + 16 + rdi + 8], rax
+    inc     r9d
+    mov     [r10 + 8], r9
+.ss_advance:
+    inc     ecx
+    mov     r11d, ecx                # start = i + 1
+    jmp     .ss_loop
+.ss_emit_last:
+    mov     eax, edx
+    sub     eax, r11d
+    test    eax, eax
+    jz      .ss_done
+    cmp     r9d, 32
+    jge     .ss_done
+    mov     edi, r9d
+    shl     edi, 4
+    mov     ebx, r11d
+    shl     ebx, 1
+    lea     r8, [rsi + rbx]
+    mov     [r10 + 16 + rdi], r8
+    mov     [r10 + 16 + rdi + 8], rax
+    inc     r9d
+    mov     [r10 + 8], r9
 .ss_done:
     sub     r14, 16
     mov     [r14], r10
     mov     qword ptr [r14+8], ARRAY_MARKER
+    pop     rbp
+    pop     rbx
     DISPATCH
 
 # __chain_compose(chain_arr) → composed mol (Zipf-weighted)
