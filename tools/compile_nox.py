@@ -615,16 +615,23 @@ class Codegen:
             self.emit_byte(OP_RET)
 
         elif kind == 'array':
-            # Push elements, then array_new
-            for elem in node[1]:
-                self.compile_node(elem)
-            # Push count
-            self.emit_byte(OP_PUSH_NUM)
-            self.emit_f64(float(len(node[1])))
-            # Call __array_new
-            self.emit_byte(OP_CALL)
-            self.emit_name('__array_new')
-            self.emit_byte(len(node[1]) + 1)  # elements + count
+            elems = node[1]
+            if len(elems) == 0:
+                # Empty array: __array_with_cap(16)
+                self.emit_byte(OP_PUSH_NUM)
+                self.emit_f64(16.0)
+                self.emit_byte(OP_CALL)
+                self.emit_name('__array_with_cap')
+                self.emit_byte(1)
+            else:
+                # Non-empty: push elements then call __array_new
+                for elem in elems:
+                    self.compile_node(elem)
+                self.emit_byte(OP_PUSH_NUM)
+                self.emit_f64(float(len(elems)))
+                self.emit_byte(OP_CALL)
+                self.emit_name('__array_new')
+                self.emit_byte(len(elems) + 1)
 
         elif kind == 'and':
             # Short-circuit: if left is false, skip right

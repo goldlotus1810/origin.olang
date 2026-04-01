@@ -3082,7 +3082,7 @@ builtin_jump_table:
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .call_not_builtin
-    .quad   .call_not_builtin
+    .quad   .builtin_array_new  # 0x191 (__array_new)
     .quad   .call_not_builtin
     .quad   .call_not_builtin
     .quad   .call_not_builtin
@@ -3658,6 +3658,66 @@ builtin_jump_table:
     mov     qword ptr [r14+8], ARRAY_MARKER
     DISPATCH
 
+# __array_new(elem0, elem1, ..., count) → array
+# Stack: [count] [elemN-1] ... [elem0] (count on top)
+.builtin_array_new:
+    movsd   xmm0, [r14]
+    cvttsd2si ecx, xmm0            # count
+    add     r14, 16                 # pop count
+    # Allocate array: [capacity:8][count:8][entries...]
+    mov     rax, r15                # array ptr
+    mov     edx, ecx
+    cmp     edx, 8
+    cmovl   edx, ecx
+    mov     edi, 8                  # min capacity = 8
+    cmp     edx, edi
+    cmovg   edi, edx
+    mov     [r15], rdi              # capacity
+    mov     [r15 + 8], rcx         # count
+    add     r15, 16
+    # Copy elements from stack (they're in reverse order)
+    test    ecx, ecx
+    jz      .ban_done
+    # Elements on stack: top = last pushed = elemN-1
+    # Array wants: [0]=elem0, [1]=elem1, ...
+    # Stack has: [r14]=elemN-1, [r14+16]=elemN-2, ..., [r14+(N-1)*16]=elem0
+    mov     edx, ecx
+    dec     edx                     # edx = N-1
+.ban_copy:
+    cmp     edx, 0
+    jl      .ban_done
+    # Copy stack[edx] to array[N-1-edx]
+    mov     esi, ecx
+    dec     esi
+    sub     esi, edx                # array index = N-1-edx
+    # Stack entry at r14 + edx*16
+    push    rdx
+    shl     edx, 4
+    mov     rdi, [r14 + rdx]       # ptr
+    mov     r8, [r14 + rdx + 8]    # len
+    pop     rdx
+    push    rdx
+    mov     edx, esi
+    shl     edx, 4
+    mov     [r15 + rdx], rdi       # array[idx].ptr
+    mov     [r15 + rdx + 8], r8    # array[idx].len
+    pop     rdx
+    dec     edx
+    jmp     .ban_copy
+.ban_done:
+    # Advance heap past entries
+    mov     edx, ecx
+    shl     edx, 4
+    add     r15, rdx
+    # Pop all elements from stack
+    shl     ecx, 4
+    add     r14, rcx
+    # Push array
+    sub     r14, 16
+    mov     [r14], rax
+    mov     qword ptr [r14 + 8], ARRAY_MARKER
+    DISPATCH
+
 # Stub builtins
 .text
 .builtin_str_find:
@@ -3696,13 +3756,14 @@ builtin_jump_table:
 
 # len(string) → number
 .builtin_len:
+    mov     rax, [r14]              # ptr field
     mov     rdx, [r14 + 8]          # len field
-    add     r14, 16                 # pop arg
     cmp     rdx, F64_MARKER
     je      .blen_num
     cmp     rdx, ARRAY_MARKER
     je      .blen_array
-    # String: len = mol count (each mol = 2 bytes, len field = mol count)
+    # String: len = mol count
+    add     r14, 16
     cvtsi2sd xmm0, rdx
     sub     r14, 16
     movsd   [r14], xmm0
@@ -3716,13 +3777,11 @@ builtin_jump_table:
     mov     qword ptr [r14+8], F64_MARKER
     DISPATCH
 .blen_array:
-    # Array: read count from heap object [capacity:8][count:8]
-    mov     rax, [r14 - 8]          # wrong offset after pop, fix
-    # Actually we already popped. The array ptr was at [r14+16] before pop.
-    # After pop, the ptr is gone. Need to read before pop.
-    # TODO: fix array len properly
+    # rax = array heap ptr (read before branch, not popped yet)
+    add     r14, 16                 # pop now
+    mov     rcx, [rax + 8]          # count (at offset 8, after capacity)
     sub     r14, 16
-    xorpd   xmm0, xmm0
+    cvtsi2sd xmm0, rcx
     movsd   [r14], xmm0
     mov     qword ptr [r14+8], F64_MARKER
     DISPATCH
