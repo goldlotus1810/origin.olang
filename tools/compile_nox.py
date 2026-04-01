@@ -28,7 +28,8 @@ OP_POP        = 0x0C
 OP_SWAP       = 0x0D
 OP_LOOP       = 0x0E  # [offset:4 LE signed]
 OP_HALT       = 0x0F
-OP_STORE      = 0x13  # [name_len:1][name:N]
+OP_STORE      = 0x13  # [name_len:1][name:N] — bare assign (global mutation)
+OP_STORE_LOCAL = 0x16 # [name_len:1][name:N] — let statement (local, undo on return)
 OP_PUSH_NUM   = 0x15  # [f64:8 LE]
 OP_PUSH_MOL   = 0x19  # [5 bytes: S,R,V,A,T]
 OP_TRY_BEGIN  = 0x1A  # [catch_offset:4]
@@ -502,7 +503,7 @@ class Codegen:
         elif kind == 'let':
             _, name, value = node
             self.compile_node(value)
-            self.emit_byte(OP_STORE)
+            self.emit_byte(OP_STORE_LOCAL)
             self.emit_name(name)
 
         elif kind == 'assign':
@@ -554,7 +555,7 @@ class Codegen:
             # Store parameters from stack into variables (reverse order)
             # Args are pushed left-to-right, so topmost = last param
             for p in reversed(params):
-                self.emit_byte(OP_STORE)
+                self.emit_byte(OP_STORE_LOCAL)
                 self.emit_name(p)
             # Compile body
             self.compile_node(body)
@@ -564,8 +565,8 @@ class Codegen:
             body_end = self.current_offset()
             # Patch body length
             self.patch_i32(body_len_offset, body_end - body_start)
-            # Store closure as named variable
-            self.emit_byte(OP_STORE)
+            # Store closure as named variable (fn name is like let)
+            self.emit_byte(OP_STORE_LOCAL)
             self.emit_name(name)
 
         elif kind == 'block':
