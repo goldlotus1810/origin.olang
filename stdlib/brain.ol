@@ -1,8 +1,8 @@
-// ═══ brain.ol — Nox Brain: Pipeline 5 tầng + PTAV loop ═══
-// Nối: encode.ol + core.ol + knowtree.ol + silk.ol + pipeline.ol
-// Spec: BP5 Pipeline, BP6 Instincts, BP9 Agent PTAV
+// ═══ brain.ol — Nox Brain: Pipeline 5 tầng + PTAV ═══
+// Uses: knowtree (kt_*), silk (silk_*), encode (encode.ol)
+// Pipeline: Capture → Activate → Hypothesize → Repair → Decode
 
-// ── Molecular helpers (from core.ol) ──
+// ── Mol helpers ──
 fn mol_pack(s, r, v, a, t) { return s * 4096 + r * 256 + v * 32 + a * 4 + t; };
 fn mol_s(m) { return __floor(m / 4096) % 16; };
 fn mol_r(m) { return __floor(m / 256) % 16; };
@@ -18,300 +18,230 @@ fn mol_dist(a, b) {
     return ds + dr + dv * 2 + da * 2 + dt * 4;
 };
 
-// ── Encode (from encode.ol, simplified) ──
-fn encode_char(cp) {
-    let s = 2; let r = 8; let v = 4; let a = 3; let t = 2;
-    if cp >= 65 { if cp <= 90 { let s = 3; let a = 5; }; };
-    if cp >= 97 { if cp <= 122 { let s = 2; let a = 3; }; };
-    if cp >= 48 { if cp <= 57 { let s = 1; let r = 3; let a = 2; let t = 1; }; };
-    if cp == 43 { let r = 0; };
-    if cp == 33 { let v = 2; let a = 6; };
-    if cp == 63 { let v = 4; let a = 5; };
-    return mol_pack(s, r, v, a, t);
-};
-
-fn encode_text(text) {
-    if len(text) == 0 { return 0; };
-    let mol = [0];
-    let ei = 0;
-    while ei < len(text) {
-        let c = __char_code(char_at(text, ei));
-        let cm = encode_char(c);
-        if ei == 0 {
-            let _ = __set_at(mol, 0, cm);
-        } else {
-            let prev = __array_get(mol, 0);
-            // Biological compose: S=max, R=first, V=amplify, A=max, T=first
-            let s = mol_s(prev); let sb = mol_s(cm);
-            if sb > s { let s = sb; };
-            let r = mol_r(prev);  // Zipf: first dominates
-            let va = mol_v(prev); let vb = mol_v(cm);
-            let v_base = __floor((va + vb) / 2);
-            let v = v_base;
-            if va + vb > 6 { let v = v_base + 1; if v > 7 { let v = 7; }; };
-            if va + vb < 6 { let v = v_base - 1; if v < 0 { let v = 0; }; };
-            let a = mol_a(prev); let ab = mol_a(cm);
-            if ab > a { let a = ab; };
-            let t = mol_t(prev);
-            let _ = __set_at(mol, 0, mol_pack(s, r, v, a, t));
-        };
-        let ei = ei + 1;
-    };
-    return __array_get(mol, 0);
-};
-
 // ── Layer 1: CAPTURE ──
-fn capture(input) {
-    let mol = encode_text(input);
-    __wm_bind(0, mol);  // WM[0] = query
-    let dim = __mol_dominant(mol);
+fn brain_capture(input) {
+    let mol = kt_encode_mol(input);
+    __wm_bind(0, mol);  // WM[0] = query mol
     return mol;
 };
 
-// ── Security Gate (BP6 §1, BP5 CP1) ──
-fn security_gate(mol) {
-    // V ≤ 1 AND A ≥ 6 → crisis
-    if mol_v(mol) < 2 {
-        if mol_a(mol) > 5 {
-            return 1;  // CRISIS
+// ── Security Gate (BP6 §1) ──
+fn brain_security(mol) {
+    if mol_v(mol) < 2 { if mol_a(mol) > 5 { return 1; }; };
+    if __bloom_check(mol) > 0 { return 2; };
+    return 0;
+};
+
+// ── Layer 2: ACTIVATE (follow silk edges + KnowTree nearest) ──
+fn brain_activate(mol) {
+    // Get top-3 nearest from KnowTree
+    let nearest = kt_nearest(mol, 3);
+    if len(nearest) == 0 { return []; };
+
+    // Collect activated mols from nearest results
+    let activated = [];
+    let i = 0;
+    while i < len(nearest) {
+        let fact_text = __array_get(nearest, i);
+        let fact_dist = __array_get(nearest, i + 1);
+        let fact_mol = kt_encode_mol(fact_text);
+        // Activation = inverse of distance (closer = higher)
+        let act = 1000 - fact_dist * 10;
+        if act < 100 { let act = 100; };
+        push(activated, fact_mol);
+        push(activated, act);
+        // Follow silk edges from this fact
+        let sw = silk_weight(mol, fact_mol);
+        if sw > 0 {
+            // Boost activation by silk strength
+            let boost = __floor(sw * 500 / 65535);
+            let _ = __set_at(activated, len(activated) - 1, act + boost);
         };
+        let i = i + 2;
     };
-    // Bloom filter check
-    if __bloom_check(mol) > 0 {
-        return 2;  // PROHIBITED
-    };
-    return 0;  // SAFE
+    return activated;
 };
 
-// ── Layer 2: ACTIVATE (Spreading Activation) ──
-fn activate(mol, depth) {
-    // Set source activation
-    __act_reset();
-    __act_set(mol, 1000);
-    // Spread along dominant dimension
-    let dim = __mol_dominant(mol);
-    let steps = [0];
-    while __array_get(steps, 0) < depth {
-        // Get top-k activated nodes
-        let top = __act_top_k(10);
-        let ti = 0;
-        while ti < len(top) {
-            let node_mol = __array_get(top, ti);
-            let node_act = __array_get(top, ti + 1);
-            if node_act > 50 {  // threshold
-                // Spread to neighbors via SilkWalk
-                // Implicit strength as activation
-                let spread = __floor(node_act * 300 / 1000);  // retention 0.3
-                // Step ±1 in dominant dimension
-                let step_val = 1;
-                if dim == 0 { let step_val = 4096; };
-                if dim == 1 { let step_val = 256; };
-                if dim == 2 { let step_val = 32; };
-                if dim == 3 { let step_val = 4; };
-                let neighbor_p = node_mol + step_val;
-                let neighbor_n = node_mol - step_val;
-                if neighbor_p >= 0 { if neighbor_p <= 65535 {
-                    __act_add(neighbor_p, spread);
-                }; };
-                if neighbor_n >= 0 { if neighbor_n <= 65535 {
-                    __act_add(neighbor_n, spread);
-                }; };
-                // Check silk edges
-                let sw = __silk_weight(mol, node_mol);
-                if sw > 0 {
-                    __act_add(node_mol, __floor(sw * spread / 65535));
-                };
-            };
-            let ti = ti + 2;
+// ── Instinct: Honesty (BP6 §1) — confidence from evidence ──
+fn instinct_honesty(result_count, silk_strength) {
+    // 0.3×results + 0.3×silk + 0.2×fire + 0.2×consistency
+    let conf = result_count * 300 + __floor(silk_strength * 300 / 65535);
+    if conf > 1000 { let conf = 1000; };
+    return conf;
+};
+
+// ── Instinct: Curiosity (BP6 §6) — novelty ──
+fn instinct_curiosity(mol, nearest_dist) {
+    // novelty = 1 - (dist / max_dist)
+    let novelty = 1000 - nearest_dist * 14;  // max_dist ≈ 70
+    if novelty < 0 { let novelty = 0; };
+    // > 500 → explore, < 300 → familiar
+    return novelty;
+};
+
+// ── Instinct: Contradiction (BP6 §2) — V distance + same topic ──
+fn instinct_contradiction(a, b) {
+    let dv = mol_v(a) - mol_v(b); if dv < 0 { let dv = 0 - dv; };
+    let dr = mol_r(a) - mol_r(b); if dr < 0 { let dr = 0 - dr; };
+    // Opposite valence + same topic
+    if dv > 4 { if dr < 3 { return 1; }; };
+    return 0;
+};
+
+// ── Instinct: Analogy (BP6 §5) — vector arithmetic in 5D ──
+// a:b :: c:? → d = c + (b - a)
+fn instinct_analogy(a, b, c) {
+    let ds = mol_s(b) - mol_s(a) + mol_s(c);
+    let dr = mol_r(b) - mol_r(a) + mol_r(c);
+    let dv = mol_v(b) - mol_v(a) + mol_v(c);
+    let da = mol_a(b) - mol_a(a) + mol_a(c);
+    let dt = mol_t(b) - mol_t(a) + mol_t(c);
+    // Clamp
+    if ds < 0 { let ds = 0; }; if ds > 15 { let ds = 15; };
+    if dr < 0 { let dr = 0; }; if dr > 15 { let dr = 15; };
+    if dv < 0 { let dv = 0; }; if dv > 7 { let dv = 7; };
+    if da < 0 { let da = 0; }; if da > 7 { let da = 7; };
+    if dt < 0 { let dt = 0; }; if dt > 3 { let dt = 3; };
+    return mol_pack(ds, dr, dv, da, dt);
+};
+
+// ── Instinct: Abstraction (BP6 §4) — variance in cluster ──
+fn instinct_abstraction(mols, count) {
+    if count < 2 { return 0; };
+    // Compute center
+    let cs = [0]; let cr = [0]; let cv = [0]; let ca = [0]; let ct = [0];
+    let i = 0;
+    while i < count {
+        let m = __array_get(mols, i * 2);
+        let _ = __set_at(cs, 0, __array_get(cs, 0) + mol_s(m));
+        let _ = __set_at(cr, 0, __array_get(cr, 0) + mol_r(m));
+        let _ = __set_at(cv, 0, __array_get(cv, 0) + mol_v(m));
+        let _ = __set_at(ca, 0, __array_get(ca, 0) + mol_a(m));
+        let _ = __set_at(ct, 0, __array_get(ct, 0) + mol_t(m));
+        let i = i + 1;
+    };
+    let center = mol_pack(
+        __floor(__array_get(cs, 0) / count),
+        __floor(__array_get(cr, 0) / count),
+        __floor(__array_get(cv, 0) / count),
+        __floor(__array_get(ca, 0) / count),
+        __floor(__array_get(ct, 0) / count)
+    );
+    // Compute variance (sum of distances from center)
+    let var = [0];
+    let i = 0;
+    while i < count {
+        let d = mol_dist(__array_get(mols, i * 2), center);
+        let _ = __set_at(var, 0, __array_get(var, 0) + d * d);
+        let i = i + 1;
+    };
+    return __floor(__array_get(var, 0) / count);
+    // < 10 → concrete, < 30 → categorical, ≥ 30 → abstract
+};
+
+// ── Instinct: Reflection (BP6 §7) ──
+fn instinct_reflection(fact_count, silk_count) {
+    if fact_count == 0 { return 0; };
+    return __floor(silk_count * 1000 / fact_count);
+};
+
+// ── Layer 3: HYPOTHESIZE (pick best from activated) ──
+fn brain_hypothesize(activated, query_mol) {
+    if len(activated) == 0 { return ""; };
+    // Best = closest activated mol to query
+    let best_i = [0]; let best_d = [999999];
+    let i = 0;
+    while i < len(activated) {
+        let fact_mol = __array_get(activated, i);
+        let act = __array_get(activated, i + 1);
+        // Score = distance penalty - activation bonus
+        let d = mol_dist(query_mol, fact_mol);
+        let score = d * 100 - act;
+        if score < __array_get(best_d, 0) {
+            let _ = __set_at(best_d, 0, score);
+            let _ = __set_at(best_i, 0, i);
         };
-        // Decay all by 0.8
-        __act_decay(800);
-        let _ = __set_at(steps, 0, __array_get(steps, 0) + 1);
+        let i = i + 2;
     };
-    // Return top-k activated
-    return __act_top_k(10);
+    // Return best mol → lookup in KnowTree
+    let best_mol = __array_get(activated, __array_get(best_i, 0));
+    return kt_exact(best_mol);
 };
 
-// ── Layer 3: HYPOTHESIZE (CLONALG simplified) ──
-fn hypothesize(activated, query_mol) {
-    // Build 3 candidate chains from top activated nodes
-    let candidates = __array_with_cap(3);
-    let hi = 0;
-    while hi < len(activated) {
-        if hi >= 6 { };  // max 3 candidates (each 2 entries: mol+activation)
-        if hi < 6 {
-            let seed_mol = __array_get(activated, hi);
-            // Build chain: seed → walk via silk
-            let chain = __array_with_cap(8);
-            push(chain, seed_mol);
-            // Walk 3 more steps
-            let current = [seed_mol];
-            let wi = 0;
-            while wi < 3 {
-                let dim = __mol_dominant(__array_get(current, 0));
-                let walked = __array_with_cap(4);
-                // Try neighbors
-                let step = 1;
-                if dim == 0 { let step = 4096; };
-                if dim == 1 { let step = 256; };
-                if dim == 2 { let step = 32; };
-                if dim == 3 { let step = 4; };
-                let next = __array_get(current, 0) + step;
-                if next >= 0 { if next <= 65535 {
-                    if __mxr(next) > 0 {  // has fact in mol_matrix
-                        push(chain, next);
-                        let _ = __set_at(current, 0, next);
-                    };
-                }; };
-                let wi = wi + 1;
-            };
-            push(candidates, chain);
-        };
-        let hi = hi + 2;  // skip activation values
-    };
-    return candidates;
-};
-
-// ── Layer 4: REPAIR (DCA simplified) ──
-fn repair(candidates, query_mol) {
-    // Pick best candidate by quality
-    let best = [0];       // best chain index
-    let best_q = [0];     // best quality
-    let ri = 0;
-    while ri < len(candidates) {
-        let chain = __array_get(candidates, ri);
-        let q = __chain_quality(chain, query_mol);
-        if q > __array_get(best_q, 0) {
-            let _ = __set_at(best_q, 0, q);
-            let _ = __set_at(best, 0, ri);
-        };
-        let ri = ri + 1;
-    };
-    // Quality check: φ⁻¹ = 618
-    if __array_get(best_q, 0) >= 618 {
-        __wm_bind(2, __array_get(best_q, 0));  // WM[2] = candidate quality
-        return __array_get(candidates, __array_get(best, 0));
-    };
-    // Below threshold — return empty
-    return [];
-};
-
-// ── Instinct: Honesty (BP6 §1) ──
-fn instinct_honesty(mol, result_count) {
-    // confidence = result_count × 250 (simple: 4 results = full confidence)
-    let confidence = result_count * 250;
-    if confidence > 1000 { let confidence = 1000; };
-    // < 400 → silence, 400-700 → hedge, > 900 → confident
-    return confidence;
-};
-
-// ── Instinct: Curiosity (BP6 §6) ──
-fn instinct_curiosity(mol) {
-    // novelty = min_distance from known facts
-    // High novelty → learning mode
-    let nearest_dist = mol_dist(mol, __wm_read(1));  // compare to context
-    if nearest_dist > 35 { return 1; };  // novel → explore
-    return 0;  // familiar
+// ── Layer 4: REPAIR (quality check) ──
+fn brain_repair(result, query_mol) {
+    if len(result) == 0 { return ""; };
+    // Quality check: is result relevant?
+    let result_mol = kt_encode_mol(result);
+    let d = mol_dist(query_mol, result_mol);
+    // φ⁻¹ threshold: distance < 35 (half of max 70)
+    if d > 35 { return ""; };
+    return result;
 };
 
 // ── Layer 5: DECODE ∂ ──
-fn decode(chain, query_mol) {
-    // Compose chain → single mol
-    let composed = __chain_compose(chain);
-    __wm_bind(3, composed);  // WM[3] = result
-    // Find text via mol_matrix lookup
-    let fact_idx = __mxr(composed);
-    if fact_idx > 0 {
-        return fact_idx;  // found matching fact
-    };
-    // Fallback: return chain length as signal
-    return len(chain);
+fn brain_decode(result, query_mol) {
+    // For now: return result text directly
+    // Future: chain → partial derivatives → generated text
+    return result;
 };
 
-// ── ConversationCurve ──
-fn update_tone(mol) {
-    let v = mol_v(mol);
-    __v_push(v);
-    return __conv_tone();
-};
-
-// ── Homeostasis ──
-fn update_homeostasis(predicted_mol, actual_mol) {
-    let f = __homeostasis(predicted_mol, actual_mol);
-    // F > 618 → learning mode, F < 618 → acting mode
-    return f;
-};
-
-// ═══ PIPELINE: Full 5-layer respond ═══
+// ═══ PIPELINE: Full 5-layer ═══
 fn pipeline_respond(input) {
-    // CP1: Security Gate
-    let mol = capture(input);
-    let gate = security_gate(mol);
-    if gate == 1 { return "crisis_detected"; };
-    if gate == 2 { return "prohibited"; };
+    // CP1: Security
+    let mol = brain_capture(input);
+    let gate = brain_security(mol);
+    if gate > 0 { return ""; };
 
-    // CP2: Encode OK (mol > 0)
+    // CP2: Encode OK
     if mol == 0 { return ""; };
 
-    // Layer 2: Activate
-    let activated = activate(mol, 3);
+    // Layer 2: Activate (KnowTree nearest + silk edges)
+    let activated = brain_activate(mol);
     if len(activated) == 0 { return ""; };
 
-    // Layer 3: Hypothesize
-    let candidates = hypothesize(activated, mol);
-
-    // Layer 4: Repair + Quality check
-    let best_chain = repair(candidates, mol);
-    if len(best_chain) == 0 {
-        // Below φ⁻¹ threshold — check honesty
-        let conf = instinct_honesty(mol, 0);
-        if conf < 400 { return ""; };  // silence
+    // Honesty check
+    let sw = 0;
+    if len(activated) >= 2 {
+        let sw = silk_weight(mol, __array_get(activated, 0));
     };
+    let conf = instinct_honesty(__floor(len(activated) / 2), sw);
+    if conf < 200 { return ""; };  // too uncertain → silence
+
+    // Layer 3: Hypothesize
+    let result = brain_hypothesize(activated, mol);
+
+    // Layer 4: Repair
+    let result = brain_repair(result, mol);
 
     // Layer 5: Decode
-    let result = decode(best_chain, mol);
+    let result = brain_decode(result, mol);
 
-    // Post-process
-    // STM push
+    // Post: STM push + silk fire
     __stm_push(mol, input);
-    // Silk fire between input and result
-    if len(best_chain) > 0 {
-        let composed = __chain_compose(best_chain);
-        // Fire silk (opcode, not builtin — can't call directly from here)
-        // Use silk_weight as proxy to check connection exists
-        let sw = __silk_weight(mol, composed);
+    if len(result) > 0 {
+        let result_mol = kt_encode_mol(result);
+        let _ = silk_fire(mol, result_mol);
     };
-    // Update conversation curve
-    let tone = update_tone(mol);
-    // Update homeostasis
-    let f_energy = update_homeostasis(__wm_read(1), mol);
 
-    // Clean WM for next turn
-    __wm_bind(1, mol);  // WM[1] = context (for next turn)
+    // ConversationCurve
+    __v_push(mol_v(mol));
+    __wm_bind(1, mol);  // WM[1] = context for next turn
 
     return result;
 };
 
-// ═══ PTAV LOOP (BP9 Agent) ═══
+// ═══ PTAV ═══
 fn ptav_cycle(input) {
-    // PERCEIVE
-    let mol = encode_text(input);
-
-    // THINK
     let response = pipeline_respond(input);
-
-    // ACT
-    // (response is returned to caller for output)
-
-    // VERIFY
-    let curiosity = instinct_curiosity(mol);
-    if curiosity > 0 {
-        // Novel input — boost learning
-        __act_add(mol, 500);  // extra activation
+    let mol = __wm_read(0);
+    // VERIFY: curiosity
+    let act = brain_activate(mol);
+    if len(act) >= 2 {
+        let nearest_dist = __array_get(act, 1);
+        let curiosity = instinct_curiosity(mol, __floor(nearest_dist / 10));
     };
-
     return response;
 };
 
-// ═══ Boot ═══
-emit "brain.ol loaded";
+emit "brain loaded";
