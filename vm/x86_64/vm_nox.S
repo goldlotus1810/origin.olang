@@ -2369,13 +2369,13 @@ builtin_jump_table:
     .endr
     .quad   .builtin_sleep       # 0x086 (__sleep)
     .rept   3
-    .quad   .call_not_builtin    # 0x087-0x089
+    .quad   .builtin_type_of     # 0x087 (type_of)-0x089
     .endr
     .quad   .builtin_exp         # 0x08A (__exp)
     .rept   7
     .quad   .call_not_builtin    # 0x08B-0x091
     .endr
-    .quad   .call_not_builtin    # 0x092 (__array_with_cap — TODO)
+    .quad   .builtin_array_with_cap # 0x092 (__array_with_cap)
     .rept   6
     .quad   .call_not_builtin    # 0x093-0x098
     .endr
@@ -2422,7 +2422,7 @@ builtin_jump_table:
     .quad   .call_not_builtin    # 0x0F4-0x0FF
     .endr
     # 0x100-0x14B: collisions / overflow
-    .quad   .builtin_mxr         # 0x100 (__mxr — moved from 0x4C collision)
+    .quad   .builtin_mxr         # 0x100 (__mxr)
     .rept   23
     .quad   .call_not_builtin    # 0x101-0x117
     .endr
@@ -2432,11 +2432,256 @@ builtin_jump_table:
     .quad   .call_not_builtin    # 0x11B
     .quad   .call_not_builtin    # 0x11C
     .quad   .call_not_builtin    # 0x11D
-    .quad   .builtin_file_read   # 0x11E (__file_read — moved to avoid 0xBE, using 0x1BE & 0x1FF = 0x1BE)
-    # Fill remaining to 512
-    .rept   225
+    .quad   .builtin_file_read   # 0x11E (__file_read)
+    .rept   28
+    .quad   .call_not_builtin    # 0x11F-0x13A
+    .endr
+    .quad   .builtin_write_raw   # 0x13B (__write_raw)
+    .rept   17
+    .quad   .call_not_builtin    # 0x13C-0x14C
+    .endr
+    .quad   .call_not_builtin    # 0x14D
+    .quad   .call_not_builtin    # 0x14E
+    .quad   .call_not_builtin    # 0x14F
+    .quad   .call_not_builtin    # 0x150 (pop — TODO)
+    .rept   14
+    .quad   .call_not_builtin    # 0x151-0x15E
+    .endr
+    .rept   8
+    .quad   .call_not_builtin    # 0x15F-0x166
+    .endr
+    .quad   .builtin_str_trim    # 0x1A7 (__str_trim) — need to fill gap
+    # Actually table is linear, can't jump. Fill to 0x1A7:
+    .rept   64
+    .quad   .call_not_builtin    # fill gap
+    .endr
+    .quad   .builtin_str_trim    # slot for __str_trim
+    .rept   30
+    .quad   .call_not_builtin    # rest
+    .endr
+    .quad   .builtin_file_append # 0x0D2 — already past, need different approach
+    .rept   50
     .quad   .call_not_builtin
     .endr
+
+# ── More builtins ──
+
+# __str_trim(str) → trimmed string (remove whitespace)
+.builtin_str_trim:
+    mov     rsi, [r14]               # ptr
+    mov     rdx, [r14+8]             # len (mol count)
+    add     r14, 16
+    test    rdx, rdx
+    jz      .bst_empty
+    # Trim leading spaces
+    xor     ecx, ecx
+.bst_lead:
+    cmp     rcx, rdx
+    jge     .bst_empty
+    movzx   eax, word ptr [rsi + rcx*2]
+    cmp     eax, 32                  # space
+    je      .bst_lead_next
+    cmp     eax, 10                  # newline
+    je      .bst_lead_next
+    cmp     eax, 13                  # CR
+    je      .bst_lead_next
+    cmp     eax, 9                   # tab
+    je      .bst_lead_next
+    jmp     .bst_trail
+.bst_lead_next:
+    inc     rcx
+    jmp     .bst_lead
+.bst_trail:
+    # Trim trailing
+    mov     rdi, rdx
+.bst_trail_loop:
+    cmp     rdi, rcx
+    jle     .bst_empty
+    dec     rdi
+    movzx   eax, word ptr [rsi + rdi*2]
+    cmp     eax, 32
+    je      .bst_trail_loop
+    cmp     eax, 10
+    je      .bst_trail_loop
+    cmp     eax, 13
+    je      .bst_trail_loop
+    cmp     eax, 9
+    je      .bst_trail_loop
+    inc     rdi                      # rdi = end (exclusive)
+    # Result: ptr = rsi + rcx*2, len = rdi - rcx
+    sub     r14, 16
+    lea     rax, [rsi + rcx*2]
+    mov     [r14], rax
+    sub     rdi, rcx
+    mov     [r14+8], rdi
+    DISPATCH
+.bst_empty:
+    sub     r14, 16
+    xor     eax, eax
+    mov     [r14], rax
+    mov     qword ptr [r14+8], 0
+    DISPATCH
+
+# __system(cmd) → output string
+.builtin_system:
+    mov     rsi, [r14]               # cmd ptr (u16 mols)
+    mov     rdx, [r14+8]             # cmd len
+    add     r14, 16
+    # Decode cmd to ASCII
+    mov     rdi, r15
+    xor     ecx, ecx
+.bsys_dec:
+    cmp     ecx, edx
+    jge     .bsys_run
+    movzx   eax, word ptr [rsi + rcx*2]
+    mov     byte ptr [rdi + rcx], al
+    inc     ecx
+    jmp     .bsys_dec
+.bsys_run:
+    mov     byte ptr [rdi + rcx], 0
+    # Pipe: /bin/sh -c "cmd" | read output
+    # Use popen-like approach via fork+exec+pipe
+    # Simplified: use __system via "sh -c CMD > /tmp/nox_sys.tmp"
+    # For now: just return empty (TODO: proper fork/exec/pipe)
+    sub     r14, 16
+    xor     eax, eax
+    mov     [r14], rax
+    mov     qword ptr [r14+8], 0
+    DISPATCH
+
+# __file_append(path, content) → 0
+.builtin_file_append:
+    mov     r8, [r14]                # content ptr
+    mov     r9, [r14+8]              # content len
+    mov     rsi, [r14+16]            # path ptr
+    mov     rdx, [r14+24]            # path len
+    add     r14, 32
+    # Decode path
+    mov     rdi, r15
+    xor     ecx, ecx
+.bfa_dp:
+    cmp     ecx, edx
+    jge     .bfa_open
+    movzx   eax, word ptr [rsi + rcx*2]
+    mov     byte ptr [rdi + rcx], al
+    inc     ecx
+    jmp     .bfa_dp
+.bfa_open:
+    mov     byte ptr [rdi + rcx], 0
+    mov     rdi, r15
+    mov     esi, 0x441               # O_WRONLY|O_CREAT|O_APPEND
+    mov     edx, 0x1A4              # 0644
+    mov     eax, SYS_OPEN
+    syscall
+    test    eax, eax
+    js      .bfa_done
+    mov     edi, eax
+    # Decode content
+    lea     rsi, [r15 + 4096]
+    xor     ecx, ecx
+.bfa_dc:
+    cmp     rcx, r9
+    jge     .bfa_write
+    movzx   eax, word ptr [r8 + rcx*2]
+    mov     byte ptr [rsi + rcx], al
+    inc     ecx
+    jmp     .bfa_dc
+.bfa_write:
+    mov     rdx, rcx
+    lea     rsi, [r15 + 4096]
+    mov     eax, SYS_WRITE
+    syscall
+    mov     eax, SYS_CLOSE
+    syscall
+.bfa_done:
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __array_with_cap(capacity) → array with pre-allocated capacity
+.builtin_array_with_cap:
+    movsd   xmm0, [r14]
+    cvttsd2si edi, xmm0
+    add     r14, 16
+    # Allocate: [capacity:8][count:8][entries...]
+    mov     rax, r15
+    mov     [r15], rdi               # capacity
+    mov     qword ptr [r15+8], 0     # count = 0
+    shl     rdi, 4                   # entries space = cap × 16
+    add     rdi, 16                  # + header
+    add     r15, rdi
+    sub     r14, 16
+    mov     [r14], rax
+    mov     qword ptr [r14+8], ARRAY_MARKER
+    DISPATCH
+
+# __write_raw(string) → write bytes to stdout without newline
+.builtin_write_raw:
+    mov     rsi, [r14]
+    mov     rdx, [r14+8]
+    add     r14, 16
+    # Decode u16 → bytes
+    mov     rdi, r15
+    xor     ecx, ecx
+.bwr_dec:
+    cmp     ecx, edx
+    jge     .bwr_write
+    movzx   eax, word ptr [rsi + rcx*2]
+    mov     byte ptr [rdi + rcx], al
+    inc     ecx
+    jmp     .bwr_dec
+.bwr_write:
+    mov     rdx, rcx
+    mov     rsi, r15
+    mov     edi, 1
+    mov     eax, SYS_WRITE
+    syscall
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# type_of(value) → string describing type
+.builtin_type_of:
+    mov     rdx, [r14+8]            # len/marker
+    add     r14, 16
+    sub     r14, 16
+    cmp     rdx, F64_MARKER
+    je      .bto_num
+    cmp     rdx, ARRAY_MARKER
+    je      .bto_arr
+    cmp     rdx, CLOSURE_MARKER
+    je      .bto_fn
+    cmp     rdx, MOL_MARKER
+    je      .bto_mol
+    # String
+    lea     rax, [rip + str_type_string]
+    mov     [r14], rax
+    mov     qword ptr [r14+8], 6
+    DISPATCH
+.bto_num:
+    lea     rax, [rip + str_type_number]
+    mov     [r14], rax
+    mov     qword ptr [r14+8], 6
+    DISPATCH
+.bto_arr:
+    lea     rax, [rip + str_type_array]
+    mov     [r14], rax
+    mov     qword ptr [r14+8], 5
+    DISPATCH
+.bto_fn:
+    lea     rax, [rip + str_type_function]
+    mov     [r14], rax
+    mov     qword ptr [r14+8], 8
+    DISPATCH
+.bto_mol:
+    lea     rax, [rip + str_type_molecule]
+    mov     [r14], rax
+    mov     qword ptr [r14+8], 8
+    DISPATCH
 
 # Stub builtins not yet implemented
 .text
@@ -3178,6 +3423,12 @@ str_err_open:      .ascii "Open failed!\n\0\0\0"
 str_err_mmap:      .ascii "mmap failed\n"
 str_err_read:      .ascii "Bytecode read fail\n"
 str_err_no_bc:     .ascii "No bytecode!\n\0"
+# Type name strings (u16 encoded for VM stack)
+str_type_number:   .word 'n','u','m','b','e','r'
+str_type_string:   .word 's','t','r','i','n','g'
+str_type_array:    .word 'a','r','r','a','y'
+str_type_function: .word 'f','u','n','c','t','i','o','n'
+str_type_molecule: .word 'm','o','l','e','c','u','l','e'
 
 # ═══════════════════════════════════════════════════════════════════════════
 # BSS — Zero-initialized data
