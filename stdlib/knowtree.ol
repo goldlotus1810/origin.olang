@@ -155,4 +155,68 @@ fn kt_encode_mol(text) {
     return kt_chain_mol(chain);
 };
 
+// ═══ PERSISTENCE — save/load facts to disk ═══
+fn kt_save(path) {
+    let n = __array_get(kt_count, 0);
+    let out = __to_string(n) + "\n";
+    let i = 0;
+    while i < n {
+        let out = out + __array_get(kt_texts, i) + "\n";
+        let i = i + 1;
+    };
+    __file_write(path, out);
+    return n;
+};
+
+fn kt_load(path) {
+    let data = __file_read(path);
+    if len(data) == 0 { return 0; };
+    let loaded = [0];
+    let ls = 0; let i = 0; let first = [1];
+    while i <= len(data) {
+        let is_nl = 0;
+        if i == len(data) { let is_nl = 1; } else { if __char_code(char_at(data, i)) == 10 { let is_nl = 1; }; };
+        if is_nl == 1 {
+            if i > ls {
+                let line = substr(data, ls, i);
+                if __array_get(first, 0) == 1 {
+                    let _ = __set_at(first, 0, 0);
+                } else {
+                    if len(line) > 0 {
+                        kt_learn(line);
+                        let _ = __set_at(loaded, 0, __array_get(loaded, 0) + 1);
+                    };
+                };
+            };
+            let ls = i + 1;
+        };
+        let i = i + 1;
+    };
+    return __array_get(loaded, 0);
+};
+
+// ═══ LOAD from simple text file (one fact per line, no header) ═══
+fn kt_load_simple(path) {
+    let data = __file_read(path);
+    if len(data) == 0 { return 0; };
+    let loaded = [0];
+    let ls = 0; let i = 0;
+    while i <= len(data) {
+        let is_nl = 0;
+        if i == len(data) { let is_nl = 1; } else { if __char_code(char_at(data, i)) == 10 { let is_nl = 1; }; };
+        if is_nl == 1 {
+            if i > ls {
+                let line = substr(data, ls, i);
+                if len(line) > 2 {
+                    kt_learn(line);
+                    let _ = __set_at(loaded, 0, __array_get(loaded, 0) + 1);
+                };
+            };
+            let ls = i + 1;
+        };
+        let i = i + 1;
+    };
+    return __array_get(loaded, 0);
+};
+
 emit "knowtree loaded";
