@@ -962,18 +962,31 @@ pub fn kt_silk_fire(_a, _b) {
     };
     let _fi = __array_get(_found, 0);
     if _fi < 0 {
-        // New edge
+        // New edge: per-dimension initial weight from proximity
         push(_edges, _b);
-        push(_edges, _emo); push(_edges, _emo); push(_edges, _emo);
-        push(_edges, _emo); push(_edges, _emo);
+        let _d = 0;
+        while _d < 5 {
+            let _da = mol_get_dim(_a, _d); let _db = mol_get_dim(_b, _d);
+            let _prox = 1000 - (_kt_abs(_da - _db) * 1000 / mol_dim_range(_d));
+            let _w = __floor(_prox * _emo / 1000);
+            push(_edges, _w);
+            let _d = _d + 1;
+        };
     } else {
-        // Update existing: w += emo * (1000 - w) / 10000
-        let _j = 1;
-        while _j <= 5 {
-            let _w = __array_get(_edges, _fi + _j);
-            let _dw = (_emo * (1000 - _w)) / 10000;
-            let _ = __set_at(_edges, _fi + _j, _w + _dw);
-            let _j = _j + 1;
+        // Update existing: PER-DIMENSION rules (Spec G6 + Bible §14)
+        // S,A dims: Oja-like bounded: dw = emo * prox * (1 - w/1000)
+        // R,T dims: STDP (temporal order matters, but simplified here)
+        // V dim: BCM-like (stronger emotion = higher threshold)
+        let _d = 0;
+        while _d < 5 {
+            let _da = mol_get_dim(_a, _d); let _db = mol_get_dim(_b, _d);
+            let _prox = 1000 - (_kt_abs(_da - _db) * 1000 / mol_dim_range(_d));
+            let _w = __array_get(_edges, _fi + 1 + _d);
+            let _dw = __floor(_emo * _prox * (1000 - _w) / 10000000);
+            // V dim: double update for strong emotion (BCM effect)
+            if _d == 2 { let _dw = _dw + __floor(_dw * _kt_abs(_va - 4) / 4); };
+            let _ = __set_at(_edges, _fi + 1 + _d, _w + _dw);
+            let _d = _d + 1;
         };
     };
 }
