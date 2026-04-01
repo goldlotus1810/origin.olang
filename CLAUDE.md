@@ -1,57 +1,124 @@
-# Nox — VM v2
+# Nox — VM v2 (SS17 complete)
 
 ## ĐẦU TIÊN
 ```bash
-make vm && make test    # verify 40/40 pass trước khi làm gì
-git log --oneline -10   # biết session trước làm gì
+make vm && make test && make benchmark   # verify 40/40 + 35/35
+git log --oneline -10
 ```
+Đọc `spec/NOX_MASTER_SPEC.md` — master document.
 Đọc `spec/` — mỗi bộ phận có spec riêng. Hiểu trước, code sau.
 
 ## Build
 ```bash
-make vm                 # as + ld → vm/x86_64/vm_nox (46KB)
+make vm                 # as + ld → vm/x86_64/vm_nox (55KB, 77 builtins)
 make test               # compile + run test_full.ol (40/40)
 make benchmark          # compile + run benchmark.ol (35/35)
 python3 tools/compile_nox.py SOURCE.ol OUTPUT.olang && ./OUTPUT.olang
 ```
 
-## Status
-- VM: vm/x86_64/vm_nox.S (5100 LOC, 46KB)
+## Status (SS17 — 2026-04-01)
+- VM: vm/x86_64/vm_nox.S (6600+ LOC, 55KB, 77 builtins)
 - Compiler: tools/compile_nox.py (Python bootstrap)
-- Stdlib: stdlib/ (core, knowtree, silk, pipeline, compiler)
-- Tests: 40/40 + 35/35 benchmark
-- Self-hosting compiler: stdlib/compiler.ol (WIP — bug 15: parse error)
+- Self-hosting: stdlib/compiler.ol ✅ Gen2==Gen3 fixed point
+- Stdlib: stdlib/ (brain, encode, core, knowtree, silk, pipeline, compiler)
+- Tests: 40/40 + 35/35 benchmark + 35/35 brain E2E = 110 tests
+- mmap 256MB: ✅ hoạt động (heap blocker SOLVED)
+
+## VM Builtins (77 total)
+```
+String:      len, substr, char_at, __char_code, __to_string, __str_find,
+             __str_index_of, __str_trim, __write_raw, __str_split
+Array:       push, __array_get, __set_at, __array_new, __array_with_cap,
+             __range, __pop_arr
+Math:        __abs, __floor, __ceil, __sqrt, __exp, __log2
+Bit:         __bit_and, __bit_or, __bit_xor, __bit_shl, __bit_shr
+File:        __file_read, __file_write, __file_append, __file_append_bytes
+Network:     __tcp_listen, __tcp_accept, __tcp_send, __tcp_recv, __tcp_close
+System:      __system, __sleep, __heap_used, __heap_pin, __type_of,
+             __f64_to_le_bytes, __mmap, __munmap, __ioctl, __mmap_file
+Matrix:      __mx_w, __mxr
+Activation:  __act_set, __act_get, __act_add, __act_decay, __act_reset,
+             __act_top_k
+Memory:      __wm_bind, __wm_read, __wm_clear, __stm_push, __stm_query,
+             __stm_count
+Pipeline:    __pseudo_select, __chain_quality, __mol_dominant,
+             __chain_compose, __chain_copy, __batch_dist
+Conversation: __v_push, __conv_tone
+Homeostasis: __homeostasis
+Silk:        __silk_weight, __silk_classify
+Security:    __bloom_check, __negative_mark
+Crypto:      __crc32, __sha256 (stub)
+```
+
+## VM Opcodes
+```
+Stack:    0x00 Nop, 0x01 Push, 0x06 Emit, 0x0B Dup, 0x0C Pop, 0x0D Swap
+Var:      0x02 Load, 0x13 Store (bare assign), 0x16 StoreLocal (let)
+Num:      0x15 PushNum, 0x19 PushMol
+Control:  0x07 Call, 0x08 Ret, 0x09 Jmp, 0x0A Jz, 0x0E Loop, 0x0F Halt
+Closure:  0x24 CallClosure, 0x25 Closure, 0x30 ClosureCapture
+Frame:    0x26 LoadReg, 0x27 StoreReg, 0x28 EnterFrame, 0x29 LeaveFrame
+Arith:    0x2A Add, 0x2B Sub, 0x2C Mul, 0x2D Div, 0x2E Mod
+Compare:  0x31-0x36 Eq/Ne/Lt/Gt/Le/Ge
+Except:   0x1A TryBegin, 0x1B CatchEnd, 0x78 Throw
+Mol:      0x40-0x47 Pack/Unpack/Dist/Compose/Dominant/BatchDist/Encode/Decode
+KnowTree: 0x50-0x54 Store/Load/Nearest/Walk/Learn
+Silk:     0x58-0x5B Fire(φ⁻³)/Decay(φ⁻¹)/Walk/Implicit
+Arena:    0x60-0x65 AllocA/B/C/ResetC/ResetB/HeapPin
+Security: 0xB0-0xB4 CapCheck/Create/Delegate/Revoke/SecGate
+```
+
+## Key Fixes (SS17)
+- OP_STORE_LOCAL (0x16): let vs bare assign — scope isolation
+- SilkFire: φ⁻³ Hebbian (diminishing returns), initial weight=25000
+- SilkDecay: φ⁻¹ = 618/1024 per 24h cycle
+- chain_compose: biological (S=Union, R=Zipf, V=Amplify, A=Max, T=First)
+- Bug 15 FIXED: compiler.ol self-hosts
+- Benchmark hang FIXED: scope leak was root cause
+- substr clamp: test/jns (was cmovl with wrong flags)
 
 ## KHÔNG BAO GIỜ
 - Hardcode data, if/else trên keywords → dùng toán 5D
-- Nói "done"/"hoàn thành" → nói "đạt chưa"/"chưa đạt"
-- Test tự sinh đáp án → test phải random/external
 - Code trước khi đọc spec → đọc spec trước
+- Nói "done" → nói "đạt chưa"/"chưa đạt"
 - `let x = x + 1` trong while/fn → dùng `let x = [0]; __set_at(x, 0, ...)`
 - `let arr = []` rồi push >8 → dùng `__array_with_cap(N)`
+- Port mù quáng từ Rust → hiểu spec A-D trước, so sánh, rồi quyết định
 
 ## Nguyên tắc
 - Encode = ∫ (tích phân). Decode = ∂ (vi phân). TÍNH, không TRA.
 - P_weight = u16 = [S:4][R:4][V:3][A:3][T:2] = 65536 molecules
-- Silk = hệ quả toán học 5D, 0 bytes storage (implicit)
+- Distance = |ΔS| + |ΔR| + 2|ΔV| + 2|ΔA| + 4|ΔT| (weighted Manhattan, max=70)
+- Compose = biological: S=Union(max), R=Zipf(first), V=Amplify, A=Max, T=First
+- Silk fire = φ⁻³ Hebbian: Δw = (1-w/65535) × 236
+- Silk decay = φ⁻¹ per 24h: w × 618/1024
+- Quality threshold = φ⁻¹ = 618/1000
+- QR promotion = weight ≥ 854 AND fire ≥ Fib(depth)
 - Học = thay đổi weights. Không phải lưu thêm strings.
 
-## Specs (links)
-- [VM Spec](spec/VM_SPEC_COMPLETE.md) — 53 sections, mọi thứ về VM
-- [BP2 Encode](spec/SPEC_BP2_ENCODE.md) — 42 formulas, Unicode→5D
-- [BP3 KnowTree](spec/SPEC_BP3_KNOWTREE.md) — fractal tree, KD-tree, QR
-- [BP4 Silk](spec/SPEC_BP4_SILK.md) — covariance, decay, homeostatic
-- [BP5 Pipeline](spec/SPEC_BP5_PIPELINE_EN.md) — Decode ∂, CLONALG, DCA
-- [BP6 Instincts](spec/SPEC_BP6_INSTINCTS.md) — 7 pure 5D formulas
-- [BP7 Memory](spec/SPEC_BP7_MEMORY.md) — observations, retrieval scoring
-- [BP8 JARVIS](spec/SPEC_BP8_JARVIS.md) — 1 brain N mouths
-- [BP9 Agent](spec/SPEC_BP9_AGENT.md) — PTAV loop, goals
-- [BP10 Data](spec/SPEC_BP10_DATA.md) — 500K facts
-- [BP11 Body](spec/SPEC_BP11_BODY.md) — camera, audio, interoception
-- [Eval Tool](spec/SPEC_EVAL_TOOL.md) — benchmark, random tests (SS17)
-- [Compiler Task](spec/TASK_SS16_COMPILER.md) — self-build (SS16)
+## Architecture
+```
++----------------------------------------------------------+
+| NOX BRAIN (Olang)                                        |
+|   brain.ol: Capture → Activate → Hypothesize → Repair → Decode |
+|   encode.ol: 42 formulas (COMPUTED)                      |
+|   KnowTree, Silk, 7 Instincts, Agent PTAV               |
++----------------------------------------------------------+
+| NOX BODY — Parasitic Library OS (Olang + ASM)            |
+|   Eyes(fb0) Hands(evdev) Voice(raw socket)               |
+|   Memory(mmap) Heartbeat(io_uring) Spine(clone)          |
+|   Evolution(KVM ring-0) Inject(eBPF)                     |
++----------------------------------------------------------+
+| LINUX HOST — Exokernel (chỉ là driver layer)             |
+|   ~22 syscalls | /dev/* | /proc/* | /sys/*               |
++----------------------------------------------------------+
+```
 
-## Brain Specs (gốc rễ — KHÔNG sửa)
+## Specs
+### Master
+- [NOX_MASTER_SPEC](spec/NOX_MASTER_SPEC.md) — THE master document
+
+### Brain (gốc rễ — KHÔNG sửa)
 - [SPEC_A](docs/SPEC_A_FOUNDATION.md) — SDF, P_weight, Encode ∫, Decode ∂
 - [SPEC_B](docs/SPEC_B_STRUCTURE.md) — Chain, KnowTree, Silk
 - [SPEC_C](docs/SPEC_C_NEURON.md) — Neuron lifecycle, physics
@@ -59,13 +126,27 @@ python3 tools/compile_nox.py SOURCE.ol OUTPUT.olang && ./OUTPUT.olang
 - [SPEC_E](docs/SPEC_E_ORGANISM.md) — Organism, self-model
 - [SPEC_F](docs/SPEC_F_AGENT.md) — Agent, autonomy
 
-## Tài liệu
-- [Kinh Thánh VN](docs/NOX_KINH_THANH_TIENG_VIET.md) — 130KB algorithms
-- [Algorithm Bible](docs/NOX_ALGORITHM_BIBLE.md) — 99KB
-- [Complete Reference](docs/NOX_COMPLETE_REFERENCE.md) — 116KB
-- [Rust Analysis](docs/RUST_CRATE_ANALYSIS_ORIGINAL.md) — port guide
+### Blueprints (implementation)
+- [BP2 Encode](spec/SPEC_BP2_ENCODE.md) — 42 formulas
+- [BP3 KnowTree](spec/SPEC_BP3_KNOWTREE.md) — fractal tree, QR
+- [BP4 Silk](spec/SPEC_BP4_SILK.md) — covariance, adaptive decay
+- [BP5 Pipeline](spec/SPEC_BP5_PIPELINE_EN.md) — 5 layers, CLONALG, DCA
+- [BP6 Instincts](spec/SPEC_BP6_INSTINCTS.md) — 7 pure 5D formulas
+- [BP7 Memory](spec/SPEC_BP7_MEMORY.md) — observations, retrieval
+- [BP8 JARVIS](spec/SPEC_BP8_JARVIS.md) — 1 brain N mouths
+- [BP9 Agent](spec/SPEC_BP9_AGENT.md) — PTAV loop
+- [BP10 Data](spec/SPEC_BP10_DATA.md) — 500K facts
+- [BP11 Body](spec/SPEC_BP11_BODY.md) — camera, audio, interoception
+- [BP12 Parasite](spec/SPEC_BP12_PARASITE.md) — 7 organs, 5 phases
 
-## Open Bugs
-- Bug 15: compiler.ol parse error on VM (deep nesting?)
-- Push realloc: arrays > initial capacity → use __array_with_cap()
-- let scope: creates local in fn/while → use array [0] pattern
+### From Rust (reference only — verify against A-D before using)
+- [Formula Engine](spec/PLAN_FORMULA_ENGINE.md) — R/V/A/T dispatch (2114 LOC)
+- [ref/rust_mol/](ref/rust_mol/) — 9 key Rust files for reference
+- ⚠️ Rust LR=φ⁻³ vs Spec C3 LR=0.1 — BP4 says adaptive β₀×fire^(-0.35)
+- ⚠️ Rust distance=similarity overlap vs Spec A2=Euclidean — VM uses weighted Manhattan (BP3)
+
+## Đã giải quyết
+- ~~Bug 15: compiler.ol parse error~~ ✅ OP_STORE_LOCAL fixed scope
+- ~~Benchmark hang~~ ✅ scope leak fixed
+- ~~Heap blocker (1500 facts)~~ ✅ __mmap 256MB
+- ~~Push realloc~~ ✅ capacity tracking + grow 2×

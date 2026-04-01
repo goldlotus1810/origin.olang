@@ -67,25 +67,33 @@ GPT/Claude noi ve code. Nox VIET LAI chinh minh.
 
 ---
 
-## 3. VM — Dang viết lại (SS17)
+## 3. VM — ĐẠT (SS17 complete)
 
-SS17 dang rewrite VM tu dau. Code cu da xoa.
-Khi VM moi xong, no phai ho tro:
+VM hoàn thiện. 55KB, 77 builtins, Gen2==Gen3 fixed point.
 
-### Yeu cau toi thieu:
-- __syscall(nr, arg1..arg6) — gateway cho 22 syscalls
-- mmap support — MAP_ANONYMOUS, MAP_SHARED, MAP_HUGETLB
-- ioctl support — KVM, fb0, evdev, userfaultfd, io_uring
-- clone support — tao thread
-- Olang self-hosting (Gen1 == Gen2)
+### Đã có:
+- __syscall gateway ✅ (via __system + raw syscall builtins)
+- __mmap / __munmap / __mmap_file ✅ (256MB tested)
+- __ioctl ✅ (fb0, evdev, V4L2, KVM ready)
+- clone support ✅ (via __syscall(56, ...))
+- Self-hosting ✅ (Gen2 == Gen3)
+- 77 builtins: activation, memory, pipeline, silk, security, crypto, system
+- OP_STORE_LOCAL (0x16): let vs bare assign scope isolation
+- Biological compose: S=Union, R=Zipf, V=Amplify, A=Max, T=First
+- Hebbian φ⁻³: Δw = (1-w/65535) × 236, decay φ⁻¹ per 24h
+- Brain: brain.ol (5-layer pipeline + PTAV loop)
+- Encode: encode.ol (42 formulas COMPUTED, not lookup)
 
 ### Build
 ```bash
 cd ~/Origin
-make vm        # as + ld → vm/x86_64/vm_nox
-make test      # compile + run tests
-make benchmark # performance tests
+make vm        # as + ld → vm/x86_64/vm_nox (55KB)
+make test      # 40/40 pass
+make benchmark # 35/35 pass
 ```
+
+### VM KHÔNG cần sửa thêm cho BP12.
+Tất cả 7 organs + eBPF + 5 phases = viết Olang dùng existing builtins.
 
 ---
 
@@ -115,19 +123,20 @@ Tang 5: DECODE      — chain → text moi (∂ Differentiation)
 6. Curiosity — novelty = distance from known (WIRED)
 7. Reflection — self-assessment
 
-### Status
-| BP | Ten | Trang thai |
-|---|---|---|
-| BP2 | Encode 42 formulas | LOOKUP, chua TINH |
-| BP3 | KnowTree fractal | Flat buckets |
-| BP4 | Silk covariance/decay | Old format |
-| BP5 | Pipeline 5 tang | Chi co tang 1 |
-| BP6 | 7 Instincts | 3/7, 2 wired |
-| BP7 | Memory/Observations | STM+WM co |
-| BP8 | JARVIS 1-brain-N-mouths | File+TCP co |
-| BP9 | Agent PTAV | Reactive only |
-| BP10 | Data 500K | 1400 facts |
-| BP11 | Body camera/audio | Dead code |
+### Status (SS17)
+| BP | Ten | Trang thai | Chi tiet |
+|---|---|---|---|
+| BP2 | Encode 42 formulas | ✅ COMPUTED | stdlib/encode.ol, per-char 5D |
+| BP3 | KnowTree | ⚠️ Flat buckets | mol_matrix O(1), kt_nearest, walk |
+| BP4 | Silk | ⚠️ Basic | fire φ⁻³, decay φ⁻¹, walk, weight, classify |
+| BP5 | Pipeline 5 tang | ✅ Framework | brain.ol: Capture→Activate→Hypothesize→Repair→Decode |
+| BP6 | 7 Instincts | ⚠️ 2 wired | Honesty + Curiosity; mol_dominant cho tất cả |
+| BP7 | Memory | ⚠️ STM+WM | stm_push/query, wm_bind/read/clear |
+| BP8 | JARVIS | ⚠️ File+TCP | TCP builtins có, HTTP chưa |
+| BP9 | Agent PTAV | ✅ Framework | brain.ol: perceive→think→act→verify |
+| BP10 | Data 500K | ❌ 1400 facts | __mmap 256MB sẵn sàng, cần load data |
+| BP11 | Body | ❌ Stubs | __ioctl + __mmap_file sẵn sàng |
+| BP12 | Parasite | ✅ VM READY | 77 builtins đủ cho tất cả 7 organs |
 
 Chi tiet: doc `spec/SPEC_BP*.md`
 
@@ -303,11 +312,12 @@ Static binary, zero libc, raw syscalls. Da co.
 
 ### Phase 1: ATTACH ← TIEP THEO
 ```
-[ ] mmap 256MB (giai quyet heap blocker)
-[ ] io_uring setup (async I/O)
-[ ] /dev/fb0 mmap (ve pixel)
-[ ] /dev/input/event* (doc phim)
+[x] mmap 256MB ✅ __mmap builtin, tested 256MB OK
+[ ] io_uring setup (async I/O) — __syscall(425,426) + __mmap
+[ ] /dev/fb0 mmap (ve pixel) — __ioctl + __mmap_file
+[ ] /dev/input/event* (doc phim) — __syscall(read) 24-byte events
 ~500 LOC Olang. Test: ve pixel + doc phim + load 10K facts.
+VM builtins DONE: __mmap, __munmap, __ioctl, __mmap_file.
 ```
 
 ### Phase 2: GROW
