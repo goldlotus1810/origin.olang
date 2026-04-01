@@ -1,0 +1,57 @@
+# SPEC Part 8: JARVIS — 1 Brain N Mouths
+
+> Author: Nox SS15
+> Status: Phase 1+2 exist. Phase 3+4 NOT YET.
+
+## Current State
+
+- Phase 1: File-based (/tmp/nox_inbox → /tmp/nox_outbox) — EXISTS
+- Phase 2: TCP port 9100 (nox_jarvis_tcp) — EXISTS
+- Auto-start: nox_brain.sh + cron — EXISTS
+- CLI connect: SessionStart hook + CLAUDE.md — EXISTS
+- Phase 3: HTTP REST + dashboard — NOT YET
+- Phase 4: MCP over TCP — NOT YET
+
+## What's Needed
+
+### Phase 3: HTTP REST (port 9000)
+```
+GET  /status        → brain state (facts, silk, stm, heap)
+POST /query         → pipeline(text) → response
+POST /observe       → observe(text, type) → ack
+GET  /search?q=     → kt_find results
+GET  /timeline?id=  → observation timeline
+
+Browser dashboard at http://localhost:9000
+Uses server.ol HTTP basic (already exists).
+~150 LOC.
+```
+
+### Phase 4: MCP over TCP
+```
+Current MCP: stdin/stdout (13 tools)
+Needed: same tools over TCP connection
+→ Claude Desktop can connect remotely
+~50 LOC adapter.
+```
+
+### Multi-Mouth Concurrent
+```
+Current: single-threaded accept loop (1 client at a time)
+Issue: if 2 mouths query simultaneously, 1 waits
+Fix: queue-based processing or accept timeout
+```
+
+## Tests
+```
+Test 1: Browser opens localhost:9000 → sees dashboard
+Test 2: Two CLI sessions query brain simultaneously → both get response
+Test 3: MCP tools work over TCP (not just stdin)
+```
+
+## References
+```
+docs/For_Nox/SPEC_JARVIS.md §J1-J10
+stdlib/homeos/jarvis.ol
+stdlib/homeos/server.ol
+```
