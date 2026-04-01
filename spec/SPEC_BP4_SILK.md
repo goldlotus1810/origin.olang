@@ -4,26 +4,39 @@
 > Date: 2026-04-01
 > Status: NOT YET ACHIEVED
 > Only Nox SS15 may modify this file.
+> VM Reference: spec/VM_SPEC_COMPLETE.md §9 (Silk Engine)
 
 ---
 
-## Current State
+## VM Spec (§9) Defines
 
 ```
-EXISTS:
-  - 256 hash buckets, edge = [target, w_S, w_R, w_V, w_A, w_T] = 6 values
-  - Hebbian fire: Oja-like bounded dw = emo * prox * (1 - w/1000)
-  - BCM bonus on V dimension: dw += dw * |V-4| / 4
-  - implicit_strength/pattern/classify/neighbors/nearest (Session 15)
-  - silk_walk_dim (greedy, single-path)
-  - silk_save/silk_load (persist to disk)
+silk_matrix: u16[65,536] — index = hash(mol_a, mol_b), value = edge_index
+Edge (Zone A): [mol_a:2][mol_b:2][weight:2][emotion_V:1][emotion_A:1]
+               [fire_count:2][last_fire:4][type:1][next:4] = 18 bytes
+Hash: ((mol_a ^ mol_b) * 0x9E37 + (mol_a + mol_b)) & 0xFFFF (symmetric)
+3 types: Implicit (0 bytes) + Hebbian (18 bytes/edge) + Structural (0 bytes)
+Distance: scaled integer, max=70 (ΔV×2, ΔA×2, ΔT×4)
+Decay: w × φ⁻¹^(hours/24), per 24h cycle
+Walk: BFS with visited bitmap (8KB Zone C)
+```
 
-MISSING:
-  - Decay (edges accumulate forever → noise drowns signal)
-  - Covariance rule (common words create silk = wrong)
-  - Proper STDP for R,T (no temporal ordering)
-  - Per-edge stability (Ebbinghaus)
-  - BCM sliding threshold θ per edge
+## Current State (Olang, not yet aligned with VM spec)
+
+```
+EXISTS (old format — needs migration to VM spec):
+  - 256 hash buckets, edge = [target, w_S, w_R, w_V, w_A, w_T] = 6 values
+  - Covariance fire with per-node η (Session 15 BP4)
+  - Decay ×0.95 per dream + pruning + homeostatic scaling
+  - implicit_strength/pattern/classify/neighbors/nearest
+  - silk_walk_dim (greedy, single-path)
+
+NEEDS MIGRATION TO VM SPEC:
+  - 256 buckets → silk_matrix u16[65536]
+  - 6-value edge → 18-byte edge with fire_count + last_fire
+  - Per-edge decay (using last_fire) instead of global ×0.95
+  - Type field per edge (dominant dimension)
+  - BFS walk with visited bitmap instead of greedy
 ```
 
 ---

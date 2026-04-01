@@ -176,10 +176,15 @@ fn _spread_activate(_source, _dim, _steps) {
 }
 ```
 
-### VM requirements:
+### VM requirements (from VM_SPEC §45):
 
-1. **None required for prototype** — Olang arrays sufficient.
-2. **Optimization later**: `__mx_w2`/`__mxr2` — second u16 matrix for activation values (avoids conflict with fact index matrix).
+1. **act_matrix (M7)**: u16[65536] — dedicated activation matrix. O(1) per mol.
+   - `__act_set(mol, value)`, `__act_get(mol)`, `__act_add(mol, delta)`
+   - `__act_decay_all(factor)` — SIMD batch decay (8 values/iter via SSE2)
+   - `__act_reset()` — memset 128KB
+   - `__act_top_k(k)` — return k highest-activation mols (min-heap, O(N log K))
+2. **Current workaround**: Olang parallel arrays (O(n²) dedup). Works for prototype.
+3. **Migration**: when VM implements §45, replace arrays with builtins.
 
 ---
 
@@ -245,14 +250,25 @@ mutate_chain(chain, alpha):
     return result
 ```
 
-### Deterministic pseudo-random (Nox has no random):
+### Deterministic pseudo-random (VM_SPEC §46):
 ```
-_pseudo_select(mol, gen, max):
-    return floor((mol * 2654435761 + gen * 40503) % max)
+__pseudo_select(mol, gen, max):
+    ; Uses Fibonacci hash constants (golden ratio)
+    ; 2654435761 = 32-bit golden ratio constant
+    ; 40503 = 16-bit golden ratio constant
+    imul eax, [mol], 2654435761
+    imul ecx, [gen], 40503
+    add eax, ecx
+    xor edx, edx
+    div [max]    → edx = result
 ```
-Properties: deterministic, well-distributed, reproducible (Gen1==Gen2).
+MUST be VM builtin for fixed-point (overflow behavior must be identical Gen0→Gen1).
+Current workaround: Olang `__floor((...) % max)` — may differ in edge cases.
 
-### VM requirements: None. Olang sufficient.
+### VM requirements (from §46):
+- `__pseudo_select(mol, gen, max)` builtin
+- `__chain_copy`, `__chain_mutate`, `__chain_compose` (Zone C allocations)
+- `__chain_affinity(chain, query_mol)` composite scorer
 
 ---
 
@@ -429,14 +445,19 @@ Not yet implementable — needs:
 
 ### VM requirements:
 
-| Need | Level | Reason |
-|------|-------|--------|
-| `__str_split(text, delim)` | Nice-to-have | Decode needs word splitting. Currently char-by-char loop. |
-| ~~`__str_contains`~~ | EXISTS | `__str_find(haystack, needle)` → array of positions. Sufficient. |
-| `__mx_w2`/`__mxr2` | Optimize later | Separate activation matrix, avoid conflict with fact index. |
+| Need | VM Spec Section | Status |
+|------|----------------|--------|
+| `__act_set/get/add/decay_all/top_k` | §45 M7 act_matrix | Planned |
+| `__pseudo_select` | §46 CLONALG | Planned |
+| `__chain_copy/mutate/compose/affinity` | §46 Chain ops | Planned |
+| `__chain_dimensional_jump` | §47 DCA | Planned |
+| `__str_split(text, delim)` | §48 Decode ∂ | Planned |
+| `__str_find` | Already exists | ✅ |
+| `__implicit_neighbors` | §47 5D Grid | Already exists (Olang) |
+| `__implicit_strength` | §47 | Already exists (Olang) |
 
-Nothing BLOCKS pipeline. Everything implementable in current Olang.
-VM builtins only add speed.
+Current: ALL implemented in Olang (workarounds). When VM implements
+§45-§50, pipeline switches to builtins for 10-50× speedup.
 
 ---
 
