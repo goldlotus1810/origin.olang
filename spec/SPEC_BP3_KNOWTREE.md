@@ -86,10 +86,33 @@ Test 4: Save + load preserves all data (round-trip)
 Test 5: 10K facts, kt_nearest < 100ms
 ```
 
+## Research Insights
+
+### KD-tree for 5D u16 (NOT HNSW)
+5D integer = low dimensional. KD-tree is optimal:
+- Leaf size: 32 (integer comparisons cheap)
+- Split: cycle S-R-V-A-T per level
+- Distance: L1 Manhattan (no multiply needed)
+- Expected: ~17 node visits at 100K facts
+- HNSW: overkill (designed for D>20, approximate)
+
+### Menzerath-Altmann Law — fractal validation
+```
+y = a × x^b × e^(-cx)
+b ≈ -0.4 (compression parameter)
+```
+Self-similar across levels: book-chapter, sentence-word, word-syllable.
+Validates KnowTree fractal design: same structure every level.
+
+### Morton Ordering for cache locality
+Interleave bits of all 5 dimensions → Z-order curve.
+Sort facts by Morton code → cache-friendly range queries.
+
 ## References
 ```
-SPEC_B_STRUCTURE.md §B2 (hierarchy)
-SPEC_B_STRUCTURE.md §B4 (QR promotion)
-SPEC_G_COMPLETE.md §G1 (data structures), §G5 (operations)
-NOX_ALGORITHM_BIBLE.md §9-10 (VP-tree, HNSW)
+SPEC_B_STRUCTURE.md §B2, §B4
+SPEC_G_COMPLETE.md §G1, §G5
+VM_SPEC_COMPLETE.md §8 (KnowTree Engine)
+Menzerath-Altmann law (quantitative linguistics)
+Bentley 1975 (KD-tree)
 ```

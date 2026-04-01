@@ -62,9 +62,39 @@ Test 2: camera frame → mol (when hardware available)
 Test 3: audio buffer → mol (when hardware available)
 ```
 
+## Research Insights
+
+### Interoception as Arousal/Valence (Chung et al. 2023)
+```
+cpu_arousal  = clamp(load_1min / num_cores × 65535, 0, 65535)
+mem_pressure = clamp(mem_used / mem_total × 65535, 0, 65535)
+arousal = (cpu × 4 + mem × 3 + load_trend × 3) / 10
+
+valence = 65535 - error_rate × 65535  // high=good, low=bad
+```
+
+### Homeostatic Drive (Kelkar 2021)
+```
+drive(variable) = |current - setpoint| / tolerance
+drive > 1.0 → prioritize restoring that variable
+Highest drive wins attention (like hunger vs thirst)
+```
+
+| Variable | Sensor | Setpoint | Tolerance | Maps to |
+|----------|--------|----------|-----------|---------|
+| CPU load | /proc/loadavg | 0.5×cores | ±0.3×cores | A |
+| Memory | /proc/meminfo | 60% | ±20% | A |
+| Errors | internal | 0/min | 0-5/min | V |
+| Latency | timer | target_ms | ±50% | A |
+
+Signal MUST change behavior to qualify as interoception (Damasio).
+
 ## References
 ```
 SPEC_E_ORGANISM.md §E1
 SPEC_G_COMPLETE.md §G15
+VM_SPEC_COMPLETE.md §37 (Multi-Modal Capture)
+Chung et al. (2023): Life-Inspired Interoceptive AI
+Kelkar (2021): Cognitive Homeostatic Agents
 docs/reference/SDF_QUILEZ_COMPLETE.md
 ```

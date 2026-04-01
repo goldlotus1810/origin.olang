@@ -60,9 +60,24 @@ Test 3: New session loads observations from previous
 Test 4: Summary compresses 10 turns into 1-2 lines
 ```
 
+## Research Insights
+
+### Retrieval Scoring (Park et al. 2023)
+```
+score = recency + relevance + importance  (equal weights)
+recency   = 0.995 ^ hours_since_access  (half-life ~6 days)
+relevance = 1 - manhattan_dist(mol, query_mol) / 70
+importance = access_count / max_access_count
+```
+
+### A-MEM Zettelkasten (2025)
+Each observation = note with context + keywords + mol-computed links.
+New notes auto-link to old. Old notes evolve when new links form.
+
 ## References
 ```
+Park et al. (2023): Generative Agents
+A-MEM (2025): Zettelkasten agent memory
 docs/For_Nox/SPEC_MEM_MEMORY.md
-docs/For_Lupin/MEM_NGHIEN_CUU_TIENG_VIET.md
 SPEC_G_COMPLETE.md §G7, §G19, §G26
 ```
