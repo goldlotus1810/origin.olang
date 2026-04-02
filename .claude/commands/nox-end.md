@@ -1,38 +1,38 @@
 ---
-description: Đóng session Nox — ghi lại quyết định + bugs + handoff
-allowed-tools: Bash(git:*), Read, Edit, Write
+description: Đóng session Nox — save state + ghi quyết định + bugs + verify
+allowed-tools: Bash(*), Read, Edit, Write
 ---
 
 ## Bước 1: Tóm tắt session
 
-Liệt kê:
-1. Những gì đã làm trong session này
-2. Quyết định kiến trúc mới (nếu có)
-3. Bugs mới phát hiện (nếu có)
-4. Bugs đã fix (nếu có)
-5. Code changes (files + LOC)
+Liệt kê ngắn gọn:
+1. Những gì đã làm
+2. Quyết định mới (nếu có)
+3. Bugs mới / đã fix (nếu có)
 
-## Bước 2: Cập nhật files
+## Bước 2: Save state qua NoxDB
 
-Nếu có quyết định mới → thêm entry vào `DECISIONS.md`
-Nếu có bug mới → thêm entry vào `BUGS_KNOWN.md`
-Nếu fix bug → chuyển từ OPEN → FIXED trong `BUGS_KNOWN.md`
-
-## Bước 3: Ghi handoff
-
-Cập nhật `~/.claude/projects/-home-lupin/memory/session_handoff_ss24.md` hoặc tạo file mới
-với trạng thái hiện tại: cái gì xong, cái gì đang dở, cái gì block.
-
-## Bước 4: Verify
-
-```
-cd ~/Origin && make vm && make test 2>&1 | tail -5
+Chạy command sau với mô tả ngắn gọn về session:
+```bash
+cd ~/Origin && printf 'set-done\nMÔ TẢ NGẮN\n' > /tmp/.nox_state_args && ./tools/nox_state.olang
 ```
 
-Đảm bảo code KHÔNG bị hỏng trước khi đóng session.
+## Bước 3: Cập nhật process files
+
+- Quyết định mới → thêm vào `DECISIONS.md`
+- Bug mới → thêm vào `BUGS_KNOWN.md`
+- Bug fixed → OPEN → FIXED trong `BUGS_KNOWN.md`
+
+## Bước 4: Verify + commit
+
+```bash
+cd ~/Origin && ./tools/oltest.sh && make fixed-point
+```
+
+Nếu pass → git add + commit + push.
 
 ## Quy tắc
 
-- KHÔNG đóng session nếu có code thay đổi chưa verify
-- KHÔNG quên ghi bugs/decisions mới
-- Session sau sẽ đọc những gì bạn ghi. Ghi RÕ RÀNG.
+- KHÔNG đóng nếu tests fail
+- KHÔNG quên save state (bước 2)
+- Session sau đọc state qua SessionStart hook TỰ ĐỘNG

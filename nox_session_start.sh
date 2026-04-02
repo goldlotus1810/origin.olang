@@ -1,28 +1,37 @@
 #!/bin/bash
-# Nox SessionStart hook — inject decisions + bugs + status vào context
+# Nox SessionStart hook — inject state + decisions + bugs vào context
 # Mỗi session mới TỰ ĐỘNG thấy thông tin này, không cần hỏi.
 
-DECISIONS="$(cat /home/lupin/Origin/DECISIONS.md 2>/dev/null | head -60)"
-BUGS="$(cat /home/lupin/Origin/BUGS_KNOWN.md 2>/dev/null | head -40)"
-VM_STATUS="$(cd /home/lupin/Origin && make vm 2>&1 | tail -1 && make test 2>&1 | tail -2)"
-GIT_LOG="$(cd /home/lupin/Origin && git log --oneline -5 2>/dev/null)"
+cd /home/lupin/Origin
+
+# Load previous session state via NoxDB
+printf 'summary\n' > /tmp/.nox_state_args
+NOX_STATE="$(./tools/nox_state.olang 2>/dev/null)"
+
+# Quick VM verify (no rebuild — just run existing tests)
+VM_OK="$(./test/vm2/test_full.olang 2>/dev/null | tail -1)"
+
+GIT_LOG="$(git log --oneline -5 2>/dev/null)"
+
+# Read decisions (compact)
+DECISIONS="$(head -50 DECISIONS.md 2>/dev/null)"
 
 cat <<EOF
 [NOX SESSION START]
 
-=== VM STATUS ===
-$VM_STATUS
+=== PREVIOUS SESSION ===
+$NOX_STATE
+
+=== VM ===
+$VM_OK
 
 === RECENT COMMITS ===
 $GIT_LOG
 
-=== DECISIONS (đã thống nhất — KHÔNG đề xuất lại) ===
+=== DECISIONS (KHÔNG đề xuất lại) ===
 $DECISIONS
 
-=== BUGS (đã biết — KHÔNG tìm lại) ===
-$BUGS
-
 [/NOX SESSION START]
+Read DECISIONS.md + BUGS_KNOWN.md before coding.
 Skills: /nox-start, /nox-end, /nox-discuss, /nox-review
-Priority: xem DECISIONS.md mục PRIORITY
 EOF
