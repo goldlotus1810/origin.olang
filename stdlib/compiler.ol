@@ -37,6 +37,7 @@ let TK_IN = 37;
 let TK_MATCH = 38;
 let TK_ARROW = 39;
 let TK_IMPORT = 40;
+let TK_COLON = 30;
 
 // ── AST node types ──
 let AST_NUM = 1;
@@ -230,6 +231,9 @@ fn lex(source) {
         if c == "!" && i + 1 < g_source_len && char_at(source, i + 1) == "=" {
             add_token(TK_OP, "!="); i = i + 2;
         } else {
+        if c == "!" {
+            add_token(TK_OP, "!"); i = i + 1;
+        } else {
         if c == "<" && i + 1 < g_source_len && char_at(source, i + 1) == "=" {
             add_token(TK_OP, "<="); i = i + 2;
         } else {
@@ -256,10 +260,11 @@ fn lex(source) {
         if c == "[" { add_token(TK_LBRACKET, c); i = i + 1; } else {
         if c == "]" { add_token(TK_RBRACKET, c); i = i + 1; } else {
         if c == "," { add_token(TK_COMMA, c); i = i + 1; } else {
+        if c == ":" { add_token(TK_COLON, c); i = i + 1; } else {
         if c == "." { add_token(TK_OP, c); i = i + 1; } else {
             // Unknown char, skip
             i = i + 1;
-        };};};};};};};};};};};};};};};};};}; }; }; }; }; }; };
+        };};};};};};};};};};};};};};};};};};};}; }; }; }; }; }; };
     };
     add_token(TK_EOF, "");
 };
@@ -570,12 +575,12 @@ fn parse_statement() {
     if t == TK_WHILE { return parse_while(); };
     if t == TK_RETURN { return parse_return(); };
     if t == TK_EMIT { return parse_emit(); };
-    // Check for assignment: ident = expr
+    // Check for assignment: ident = expr, ident[i] = val, ident.field = val
     if t == TK_IDENT {
         let next_type = __array_get(g_tok_types, g_pos + 1);
         if next_type == TK_ASSIGN {
             let name = advance();
-            advance();  // skip =
+            advance();
             let val = parse_expr();
             match_tok(TK_SEMI);
             let node = [];
@@ -583,6 +588,63 @@ fn parse_statement() {
             push(node, name);
             push(node, val);
             return node;
+        };
+        if next_type == TK_LBRACKET {
+            let name = advance();
+            advance();
+            let idx = parse_expr();
+            expect(TK_RBRACKET);
+            if peek_type() == TK_ASSIGN {
+                advance();
+                let val = parse_expr();
+                match_tok(TK_SEMI);
+                let arr_node = [];
+                push(arr_node, AST_VAR);
+                push(arr_node, name);
+                let args = [];
+                push(args, arr_node);
+                push(args, idx);
+                push(args, val);
+                let call = [];
+                push(call, AST_CALL);
+                push(call, "__set_at");
+                push(call, args);
+                let stmt = [];
+                push(stmt, AST_EXPR_STMT);
+                push(stmt, call);
+                return stmt;
+            };
+        };
+        if next_type == TK_OP && __array_get(g_tok_values, g_pos + 1) == "." {
+            let save_pos = g_pos;
+            let name = advance();
+            advance();
+            let field = advance();
+            if peek_type() == TK_ASSIGN {
+                advance();
+                let val = parse_expr();
+                match_tok(TK_SEMI);
+                let obj_node = [];
+                push(obj_node, AST_VAR);
+                push(obj_node, name);
+                let fname = [];
+                push(fname, AST_STR);
+                push(fname, field);
+                let args = [];
+                push(args, obj_node);
+                push(args, fname);
+                push(args, val);
+                let call = [];
+                push(call, AST_CALL);
+                push(call, "__dict_set");
+                push(call, args);
+                let stmt = [];
+                push(stmt, AST_EXPR_STMT);
+                push(stmt, call);
+                return stmt;
+            } else {
+                g_pos = save_pos;
+            };
         };
     };
     let expr = parse_expr();
@@ -788,7 +850,73 @@ fn parse_unary() {
         push(node, expr);
         return node;
     };
-    return parse_primary();
+    if peek_type() == TK_OP && peek_val() == "!" {
+        advance();
+        let expr = parse_unary();
+        let zero = [];
+        push(zero, AST_NUM);
+        push(zero, 0);
+        let node = [];
+        push(node, AST_BINOP);
+        push(node, "==");
+        push(node, expr);
+        push(node, zero);
+        return node;
+    };
+    return parse_postfix(parse_primary());
+};
+
+fn parse_postfix(node) {
+    while peek_type() == TK_LBRACKET || (peek_type() == TK_OP && peek_val() == ".") {
+        if peek_type() == TK_LBRACKET {
+            advance();
+            let idx = parse_expr();
+            expect(TK_RBRACKET);
+            let args = [];
+            push(args, node);
+            push(args, idx);
+            let call = [];
+            push(call, AST_CALL);
+            push(call, "__array_get");
+            push(call, args);
+            node = call;
+        } else {
+            advance();
+            let field = expect(TK_IDENT);
+            let fname = [];
+            push(fname, AST_STR);
+            push(fname, field);
+            let args = [];
+            push(args, node);
+            push(args, fname);
+            let call = [];
+            push(call, AST_CALL);
+            push(call, "__dict_get");
+            push(call, args);
+            node = call;
+        };
+    };
+    return node;
+};
+
+fn parse_dict() {
+    advance();
+    let pairs = [];
+    while peek_type() != TK_RBRACE {
+        let key = expect(TK_IDENT);
+        expect(TK_COLON);
+        let val = parse_expr();
+        let pair = [];
+        push(pair, key);
+        push(pair, val);
+        push(pairs, pair);
+        if peek_type() != TK_RBRACE { expect(TK_COMMA); };
+    };
+    expect(TK_RBRACE);
+    let node = [];
+    push(node, AST_DICT);
+    push(node, pairs);
+    return node;
 };
 
 fn parse_primary() {
@@ -860,6 +988,9 @@ fn parse_primary() {
         push(node, AST_ARRAY);
         push(node, elems);
         return node;
+    };
+    if t == TK_LBRACE && __array_get(g_tok_types, g_pos + 1) == TK_IDENT && __array_get(g_tok_types, g_pos + 2) == TK_COLON {
+        return parse_dict();
     };
     emit "Parse error: unexpected";
     emit peek_val();
@@ -941,13 +1072,39 @@ fn emit_name(name) {
 
 fn emit_string(s) {
     let slen = len(s);
-    let byte_len = slen * 2;
-    emit_byte(OP_PUSH);
-    emit_u16(byte_len);
+    // Pass 1: count actual chars (escapes = 1 char, not 2)
+    let actual = 0;
     let i = 0;
     while i < slen {
-        emit_u16(__char_code(char_at(s, i)));
-        i = i + 1;
+        if __char_code(char_at(s, i)) == 92 && i + 1 < slen {
+            actual = actual + 1;
+            i = i + 2;
+        } else {
+            actual = actual + 1;
+            i = i + 1;
+        };
+    };
+    emit_byte(OP_PUSH);
+    emit_u16(actual * 2);
+    // Pass 2: emit chars, converting escapes
+    i = 0;
+    while i < slen {
+        let cc = __char_code(char_at(s, i));
+        if cc == 92 && i + 1 < slen {
+            let esc = __char_code(char_at(s, i + 1));
+            if esc == 110 { emit_u16(10); } else {
+            if esc == 114 { emit_u16(13); } else {
+            if esc == 116 { emit_u16(9); } else {
+            if esc == 48 { emit_u16(0); } else {
+            if esc == 92 { emit_u16(92); } else {
+            if esc == 34 { emit_u16(34); } else {
+                emit_u16(esc);
+            };};};};}; };
+            i = i + 2;
+        } else {
+            emit_u16(cc);
+            i = i + 1;
+        };
     };
 };
 
@@ -1213,6 +1370,26 @@ fn compile_node(node) {
         emit_byte(OP_CALL);
         emit_name(name);
         emit_byte(argc);
+        return 0;
+    };
+
+    if kind == AST_DICT {
+        let pairs = __array_get(node, 1);
+        emit_byte(OP_CALL);
+        emit_name("__dict_new");
+        emit_byte(0);
+        let i = 0;
+        while i < len(pairs) {
+            let pair = __array_get(pairs, i);
+            emit_byte(OP_DUP);
+            emit_string(__array_get(pair, 0));
+            compile_node(__array_get(pair, 1));
+            emit_byte(OP_CALL);
+            emit_name("__dict_set");
+            emit_byte(3);
+            emit_byte(OP_POP);
+            i = i + 1;
+        };
         return 0;
     };
 
