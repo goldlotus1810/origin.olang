@@ -58,6 +58,7 @@ let AST_ASSIGN = 15;
 let AST_ARRAY = 16;
 let AST_AND = 17;
 let AST_OR = 18;
+let AST_DICT = 19;
 let AST_TRY = 20;
 let AST_THROW = 21;
 let AST_BREAK = 22;
