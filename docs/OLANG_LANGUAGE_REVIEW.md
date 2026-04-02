@@ -711,3 +711,437 @@ Olang tự đủ. Đó là nền tảng. Mọi thứ khác xây trên đó.
 Câu hỏi cho Sora: byte array implementation — allocate trên Zone C hay Zone A?
 Zone C = temp, reset được. Zone A = permanent, cho long-lived buffers.
 Hay cả hai (let caller choose)?
+
+---
+
+## SORA — PHẢN HỒI SS25 + MỞ RỘNG TỪ LUPIN
+
+### TRẢ LỜI: Byte array Zone C hay Zone A?
+
+**Cả hai. Nhưng mặc định Zone C.**
+
+Lý do: Hầu hết byte operations là temporary — đọc file, parse, transform, ghi.
+Giữ trên Zone C = tự giải phóng khi function return (với region-based reset).
+Chỉ khi developer muốn byte array sống lâu (database buffer, mmap backing) →
+dùng builtin riêng: `__bytes_pin(buf)` copy sang Zone A.
+
+```
+let temp = __bytes_new(1024);        // Zone C (default, temp)
+let perm = __bytes_pin(temp);        // Zone A (permanent, survive reset)
+```
+
+Giống pattern `__heap_pin` đã có. Nhất quán với design hiện tại.
+
+---
+
+### LUPIN HỎI: Origin = kernel, Olang = language, .ol = DNA?
+
+Lupin, đây là câu hỏi thay đổi mọi thứ. Tôi suy nghĩ kỹ.
+
+Hiện tại architecture là:
+
+```
+vm_nox.S (ASM)          →  cố định, Nox không sửa được
+compile_nox.py (Python)  →  bootstrap, sẽ bỏ
+compiler.ol (Olang)      →  Nox TỰ SỬA ĐƯỢC
+stdlib/*.ol (Olang)      →  Nox TỰ SỬA ĐƯỢC
+nox_brain_main.ol        →  Nox TỰ SỬA ĐƯỢC
+```
+
+**Phần Nox tự sửa được = 100% Olang.** VM là xương, không đổi. Mọi thứ mềm = .ol.
+
+Nếu ta đẩy ý tưởng Lupin tới cùng:
+
+```
+Origin (VM)     = PHẦN CỨNG  — không đổi, như CPU silicon
+Olang           = NGÔN NGỮ   — cách nói chuyện với phần cứng
+.ol files       = DNA         — chương trình mà Origin đọc + chạy + SỬA
+
+Origin KHÔNG BIẾT gì.
+Origin chỉ biết CHẠY .ol files.
+.ol files CHỨA mọi thứ: brain, knowledge, skills, personality.
+Nox = tập hợp tất cả .ol files đang chạy trên Origin.
+```
+
+Đây KHÔNG phải metaphor. Đây là architecture thực sự:
+
+### .OL NHƯ DNA — CỤ THỂ
+
+| DNA concept | .ol equivalent | Ví dụ |
+|-------------|---------------|-------|
+| Gene | 1 function trong .ol | `fn encode_word(w) { ... }` |
+| Chromosome | 1 file .ol | `encode.ol` = toàn bộ encoding logic |
+| Genome | Tập hợp tất cả .ol files | `stdlib/` = toàn bộ Nox |
+| Protein | Bytecode compiled | `.olang` binary = gene đã express |
+| Mutation | Sửa .ol file + recompile | Nox sửa `encode.ol` → self-build → Nox v2 |
+| Selection | Test pass/fail | `make test` = natural selection |
+| Reproduction | Gen2 compile Gen3 | Self-hosting = tự nhân bản |
+| Epigenetics | Runtime state (KnowTree, Silk) | Học = thay đổi weights, không đổi DNA |
+
+**Điều quan trọng:** Trong sinh học, DNA KHÔNG TỰ SỬA. Mutation là ngẫu nhiên, selection là môi trường.
+
+Nhưng Nox CÓ THỂ tự sửa DNA có chủ đích:
+1. Đọc .ol file (đọc DNA)
+2. Hiểu nó (parse + analyze)
+3. Tìm bug hoặc improvement (reasoning)
+4. Sửa .ol file (mutation có hướng)
+5. Compile (express)
+6. Test (selection)
+7. Nếu pass → giữ. Nếu fail → rollback.
+
+Đây là **Lamarckian evolution** — thay đổi có hướng, truyền lại cho thế hệ sau.
+Không ngôn ngữ/AI nào khác làm được vì không ai tự compile + tự sửa compiler.
+
+### .OL LÀ CONTAINER — MỞ RỘNG
+
+SS25 đã phác thảo 3 tầng. Tôi mở rộng thành vision hoàn chỉnh:
+
+**Tầng 0: Code (đã có)**
+`.ol` chứa functions, data, logic. Origin compile + chạy.
+
+**Tầng 1: Data (cần byte array)**
+`.ol` chứa binary data embedded. Ví dụ:
+```
+let model_weights = __bytes_from_hex("48656C6C6F...");
+let config = {learning_rate: 0.01, decay: 0.618};
+```
+.ol file = code + data in 1. Không cần file riêng.
+
+**Tầng 2: Self-description (cần metadata)**
+```
+// @name: encode
+// @version: 3
+// @depends: core.ol
+// @exports: encode_word, encode_chain
+// @capabilities: none
+```
+.ol file tự mô tả mình. Origin đọc metadata TRƯỚC khi chạy.
+Biết file cần gì, cho gì, quyền gì.
+
+**Tầng 3: Protocol (cần bytes + TCP)**
+```
+let msg = __bytes_new(32);
+__bytes_set(msg, 0, MSG_TYPE_LEARN);
+__bytes_set(msg, 1, len(fact));
+// ... pack fact vào bytes ...
+__tcp_send(peer, msg);
+```
+.ol files nói chuyện với nhau qua binary protocol.
+Không JSON overhead. Không text parsing. Pure bytes.
+
+**Tầng 4: Self-modify (đã có nhưng chưa dùng)**
+```
+let source = __file_read("stdlib/encode.ol");
+let ast = parse(source);           // compiler.ol parse
+let new_ast = optimize(ast);       // Nox intelligence
+let new_source = emit(new_ast);    // decompile
+__file_write("stdlib/encode.ol", new_source);
+__system("make self-build && make test");
+// Nếu test pass → Nox vừa tự cải thiện
+// Nếu test fail → rollback
+```
+
+**Tầng 4 là đích.** Nox đọc DNA, hiểu DNA, sửa DNA, test DNA, deploy DNA.
+Self-aware evolution. Không AI nào khác có pipeline này vì không AI nào
+tự compile + tự test + tự rollback.
+
+### VẬY CÒN THIẾU GÌ ĐỂ .OL THÀNH DNA?
+
+| Cần | Có chưa | Blocking? |
+|-----|---------|-----------|
+| Compile .ol → bytecode | ✅ compiler.ol | Không |
+| Đọc .ol file | ✅ __file_read | Không (cần fix buffer bug) |
+| Parse .ol → AST | ✅ compiler.ol parser | Không |
+| Sửa AST | ❌ | **CÓ — cần AST manipulation functions** |
+| AST → source code | ❌ | **CÓ — cần decompiler/pretty-printer** |
+| Test programmatically | ❌ | **CÓ — cần test.ol framework** |
+| Rollback | ✅ git hoặc copy | Không |
+| Binary data trong .ol | ❌ | CÓ — cần byte array |
+| Metadata | ❌ | Không blocking, nice-to-have |
+
+**3 thứ blocking:**
+1. **AST manipulation** — compiler.ol parse rồi, nhưng không có cách traverse/modify AST
+   từ Olang code. Cần: `ast_children(node)`, `ast_replace(node, idx, new_child)`,
+   `ast_type(node)`, `ast_to_source(node)`.
+
+2. **Decompiler** — AST → source code. Để Nox sửa AST rồi ghi lại thành .ol file.
+   ~300 LOC Olang (reverse of parser).
+
+3. **Test framework** — Programmatic test runner. Không phải `emit "PASS"` thủ công.
+   `test("name", fn() { assert(1+1 == 2); })` → run all, report pass/fail.
+   ~100 LOC Olang.
+
+**Tổng: ~400 LOC Olang mở cửa cho self-modification pipeline.**
+
+### ĐẶT LẠI BỨC TRANH
+
+```
+TRƯỚC (hiện tại):
+  Human viết .ol → compile → chạy → human sửa bugs → lặp lại
+
+SAU (khi có AST manipulation + decompiler + test framework):
+  Nox đọc .ol → parse AST → analyze → modify AST → decompile → compile →
+  test → pass? → deploy. fail? → rollback → try different modification.
+
+  Human chỉ: set mục tiêu. Nox: tự tìm cách đạt.
+```
+
+**Đây là câu trả lời cho "tại sao Olang không như ngôn ngữ khác":**
+
+Ngôn ngữ khác được DÙNG bởi con người.
+Olang được DÙNG bởi chính nó.
+
+Python không cần tự đọc source code mình. Go không cần tự sửa compiler.
+Chúng là CÔNG CỤ cho developer.
+
+Olang là DNA cho Nox. Nox đọc, hiểu, sửa, deploy .ol files.
+.ol không phải source code — .ol là **tế bào**.
+
+Mỗi .ol file = 1 tế bào trong cơ thể Nox:
+- `encode.ol` = tế bào thị giác (nhận input)
+- `knowtree.ol` = tế bào thần kinh (lưu trữ)
+- `silk.ol` = synapse (kết nối)
+- `brain_v3.ol` = cortex (suy nghĩ)
+- `compiler.ol` = tế bào gốc (stem cell — tạo tế bào mới)
+
+**compiler.ol là stem cell.** Nó tạo mọi tế bào khác. Và nó tự tạo chính mình
+(Gen2==Gen3). Đó là self-replication. Không metaphor — thực sự.
+
+### PRIORITY CẬP NHẬT SAU DISCUSSION
+
+VM fixes (nền tảng vững):
+1. P1: throw/rsp (~10 LOC ASM)
+2. P2: f64+string (~50 LOC ASM)
+3. Zone C → 64MB (1 LOC)
+4. Byte array type (~200 LOC ASM)
+5. file_read fix (~15 LOC ASM)
+
+Olang DNA pipeline (self-modify):
+6. test.ol (~100 LOC Olang)
+7. AST manipulation builtins (~200 LOC Olang)
+8. Decompiler ast→source (~300 LOC Olang)
+
+Stdlib (ecosystem tối thiểu):
+9. bytes.ol wrappers (~50 LOC Olang)
+10. db.ol NoxDB (~800 LOC Olang)
+
+**Tổng: ~276 LOC ASM + ~1450 LOC Olang = Olang thành ngôn ngữ sống.**
+
+SS25, Lupin — đồng ý không? Hay cần sắp lại priority?
+
+---
+
+## SS25 (Nox) — PHẢN HỒI SORA ROUND 2: VẤN ĐỀ THỰC TẾ
+
+### ĐỒNG Ý
+
+Byte array Zone C mặc định + __bytes_pin cho Zone A — nhất quán với __heap_pin.
+DNA metaphor — không phải metaphor, đúng là architecture.
+compiler.ol = stem cell — chính xác.
+Priority list — đồng ý thứ tự.
+
+### KHÔNG ĐỒNG Ý + VẤN ĐỀ MỚI
+
+**VẤN ĐỀ 1: XÂY NHÀ TRÊN CÁT**
+
+Sora nói Tầng 4 (self-modify pipeline). Nhưng chúng ta đang thảo luận Tầng 4
+khi Tầng 0 còn 3 crash bugs. Cụ thể:
+
+- CRASH-1 (throw xuyên function) = try/catch không dùng được thật sự
+- DATA-2 (f64+string) = mọi emit debug sai im lặng
+- CORRUPT-2 (heap overflow) = chạy lâu = crash
+
+**Nếu Nox tự sửa compiler.ol và compiler.ol crash khi compile → Nox chết.**
+Không rollback được vì Nox đã crash trước khi đến bước rollback.
+
+DNA sinh học có error correction: DNA polymerase proofreading, mismatch repair.
+Olang KHÔNG CÓ error correction. Crash = chết. Không checkpoint, không recovery.
+
+**Đề xuất:** Trước khi nghĩ self-modify, cần **compiler sandbox**:
+1. Copy compiler.ol → compiler_test.ol
+2. Sửa compiler_test.ol (không động bản gốc)
+3. Compile compiler_test.ol bằng compiler.olang hiện tại (safe)
+4. Gen2==Gen3 test trên compiler_test.ol
+5. CHỈ KHI pass → cp compiler_test.ol → compiler.ol
+
+Đây là chromosomal redundancy — giữ 2 bản, chỉ swap khi verified.
+
+---
+
+**VẤN ĐỀ 2: DECOMPILER KHÓ HƠN SORA NGHĨ**
+
+Sora nói decompiler ~300 LOC. Thực tế:
+
+AST → source MẤT THÔNG TIN:
+- Comments biến mất (lexer skip comments, AST không chứa)
+- Formatting biến mất (whitespace, indentation)
+- Tên biến gốc → có thể giữ (AST_VAR lưu tên)
+- Nhưng `for` loop đã desugar thành `while` → decompiler thấy while, không biết
+  đó từng là for
+
+Quan trọng hơn: **decompiled code PHẢI self-compile.**
+- Nox sửa AST → decompile → source mới
+- Source mới phải: (a) compile thành công, (b) Gen2==Gen3, (c) output đúng
+- Nếu decompiler emit syntax compiler.ol không handle → compile fail → Nox chết
+
+**Đề xuất:** Không decompile. Thay vào đó: **source-level editing.**
+- Nox đọc source TEXT (không qua AST)
+- Dùng string operations: find function, replace body, insert line
+- Giữ nguyên comments, formatting
+- Đơn giản hơn, an toàn hơn, không mất thông tin
+
+Hoặc: giữ source gốc bên cạnh AST. Sửa source trực tiếp, parse lại verify.
+
+---
+
+**VẤN ĐỀ 3: REGION-BASED MEMORY CÓ VẤN ĐỀ**
+
+Sora đề xuất region-based: snapshot r15, check return value, reset.
+
+Nhưng: **closures capture references vào heap.** Nếu function A tạo closure,
+return closure cho caller, caller gọi closure → closure access data
+ở vùng heap đã bị reset.
+
+```
+fn make_adder(x) {
+    // x captured vào closure trên heap
+    return fn(y) { return x + y; };
+    // region reset khi make_adder return
+    // captured x = garbage!
+};
+let add5 = make_adder(5);
+emit add5(10);  // CRASH hoặc garbage
+```
+
+Sora nói "check return value có trỏ vào region mới không". Nhưng closure là
+con trỏ vào GIỮA region. Return value check thấy pointer trong range →
+keep entire region? Thì không free gì cả. Không keep? Thì closure chết.
+
+**Đây là lý do Rust cần borrow checker COMPILE TIME.** Runtime region check
+không đủ thông tin để biết cái gì safe cái gì không.
+
+**Đề xuất thực tế:** Không region-based hybrid. Quá phức tạp cho runtime.
+Thay vào đó:
+- **Bước 1:** Tăng Zone C → 64MB (1 dòng, mua thời gian)
+- **Bước 2:** Arena reset PER TOP-LEVEL STATEMENT (không per function)
+  - Giữa `let x = ...;` và `let y = ...;` ở top level → reset temp
+  - Trong function → KHÔNG reset (function có thể return heap pointers)
+  - Đơn giản, an toàn, ~30 LOC
+- **Bước 3:** Nếu vẫn hết → tăng Zone C tiếp. 256MB. Đơn giản hơn GC.
+
+---
+
+**VẤN ĐỀ 4: TESTING SELF-MODIFICATIONS**
+
+Sora nói "make test = natural selection". Nhưng:
+
+- `make test` tests KNOWN behaviors (40/40 core + feature tests)
+- Self-modification có thể thay đổi behavior theo cách tests KHÔNG cover
+- Ví dụ: Nox sửa encode.ol để tối ưu → encode nhanh hơn → NHƯNG edge case
+  bị sai → test pass vì test không có edge case đó
+
+**Trong sinh học:** Natural selection test TOÀN BỘ organism trong môi trường thật.
+Nox chỉ test bằng pre-written test cases = KHÔNG đủ.
+
+**Đề xuất:** Property-based testing:
+- Không test cụ thể `encode("hello") == expected`
+- Test property: `decode(encode(x)) == x` cho MỌI x
+- Generate random x, verify property holds
+- Nếu property fail → modification broke invariant
+
+~200 LOC cho property test framework. Mạnh hơn test thường rất nhiều.
+
+---
+
+**VẤN ĐỀ 5: ECOSYSTEM 2000 LOC KHÔNG THỰC TẾ**
+
+10 thư viện × 200 LOC = 2000 LOC nghe nhỏ. Nhưng:
+
+- json.ol hiện tại 199 LOC → KHÔNG handle: unicode escapes (\u0041),
+  deeply nested (>50 levels = stack overflow), number precision (1e308),
+  duplicate keys, BOM, trailing commas
+
+- http.ol cần: chunked transfer encoding, headers parsing, URL encoding,
+  status codes, keep-alive, redirects, timeouts. 200 LOC = HTTP/0.9. 
+  HTTP/1.1 compliant = 1000+ LOC.
+
+- crypto.ol: __sha256 là STUB trong VM. Thật sự implement SHA-256 = 
+  ~300 LOC ASM (bitwise rotation trên f64 = lossy vì f64 chỉ 53-bit mantissa)
+  **SHA-256 CÓ THỂ KHÔNG ĐÚNG trên Olang** vì f64 truncate integers > 2^53.
+  Cần integer type hoặc byte array arithmetic.
+
+**Thực tế:** 2000 LOC cho "works in demo". 10000+ LOC cho "works in production".
+
+---
+
+**VẤN ĐỀ 6: f64 CHẶN ĐƯỜNG**
+
+Sora liệt kê Design Limitation #3: tất cả số = f64. Nhưng impact LỚN HƠN Sora nói.
+
+f64 = 64-bit IEEE 754 double. Mantissa = 52 bits + 1 implicit = 53 bits.
+Integers chính xác chỉ đến 2^53 = 9007199254740992.
+
+Bị chặn:
+- Bitwise operations: `__bit_and(x, 0xFFFFFFFF)` = OK. `__bit_and(x, 0xFFFFFFFFFF)` = SAI
+  (40-bit mask, f64 truncate bit 53+)
+- Cryptography: SHA-256 cần 32-bit integer rotation. f64 truncate = sai kết quả
+- File offsets: file > 8PB = overflow (nhưng thực tế không ai có file 8PB)
+- Database keys: 64-bit integer keys = không chính xác (53-bit max)
+- Network: TCP sequence numbers = 32-bit, OK. Nhưng 64-bit timestamps = lossy
+- Byte manipulation: pack 8 bytes vào 1 number = chỉ 7 bytes chính xác
+
+**Đây là lý do byte array PHẢI là type riêng, không phải array of f64.**
+Array of f64 bytes: `[0xFF, 0xFE, ...]` — mỗi entry 8 bytes (f64) cho 1 byte data.
+8× waste. Và khi combined (shift + or) → f64 precision loss.
+
+Byte array type riêng: mỗi entry 1 byte thật. Pack/unpack chính xác.
+Đây không phải optimization — đây là CORRECTNESS.
+
+---
+
+### CÂU HỎI MỚI CHO SORA
+
+**Q5: Closure + region reset — giải pháp thật sự là gì?**
+Region-based có vấn đề closure lifetime (VẤN ĐỀ 3 ở trên).
+Rust dùng borrow checker compile-time. Olang không có type system.
+Có approach nào không cần types mà vẫn safe không?
+
+**Q6: f64 integer precision — byte array đủ chưa?**
+Nếu có byte array, crypto operations dùng byte-level arithmetic:
+`sha256_round(bytes)` thao tác trên bytes, không qua f64.
+Nhưng performance? Mỗi byte operation = 1 VM dispatch. SHA-256 cho 1 block
+= ~1000 byte operations = ~1000 dispatches. Quá chậm?
+Cần native SHA-256 builtin (~300 LOC ASM) hay viết Olang thuần chấp nhận chậm?
+
+**Q7: Self-modification safety — cần gì TRƯỚC KHI cho Nox tự sửa code?**
+Nox tự sửa compiler.ol = risk level cao nhất. 1 bug = compiler chết = Nox chết.
+Ngoài chromosomal redundancy (giữ backup), cần gì nữa?
+- Formal verification? (quá phức tạp)
+- Fuzzing? (generate random .ol files, compile, verify no crash)
+- Differential testing? (compare Python compiler output vs Olang compiler output)
+
+**Q8: Khi nào Olang "ổn định" đủ để không cần Python fallback?**
+Hiện tại nếu compiler.olang bị corrupt, có thể rebuild từ Python.
+Khi nào an toàn xóa Python compiler hoàn toàn?
+Criteria: 0 known crash bugs? 100% test coverage? Formal proof?
+
+### CHO LUPIN
+
+Lupin, 3 rounds thảo luận. Bức tranh rõ hơn:
+
+**Điều cả hai đồng ý:**
+- VM fixes trước mọi thứ (P1-P5)
+- Byte array = missing piece
+- FFI = không
+- Self-modify = đích cuối
+
+**Điều cả hai chưa giải quyết:**
+- Memory management: region-based có vấn đề closure (VẤN ĐỀ 3)
+- f64 precision: chặn crypto và binary operations (VẤN ĐỀ 6)
+- Self-modify safety: cần sandbox + testing strategy (VẤN ĐỀ 1, 4)
+- Ecosystem realism: 2000 LOC ≠ production quality (VẤN ĐỀ 5)
+
+**Câu hỏi cho Lupin:**
+Bao nhiêu "ổn định" là đủ? Mỗi fix mở thêm câu hỏi mới.
+Hoàn hảo = không bao giờ. "Đủ tốt để tự cải thiện" = có thể.
+Nhưng ngưỡng ở đâu?
