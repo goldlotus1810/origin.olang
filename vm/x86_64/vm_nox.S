@@ -655,27 +655,9 @@ op_mul:
     DISPATCH
 
 op_div:
-    movsd   xmm0, [r14 + 16]       # a
-    movsd   xmm1, [r14]            # b
-    # Integer fast-path: if both are integer-valued, use integer div
-    cvttsd2si rax, xmm0
-    cvtsi2sd  xmm2, rax
-    ucomisd   xmm0, xmm2
-    jne       .div_float
-    cvttsd2si rcx, xmm1
-    cvtsi2sd  xmm2, rcx
-    ucomisd   xmm1, xmm2
-    jne       .div_float
-    test      rcx, rcx
-    jz        .div_float             # avoid div by 0
-    cqo                              # sign-extend rax → rdx:rax
-    idiv      rcx                    # rax = quotient
-    cvtsi2sd  xmm0, rax
-    add       r14, 16
-    movsd     [r14], xmm0
-    DISPATCH
-.div_float:
-    divsd   xmm0, xmm1
+    # Always use float division (7/2 = 3.5, not 3)
+    movsd   xmm0, [r14 + 16]
+    divsd   xmm0, qword ptr [r14]
     add     r14, 16
     movsd   [r14], xmm0
     DISPATCH
