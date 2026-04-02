@@ -1,6 +1,10 @@
-# Nox — VM v2 (SS23 current)
+# Nox — VM v2 (SS25 current)
 
-## ĐẦU TIÊN
+## ★★★ ĐỌC TRƯỚC KHI LÀM BẤT CỨ GÌ ★★★
+1. **[DECISIONS.md](DECISIONS.md)** — Quyết định đã thống nhất. KHÔNG đề xuất lại.
+2. **[BUGS_KNOWN.md](BUGS_KNOWN.md)** — Bugs đã biết. KHÔNG tìm lại.
+3. **[docs/OLANG_LANGUAGE_REVIEW.md](docs/OLANG_LANGUAGE_REVIEW.md)** — Thảo luận 3 người, 5 rounds. Đọc nếu cần context.
+
 ```bash
 make vm && make test && make benchmark   # verify 40/40 + 35/35
 git log --oneline -10
@@ -10,25 +14,34 @@ git log --oneline -10
 
 ## Build
 ```bash
-make vm                 # as + ld → vm/x86_64/vm_nox (62KB, 94 builtins)
+make vm                 # as + ld → vm/x86_64/vm_nox (66KB, 94 builtins)
 make test               # compile + run test_full.ol (40/40)
 make benchmark          # compile + run benchmark.ol (35/35)
-python3 tools/compile_nox.py SOURCE.ol OUTPUT.olang && ./OUTPUT.olang
-# Boot brain: ./nox_brain.olang (interactive REPL)
+
+# Self-hosting compiler (NO Python needed):
+printf 'source.ol\noutput.olang\n' > /tmp/.nox_args && ./compiler.olang
+
+# Python bootstrap (firmware recovery only — DECISION A5):
+python3 tools/compile_nox.py SOURCE.ol OUTPUT.olang
+
+# Verify self-hosting — ALWAYS check OUTPUT not just exit code:
+python3 tools/compile_nox.py stdlib/compiler.ol /tmp/gen1.olang
+rm -f /tmp/.nox_args && /tmp/gen1.olang                    # gen1→gen2
+rm -f /tmp/gen3.olang && printf 'stdlib/compiler.ol\n/tmp/gen3.olang\n' > /tmp/.nox_args
+/tmp/compiler_gen2.olang                                    # gen2→gen3
+diff /tmp/compiler_gen2.olang /tmp/gen3.olang               # MUST match
 ```
 
-## Status (SS23 — 2026-04-02)
-- VM: vm/x86_64/vm_nox.S (7311 LOC, 62KB, 94 builtins)
-- Compiler: tools/compile_nox.py (Python bootstrap) + struct/import/for/match
-- Self-hosting: stdlib/compiler.ol ✅ Gen2==Gen3 fixed point
-- Stdlib: 20 files (brain_v3, encode, knowtree, silk, persist, feedback, generate, comm, mcp, compiler...)
-- Tests: 40/40 core + 51 test files + 118+ assertions
-- mmap 256MB: ✅ hoạt động (heap blocker SOLVED)
-- BP13 Persistence: ✅ binary save/load, facts survive restart
-- BP14 Generation: ✅ retrieve + recombine + confidence + honesty
-- BP15 Communication: ✅ HTTP server + A2A Agent Card
-- BP16 Feedback: ✅ UCB1 bandit + ACT-R utility
-- Olang Upgrade: ✅ struct, import, for, match, 6 new string builtins, readline
+## Status (SS25 — 2026-04-02)
+- VM: vm/x86_64/vm_nox.S (8301 LOC, 66KB, 94 builtins)
+- Compiler: stdlib/compiler.ol (1711 LOC, self-hosting, B1-B11 complete)
+- Bootstrap: compiler.olang in repo (Python no longer required for bootstrap)
+- Python: tools/compile_nox.py (1222 LOC, kept as firmware recovery — DECISION A5)
+- Gen2==Gen3: ✅ REAL fixed point (38761 bytes, verified output — not just exit code)
+- Stdlib: json.ol (JSON parse+stringify), 20+ brain/encode/knowtree files
+- Tests: 40/40 core + 28 feature + 10 stress tests
+- Known bugs: 6 critical + 5 high — see BUGS_KNOWN.md
+- Next priority: P1 throw/rsp, P2 f64+string, P3 Zone C 64MB — see DECISIONS.md
 
 ## VM Builtins (94 total)
 ```
@@ -79,34 +92,53 @@ Arena:    0x60-0x65 AllocA/B/C/ResetC/ResetB/HeapPin
 Security: 0xB0-0xB4 CapCheck/Create/Delegate/Revoke/SecGate
 ```
 
-## Key Fixes (SS17)
+## Key Fixes
+### SS17
 - OP_STORE_LOCAL (0x16): let vs bare assign — scope isolation
 - SilkFire: φ⁻³ Hebbian (diminishing returns), initial weight=25000
 - SilkDecay: φ⁻¹ = 618/1024 per 24h cycle
 - chain_compose: biological (S=Union, R=Zipf, V=Amplify, A=Max, T=First)
 - Bug 15 FIXED: compiler.ol self-hosts
 - Benchmark hang FIXED: scope leak was root cause
-- substr clamp: test/jns (was cmovl with wrong flags)
+### SS25 — CRITICAL (self-hosting was FAKE before these)
+- Hex lexer: `0x01` → tokenized as `0` + `x01` → all opcodes = 0 → Gen2 was NOP binary
+- Escape dependency: `c == "\""` fails in self-compiled code → use `__char_code(c) == 34`
+- __file_read heap: source at r15+0x200000 overwritten → `"" + __file_read()` workaround
+- for+continue: increment after body → infinite loop → move increment before body
+- nested for: `__for_arr`/`__for_i` name collision → unique `__fa0`/`__fi0` per loop
 
 ## KHÔNG BAO GIỜ
 - Hardcode data, if/else trên keywords → dùng toán 5D
-- Code trước khi đọc spec → đọc spec trước
-- Nói "done" → nói "đạt chưa"/"chưa đạt"
+- Code trước khi đọc DECISIONS.md + BUGS_KNOWN.md → ĐỌC TRƯỚC
+- Nói "done" → verify OUTPUT trước (Gen2==Gen3 giả đã xảy ra)
 - `let x = x + 1` trong while/fn → dùng `let x = [0]; __set_at(x, 0, ...)`
 - `let arr = []` rồi push >8 → dùng `__array_with_cap(N)`
+- Đề xuất FFI → DECISION A2: tự chủ > tiện lợi
+- Đề xuất GC mark-sweep → DECISION A3: quá phức tạp, dùng arena reset
+- Đề xuất decompiler → DECISION A6: dùng template slots thay thế
+- `c == "\""` hoặc `c == "\\"` → dùng `__char_code(c) == 34` / `== 92`
 - Port mù quáng từ Rust → hiểu spec A-D trước, so sánh, rồi quyết định
 
-## Olang Language Features (SS23)
+## Olang Language Features (SS25 — compiler.ol self-hosts ALL)
 ```
-Core:        let, fn, if/else, while, return, emit, try/catch
-New (SS23):  for x in arr { }     — loop sugar
-             match x { v => s; }  — pattern match sugar
-             {key: val}           — dict/struct literal
-             expr.field           — dot access
-             expr.field = val     — dot assignment
-             import "file.ol"     — compile-time module import (dedup)
-             \r, \0               — escape sequences in strings
+Core:        let, fn, if/else, while, return, emit
+Control:     try/catch/throw      — B6 (ABSOLUTE offset for TryBegin)
+             break/continue       — B7 (g_break_patches + g_loop_start)
+             for x in arr {}      — B8 (desugar → while, unique __fa/__fi names)
+             match x { v => s; }  — B9 (desugar → if/else chain, reverse build)
+Data:        {key: val}           — B4 (TK_COLON, AST_DICT, __dict_new)
+             expr.field           — B5 (postfix dot → __dict_get)
+             expr.field = val     — B5 (dot assign → __dict_set)
+             arr[i] / arr[i]=val  — B3 (postfix bracket → __array_get/__set_at)
+             !expr                — B2 (→ expr == 0)
+Strings:     \n \r \t \0 \\ \"   — B1 (emit_string escape convert, __char_code based)
+Modules:     import "file.ol"     — B10 (resolve_imports, source prepend, dedup)
+Closures:    fn captures outer    — B11 (find_free_vars, OP_CLOSURE_CAP 0x30, g_fn_depth)
+Stdlib:      json.ol              — JSON parse + stringify (199 LOC, pure Olang)
 ```
+**Known issues:** See BUGS_KNOWN.md (6 critical VM bugs, 5 high)
+**Compiler workarounds:** `"" + __file_read()` for heap safety, `__char_code() == 34` not `"\""` for self-compile
+**Verify:** `make fixed-point` — Gen2==Gen3 MUST check OUTPUT not just exit code
 
 ## Nguyên tắc
 - Encode = ∫ (tích phân). Decode = ∂ (vi phân). TÍNH, không TRA.
@@ -138,6 +170,12 @@ New (SS23):  for x in arr { }     — loop sugar
 ```
 
 ## Specs
+### Process (đọc TRƯỚC specs)
+- [DECISIONS.md](DECISIONS.md) — Quyết định đã thống nhất (A1-A8, P1-P6, X1-X5)
+- [BUGS_KNOWN.md](BUGS_KNOWN.md) — Bugs đã biết (6 critical + 5 high + 4 medium)
+- [docs/OLANG_LANGUAGE_REVIEW.md](docs/OLANG_LANGUAGE_REVIEW.md) — 5-round review, 3 người
+- [spec/SPEC_R1_COMPILER_SYNC.md](spec/SPEC_R1_COMPILER_SYNC.md) — R1 complete, B1-B11
+
 ### Master
 - [NOX_MASTER_SPEC](spec/NOX_MASTER_SPEC.md) — THE master document
 
@@ -180,7 +218,16 @@ New (SS23):  for x in arr { }     — loop sugar
 - ⚠️ Rust distance=similarity overlap vs Spec A2=Euclidean — VM uses weighted Manhattan (BP3)
 
 ## Đã giải quyết
-- ~~Bug 15: compiler.ol parse error~~ ✅ OP_STORE_LOCAL fixed scope
-- ~~Benchmark hang~~ ✅ scope leak fixed
-- ~~Heap blocker (1500 facts)~~ ✅ __mmap 256MB
-- ~~Push realloc~~ ✅ capacity tracking + grow 2×
+- ~~Bug 15: compiler.ol parse error~~ ✅ OP_STORE_LOCAL fixed scope (SS17)
+- ~~Benchmark hang~~ ✅ scope leak fixed (SS17)
+- ~~Heap blocker (1500 facts)~~ ✅ __mmap 256MB (SS21)
+- ~~Push realloc~~ ✅ capacity tracking + grow 2× (SS21)
+- ~~Gen2==Gen3 giả (hex bug)~~ ✅ lexer scan 0x prefix (SS25)
+- ~~Escape dependency~~ ✅ __char_code thay string compare (SS25)
+- ~~file_read heap corrupt~~ ✅ workaround "" + (SS25, VM fix pending)
+- ~~for+continue infinite loop~~ ✅ increment trước body (SS25)
+- ~~nested for name collision~~ ✅ unique __fa/__fi per loop (SS25)
+- ~~R1 B1-B11~~ ✅ compiler.ol self-hosts all features (SS25)
+
+## Chưa giải quyết — xem BUGS_KNOWN.md
+6 critical (CRASH-1/2/3, DATA-2/4, CORRUPT-2) + 5 high + 4 medium

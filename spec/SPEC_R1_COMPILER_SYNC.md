@@ -1,9 +1,14 @@
 # SPEC R1: compiler.ol Self-Bootstrap Sync
 
 > Date: 2026-04-02
-> Status: IN PROGRESS
+> Status: ✅ COMPLETE (SS25)
 > Author: Nox
 > Goal: compiler.ol = compile_nox.py (byte-identical output)
+>
+> **RESULT:** B1-B11 all done. Gen2==Gen3 REAL (38761 bytes).
+> 5 compiler bugs fixed (hex lexer, escape dependency, file_read heap, for+continue, nested for).
+> compiler.olang saved to repo — Python bootstrap no longer required.
+> See DECISIONS.md for architecture decisions made during R1.
 
 ---
 
