@@ -2908,9 +2908,11 @@ var_load_matrix:
     ret
 
 # f64_to_string: xmm0=value → rax=ptr, rdx=len (on Zone C heap)
-# Converts f64 to decimal string. Integer part only for now.
+# Converts f64 to decimal string with up to 6 decimal places.
 f64_to_string:
     # Output u16 molecules (not bytes) — VM string format
+    sub     rsp, 8
+    movsd   [rsp], xmm0             # save original value
     push    r15                      # save heap ptr (= output start)
     cvttsd2si rax, xmm0             # integer part
     # Handle negative
@@ -2920,12 +2922,12 @@ f64_to_string:
     add     r15, 2
     neg     rax
 .f2s_pos:
-    # Handle zero
+    # Handle zero integer part (but might have fraction like 0.5)
     test    rax, rax
     jnz     .f2s_nonzero
     mov     word ptr [r15], '0'
     add     r15, 2
-    jmp     .f2s_done
+    jmp     .f2s_check_frac          # check for fractional part
 .f2s_nonzero:
     # Convert integer to decimal digits (reversed into temp u16 area)
     lea     rdi, [r15 + 48]          # temp end (room for 24 u16 digits)
@@ -2948,12 +2950,80 @@ f64_to_string:
     sub     rcx, rsi                 # byte count
     rep     movsb
     mov     r15, rdi                 # r15 past last digit
-.f2s_done:
-    pop     rax                      # rax = output start
+.f2s_check_frac:
+    # Check for fractional part
+    movsd   xmm0, [rsp + 8]         # reload original value (saved before push r15)
+    # Get absolute value for comparison
+    movsd   xmm1, xmm0
+    # Make positive: if negative, negate
+    xorpd   xmm3, xmm3
+    cmpsd   xmm3, xmm1, 1           # xmm3 = (0 < xmm1) ? all-1 : 0 — wrong approach
+    # Simpler: use abs via AND mask
+    pcmpeqd xmm3, xmm3              # all 1s
+    psrlq   xmm3, 1                  # clear sign bit → 0x7FFF...
+    andpd   xmm1, xmm3              # abs(original)
+    # Get integer part as f64
+    cvttsd2si rax, xmm1
+    cvtsi2sd xmm4, rax              # integer as f64
+    # Fractional part = abs(original) - integer
+    subsd   xmm1, xmm4              # xmm1 = fractional part (0.0 to 0.999...)
+    # Check if fractional part is essentially zero
+    movsd   xmm4, [rip + .f2s_epsilon]
+    ucomisd xmm1, xmm4
+    jb      .f2s_nofrac              # < 0.000001 → no fraction
+    # Emit decimal point
+    mov     word ptr [r15], '.'
+    add     r15, 2
+    # Multiply frac by 1000000, convert to int, emit digits
+    movsd   xmm4, [rip + .f2s_million]
+    mulsd   xmm1, xmm4              # frac * 1000000
+    addsd   xmm1, [rip + .f2s_half] # round
+    cvttsd2si rax, xmm1             # integer frac digits
+    # Convert to 6 digits, then strip trailing zeros
+    lea     rdi, [r15 + 24]          # temp (6 u16 digits max)
+    mov     r8, rdi
+    mov     rcx, 6                   # exactly 6 digits
+.f2s_fdigit:
+    test    rcx, rcx
+    jz      .f2s_fstrip
+    xor     edx, edx
+    mov     rsi, 10
+    div     rsi
+    add     dl, '0'
+    sub     rdi, 2
+    mov     word ptr [rdi], dx
+    dec     rcx
+    jmp     .f2s_fdigit
+.f2s_fstrip:
+    # Strip trailing '0' from end
+    sub     r8, 2                    # point to last digit
+.f2s_strip_loop:
+    cmp     r8, rdi
+    jle     .f2s_fcopy
+    cmp     word ptr [r8], '0'
+    jne     .f2s_fcopy
+    sub     r8, 2
+    jmp     .f2s_strip_loop
+.f2s_fcopy:
+    # Copy frac digits to output
+    add     r8, 2                    # past last non-zero digit
+    mov     rsi, rdi
+    mov     rdi, r15
+    mov     rcx, r8
+    sub     rcx, rsi
+    rep     movsb
+    mov     r15, rdi
+.f2s_nofrac:
+    pop     rax                      # output start
+    add     rsp, 8                   # discard saved xmm0
     mov     rdx, r15
-    sub     rdx, rax                 # rdx = total bytes
-    shr     rdx, 1                   # rdx = mol count (bytes / 2)
+    sub     rdx, rax
+    shr     rdx, 1                   # mol count
     ret
+
+.f2s_epsilon: .quad 0x3EB0C6F7A0B5ED8D  # ~0.000001
+.f2s_million: .quad 0x412E848000000000   # 1000000.0
+.f2s_half:    .quad 0x3FE0000000000000   # 0.5
 
 # ═══════════════════════════════════════════════════════════════════════════
 # ERROR HANDLERS
