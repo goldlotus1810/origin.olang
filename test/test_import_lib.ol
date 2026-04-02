@@ -1,5 +1,2 @@
-// Library file for import test
-fn add(a, b) { return a + b; };
-fn greet(name) { return "hello " + name; };
-let LIB_VERSION = 42;
-emit "lib loaded";
+fn add_nums(a, b) { return a + b; };
+fn mul_nums(a, b) { return a * b; };

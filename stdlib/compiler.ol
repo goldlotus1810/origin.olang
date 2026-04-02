@@ -27,6 +27,16 @@ let TK_RETURN = 25;
 let TK_EMIT = 26;
 let TK_TRUE = 27;
 let TK_FALSE = 28;
+let TK_TRY = 31;
+let TK_CATCH = 32;
+let TK_THROW = 33;
+let TK_BREAK = 34;
+let TK_CONTINUE = 35;
+let TK_FOR = 36;
+let TK_IN = 37;
+let TK_MATCH = 38;
+let TK_ARROW = 39;
+let TK_IMPORT = 40;
 
 // ── AST node types ──
 let AST_NUM = 1;
@@ -47,6 +57,10 @@ let AST_ASSIGN = 15;
 let AST_ARRAY = 16;
 let AST_AND = 17;
 let AST_OR = 18;
+let AST_TRY = 20;
+let AST_THROW = 21;
+let AST_BREAK = 22;
+let AST_CONTINUE = 23;
 
 // ── Opcodes ──
 let OP_PUSH = 0x01;
@@ -75,6 +89,10 @@ let OP_LT = 0x33;
 let OP_GT = 0x34;
 let OP_LE = 0x35;
 let OP_GE = 0x36;
+let OP_CLOSURE_CAP = 0x30;
+let OP_TRY_BEGIN = 0x1A;
+let OP_CATCH_END = 0x1B;
+let OP_THROW = 0x78;
 
 // ═══ Global state ═══
 let g_source = "";
@@ -85,6 +103,10 @@ let g_tok_values = [];
 let g_tok_count = 0;
 let g_pos = 0;
 let g_code = [];       // bytecode output (array of bytes)
+let g_break_patches = [];  // break jump offsets to patch
+let g_loop_start = 0;     // loop start offset for continue
+let g_fn_depth = 0;       // function nesting depth (0 = top level)
+let g_for_id = 0;        // unique ID for for loop desugar names
 
 // ═══════════════════════════════════════════════════════════════
 // LEXER
@@ -138,29 +160,34 @@ fn lex(source) {
             };
         } else {
 
-        // Numbers
+        // Numbers (decimal and 0x hex)
         if is_digit(c) {
             let start = i;
-            while i < g_source_len && (is_digit(char_at(source, i)) || char_at(source, i) == ".") {
-                i = i + 1;
+            if c == "0" && i + 1 < g_source_len && char_at(source, i + 1) == "x" {
+                i = i + 2;
+                while i < g_source_len && is_alnum(char_at(source, i)) {
+                    i = i + 1;
+                };
+            } else {
+                while i < g_source_len && (is_digit(char_at(source, i)) || char_at(source, i) == ".") {
+                    i = i + 1;
+                };
             };
-            // Check for 0x hex
             let num_str = substr(source, start, i);
-            // Simple decimal parse for now
             let val = parse_number(num_str);
             add_token(TK_NUM, val);
         } else {
 
-        // Strings
-        if c == "\"" {
+        // Strings (use char codes to avoid escape dependency)
+        if __char_code(c) == 34 {
             i = i + 1;
             let start = i;
-            while i < g_source_len && char_at(source, i) != "\"" {
-                if char_at(source, i) == "\\" { i = i + 1; };
+            while i < g_source_len && __char_code(char_at(source, i)) != 34 {
+                if __char_code(char_at(source, i)) == 92 { i = i + 1; };
                 i = i + 1;
             };
             let str_val = substr(source, start, i);
-            i = i + 1;  // skip closing "
+            i = i + 1;
             add_token(TK_STR, str_val);
         } else {
 
@@ -171,20 +198,32 @@ fn lex(source) {
                 i = i + 1;
             };
             let word = substr(source, start, i);
-            if word == "let" { add_token(TK_LET, word); } else {
-            if word == "fn" { add_token(TK_FN, word); } else {
-            if word == "if" { add_token(TK_IF, word); } else {
-            if word == "else" { add_token(TK_ELSE, word); } else {
-            if word == "while" { add_token(TK_WHILE, word); } else {
-            if word == "return" { add_token(TK_RETURN, word); } else {
-            if word == "emit" { add_token(TK_EMIT, word); } else {
-            if word == "true" { add_token(TK_TRUE, word); } else {
-            if word == "false" { add_token(TK_FALSE, word); } else {
-                add_token(TK_IDENT, word);
-            };};};};};};};}; };
+            let kw = 0;
+            if word == "let" { add_token(TK_LET, word); kw = 1; };
+            if kw == 0 && word == "fn" { add_token(TK_FN, word); kw = 1; };
+            if kw == 0 && word == "if" { add_token(TK_IF, word); kw = 1; };
+            if kw == 0 && word == "else" { add_token(TK_ELSE, word); kw = 1; };
+            if kw == 0 && word == "while" { add_token(TK_WHILE, word); kw = 1; };
+            if kw == 0 && word == "return" { add_token(TK_RETURN, word); kw = 1; };
+            if kw == 0 && word == "emit" { add_token(TK_EMIT, word); kw = 1; };
+            if kw == 0 && word == "true" { add_token(TK_TRUE, word); kw = 1; };
+            if kw == 0 && word == "false" { add_token(TK_FALSE, word); kw = 1; };
+            if kw == 0 && word == "try" { add_token(TK_TRY, word); kw = 1; };
+            if kw == 0 && word == "catch" { add_token(TK_CATCH, word); kw = 1; };
+            if kw == 0 && word == "throw" { add_token(TK_THROW, word); kw = 1; };
+            if kw == 0 && word == "break" { add_token(TK_BREAK, word); kw = 1; };
+            if kw == 0 && word == "continue" { add_token(TK_CONTINUE, word); kw = 1; };
+            if kw == 0 && word == "for" { add_token(TK_FOR, word); kw = 1; };
+            if kw == 0 && word == "in" { add_token(TK_IN, word); kw = 1; };
+            if kw == 0 && word == "match" { add_token(TK_MATCH, word); kw = 1; };
+            if kw == 0 && word == "import" { add_token(TK_IMPORT, word); kw = 1; };
+            if kw == 0 { add_token(TK_IDENT, word); };
         } else {
 
         // Two-char operators
+        if c == "=" && i + 1 < g_source_len && char_at(source, i + 1) == ">" {
+            add_token(TK_ARROW, "=>"); i = i + 2;
+        } else {
         if c == "=" && i + 1 < g_source_len && char_at(source, i + 1) == "=" {
             add_token(TK_OP, "=="); i = i + 2;
         } else {
@@ -220,7 +259,7 @@ fn lex(source) {
         if c == "." { add_token(TK_OP, c); i = i + 1; } else {
             // Unknown char, skip
             i = i + 1;
-        };};};};};};};};};};};};};};};};}; }; }; }; }; }; };
+        };};};};};};};};};};};};};};};};};}; }; }; }; }; }; };
     };
     add_token(TK_EOF, "");
 };
@@ -302,8 +341,229 @@ fn parse_program() {
     return node;
 };
 
+fn parse_try() {
+    expect(TK_TRY);
+    let body = parse_block();
+    expect(TK_CATCH);
+    expect(TK_LPAREN);
+    let var_name = expect(TK_IDENT);
+    expect(TK_RPAREN);
+    let handler = parse_block();
+    let node = [];
+    push(node, AST_TRY);
+    push(node, body);
+    push(node, var_name);
+    push(node, handler);
+    return node;
+};
+
+fn parse_throw() {
+    expect(TK_THROW);
+    let val = parse_expr();
+    match_tok(TK_SEMI);
+    let node = [];
+    push(node, AST_THROW);
+    push(node, val);
+    return node;
+};
+
+fn parse_break() {
+    expect(TK_BREAK);
+    match_tok(TK_SEMI);
+    let node = [];
+    push(node, AST_BREAK);
+    return node;
+};
+
+fn parse_continue() {
+    expect(TK_CONTINUE);
+    match_tok(TK_SEMI);
+    let node = [];
+    push(node, AST_CONTINUE);
+    return node;
+};
+
+fn parse_for() {
+    expect(TK_FOR);
+    let var_name = expect(TK_IDENT);
+    expect(TK_IN);
+    let arr_expr = parse_expr();
+    let body = parse_block();
+    // Unique names for nested for loops
+    let fid = __to_string(g_for_id);
+    g_for_id = g_for_id + 1;
+    let arr_name = "__fa" + fid;
+    let idx_name = "__fi" + fid;
+    let arr_let = [];
+    push(arr_let, AST_LET);
+    push(arr_let, arr_name);
+    push(arr_let, arr_expr);
+    let idx_zero = [];
+    push(idx_zero, AST_NUM);
+    push(idx_zero, 0);
+    let idx_let = [];
+    push(idx_let, AST_LET);
+    push(idx_let, idx_name);
+    push(idx_let, idx_zero);
+    let arr_var = [];
+    push(arr_var, AST_VAR);
+    push(arr_var, arr_name);
+    let len_args = [];
+    push(len_args, arr_var);
+    let len_call = [];
+    push(len_call, AST_CALL);
+    push(len_call, "len");
+    push(len_call, len_args);
+    let idx_var = [];
+    push(idx_var, AST_VAR);
+    push(idx_var, idx_name);
+    let cond = [];
+    push(cond, AST_BINOP);
+    push(cond, "<");
+    push(cond, idx_var);
+    push(cond, len_call);
+    let av2 = [];
+    push(av2, AST_VAR);
+    push(av2, arr_name);
+    let iv2 = [];
+    push(iv2, AST_VAR);
+    push(iv2, idx_name);
+    let get_args = [];
+    push(get_args, av2);
+    push(get_args, iv2);
+    let get_call = [];
+    push(get_call, AST_CALL);
+    push(get_call, "__array_get");
+    push(get_call, get_args);
+    let var_let = [];
+    push(var_let, AST_LET);
+    push(var_let, var_name);
+    push(var_let, get_call);
+    let iv3 = [];
+    push(iv3, AST_VAR);
+    push(iv3, idx_name);
+    let one = [];
+    push(one, AST_NUM);
+    push(one, 1);
+    let inc = [];
+    push(inc, AST_BINOP);
+    push(inc, "+");
+    push(inc, iv3);
+    push(inc, one);
+    let inc_assign = [];
+    push(inc_assign, AST_ASSIGN);
+    push(inc_assign, idx_name);
+    push(inc_assign, inc);
+    // While body: [var_let, inc_assign, body_stmts...]
+    // inc BEFORE body so continue doesn't skip it
+    let body_stmts = __array_get(body, 1);
+    let while_stmts = [];
+    push(while_stmts, var_let);
+    push(while_stmts, inc_assign);
+    let si = 0;
+    while si < len(body_stmts) {
+        push(while_stmts, __array_get(body_stmts, si));
+        si = si + 1;
+    };
+    let while_body = [];
+    push(while_body, AST_BLOCK);
+    push(while_body, while_stmts);
+    let while_node = [];
+    push(while_node, AST_WHILE);
+    push(while_node, cond);
+    push(while_node, while_body);
+    // Block: [arr_let, idx_let, while_node]
+    let block_stmts = [];
+    push(block_stmts, arr_let);
+    push(block_stmts, idx_let);
+    push(block_stmts, while_node);
+    let block = [];
+    push(block, AST_BLOCK);
+    push(block, block_stmts);
+    return block;
+};
+
+fn parse_match() {
+    expect(TK_MATCH);
+    let val = parse_expr();
+    expect(TK_LBRACE);
+    let val_let = [];
+    push(val_let, AST_LET);
+    push(val_let, "__match_val");
+    push(val_let, val);
+    // Collect arms: [pat_or_0, body] pairs
+    let arms_pat = [];
+    let arms_body = [];
+    while peek_type() != TK_RBRACE {
+        if peek_type() == TK_IDENT && peek_val() == "_" {
+            advance();
+            push(arms_pat, 0);
+        } else {
+            push(arms_pat, parse_expr());
+        };
+        expect(TK_ARROW);
+        let stmt = parse_statement();
+        let body_stmts = [];
+        push(body_stmts, stmt);
+        let body = [];
+        push(body, AST_BLOCK);
+        push(body, body_stmts);
+        push(arms_body, body);
+    };
+    expect(TK_RBRACE);
+    match_tok(TK_SEMI);
+    // Build if/else chain from LAST to FIRST
+    let result = 0;
+    let ai = len(arms_pat) - 1;
+    while ai >= 0 {
+        let pat = __array_get(arms_pat, ai);
+        let body = __array_get(arms_body, ai);
+        if pat == 0 {
+            result = body;
+        } else {
+            let mv = [];
+            push(mv, AST_VAR);
+            push(mv, "__match_val");
+            let cond = [];
+            push(cond, AST_BINOP);
+            push(cond, "==");
+            push(cond, mv);
+            push(cond, pat);
+            let if_node = [];
+            push(if_node, AST_IF);
+            push(if_node, cond);
+            push(if_node, body);
+            push(if_node, result);
+            result = if_node;
+        };
+        ai = ai - 1;
+    };
+    let block_stmts = [];
+    push(block_stmts, val_let);
+    if result != 0 { push(block_stmts, result); };
+    let block = [];
+    push(block, AST_BLOCK);
+    push(block, block_stmts);
+    return block;
+};
+
 fn parse_statement() {
     let t = peek_type();
+    if t == TK_TRY { return parse_try(); };
+    if t == TK_THROW { return parse_throw(); };
+    if t == TK_BREAK { return parse_break(); };
+    if t == TK_CONTINUE { return parse_continue(); };
+    if t == TK_FOR { return parse_for(); };
+    if t == TK_MATCH { return parse_match(); };
+    if t == TK_IMPORT {
+        advance();
+        if peek_type() == 2 { advance(); };
+        match_tok(TK_SEMI);
+        let nop = [];
+        push(nop, AST_BLOCK);
+        push(nop, []);
+        return nop;
+    };
     if t == TK_LET { return parse_let(); };
     if t == TK_FN { return parse_fn(); };
     if t == TK_IF { return parse_if(); };
@@ -702,9 +962,172 @@ fn patch_i32(offset, value) {
     __set_at(g_code, offset + 3, __bit_and(__bit_shr(iv, 24), 255));
 };
 
+fn array_contains(arr, val) {
+    let i = 0;
+    while i < len(arr) {
+        if __array_get(arr, i) == val { return 1; };
+        i = i + 1;
+    };
+    return 0;
+};
+
+fn collect_free_vars(node, bound, free) {
+    // Walk AST, find vars used but not in bound. Add to free (dedup).
+    if type_of(node) != "array" { return 0; };
+    let kind = __array_get(node, 0);
+    if kind == AST_VAR {
+        let name = __array_get(node, 1);
+        if array_contains(bound, name) == 0 && array_contains(free, name) == 0 {
+            push(free, name);
+        };
+        return 0;
+    };
+    if kind == AST_LET {
+        // RHS first (may reference vars), then add name to bound
+        collect_free_vars(__array_get(node, 2), bound, free);
+        push(bound, __array_get(node, 1));
+        return 0;
+    };
+    if kind == AST_ASSIGN {
+        collect_free_vars(__array_get(node, 2), bound, free);
+        return 0;
+    };
+    if kind == AST_FN {
+        // Nested fn — skip (it has its own scope)
+        return 0;
+    };
+    if kind == AST_BINOP {
+        collect_free_vars(__array_get(node, 2), bound, free);
+        collect_free_vars(__array_get(node, 3), bound, free);
+        return 0;
+    };
+    if kind == AST_CALL {
+        let args = __array_get(node, 2);
+        let i = 0;
+        while i < len(args) {
+            collect_free_vars(__array_get(args, i), bound, free);
+            i = i + 1;
+        };
+        return 0;
+    };
+    if kind == AST_BLOCK {
+        let stmts = __array_get(node, 1);
+        let i = 0;
+        while i < len(stmts) {
+            collect_free_vars(__array_get(stmts, i), bound, free);
+            i = i + 1;
+        };
+        return 0;
+    };
+    if kind == AST_IF {
+        collect_free_vars(__array_get(node, 1), bound, free);
+        collect_free_vars(__array_get(node, 2), bound, free);
+        if __array_get(node, 3) != 0 { collect_free_vars(__array_get(node, 3), bound, free); };
+        return 0;
+    };
+    if kind == AST_WHILE {
+        collect_free_vars(__array_get(node, 1), bound, free);
+        collect_free_vars(__array_get(node, 2), bound, free);
+        return 0;
+    };
+    if kind == AST_RETURN {
+        if __array_get(node, 1) != 0 { collect_free_vars(__array_get(node, 1), bound, free); };
+        return 0;
+    };
+    if kind == AST_EMIT {
+        collect_free_vars(__array_get(node, 1), bound, free);
+        return 0;
+    };
+    if kind == AST_EXPR_STMT {
+        collect_free_vars(__array_get(node, 1), bound, free);
+        return 0;
+    };
+    if kind == AST_AND || kind == AST_OR {
+        collect_free_vars(__array_get(node, 1), bound, free);
+        collect_free_vars(__array_get(node, 2), bound, free);
+        return 0;
+    };
+    if kind == AST_ARRAY {
+        let elems = __array_get(node, 1);
+        let i = 0;
+        while i < len(elems) {
+            collect_free_vars(__array_get(elems, i), bound, free);
+            i = i + 1;
+        };
+        return 0;
+    };
+    if kind == AST_TRY {
+        collect_free_vars(__array_get(node, 1), bound, free);
+        push(bound, __array_get(node, 2));
+        collect_free_vars(__array_get(node, 3), bound, free);
+        return 0;
+    };
+    if kind == AST_THROW {
+        collect_free_vars(__array_get(node, 1), bound, free);
+        return 0;
+    };
+    return 0;
+};
+
+fn find_free_vars(body, params) {
+    let bound = [];
+    let i = 0;
+    while i < len(params) {
+        push(bound, __array_get(params, i));
+        i = i + 1;
+    };
+    let free = [];
+    collect_free_vars(body, bound, free);
+    return free;
+};
+
+fn compile_node_ext(kind, node) {
+    if kind == AST_TRY {
+        let body = __array_get(node, 1);
+        let var_name = __array_get(node, 2);
+        let handler = __array_get(node, 3);
+        emit_byte(OP_TRY_BEGIN);
+        let try_off = current_offset();
+        emit_i32(0);
+        compile_node(body);
+        emit_byte(OP_CATCH_END);
+        emit_byte(OP_JMP);
+        let jmp_off = current_offset();
+        emit_i32(0);
+        let jmp_target = current_offset();
+        patch_i32(try_off, current_offset());
+        emit_byte(OP_PUSH_NUM);
+        emit_f64(0);
+        emit_byte(OP_STORE_LOCAL);
+        emit_name(var_name);
+        compile_node(handler);
+        patch_i32(jmp_off, current_offset() - jmp_target);
+        return 0;
+    };
+    if kind == AST_THROW {
+        compile_node(__array_get(node, 1));
+        emit_byte(OP_THROW);
+        return 0;
+    };
+    if kind == AST_BREAK {
+        emit_byte(OP_JMP);
+        push(g_break_patches, current_offset());
+        emit_i32(0);
+        return 0;
+    };
+    if kind == AST_CONTINUE {
+        emit_byte(OP_LOOP);
+        let delta = g_loop_start - (current_offset() + 4);
+        emit_i32(delta);
+        return 0;
+    };
+    return 0;
+};
+
 fn compile_node(node) {
     if type_of(node) != "array" { return 0; };
     let kind = __array_get(node, 0);
+    if kind >= 20 { return compile_node_ext(kind, node); };
 
     if kind == AST_PROGRAM {
         let stmts = __array_get(node, 1);
@@ -797,12 +1220,26 @@ fn compile_node(node) {
         let name = __array_get(node, 1);
         let params = __array_get(node, 2);
         let body = __array_get(node, 3);
-        emit_byte(OP_CLOSURE);
-        emit_byte(len(params));
+        // Only analyze captures for nested functions (depth > 0)
+        let free = [];
+        if g_fn_depth > 0 { free = find_free_vars(body, params); };
+        if len(free) > 0 {
+            emit_byte(OP_CLOSURE_CAP);
+            emit_byte(len(params));
+            emit_byte(len(free));
+            let ci = 0;
+            while ci < len(free) {
+                emit_name(__array_get(free, ci));
+                ci = ci + 1;
+            };
+        } else {
+            emit_byte(OP_CLOSURE);
+            emit_byte(len(params));
+        };
         let body_len_off = current_offset();
-        emit_u32(0);  // placeholder
+        emit_u32(0);
         let body_start = current_offset();
-        // Store params (reversed) — local bindings
+        g_fn_depth = g_fn_depth + 1;
         let pi = len(params) - 1;
         while pi >= 0 {
             emit_byte(OP_STORE_LOCAL);
@@ -810,7 +1247,7 @@ fn compile_node(node) {
             pi = pi - 1;
         };
         compile_node(body);
-        // Trailing Ret if body doesn't end with one
+        g_fn_depth = g_fn_depth - 1;
         if len(g_code) == 0 || __array_get(g_code, len(g_code) - 1) != OP_RET {
             emit_byte(OP_RET);
         };
@@ -856,7 +1293,12 @@ fn compile_node(node) {
     };
 
     if kind == AST_WHILE {
+        // Save outer loop state
+        let old_break_patches = g_break_patches;
+        let old_loop_start = g_loop_start;
+        g_break_patches = [];
         let loop_start = current_offset();
+        g_loop_start = loop_start;
         compile_node(__array_get(node, 1));  // cond
         emit_byte(OP_JZ);
         let jz_off = current_offset();
@@ -867,6 +1309,16 @@ fn compile_node(node) {
         let loop_delta = loop_start - (current_offset() + 4);
         emit_i32(loop_delta);
         patch_i32(jz_off, current_offset() - jz_target);
+        // Patch all break jumps to here (after loop)
+        let bi = 0;
+        while bi < len(g_break_patches) {
+            let bp = __array_get(g_break_patches, bi);
+            patch_i32(bp, current_offset() - (bp + 4));
+            bi = bi + 1;
+        };
+        // Restore outer loop state
+        g_break_patches = old_break_patches;
+        g_loop_start = old_loop_start;
         return 0;
     };
 
@@ -943,13 +1395,64 @@ fn compile_node(node) {
 // BUILDER — assemble binary
 // ═══════════════════════════════════════════════════════════════
 
+fn resolve_imports(source) {
+    // Scan source char-by-char for lines starting with: import "path"
+    // Prepend imported file contents, strip import lines
+    let imported = [];
+    let prefix = "";
+    let slen = len(source);
+    let i = 0;
+    while i < slen {
+        // Check if line starts with import "
+        let bol = i;
+        // Skip leading whitespace
+        while i < slen && (__char_code(char_at(source, i)) == 32 || __char_code(char_at(source, i)) == 9) {
+            i = i + 1;
+        };
+        // Check for "import "
+        if i + 7 < slen && substr(source, i, i + 7) == "import " {
+            let pi = i + 7;
+            // Skip to opening quote
+            while pi < slen && __char_code(char_at(source, pi)) != 34 { pi = pi + 1; };
+            if pi < slen {
+                let ps = pi + 1;
+                // Find closing quote
+                let pe = ps;
+                while pe < slen && __char_code(char_at(source, pe)) != 34 { pe = pe + 1; };
+                if pe < slen {
+                    let path = substr(source, ps, pe);
+                    let dup = 0;
+                    let di = 0;
+                    while di < len(imported) {
+                        if __array_get(imported, di) == path { dup = 1; };
+                        di = di + 1;
+                    };
+                    if dup == 0 {
+                        push(imported, path);
+                        let content = "" + __file_read(path);
+                        if len(content) > 0 { prefix = prefix + content + "\n"; };
+                    };
+                };
+            };
+        };
+        // Skip to end of line
+        while i < slen && __char_code(char_at(source, i)) != 10 { i = i + 1; };
+        if i < slen { i = i + 1; };
+    };
+    if len(prefix) > 0 { return prefix + source; };
+    return source;
+};
+
 fn build_binary(source_path, output_path) {
     // Read source
-    let source = __file_read(source_path);
+    let source = "" + __file_read(source_path);
     if len(source) == 0 {
         emit "Error: cannot read source file";
         return 0;
     };
+
+    // Resolve imports
+    source = resolve_imports(source);
 
     // Lex
     g_tok_types = [];
@@ -1012,9 +1515,20 @@ fn build_binary(source_path, output_path) {
 // MAIN
 // ═══════════════════════════════════════════════════════════════
 
-// Read command line args (passed as first arg to the binary)
-// For now, hardcode paths for testing
-let source_file = "stdlib/compiler.ol";
-let output_file = "/tmp/compiler_gen2.olang";
-
+let _args_raw = "" + __file_read("/tmp/.nox_args");
+let source_file = "";
+let output_file = "";
+if len(_args_raw) > 0 {
+    let _args_lines = __str_split(_args_raw, 10);
+    if len(_args_lines) >= 1 {
+        source_file = __str_trim(__array_get(_args_lines, 0));
+    };
+    if len(_args_lines) >= 2 {
+        output_file = __str_trim(__array_get(_args_lines, 1));
+    };
+};
+if len(source_file) == 0 {
+    source_file = "stdlib/compiler.ol";
+    output_file = "/tmp/compiler_gen2.olang";
+};
 build_binary(source_file, output_file);
