@@ -11,6 +11,12 @@ let _persist_dir = ["/tmp/nox_data"];
 let _persist_turn = [0];
 let _persist_interval = 20;  // auto-save every N turns
 
+// ═══ HEAP MANAGEMENT ═══
+// Pin heap after boot (all loaded data preserved)
+// Reset between PTAV cycles (temp strings freed, pinned data survives)
+fn brain_heap_pin() { __heap_pin(); };
+fn brain_heap_reset() { __heap_reset(); };
+
 // ═══ BOOT ═══
 // Try binary first (fast), fallback to text (slow)
 fn brain_boot(dir) {
@@ -60,6 +66,9 @@ fn brain_boot(dir) {
         };
     };
 
+    // Pin heap — all loaded data preserved, future allocs are temp
+    brain_heap_pin();
+
     return __array_get(total, 0);
 };
 
@@ -88,6 +97,9 @@ fn brain_save() {
 // ═══ PTAVF CYCLE — Perceive Think Act Verify Feedback ═══
 // One full brain cycle for a query
 fn ptav_cycle(query) {
+    // Reset heap to boot checkpoint — free all temp from previous cycle
+    brain_heap_reset();
+
     // P: Perceive — encode query
     let qmol = kt_encode_mol(query);
 

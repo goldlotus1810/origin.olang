@@ -3355,15 +3355,15 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
+    .quad   0x145951C08726D831  # __heap_reset (slot 49)
+    .quad   .builtin_heap_reset
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x9AC7CE5A9EB9FA35
+    .quad   0x9AC7CE5A9EB9FA35  # __heap_pin
     .quad   .builtin_heap_pin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
@@ -4825,6 +4825,21 @@ builtin_hash_table:
 
 .builtin_heap_pin:
     mov     [rip + repl_heap_checkpoint], r15
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __heap_reset() — reset Zone C to pinned checkpoint
+# Frees all temp allocations since last __heap_pin()
+# Data pinned before this call survives
+.builtin_heap_reset:
+    mov     rax, [rip + repl_heap_checkpoint]
+    test    rax, rax
+    jz      .bhr_skip                    # no checkpoint set → do nothing
+    mov     r15, rax                     # reset heap to checkpoint
+.bhr_skip:
     sub     r14, 16
     xorpd   xmm0, xmm0
     movsd   [r14], xmm0
