@@ -13,3 +13,7 @@ old/books/
 old/
 json/
 *.xlsx
+
+# Large files (GitHub 100MB limit)
+data/conversations_150k.csv
+docs/references/OSDev_Wiki_offline.zip
