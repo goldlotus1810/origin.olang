@@ -9,8 +9,8 @@
 | ID | Bug | File | Impact | Status | Session |
 |----|-----|------|--------|--------|---------|
 | CRASH-1 | throw xuyên function = SEGFAULT. CPU stack không unwind. | vm_nox.S:1299 | try/catch trong function = crash | **FIXED** | Sora (SS25b) |
-| CRASH-2 | stm_query double-indexing: `imul r8d, r8d, 48` trên r8 đã ×48 | vm_nox.S:5858 | STM trả sai text cho best_idx>0 | **OPEN** | Sora |
-| CRASH-3 | op_closure_cap clobber rbp (frame base) | vm_nox.S:1229 | Closure trong kt_nearest = wrong results | **OPEN** | Sora |
+| CRASH-2 | stm_query double-indexing: `imul r8d, r8d, 48` trên r8 đã ×48 | vm_nox.S:5896 | STM trả sai text cho best_idx>0 | **FIXED** | Sora (SS25b) |
+| CRASH-3 | op_closure_cap clobber rbp (frame base) | vm_nox.S:1241 | Closure trong kt_nearest = wrong results | **FIXED** | Sora (SS25b) |
 | DATA-2 | f64 + string = chuỗi rỗng im lặng. TODO trong code. | vm_nox.S:628 | Mọi `"text" + number` mất data | **FIXED** | Sora (SS25b) |
 | DATA-4 | try/catch: catch variable luôn = 0, throw value mất | compile_nox.py:1056 | catch(e) → e luôn 0 | **FIXED** | Sora (SS25b) |
 | CORRUPT-2 | Heap (Zone C) chỉ tăng. Batch programs hết 4MB → corrupt | vm_nox.S | Brain chạy lâu = crash | **MITIGATED** (64MB) | Sora (SS25b) |

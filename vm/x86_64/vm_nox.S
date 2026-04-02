@@ -1238,6 +1238,7 @@ op_closure_cap:
     movzx   edx, byte ptr [r12 + r13]   # capture_count
     inc     r13
     # Allocate heap object: [body_pc:8][capture_count:8][(hash:8,ptr:8,len:8)×N]
+    push    rbp                          # CRASH-3 FIX: save frame base
     mov     rbp, r15
     add     r15, 16                      # header space
     push    rcx
@@ -1279,6 +1280,7 @@ op_closure_cap:
     sub     r14, 16
     mov     [r14], rbp                   # push heap object ptr
     mov     qword ptr [r14+8], CLOSURE_MARKER
+    pop     rbp                          # CRASH-3 FIX: restore frame base
     DISPATCH
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1294,25 +1296,27 @@ op_try_begin:
     push    r14                          # save VM stack
     push    rax                          # catch PC
     # CRASH-1 FIX: save rsp AFTER pushes into BSS array (indexed by try_depth)
-    # On throw, restore rsp here → pop try frame normally regardless of call depth
+    # SCOPE-THROW FIX: also save closure_depth + var_save_top
     mov     rcx, [rip + try_depth]
     lea     rdi, [rip + try_rsp_stack]
-    mov     [rdi + rcx*8], rsp           # try_rsp_stack[depth] = rsp (after pushes)
+    mov     [rdi + rcx*8], rsp
+    lea     rdi, [rip + try_closure_depth_stack]
+    mov     rax, [rip + closure_depth]
+    mov     [rdi + rcx*8], rax
+    lea     rdi, [rip + try_var_save_stack]
+    mov     rax, [rip + var_save_top]
+    mov     [rdi + rcx*8], rax
     inc     qword ptr [rip + try_depth]
     DISPATCH
 
 # 0x1B: CatchEnd — end of catch block, pop try frame
+# This runs when try body completes WITHOUT throwing — DISCARD the saved frame
+# IMPORTANT: do NOT restore r14/r15 — they hold CURRENT state, not saved state
 op_catch_end:
     cmp     qword ptr [rip + try_depth], 0
     je      .ce_skip
-    # Restore rsp from BSS (in case catch block itself called functions)
     dec     qword ptr [rip + try_depth]
-    mov     rcx, [rip + try_depth]
-    lea     rdi, [rip + try_rsp_stack]
-    mov     rsp, [rdi + rcx*8]           # restore rsp to try frame position
-    pop     rax                          # discard catch_pc
-    pop     r14                          # discard saved stack (we're past the try now)
-    pop     r15                          # discard saved heap
+    add     rsp, 24                      # discard 3 saved values (catch_pc, r14, r15) without restoring
 .ce_skip:
     DISPATCH
 
@@ -1329,13 +1333,44 @@ op_throw:
     mov     rax, [rip + try_depth]
     lea     rdi, [rip + try_rsp_stack]
     mov     rsp, [rdi + rax*8]           # rsp → try frame (after original pushes)
+    # SCOPE-THROW FIX: restore closure_depth + var_save_top
+    lea     rdi, [rip + try_closure_depth_stack]
+    mov     rdi, [rdi + rax*8]
+    mov     [rip + closure_depth], rdi
+    lea     rdi, [rip + try_var_save_stack]
+    mov     rdi, [rdi + rax*8]
+    mov     [rip + var_save_top], rdi
     # Pop try frame normally
     pop     rax                          # catch_pc
     pop     r14                          # restore VM stack
     pop     r15                          # restore heap
+    # Copy throw value to NEW heap (old ptr may be in reclaimed space after r15 restore)
+    # rcx=old_ptr, rdx=old_len
+    cmp     rdx, F64_MARKER
+    je      .throw_push_val              # f64 value — no copy needed (bits in ptr)
+    cmp     rdx, 0
+    jle     .throw_push_val              # empty/special — no copy needed
+    # String/chain: copy mol data (rdx mols × 2 bytes) to heap
+    push    rax                          # save catch_pc
+    push    rdx                          # save mol count
+    mov     rsi, rcx                     # source = old ptr
+    mov     rdi, r15                     # dest = new heap top
+    mov     rcx, rdx
+    shl     rcx, 1                       # byte count = mol_count × 2
+    push    rcx
+    rep     movsb                        # copy bytes
+    pop     rcx
+    mov     rax, r15                     # new ptr = heap top
+    add     r15, rcx                     # advance heap past copied data
+    add     r15, 7
+    and     r15, -8                      # align 8
+    pop     rdx                          # restore mol count
+    mov     rcx, rax                     # rcx = new ptr (on safe heap)
+    pop     rax                          # restore catch_pc
+.throw_push_val:
     # Push throw value onto restored VM stack for catch block
     sub     r14, 16
-    mov     [r14], rcx                   # throw value ptr
+    mov     [r14], rcx                   # throw value ptr (now on safe heap)
     mov     [r14 + 8], rdx              # throw value len
     mov     r13d, eax                    # jump to catch
     DISPATCH
@@ -5897,9 +5932,8 @@ builtin_hash_table:
     # Return text from best entry
     imul    eax, r8d, 48
     mov     rax, [rsi + rax + 8]     # text_ptr
-    mov     rdx, [rsi + r8*1 + 16]   # text_len — WRONG, fix:
     imul    r8d, r8d, 48
-    mov     rdx, [rsi + r8 + 16]
+    mov     rdx, [rsi + r8 + 16]     # text_len (r8 now correctly ×48)
     sub     r14, 16
     mov     [r14], rax
     mov     [r14+8], rdx
@@ -8333,6 +8367,8 @@ call_stack:       .space 1536   # [(name_ptr:8, name_len:8, call_pc:8) × 64]
 _push_old_arr: .space 8
 try_depth:      .space 8
 try_rsp_stack:  .space 64              # 8 nested try levels × 8 bytes (saved rsp)
+try_closure_depth_stack: .space 64     # 8 levels × 8 bytes (saved closure_depth)
+try_var_save_stack:      .space 64     # 8 levels × 8 bytes (saved var_save_top)
 
 # SIMD temp buffer
 .align 16
