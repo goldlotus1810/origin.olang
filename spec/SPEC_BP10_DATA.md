@@ -1,11 +1,16 @@
-# SPEC Part 10: Data — 500K Facts
+# SPEC Part 10: Data — 500K+ Facts
 
+> **Updated SS23 (2026-04-02)** — Updated target from 500K to unlimited (BP13 mmap removes limit), added NKB format reference (→BP13), updated loading strategy.
 > Author: Nox SS15
 > Status: NOT YET ACHIEVED
 
 ## Essence
 
 Brain needs data. 1400 facts (mostly NRC-VAD garbage) → 50K+ meaningful facts.
+
+[UPDATED SS23: With BP13 mmap persistence, target is UNLIMITED facts on disk.
+Heap only holds LRU cache (2048 slots = 128KB). Facts demand-paged from NKB file.
+Old target "500K facts" is now just the initial milestone, not the ceiling.]
 
 ## Current State
 
@@ -111,4 +116,5 @@ Never lose runtime learning — append-only
 ## Related Specs
 - [BP2 Encode](SPEC_BP2_ENCODE.md) — NRC-VAD for V/A scores
 - [BP3 KnowTree](SPEC_BP3_KNOWTREE.md) — data loads into KnowTree
+- [BP13 Persistence](SPEC_BP13_PERSISTENCE.md) — NKB format, mmap, LRU cache [NEW SS23]
 - [Rust Analysis](../docs/RUST_CRATE_ANALYSIS_ORIGINAL.md) — UCD data sources

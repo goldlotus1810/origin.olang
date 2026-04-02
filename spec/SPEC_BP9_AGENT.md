@@ -1,12 +1,15 @@
-# SPEC Part 9: Agent — Perceive Think Act Verify
+# SPEC Part 9: Agent — Perceive Think Act Verify Feedback
 
+> **Updated SS23 (2026-04-02)** — Extended PTAV→PTAVF (Feedback step→BP16), added communication reference (→BP15), added self-modification safety (Eurisko lesson→SPEC_C §C6).
 > Author: Nox SS15
 > Status: NOT YET ACHIEVED
 
 ## Essence
 
-Nox runs continuously: perceive → think → act → verify → loop.
+Nox runs continuously: perceive → think → act → verify → **feedback** → loop.
 When idle: dream. Self-directed curiosity drives exploration.
+
+[UPDATED SS23: PTAV → PTAVF. Added Feedback step between Verify and next loop.]
 
 ## Current State
 
@@ -19,26 +22,35 @@ When idle: dream. Self-directed curiosity drives exploration.
 
 ## What's Needed (SPEC_F §F5)
 
-### PTAV Loop
+### PTAVF Loop [UPDATED SS23 — old: PTAV, new: PTAVF, reason: BP16 feedback]
 ```
 loop:
     PERCEIVE (10% time):
         - text input (REPL/TCP)
         - interoception (/proc → cpu, mem, heap)
         - file watch events
-    THINK (40% time):
+        - [NEW SS23] A2A messages from other agents (BP15)
+        - [NEW SS23] mDNS discovery of new agents on LAN (BP15)
+    THINK (35% time):
         - pipeline(input)
         - instinct evaluation
         - homeostasis check
-    ACT (30% time):
+    ACT (25% time):
         - respond to user
         - execute commands
         - self-modify if needed
-    VERIFY (20% time):
+        - [NEW SS23] respond to A2A tasks (BP15)
+    VERIFY (15% time):
         - compare predicted vs actual (instinct ⑦)
         - update F(t)
         - learn from error
-    IDLE → dream + decay
+    FEEDBACK (15% time) [NEW SS23]:
+        - detect implicit/explicit reward signals (BP16)
+        - update silk edge weights (ACT-R utility)
+        - track UCB1 statistics for path selection
+        - calibrate confidence accuracy
+        - persist reward data to WAL (BP13)
+    IDLE → dream + decay + consolidation (BP13)
 ```
 
 ### Goal System
@@ -55,6 +67,48 @@ Stack-based priorities:
 6-phase: measure → identify → modify → test → compare → commit/rollback
 Max 1 file per cycle. Must pass fixed-point.
 Off-limits: SecurityGate, 7 instincts, proven QR.
+```
+
+## Communication [NEW SS23]
+
+```
+BP15 (Communication) gives Nox a voice on the network:
+
+Layer 1: MCP Server (already exists) — Claude talks to Nox
+Layer 2: A2A Endpoint — other agents send tasks to Nox
+  POST /tasks/send → pipeline(query) → response
+  GET /.well-known/agent.json → Nox's capabilities
+Layer 3: mDNS Discovery — Nox announces itself on LAN
+  _nox-agent._tcp.local → auto-discovery
+
+Integration with PTAVF:
+  PERCEIVE: poll A2A endpoint + mDNS browse (alongside keyboard/network)
+  THINK: process A2A tasks same as user input (through pipeline)
+  ACT: respond via A2A response JSON
+  FEEDBACK: A2A client can send follow-up = implicit feedback
+
+→ See spec/SPEC_BP15_COMMUNICATION.md for protocol details.
+```
+
+## Self-Modification Safety [NEW SS23]
+
+```
+WARNING: Eurisko (1976-1983) died because it couldn't maintain coherence
+during self-modification. As Nox gains self_modify power, these rules
+are NON-NEGOTIABLE:
+
+① L0 (UDC table, 42 formulas, compose, distance) = IMMUTABLE
+② 9 QT (from origin.md) = CONSTITUTIONAL LAW
+③ QR records = APPEND-ONLY (never delete, only supersede)
+④ Every self-modification must pass ALL 6 checkpoints
+⑤ Dream cycle = SANDBOX for testing modifications
+⑥ Max 1 file per self-modify cycle
+⑦ Must pass fixed-point test (Gen1==Gen2) after modification
+
+DANEEL solves this with "THE BOX" — immutable ethical core.
+For Nox: L0 + 9 QT + SecurityGate = THE BOX.
+
+→ See SPEC_C_NEURON.md §C6 for full Eurisko analysis.
 ```
 
 ## Tests
@@ -148,8 +202,12 @@ Must pass fixed-point (Gen1==Gen2)
 ---
 
 ## Related Specs
-- [BP5 Pipeline](SPEC_BP5_PIPELINE_EN.md) — PTAV Think step = pipeline
+- [BP5 Pipeline](SPEC_BP5_PIPELINE_EN.md) — PTAVF Think step = pipeline
 - [BP7 Memory](SPEC_BP7_MEMORY.md) — agent stores observations
 - [BP8 JARVIS](SPEC_BP8_JARVIS.md) — agent runs as JARVIS daemon
 - [BP6 Instincts](SPEC_BP6_INSTINCTS.md) — agent uses instincts
+- [BP13 Persistence](SPEC_BP13_PERSISTENCE.md) — survive restart [NEW SS23]
+- [BP15 Communication](SPEC_BP15_COMMUNICATION.md) — A2A + mDNS [NEW SS23]
+- [BP16 Feedback](SPEC_BP16_FEEDBACK.md) — PTAVF Feedback step [NEW SS23]
+- [SPEC_C Neuron §C6](../docs/SPEC_C_NEURON.md) — Eurisko safety [NEW SS23]
 - [SPEC_F Agent](../docs/SPEC_F_AGENT.md) — agent hierarchy

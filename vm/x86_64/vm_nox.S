@@ -462,7 +462,6 @@ op_emit:
     mov     edi, 1
     mov     eax, SYS_WRITE
     syscall
-    pop     rsi
     DISPATCH
 
 .emit_f64:
@@ -656,8 +655,27 @@ op_mul:
     DISPATCH
 
 op_div:
-    movsd   xmm0, [r14 + 16]
-    divsd   xmm0, qword ptr [r14]
+    movsd   xmm0, [r14 + 16]       # a
+    movsd   xmm1, [r14]            # b
+    # Integer fast-path: if both are integer-valued, use integer div
+    cvttsd2si rax, xmm0
+    cvtsi2sd  xmm2, rax
+    ucomisd   xmm0, xmm2
+    jne       .div_float
+    cvttsd2si rcx, xmm1
+    cvtsi2sd  xmm2, rcx
+    ucomisd   xmm1, xmm2
+    jne       .div_float
+    test      rcx, rcx
+    jz        .div_float             # avoid div by 0
+    cqo                              # sign-extend rax → rdx:rax
+    idiv      rcx                    # rax = quotient
+    cvtsi2sd  xmm0, rax
+    add       r14, 16
+    movsd     [r14], xmm0
+    DISPATCH
+.div_float:
+    divsd   xmm0, xmm1
     add     r14, 16
     movsd   [r14], xmm0
     DISPATCH
@@ -665,12 +683,30 @@ op_div:
 op_mod:
     movsd   xmm0, [r14 + 16]       # a
     movsd   xmm1, [r14]            # b
+    # Integer fast-path
+    cvttsd2si rax, xmm0
+    cvtsi2sd  xmm2, rax
+    ucomisd   xmm0, xmm2
+    jne       .mod_float
+    cvttsd2si rcx, xmm1
+    cvtsi2sd  xmm2, rcx
+    ucomisd   xmm1, xmm2
+    jne       .mod_float
+    test      rcx, rcx
+    jz        .mod_float
+    cqo
+    idiv      rcx                    # rdx = remainder
+    cvtsi2sd  xmm0, rdx
+    add       r14, 16
+    movsd     [r14], xmm0
+    DISPATCH
+.mod_float:
     # a % b = a - floor(a/b) * b
     movsd   xmm2, xmm0
-    divsd   xmm2, xmm1             # a/b
-    roundsd xmm2, xmm2, 1          # floor
-    mulsd   xmm2, xmm1             # floor(a/b)*b
-    subsd   xmm0, xmm2             # a - floor(a/b)*b
+    divsd   xmm2, xmm1
+    roundsd xmm2, xmm2, 1
+    mulsd   xmm2, xmm1
+    subsd   xmm0, xmm2
     add     r14, 16
     movsd   [r14], xmm0
     DISPATCH
@@ -822,6 +858,8 @@ op_call:
     inc     r13
     lea     rdi, [r12 + r13]        # name ptr
     mov     edx, ecx                # name len
+    mov     [rip + _call_save_name_ptr], rdi
+    mov     [rip + _call_save_name_len], rdx
     push    rcx                      # save name len
     call    hash_fnv1a              # → rax = hash
     pop     rcx
@@ -860,12 +898,28 @@ op_call:
     jnz     .call_probe
     jmp     .call_skip               # exhausted probes
 .call_closure:
-    # rax = body_pc, call it
+    # rax = body_pc (simple) or heap_ptr (captured)
+    # Push to shadow call stack for error traces
+    push    rax
+    mov     rcx, [rip + call_stack_depth]
+    cmp     rcx, 64
+    jge     .cs_skip_push
+    lea     rdi, [rip + call_stack]
+    imul    rcx, rcx, 24             # 24 bytes per entry
+    mov     rsi, [rip + _call_save_name_ptr]
+    mov     [rdi + rcx], rsi         # name_ptr
+    mov     rsi, [rip + _call_save_name_len]
+    mov     [rdi + rcx + 8], rsi     # name_len
+    mov     esi, r13d                # call site PC
+    mov     [rdi + rcx + 16], rsi    # call_pc
+    inc     qword ptr [rip + call_stack_depth]
+.cs_skip_push:
+    pop     rax
     push    r12                      # save bytecode base
     push    r13                      # save return PC
     push    rbx                      # save bc_size
     # Push MARKER to undo stack (for scope save/restore)
-    push    rax                      # save body_pc
+    push    rax                      # save closure value
     lea     rcx, [rip + var_save_top]
     mov     rdi, [rcx]
     mov     qword ptr [rdi], -1      # MARKER (slot_off = -1)
@@ -874,7 +928,31 @@ op_call:
     pop     rax
     # Scope: depth++
     inc     qword ptr [rip + closure_depth]
-    # Jump to closure body
+    # Check: simple closure (body_pc < bc_size) or captured (heap ptr)?
+    cmp     rax, rbx
+    jb      .call_closure_simple
+    # Captured closure: rax = heap ptr → [body_pc:8][cap_count:8][caps...]
+    mov     rdi, rax
+    mov     r13d, [rdi]              # body_pc from heap object
+    mov     rcx, [rdi+8]             # capture_count
+    test    rcx, rcx
+    jz      .call_closure_dispatch
+    lea     rsi, [rdi + 16]          # first capture
+.call_closure_restore:
+    push    rcx
+    push    rsi
+    mov     eax, [rsi]               # hash (lower 32 bits sufficient)
+    mov     r8, [rsi+8]              # ptr/value
+    mov     r9, [rsi+16]             # len/marker
+    call    var_store_matrix
+    pop     rsi
+    pop     rcx
+    add     rsi, 24
+    dec     rcx
+    jnz     .call_closure_restore
+.call_closure_dispatch:
+    DISPATCH
+.call_closure_simple:
     mov     r13d, eax                # PC = body_pc
     DISPATCH
 .call_skip:
@@ -890,6 +968,11 @@ op_ret:
     pop     rbx                      # restore bc_size
     pop     r13                      # restore return PC
     pop     r12                      # restore bytecode base
+    # Pop shadow call stack
+    cmp     qword ptr [rip + call_stack_depth], 0
+    je      .cs_skip_pop
+    dec     qword ptr [rip + call_stack_depth]
+.cs_skip_pop:
     # Scope restore: pop undo stack until MARKER
     cmp     qword ptr [rip + closure_depth], 0
     je      .ret_no_scope
@@ -1106,7 +1189,33 @@ op_call_closure:
     push    r13
     push    rbx
     inc     qword ptr [rip + closure_depth]
-    mov     r13d, eax
+    # Check: simple closure (body_pc) or captured closure (heap object)?
+    cmp     rax, rbx                 # body_pc < bytecode_size?
+    jb      .ccl_simple
+    # Captured closure: rax = heap ptr → [body_pc:8][cap_count:8][caps...]
+    mov     rdi, rax                 # save heap ptr
+    mov     r13d, [rdi]              # body_pc from heap object
+    mov     rcx, [rdi+8]             # capture_count
+    test    rcx, rcx
+    jz      .ccl_dispatch
+    # Restore captured variables: each cap is [hash:8][ptr:8][len:8]
+    lea     rsi, [rdi + 16]          # first capture
+.ccl_restore_cap:
+    push    rcx
+    push    rsi
+    mov     eax, [rsi]               # hash (lower 32 bits)
+    mov     r8, [rsi+8]              # ptr/value
+    mov     r9, [rsi+16]             # len/marker
+    call    var_store_matrix         # eax=hash, r8=ptr, r9=len
+    pop     rsi
+    pop     rcx
+    add     rsi, 24                  # next capture
+    dec     rcx
+    jnz     .ccl_restore_cap
+.ccl_dispatch:
+    DISPATCH
+.ccl_simple:
+    mov     r13d, eax                # simple: body_pc directly
     DISPATCH
 .ccl_notfound:
     sub     r14, 16
@@ -1207,13 +1316,142 @@ op_catch_end:
 # 0x78: Throw — jump to catch handler
 op_throw:
     cmp     qword ptr [rip + try_depth], 0
-    je      op_halt                      # uncaught → halt
+    je      .throw_uncaught
     pop     rax                          # catch_pc
     pop     r14                          # restore VM stack
     pop     r15                          # restore heap
     dec     qword ptr [rip + try_depth]
     mov     r13d, eax                    # jump to catch
     DISPATCH
+.throw_uncaught:
+    # Print "Error at line N" then halt
+    # Find line table: at [r12 + code_size] where code_size is stored at [r12 + code_size]
+    # Format: [code_size:4]["LN":2][count:4][(offset:4,line:4)×N]
+    push    r13                          # save current PC (error location)
+    # Line table starts right after code. First 4 bytes after code = code_size itself.
+    # The code_size value is at bytecode[code_size] — but we need to find it.
+    # Actually the bytecode is: [code bytes][code_size:4][LN:2][count:4][entries...]
+    # code_size = position of first non-code byte.
+    # The HALT opcode is the last code byte. It's at some position.
+    # Simpler: read code_size from bc_size: line table = [bc_data + (bc_size - line_table_size)]
+    # OR: just scan backward from bc_size for "LN" magic
+    # Scan backward for magic 0xDEAD4C4E
+    mov     ecx, ebx
+    sub     ecx, 4
+.tu_scan_back:
+    cmp     ecx, 0
+    jle     .tu_no_linetable
+    cmp     dword ptr [r12 + rcx], 0xDEAD4C4E
+    je      .tu_found_lt
+    dec     ecx
+    jmp     .tu_scan_back
+.tu_found_lt:
+    lea     rdi, [r12 + rcx]
+    mov     ecx, [rdi+4]               # entry count
+    lea     rsi, [rdi+8]               # first entry
+    pop     rax                         # error PC (points after throw instruction)
+    dec     eax                         # adjust to point AT the throw
+    # Linear search: find last entry where offset <= error PC
+    xor     edx, edx                    # best line = 0
+.tu_search:
+    test    ecx, ecx
+    jz      .tu_print
+    cmp     [rsi], eax                  # entry.offset <= error PC?
+    ja      .tu_print                   # past our PC → stop
+    mov     edx, [rsi+4]               # update best line
+    add     rsi, 8
+    dec     ecx
+    jmp     .tu_search
+.tu_print:
+    # edx = source line number. Print "Error at line N\n"
+    test    edx, edx
+    jz      .tu_no_line
+    # Convert line number to string and print
+    push    rdx
+    lea     rsi, [rip + .str_error_at]
+    mov     edx, 14                     # "Error at line "
+    mov     edi, 2                      # stderr
+    mov     eax, SYS_WRITE
+    syscall
+    pop     rdx
+    # Print line number (simple: convert to digits on stack)
+    sub     rsp, 16
+    mov     rdi, rsp
+    add     rdi, 15
+    mov     byte ptr [rdi], 10          # newline
+    mov     ecx, 1                      # digit count (including newline)
+    mov     eax, edx
+.tu_digits:
+    xor     edx, edx
+    mov     esi, 10
+    div     esi                         # eax=quotient, edx=remainder
+    add     dl, 48                      # digit char
+    dec     rdi
+    mov     [rdi], dl
+    inc     ecx
+    test    eax, eax
+    jnz     .tu_digits
+    # Write digits
+    mov     rsi, rdi
+    mov     edx, ecx
+    mov     edi, 2                      # stderr
+    mov     eax, SYS_WRITE
+    syscall
+    add     rsp, 16
+    # Print call stack trace
+    mov     rcx, [rip + call_stack_depth]
+    test    rcx, rcx
+    jz      .tu_halt
+    lea     rdi, [rip + call_stack]
+    # Walk stack from top to bottom
+.tu_trace_loop:
+    test    rcx, rcx
+    jz      .tu_halt
+    dec     rcx
+    push    rcx
+    push    rdi
+    # Print "  at " (4 bytes)
+    lea     rsi, [rip + .str_at]
+    mov     edx, 5
+    mov     edi, 2
+    mov     eax, SYS_WRITE
+    syscall
+    pop     rdi
+    pop     rcx
+    # Print function name (name_ptr, name_len from shadow stack entry)
+    push    rcx
+    push    rdi
+    imul    rax, rcx, 24
+    mov     rsi, [rdi + rax]         # name_ptr
+    mov     edx, [rdi + rax + 8]     # name_len
+    mov     edi, 2
+    mov     eax, SYS_WRITE
+    syscall
+    # Print newline
+    lea     rsi, [rip + str_newline]
+    mov     edx, 1
+    mov     edi, 2
+    mov     eax, SYS_WRITE
+    syscall
+    pop     rdi
+    pop     rcx
+    jmp     .tu_trace_loop
+.tu_halt:
+    jmp     op_halt
+.tu_no_line:
+    pop     rax
+.tu_no_linetable:
+    # No line table or no match — just print generic error
+    lea     rsi, [rip + .str_uncaught]
+    mov     edx, 17                     # "Uncaught error!\n"
+    mov     edi, 2
+    mov     eax, SYS_WRITE
+    syscall
+    jmp     op_halt
+
+.str_error_at:  .ascii "Error at line "
+.str_at:        .ascii "  at "
+.str_uncaught:  .ascii "Uncaught error!\n"
 
 # ═══════════════════════════════════════════════════════════════════════════
 # STRING CONCAT (Add on strings)
@@ -2862,7 +3100,7 @@ codegen_table:
     .quad   op_nop          # 0x74 NetSend (TODO)
     .quad   op_nop          # 0x75 NetRecv (TODO)
     .quad   op_nop, op_nop
-    .quad   op_nop          # 0x78 Throw (TODO)
+    .quad   op_throw        # 0x78 Throw
     # 0x79-0x8F: reserved
     .quad   op_nop, op_nop, op_nop, op_nop, op_nop, op_nop, op_nop
     .quad   op_nop, op_nop, op_nop, op_nop, op_nop, op_nop, op_nop
@@ -2904,6 +3142,36 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
+    .quad   0x230B1BF698686603  # __log
+    .quad   .builtin_log
+    .quad   0x0000000000000000
+    .quad   .call_not_builtin
+    .quad   0x0000000000000000
+    .quad   .call_not_builtin
+    .quad   0x0000000000000000
+    .quad   .call_not_builtin
+    .quad   0x0000000000000000
+    .quad   .call_not_builtin
+    .quad   0x0000000000000000
+    .quad   .call_not_builtin
+    .quad   0x0000000000000000
+    .quad   .call_not_builtin
+    .quad   0x0000000000000000
+    .quad   .call_not_builtin
+    .quad   0x0000000000000000
+    .quad   .call_not_builtin
+    .quad   0x0000000000000000
+    .quad   .call_not_builtin
+    .quad   0x0000000000000000
+    .quad   .call_not_builtin
+    .quad   0x0000000000000000
+    .quad   .call_not_builtin
+    .quad   0x0000000000000000
+    .quad   .call_not_builtin
+    .quad   0x0000000000000000
+    .quad   .call_not_builtin
+    .quad   0x8E218B3185A1C411  # __array_slice
+    .quad   .builtin_array_slice
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -2932,38 +3200,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x234A766F8747B620  # __dict_keys
+    .quad   .builtin_dict_keys
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3028,16 +3266,16 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x6CB96C9AE6FE4E41  # __u8_set
+    .quad   .builtin_u8_set
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x4A829EA00BA2FE44  # __mem_write8
     .quad   .builtin_mem_write8
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x1157F2DB94C06A45  # __readline
+    .quad   .builtin_readline
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3084,14 +3322,14 @@ builtin_hash_table:
     .quad   .builtin_f64_to_le_bytes
     .quad   0x0000000000000000
     .quad   .call_not_builtin
+    .quad   0x2C6FF83E07A3C85D  # __str_to_num
+    .quad   .builtin_str_to_num
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x79C07AA57E23765F  # __tcp_connect
+    .quad   .builtin_tcp_connect
+    .quad   0x29468D7CC2100660  # __f64_new
+    .quad   .builtin_f64_new
     .quad   0xC8220FDA76231661
     .quad   .builtin_file_write
     .quad   0xC60CB074703A7C62  # __fd_open
@@ -3114,8 +3352,8 @@ builtin_hash_table:
     .quad   .builtin_ceil
     .quad   0x325D856BA281A26A
     .quad   .builtin_system
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x1B63E5F6945BD26B  # __max (probe from 107)
+    .quad   .builtin_max
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0xECF7E3335641986E
@@ -3126,8 +3364,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0xDD3AF5492696D871
     .quad   .builtin_tcp_close
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x79CE1073C7BA6272  # __log10
+    .quad   .builtin_log10
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x67EB4FF1020B0474  # __v_push
@@ -3152,8 +3390,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x333F701075D38A7F  # __str_join
+    .quad   .builtin_str_join
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3216,18 +3454,18 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
+    .quad   0x46A5AFF6ACD8369F  # __pow
+    .quad   .builtin_pow
+    .quad   0x0000000000000000
+    .quad   .call_not_builtin
+    .quad   0x9BDA6199099438A1  # __atan
+    .quad   .builtin_atan
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x1BA208C5DAE0ECA4  # __random
+    .quad   .builtin_random
     .quad   0xC3A02D0FADAAA8A5
     .quad   .builtin_sqrt
     .quad   0x8415CC91A41356A6  # __pseudo_select
@@ -3256,8 +3494,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x526EB811B28D5CB2
     .quad   .builtin_range
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0xAC14F0D5445512B2  # __str_ends_with (probe from 178)
+    .quad   .builtin_str_ends_with
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0xCC77F04E614970B5  # __munmap
@@ -3292,8 +3530,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x4DF573A9858FB4C5  # __array_reverse
+    .quad   .builtin_array_reverse
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3312,8 +3550,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x24D59CBB354B1ECE  # __conv_tone
     .quad   .builtin_conv_tone
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x83B7937C64038ACE  # __f64_set
+    .quad   .builtin_f64_set
     .quad   0x8D90008B055AECD0  # __ioctl
     .quad   .builtin_ioctl
     .quad   0x0000000000000000
@@ -3332,6 +3570,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
+    .quad   0xCA899B165A30E4D9  # __str_replace
+    .quad   .builtin_str_replace
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3362,10 +3602,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0xEE7C5F359328DCE9  # __time_now
+    .quad   .builtin_time_now
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3452,8 +3690,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x1B47FBF694437D15  # __min
+    .quad   .builtin_min
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0xAD9A9975BDE0C517
@@ -3466,8 +3704,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x5FCEDD9B2804CF1C  # __dict_set
+    .quad   .builtin_dict_set
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3518,8 +3756,8 @@ builtin_hash_table:
     .quad   .builtin_sha256
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x6B056AF6C1EF9136  # __tan
+    .quad   .builtin_tan
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3576,10 +3814,10 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0xCE5C6627B5591F52  # __crc32
     .quad   .builtin_crc32
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0xEBC46F7C9EFA6B52  # __f64_get
+    .quad   .builtin_f64_get
+    .quad   0x500EDE9AD5FFB553  # __u8_new
+    .quad   .builtin_u8_new
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3662,8 +3900,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0xF2CD7EA5B92CBF7D  # __str_split
     .quad   .builtin_str_split
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0xF393AA7CA328597D  # __f64_dot
+    .quad   .builtin_f64_dot
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3692,14 +3930,14 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
+    .quad   0x3B57F87CCC81F38D  # __f64_len
+    .quad   .builtin_f64_len
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0xC8B4C99B63B3BB90  # __dict_get
+    .quad   .builtin_dict_get
     .quad   0xF10E316E51D66791
     .quad   .builtin_array_new
     .quad   0x0000000000000000
@@ -3766,8 +4004,8 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x46660429A841B3B1  # __act_add
     .quad   .builtin_act_add
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x061BEB9B86B295B2  # __dict_new
+    .quad   .builtin_dict_new
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -3812,16 +4050,16 @@ builtin_hash_table:
     .quad   .builtin_heap_used
     .quad   0x4E03A6338DB8ADC8
     .quad   .builtin_bit_xor
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x684C6A0B46DC21C9  # __atan2
+    .quad   .builtin_atan2
     .quad   0xBDF45029EB7D1BCA  # __act_set
     .quad   .builtin_act_set
     .quad   0xC194C8A1C36B71CB  # __wm_bind
     .quad   .builtin_wm_bind
     .quad   0xF54D326409EE81CA  # __homeostasis
     .quad   .builtin_homeostasis
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0x03D3809AAB4F61CD  # __u8_get
+    .quad   .builtin_u8_get
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x493ABC5CE7C7C7CF
@@ -3848,16 +4086,16 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x4DF51F96D54C8DDA  # __mol_dominant
     .quad   .builtin_mol_dominant
+    .quad   0xC2CEE6D705C855DB  # __ffi_call
+    .quad   .builtin_ffi_call
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0xF8681D5A59E94FDF  # __str_starts_with
+    .quad   .builtin_str_starts_with
     .quad   0xA95ABDDB8044CDE0  # __stm_query
     .quad   .builtin_stm_query
     .quad   0x0000000000000000
@@ -3878,22 +4116,22 @@ builtin_hash_table:
     .quad   .call_not_builtin
     .quad   0x11C1AA218C63CDE9  # __wm_clear
     .quad   .builtin_wm_clear
+    .quad   0xA401B8F65145D9EA  # __cos
+    .quad   .builtin_cos
+    .quad   0x2DCC3B6C275DC3E9  # __round (probe from 489)
+    .quad   .builtin_round
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
+    .quad   0x2DAB4DF69EFB49EF  # __sin
+    .quad   .builtin_sin
     .quad   0x0000000000000000
     .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
-    .quad   0x0000000000000000
-    .quad   .call_not_builtin
+    .quad   0xEC2A71D35F965BF1  # __array_sort
+    .quad   .builtin_array_sort
     .quad   0x0000000000000000
     .quad   .call_not_builtin
     .quad   0x0000000000000000
@@ -4280,10 +4518,19 @@ builtin_hash_table:
     je      .bto_fn
     cmp     rdx, MOL_MARKER
     je      .bto_mol
-    # String
+    cmp     rdx, DICT_MARKER
+    je      .bto_dict
+    # String (len >= 0)
+    test    rdx, rdx
+    js      .bto_num                 # negative marker we don't know → treat as number
     lea     rax, [rip + str_type_string]
     mov     [r14], rax
     mov     qword ptr [r14+8], 6
+    DISPATCH
+.bto_dict:
+    lea     rax, [rip + str_type_dict]
+    mov     [r14], rax
+    mov     qword ptr [r14+8], 4     # "dict" = 4 chars
     DISPATCH
 .bto_num:
     lea     rax, [rip + str_type_number]
@@ -6563,6 +6810,1286 @@ builtin_hash_table:
     DISPATCH
 
 # ═══════════════════════════════════════════════════════════════════════════
+# S6: __readline() → string (read line from stdin, no trailing \n)
+# ═══════════════════════════════════════════════════════════════════════════
+
+.builtin_readline:
+    # No args to pop (0 args)
+    # Read bytes from fd 0 into Zone C as u16 mols
+    mov     rdi, r15                 # result start
+    xor     ecx, ecx                 # char count
+.brl_loop:
+    # read(0, &byte, 1)
+    push    rcx
+    push    rdi
+    sub     rsp, 8                   # 1-byte buffer (aligned)
+    mov     eax, SYS_READ            # 0
+    xor     edi, edi                 # fd = 0 (stdin)
+    mov     rsi, rsp                 # buffer
+    mov     edx, 1                   # count = 1
+    syscall
+    cmp     rax, 0
+    jle     .brl_eof                 # EOF or error → done
+    movzx   eax, byte ptr [rsp]      # read byte
+    add     rsp, 8
+    pop     rdi
+    pop     rcx
+    cmp     eax, 10                  # newline?
+    je      .brl_done
+    cmp     eax, 0                   # null?
+    je      .brl_done
+    # Store as u16 mol
+    mov     word ptr [r15], ax
+    add     r15, 2
+    inc     ecx
+    cmp     ecx, 4096               # max 4096 chars
+    jl      .brl_loop
+    jmp     .brl_done
+.brl_eof:
+    add     rsp, 8
+    pop     rdi
+    pop     rcx
+.brl_done:
+    # Return: [ptr=rdi, len=ecx]
+    sub     r14, 16
+    mov     [r14], rdi
+    mov     rax, rcx
+    mov     [r14+8], rax
+    DISPATCH
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 4.2: Typed f64/u8 arrays — contiguous, no tags
+# f64 layout: [count:8][f64 × N], marker = -8
+# u8 layout:  [count:8][u8 × N], marker = -9
+# ═══════════════════════════════════════════════════════════════════════════
+
+# __f64_new(count) → typed f64 array (zeroed)
+.builtin_f64_new:
+    movsd   xmm0, [r14]
+    cvttsd2si ecx, xmm0
+    add     r14, 16
+    mov     rdi, r15
+    mov     [r15], rcx
+    lea     r15, [r15 + 8]
+    # Zero N×8 bytes
+    push    rcx
+    push    rdi
+    mov     rdi, r15
+    shl     ecx, 3
+    xor     eax, eax
+    rep     stosb
+    pop     rdi
+    pop     rcx
+    shl     rcx, 3
+    add     r15, rcx
+    sub     r14, 16
+    mov     [r14], rdi
+    mov     qword ptr [r14+8], -8
+    DISPATCH
+
+# __f64_get(arr, idx) → f64
+.builtin_f64_get:
+    movsd   xmm0, [r14]
+    cvttsd2si ecx, xmm0
+    mov     rax, [r14+16]
+    add     r14, 32
+    movsd   xmm0, [rax + 8 + rcx*8]
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], -1
+    DISPATCH
+
+# __f64_set(arr, idx, val) → arr
+.builtin_f64_set:
+    movsd   xmm0, [r14]
+    movsd   xmm1, [r14+16]
+    cvttsd2si ecx, xmm1
+    mov     rax, [r14+32]
+    add     r14, 48
+    movsd   [rax + 8 + rcx*8], xmm0
+    sub     r14, 16
+    mov     [r14], rax
+    mov     qword ptr [r14+8], -8
+    DISPATCH
+
+# __f64_len(arr) → count
+.builtin_f64_len:
+    mov     rax, [r14]
+    mov     rcx, [rax]
+    cvtsi2sd xmm0, rcx
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], -1
+    DISPATCH
+
+# __f64_dot(a, b, count) → scalar
+.builtin_f64_dot:
+    movsd   xmm0, [r14]
+    cvttsd2si ecx, xmm0
+    mov     rsi, [r14+16]
+    mov     rdi, [r14+32]
+    add     r14, 48
+    lea     rdi, [rdi + 8]
+    lea     rsi, [rsi + 8]
+    xorpd   xmm0, xmm0
+    xorpd   xmm2, xmm2              # SSE2 vector accumulator
+.f64d_vec:
+    cmp     ecx, 2
+    jl      .f64d_tail
+    movupd  xmm1, [rdi]             # 2 f64s from a
+    movupd  xmm3, [rsi]             # 2 f64s from b
+    mulpd   xmm1, xmm3              # pairwise multiply
+    addpd   xmm2, xmm1              # accumulate vector
+    add     rdi, 16
+    add     rsi, 16
+    sub     ecx, 2
+    jmp     .f64d_vec
+.f64d_tail:
+    # Reduce: xmm2 = [lo, hi] → xmm0 += lo + hi
+    movapd  xmm1, xmm2
+    unpckhpd xmm1, xmm1             # xmm1 = [hi, hi]
+    addsd   xmm0, xmm2              # += lo
+    addsd   xmm0, xmm1              # += hi
+    # Remaining 0 or 1 element
+    test    ecx, ecx
+    jz      .f64d_dn
+    movsd   xmm1, [rdi]
+    mulsd   xmm1, [rsi]
+    addsd   xmm0, xmm1
+.f64d_dn:
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], -1
+    DISPATCH
+
+# __u8_new(count) → typed u8 array
+.builtin_u8_new:
+    movsd   xmm0, [r14]
+    cvttsd2si ecx, xmm0
+    add     r14, 16
+    mov     rdi, r15
+    mov     [r15], rcx
+    lea     r15, [r15 + 8]
+    push    rcx
+    push    rdi
+    mov     rdi, r15
+    xor     eax, eax
+    rep     stosb
+    pop     rdi
+    pop     rcx
+    add     r15, rcx
+    add     r15, 7
+    and     r15, -8
+    sub     r14, 16
+    mov     [r14], rdi
+    mov     qword ptr [r14+8], -9
+    DISPATCH
+
+# __u8_get(arr, idx) → byte as f64
+.builtin_u8_get:
+    movsd   xmm0, [r14]
+    cvttsd2si ecx, xmm0
+    mov     rax, [r14+16]
+    add     r14, 32
+    movzx   eax, byte ptr [rax + 8 + rcx]
+    cvtsi2sd xmm0, eax
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], -1
+    DISPATCH
+
+# __u8_set(arr, idx, val) → arr
+.builtin_u8_set:
+    movsd   xmm0, [r14]
+    cvttsd2si eax, xmm0
+    movsd   xmm1, [r14+16]
+    cvttsd2si ecx, xmm1
+    mov     rdx, [r14+32]
+    add     r14, 48
+    mov     byte ptr [rdx + 8 + rcx], al
+    sub     r14, 16
+    mov     [r14], rdx
+    mov     qword ptr [r14+8], -9
+    DISPATCH
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 3.1: FFI — call C function via pointer
+# __ffi_call(fn_ptr, arg1, ..., argN, N) → result (integer)
+# N = number of args (not counting fn_ptr and N itself). Max 6.
+# All args converted from f64 to i64. Result i64 → f64.
+# ═══════════════════════════════════════════════════════════════════════════
+.builtin_ffi_call:
+    # Read argc from top of stack
+    movsd   xmm0, [r14]
+    cvttsd2si ebp, xmm0             # argc
+    add     r14, 16                  # pop argc
+    # Read args in reverse order into temp storage
+    sub     rsp, 48                  # 6 × 8 bytes
+    xor     ecx, ecx
+.ffc_read:
+    cmp     ecx, ebp
+    jge     .ffc_readfn
+    movsd   xmm0, [r14]
+    cvttsd2si rax, xmm0
+    mov     [rsp + rcx*8], rax
+    add     r14, 16
+    inc     ecx
+    jmp     .ffc_read
+.ffc_readfn:
+    # Read function pointer
+    movsd   xmm0, [r14]
+    cvttsd2si rax, xmm0
+    add     r14, 16
+    # Setup System V ABI regs (args are in stack[0..argc-1], reversed)
+    # stack[0] = last arg pushed = argN-1. We need stack[argc-1] = arg0
+    cmp     ebp, 1
+    jl      .ffc_call
+    mov     rdi, [rsp + rbp*8 - 8]
+    cmp     ebp, 2
+    jl      .ffc_call
+    mov     rsi, [rsp + rbp*8 - 16]
+    cmp     ebp, 3
+    jl      .ffc_call
+    mov     rdx, [rsp + rbp*8 - 24]
+    cmp     ebp, 4
+    jl      .ffc_call
+    mov     rcx, [rsp + rbp*8 - 32]
+    cmp     ebp, 5
+    jl      .ffc_call
+    mov     r8, [rsp + rbp*8 - 40]
+    cmp     ebp, 6
+    jl      .ffc_call
+    mov     r9, [rsp + rbp*8 - 48]
+.ffc_call:
+    add     rsp, 48
+    # Save VM registers (C function may clobber them)
+    push    r12
+    push    r13
+    push    r14
+    push    r15
+    push    rbx
+    # Align stack
+    mov     r10, rsp
+    and     rsp, -16
+    push    r10
+    # Call
+    call    rax
+    # Restore
+    pop     rsp
+    pop     rbx
+    pop     r15
+    pop     r14
+    pop     r13
+    pop     r12
+    # Return rax as f64
+    cvtsi2sd xmm0, rax
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 3.4: Array builtins
+# ═══════════════════════════════════════════════════════════════════════════
+
+# __array_sort(arr) → sorted arr (in-place insertion sort, numeric ascending)
+.builtin_array_sort:
+    mov     rax, [r14]               # array ptr
+    # Follow forwarding
+.bas_fwd:
+    cmp     qword ptr [rax], -2
+    jne     .bas_nofwd
+    mov     rax, [rax+8]
+    jmp     .bas_fwd
+.bas_nofwd:
+    mov     rcx, [rax+8]            # count
+    cmp     rcx, 2
+    jl      .bas_done                # 0 or 1 elements → already sorted
+    push    rbx
+    mov     rbx, rax                 # array base
+    # Insertion sort: i=1..count-1
+    mov     rsi, 1                   # i
+.bas_outer:
+    cmp     rsi, rcx
+    jge     .bas_finish
+    # key = arr[i]
+    mov     rdi, rsi
+    shl     rdi, 4
+    add     rdi, 16                  # offset = 16 + i*16
+    movsd   xmm0, [rbx + rdi]       # key.ptr (f64 bits)
+    mov     r8, [rbx + rdi + 8]     # key.marker
+    # j = i - 1
+    mov     rdx, rsi
+    dec     rdx
+.bas_inner:
+    cmp     rdx, 0
+    jl      .bas_insert
+    # Compare arr[j] > key
+    mov     rdi, rdx
+    shl     rdi, 4
+    add     rdi, 16
+    movsd   xmm1, [rbx + rdi]       # arr[j].ptr
+    ucomisd xmm1, xmm0              # arr[j] > key?
+    jbe     .bas_insert              # arr[j] <= key → stop
+    # arr[j+1] = arr[j]
+    mov     r9, [rbx + rdi]
+    mov     r10, [rbx + rdi + 8]
+    mov     [rbx + rdi + 16], r9
+    mov     [rbx + rdi + 24], r10
+    dec     rdx
+    jmp     .bas_inner
+.bas_insert:
+    # arr[j+1] = key
+    mov     rdi, rdx
+    inc     rdi
+    shl     rdi, 4
+    add     rdi, 16
+    movsd   [rbx + rdi], xmm0
+    mov     [rbx + rdi + 8], r8
+    inc     rsi
+    mov     rcx, [rbx + 8]          # reload count (safe)
+    jmp     .bas_outer
+.bas_finish:
+    pop     rbx
+.bas_done:
+    # Return the array (already on stack, in-place sort)
+    DISPATCH
+
+# __array_slice(arr, start, end) → new array
+.builtin_array_slice:
+    movsd   xmm0, [r14]             # end
+    cvttsd2si r9d, xmm0
+    movsd   xmm0, [r14+16]          # start
+    cvttsd2si r8d, xmm0
+    mov     rax, [r14+32]           # array ptr
+    add     r14, 48                  # pop 3 args
+    # Follow forwarding
+.bsl_fwd:
+    cmp     qword ptr [rax], -2
+    jne     .bsl_nofwd
+    mov     rax, [rax+8]
+    jmp     .bsl_fwd
+.bsl_nofwd:
+    mov     rcx, [rax+8]            # count
+    # Clamp
+    cmp     r8d, 0
+    jge     .bsl_s_ok
+    xor     r8d, r8d
+.bsl_s_ok:
+    cmp     r9d, ecx
+    jle     .bsl_e_ok
+    mov     r9d, ecx
+.bsl_e_ok:
+    cmp     r8d, r9d
+    jge     .bsl_empty
+    # New array on heap
+    mov     rdi, r15                 # new array base
+    mov     edx, r9d
+    sub     edx, r8d                 # new count
+    mov     [r15], rdx               # capacity = count
+    mov     [r15+8], rdx             # count
+    lea     r15, [r15 + 16]
+    # Copy elements
+    xor     ecx, ecx
+.bsl_copy:
+    cmp     ecx, edx
+    jge     .bsl_ret
+    mov     esi, r8d
+    add     esi, ecx
+    shl     esi, 4
+    add     esi, 16
+    mov     r10, [rax + rsi]
+    mov     r11, [rax + rsi + 8]
+    mov     [r15], r10
+    mov     [r15+8], r11
+    add     r15, 16
+    inc     ecx
+    jmp     .bsl_copy
+.bsl_ret:
+    sub     r14, 16
+    mov     [r14], rdi
+    mov     qword ptr [r14+8], ARRAY_MARKER
+    DISPATCH
+.bsl_empty:
+    # Return empty array
+    mov     rdi, r15
+    mov     qword ptr [r15], 0
+    mov     qword ptr [r15+8], 0
+    add     r15, 16
+    sub     r14, 16
+    mov     [r14], rdi
+    mov     qword ptr [r14+8], ARRAY_MARKER
+    DISPATCH
+
+# __array_reverse(arr) → reversed arr (in-place)
+.builtin_array_reverse:
+    mov     rax, [r14]
+.bar_fwd:
+    cmp     qword ptr [rax], -2
+    jne     .bar_nofwd
+    mov     rax, [rax+8]
+    jmp     .bar_fwd
+.bar_nofwd:
+    mov     rcx, [rax+8]            # count
+    cmp     rcx, 2
+    jl      .bar_done
+    xor     esi, esi                 # left = 0
+    mov     edi, ecx
+    dec     edi                      # right = count-1
+.bar_swap:
+    cmp     esi, edi
+    jge     .bar_done
+    # Swap arr[left] and arr[right]
+    mov     edx, esi
+    shl     edx, 4
+    add     edx, 16
+    mov     r8, [rax + rdx]
+    mov     r9, [rax + rdx + 8]
+    mov     ecx, edi
+    shl     ecx, 4
+    add     ecx, 16
+    mov     r10, [rax + rcx]
+    mov     r11, [rax + rcx + 8]
+    mov     [rax + rdx], r10
+    mov     [rax + rdx + 8], r11
+    mov     [rax + rcx], r8
+    mov     [rax + rcx + 8], r9
+    inc     esi
+    dec     edi
+    jmp     .bar_swap
+.bar_done:
+    DISPATCH
+
+# __time_now() → milliseconds since epoch (f64)
+.builtin_time_now:
+    sub     rsp, 16                  # struct timespec {sec:8, nsec:8}
+    mov     eax, SYS_CLOCK_GETTIME  # 228
+    xor     edi, edi                 # CLOCK_REALTIME = 0
+    mov     rsi, rsp
+    syscall
+    # Convert: ms = sec * 1000.0 + nsec / 1000000.0
+    cvtsi2sd xmm0, qword ptr [rsp]   # seconds
+    movsd    xmm1, [rip + .time_1000]
+    mulsd    xmm0, xmm1               # sec * 1000
+    cvtsi2sd xmm1, qword ptr [rsp+8]  # nanoseconds
+    movsd    xmm2, [rip + .time_1m]
+    divsd    xmm1, xmm2               # nsec / 1000000
+    addsd    xmm0, xmm1               # total ms
+    add      rsp, 16
+    sub      r14, 16
+    movsd    [r14], xmm0
+    mov      qword ptr [r14+8], F64_MARKER
+    DISPATCH
+.time_1000: .quad 0x408F400000000000   # 1000.0
+.time_1m:   .quad 0x412E848000000000   # 1000000.0
+
+# ═══════════════════════════════════════════════════════════════════════════
+# __tcp_connect(ip_str, port) → fd or -1
+# Connects to ip:port via TCP. ip_str is "1.2.3.4" format.
+# ═══════════════════════════════════════════════════════════════════════════
+.builtin_tcp_connect:
+    movsd   xmm0, [r14]             # port (f64)
+    cvttsd2si edi, xmm0             # port as int
+    mov     rsi, [r14+16]           # ip string ptr (u16 mols)
+    mov     rdx, [r14+24]           # ip string len
+    add     r14, 32                 # pop 2 args
+    push    rdi                      # save port
+    # Parse IP: "1.2.3.4" → 4 bytes
+    # Decode u16 mols to ASCII bytes first
+    sub     rsp, 64                  # temp buffer
+    mov     rdi, rsp
+    xor     ecx, ecx
+.btc_decode:
+    cmp     ecx, edx
+    jge     .btc_decoded
+    movzx   eax, word ptr [rsi + rcx*2]
+    mov     byte ptr [rdi + rcx], al
+    inc     ecx
+    jmp     .btc_decode
+.btc_decoded:
+    mov     byte ptr [rdi + rcx], 0  # null terminate
+    # Parse IP octets: simple manual parse
+    xor     r8d, r8d                 # octet accumulator
+    xor     r9d, r9d                 # byte index (0-3)
+    xor     r10d, r10d               # result IP (network byte order)
+    xor     ecx, ecx
+.btc_parse_ip:
+    movzx   eax, byte ptr [rdi + rcx]
+    test    eax, eax
+    jz      .btc_ip_done_last
+    cmp     eax, 46                  # '.'
+    je      .btc_ip_dot
+    sub     eax, 48
+    imul    r8d, r8d, 10
+    add     r8d, eax
+    inc     ecx
+    jmp     .btc_parse_ip
+.btc_ip_dot:
+    # Store octet
+    shl     r10d, 8
+    or      r10d, r8d
+    xor     r8d, r8d
+    inc     r9d
+    inc     ecx
+    jmp     .btc_parse_ip
+.btc_ip_done_last:
+    shl     r10d, 8
+    or      r10d, r8d
+    # r10d now has IP in big-endian wrong order, need to bswap
+    bswap   r10d
+    add     rsp, 64
+    pop     rdi                      # port
+
+    # Build sockaddr_in on stack: [AF_INET:2][port:2][ip:4][zero:8]
+    sub     rsp, 16
+    mov     word ptr [rsp], 2        # AF_INET
+    # Port in network byte order (big-endian)
+    mov     eax, edi
+    xchg    al, ah                   # swap bytes for network order
+    mov     word ptr [rsp+2], ax     # port
+    mov     dword ptr [rsp+4], r10d  # IP
+    mov     qword ptr [rsp+8], 0     # padding
+
+    # socket(AF_INET=2, SOCK_STREAM=1, 0)
+    mov     eax, SYS_SOCKET          # 41
+    mov     edi, 2                   # AF_INET
+    mov     esi, 1                   # SOCK_STREAM
+    xor     edx, edx                 # protocol = 0
+    syscall
+    test    eax, eax
+    js      .btc_fail
+    mov     r8d, eax                 # save fd
+
+    # connect(fd, sockaddr, 16)
+    mov     edi, r8d                 # fd
+    mov     rsi, rsp                 # sockaddr_in ptr
+    mov     edx, 16                  # addrlen
+    mov     eax, SYS_CONNECT         # 42
+    syscall
+    add     rsp, 16                  # cleanup sockaddr
+    test    eax, eax
+    js      .btc_close_fail
+    # Success: return fd
+    cvtsi2sd xmm0, r8d
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+.btc_close_fail:
+    # Connect failed, close socket, sockaddr already on stack
+    add     rsp, 16                  # cleanup sockaddr
+    mov     edi, r8d
+    mov     eax, SYS_CLOSE
+    syscall
+    jmp     .btc_ret_fail
+.btc_fail:
+    add     rsp, 16                  # cleanup sockaddr
+.btc_ret_fail:
+    sub     r14, 16
+    mov     rax, -1
+    cvtsi2sd xmm0, rax
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 1.5: Math Builtins (SS23)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# __sin(x) → sin(x)  [1 arg, uses x87 fsin]
+.builtin_sin:
+    fld     qword ptr [r14]
+    fsin
+    fstp    qword ptr [r14]
+    DISPATCH
+
+# __cos(x) → cos(x)
+.builtin_cos:
+    fld     qword ptr [r14]
+    fcos
+    fstp    qword ptr [r14]
+    DISPATCH
+
+# __tan(x) → tan(x) = sin/cos
+.builtin_tan:
+    fld     qword ptr [r14]
+    fptan                           # st(0)=1, st(1)=tan(x)
+    fstp    st(0)                   # pop the 1
+    fstp    qword ptr [r14]
+    DISPATCH
+
+# __atan(x) → atan(x)
+.builtin_atan:
+    fld     qword ptr [r14]
+    fld1
+    fpatan                          # atan(st(1)/st(0)) = atan(x/1) = atan(x)
+    fstp    qword ptr [r14]
+    DISPATCH
+
+# __atan2(y, x) → atan2(y, x)  [2 args]
+.builtin_atan2:
+    fld     qword ptr [r14+16]      # y
+    fld     qword ptr [r14]         # x
+    fpatan                          # atan(y/x)
+    add     r14, 16                 # pop 1 arg (result replaces first)
+    fstp    qword ptr [r14]
+    DISPATCH
+
+# __pow(base, exp) → base^exp  [2 args]
+.builtin_pow:
+    # x^y = 2^(y * log2(x))
+    fld     qword ptr [r14]         # exp
+    fld     qword ptr [r14+16]      # base
+    fyl2x                           # st(0) = exp * log2(base)
+    fld     st(0)
+    frndint
+    fxch
+    fsub    st(0), st(1)
+    f2xm1
+    fld1
+    faddp
+    fscale
+    fstp    st(1)
+    add     r14, 16
+    fstp    qword ptr [r14]
+    DISPATCH
+
+# __log(x) → ln(x)  (natural log)
+.builtin_log:
+    fldln2                          # ln(2)
+    fld     qword ptr [r14]         # x
+    fyl2x                           # ln(2) * log2(x) = ln(x)
+    fstp    qword ptr [r14]
+    DISPATCH
+
+# __log10(x) → log10(x)
+.builtin_log10:
+    fldlg2                          # log10(2)
+    fld     qword ptr [r14]
+    fyl2x                           # log10(2) * log2(x) = log10(x)
+    fstp    qword ptr [r14]
+    DISPATCH
+
+# __round(x) → nearest integer
+.builtin_round:
+    fld     qword ptr [r14]
+    frndint
+    fstp    qword ptr [r14]
+    DISPATCH
+
+# __min(a, b) → smaller  [2 args]
+.builtin_min:
+    movsd   xmm0, [r14+16]         # a
+    movsd   xmm1, [r14]            # b
+    minsd   xmm0, xmm1
+    add     r14, 16
+    movsd   [r14], xmm0
+    DISPATCH
+
+# __max(a, b) → larger  [2 args]
+.builtin_max:
+    movsd   xmm0, [r14+16]
+    movsd   xmm1, [r14]
+    maxsd   xmm0, xmm1
+    add     r14, 16
+    movsd   [r14], xmm0
+    DISPATCH
+
+# __random() → random f64 in [0, 1)  [0 args]
+.builtin_random:
+    sub     rsp, 8
+    mov     eax, SYS_GETRANDOM     # 318
+    mov     rdi, rsp                # buf (rdi = arg1)
+    mov     esi, 8                  # buflen (rsi = arg2)
+    xor     edx, edx                # flags (rdx = arg3) = 0
+    syscall
+    mov     rax, [rsp]
+    add     rsp, 8
+    # Convert u64 to [0,1): divide by 2^64
+    # Method: mask to 52-bit mantissa, set exponent to 1.0, subtract 1.0
+    mov     rcx, 0x3FF0000000000000 # 1.0 as f64
+    shr     rax, 12                 # keep 52 bits
+    or      rax, rcx                # exponent = 1.0, mantissa = random
+    sub     r14, 16
+    mov     [r14], rax
+    mov     qword ptr [r14+8], F64_MARKER
+    # Subtract 1.0 to get [0, 1)
+    movsd   xmm0, [r14]
+    movsd   xmm1, [rip + .random_one]
+    subsd   xmm0, xmm1
+    movsd   [r14], xmm0
+    DISPATCH
+.random_one:
+    .quad   0x3FF0000000000000      # 1.0
+
+# ═══════════════════════════════════════════════════════════════════════════
+# S2: Dict Builtins (SS23) — struct support
+# Layout: [cap:8][count:8][entries...] where entry = [key_ptr:8][key_len:8][val:8][val_marker:8] = 32 bytes
+# ═══════════════════════════════════════════════════════════════════════════
+
+# __dict_new() → empty dict (capacity 16)
+.builtin_dict_new:
+    mov     rax, r15                 # dict base
+    mov     qword ptr [r15], 16      # capacity = 16
+    mov     qword ptr [r15+8], 0     # count = 0
+    # Zero out 16 entries × 32 bytes = 512 bytes
+    lea     rdi, [r15 + 16]
+    mov     ecx, 64                  # 512/8 = 64 qwords
+    xor     eax, eax
+    rep     stosq
+    mov     rax, r15                 # save base before advancing
+    add     r15, 528                 # 16 header + 512 entries
+    sub     r14, 16
+    mov     [r14], rax
+    mov     qword ptr [r14+8], DICT_MARKER
+    DISPATCH
+
+# __dict_get(dict, key_str) → value (or 0 if not found)
+.builtin_dict_get:
+    mov     r8, [r14]                # key ptr
+    mov     r9, [r14+8]              # key len
+    mov     rax, [r14+16]            # dict ptr
+    add     r14, 32                  # pop 2 args
+    # Follow forwarding
+.bdg_fwd:
+    cmp     qword ptr [rax], -2
+    jne     .bdg_nofwd
+    mov     rax, [rax+8]
+    jmp     .bdg_fwd
+.bdg_nofwd:
+    mov     rcx, [rax+8]            # count
+    test    rcx, rcx
+    jz      .bdg_notfound
+    lea     rdi, [rax + 16]          # first entry
+    xor     esi, esi                 # index
+.bdg_scan:
+    cmp     rsi, rcx
+    jge     .bdg_notfound
+    # Compare key: entry.key_ptr, entry.key_len vs r8, r9
+    mov     rdx, [rdi]               # entry key ptr
+    mov     r10, [rdi+8]             # entry key len
+    cmp     r10, r9                  # same length?
+    jne     .bdg_next
+    # Compare bytes
+    push    rsi
+    push    rdi
+    push    rcx
+    xor     ecx, ecx
+.bdg_cmp:
+    cmp     rcx, r9
+    jge     .bdg_found_pop
+    movzx   eax, word ptr [rdx + rcx*2]
+    movzx   r10d, word ptr [r8 + rcx*2]
+    cmp     eax, r10d
+    jne     .bdg_next_pop
+    inc     rcx
+    jmp     .bdg_cmp
+.bdg_found_pop:
+    pop     rcx
+    pop     rdi
+    pop     rsi
+    # Found! Return value at [rdi+16], marker at [rdi+24]
+    sub     r14, 16
+    mov     rax, [rdi+16]
+    mov     rdx, [rdi+24]
+    mov     [r14], rax
+    mov     [r14+8], rdx
+    DISPATCH
+.bdg_next_pop:
+    pop     rcx
+    pop     rdi
+    pop     rsi
+.bdg_next:
+    add     rdi, 32                  # next entry
+    inc     rsi
+    jmp     .bdg_scan
+.bdg_notfound:
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __dict_set(dict, key_str, value) → dict (mutates in place, returns same dict)
+.builtin_dict_set:
+    # Stack: [val:8][val_mk:8] [key_ptr:8][key_len:8] [dict_ptr:8][dict_mk:8]
+    mov     r10, [r14]               # val
+    mov     r11, [r14+8]             # val marker
+    mov     r8, [r14+16]             # key ptr
+    mov     r9, [r14+24]             # key len
+    mov     rax, [r14+32]            # dict ptr
+    add     r14, 48                  # pop 3 args
+    # Follow forwarding
+.bds_fwd:
+    cmp     qword ptr [rax], -2
+    jne     .bds_nofwd
+    mov     rax, [rax+8]
+    jmp     .bds_fwd
+.bds_nofwd:
+    mov     rcx, [rax+8]            # count
+    push    rax                      # save dict ptr
+    lea     rdi, [rax + 16]          # first entry
+    xor     esi, esi
+    # Search for existing key
+.bds_scan:
+    cmp     rsi, rcx
+    jge     .bds_append
+    mov     rdx, [rdi]               # entry key ptr
+    cmp     [rdi+8], r9              # entry key len == key len?
+    jne     .bds_snext
+    # Compare key chars
+    push    rsi
+    push    rdi
+    push    rcx
+    xor     ecx, ecx
+.bds_cmp:
+    cmp     rcx, r9
+    jge     .bds_update_pop
+    movzx   eax, word ptr [rdx + rcx*2]
+    movzx   esi, word ptr [r8 + rcx*2]
+    cmp     eax, esi
+    jne     .bds_snext_pop
+    inc     rcx
+    jmp     .bds_cmp
+.bds_update_pop:
+    pop     rcx
+    pop     rdi
+    pop     rsi
+    # Key exists → update value
+    mov     [rdi+16], r10
+    mov     [rdi+24], r11
+    pop     rax                      # dict ptr
+    jmp     .bds_return
+.bds_snext_pop:
+    pop     rcx
+    pop     rdi
+    pop     rsi
+.bds_snext:
+    add     rdi, 32
+    inc     rsi
+    jmp     .bds_scan
+.bds_append:
+    # Key not found → append new entry
+    pop     rax                      # dict ptr
+    mov     rcx, [rax+8]            # count
+    cmp     rcx, [rax]              # count >= capacity?
+    jge     .bds_return              # full → silently fail (TODO: grow)
+    # rdi already points to entries[count]
+    mov     [rdi], r8                # key ptr
+    mov     [rdi+8], r9              # key len
+    mov     [rdi+16], r10            # value
+    mov     [rdi+24], r11            # value marker
+    inc     qword ptr [rax+8]        # count++
+.bds_return:
+    sub     r14, 16
+    mov     [r14], rax
+    mov     qword ptr [r14+8], DICT_MARKER
+    DISPATCH
+
+# __dict_keys(dict) → array of key strings
+.builtin_dict_keys:
+    mov     rax, [r14]               # dict ptr
+    add     r14, 16                  # pop 1 arg
+    # Follow forwarding
+.bdk_fwd:
+    cmp     qword ptr [rax], -2
+    jne     .bdk_nofwd
+    mov     rax, [rax+8]
+    jmp     .bdk_fwd
+.bdk_nofwd:
+    mov     rcx, [rax+8]            # count
+    push    rbx
+    mov     rbx, rax                 # save dict ptr
+    # Allocate result array on r15
+    mov     rdi, r15                 # array base
+    mov     [r15], rcx               # capacity = count
+    mov     [r15+8], rcx             # count = count
+    lea     r15, [r15 + 16]          # skip header
+    # Copy key ptrs as string entries
+    lea     rsi, [rbx + 16]          # first entry
+    xor     edx, edx
+.bdk_loop:
+    cmp     rdx, rcx
+    jge     .bdk_done
+    mov     rax, [rsi]               # key ptr
+    mov     r8, [rsi+8]              # key len
+    mov     [r15], rax
+    mov     [r15+8], r8
+    add     r15, 16
+    add     rsi, 32                  # next entry
+    inc     rdx
+    jmp     .bdk_loop
+.bdk_done:
+    pop     rbx
+    sub     r14, 16
+    mov     [r14], rdi               # array ptr
+    mov     qword ptr [r14+8], ARRAY_MARKER
+    DISPATCH
+
+# ═══════════════════════════════════════════════════════════════════════════
+# S1: New String Builtins (SS23)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# __str_starts_with(text, prefix) → 0 or 1 (f64)
+.builtin_str_starts_with:
+    mov     r8, [r14]                # prefix ptr
+    mov     r9, [r14+8]              # prefix len
+    mov     rsi, [r14+16]            # text ptr
+    mov     rdx, [r14+24]            # text len
+    add     r14, 32                  # pop 2 args
+    cmp     r9, rdx
+    jg      .bssw_false              # prefix longer → false
+    test    r9, r9
+    jz      .bssw_true               # empty prefix → true
+    xor     ecx, ecx
+.bssw_cmp:
+    cmp     rcx, r9
+    jge     .bssw_true
+    movzx   eax, word ptr [rsi + rcx*2]
+    movzx   edi, word ptr [r8 + rcx*2]
+    cmp     eax, edi
+    jne     .bssw_false
+    inc     rcx
+    jmp     .bssw_cmp
+.bssw_true:
+    sub     r14, 16
+    mov     rax, 1
+    cvtsi2sd xmm0, rax
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+.bssw_false:
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __str_ends_with(text, suffix) → 0 or 1 (f64)
+.builtin_str_ends_with:
+    mov     r8, [r14]                # suffix ptr
+    mov     r9, [r14+8]              # suffix len
+    mov     rsi, [r14+16]            # text ptr
+    mov     rdx, [r14+24]            # text len
+    add     r14, 32                  # pop 2 args
+    cmp     r9, rdx
+    jg      .bsew_false              # suffix longer → false
+    test    r9, r9
+    jz      .bsew_true               # empty suffix → true
+    # Compare from end: text[len-suflen..len] vs suffix[0..suflen]
+    mov     rcx, rdx
+    sub     rcx, r9                  # rcx = offset where suffix should start
+    xor     edi, edi
+.bsew_cmp:
+    cmp     rdi, r9
+    jge     .bsew_true
+    lea     rax, [rcx + rdi]
+    movzx   eax, word ptr [rsi + rax*2]
+    movzx   r10d, word ptr [r8 + rdi*2]
+    cmp     eax, r10d
+    jne     .bsew_false
+    inc     rdi
+    jmp     .bsew_cmp
+.bsew_true:
+    sub     r14, 16
+    mov     rax, 1
+    cvtsi2sd xmm0, rax
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+.bsew_false:
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __str_to_num(str) → f64 (parse decimal number from string)
+# Handles: integers, decimals, negative numbers
+.builtin_str_to_num:
+    mov     rsi, [r14]               # text ptr
+    mov     rdx, [r14+8]             # text len
+    add     r14, 16                  # pop 1 arg
+    test    rdx, rdx
+    jz      .bstn_zero
+    # State: sign, integer part, fractional part
+    xor     ecx, ecx                 # position
+    xor     r8d, r8d                 # sign flag (0=positive)
+    # Check leading minus
+    movzx   eax, word ptr [rsi]
+    cmp     eax, 45                  # '-'
+    jne     .bstn_int
+    mov     r8d, 1                   # negative
+    inc     ecx
+.bstn_int:
+    xor     r9d, r9d                 # integer accumulator
+.bstn_int_loop:
+    cmp     ecx, edx
+    jge     .bstn_build
+    movzx   eax, word ptr [rsi + rcx*2]
+    cmp     eax, 46                  # '.'
+    je      .bstn_frac_start
+    sub     eax, 48                  # '0'
+    cmp     eax, 9
+    ja      .bstn_build              # non-digit → stop
+    imul    r9, r9, 10
+    add     r9, rax
+    inc     ecx
+    jmp     .bstn_int_loop
+.bstn_frac_start:
+    inc     ecx                      # skip '.'
+    xor     r10d, r10d               # frac accumulator
+    mov     r11d, 1                  # frac divisor
+.bstn_frac_loop:
+    cmp     ecx, edx
+    jge     .bstn_build_frac
+    movzx   eax, word ptr [rsi + rcx*2]
+    sub     eax, 48
+    cmp     eax, 9
+    ja      .bstn_build_frac
+    imul    r10, r10, 10
+    add     r10, rax
+    imul    r11, r11, 10
+    inc     ecx
+    jmp     .bstn_frac_loop
+.bstn_build_frac:
+    # result = integer + frac/divisor
+    cvtsi2sd xmm0, r9               # integer part
+    cvtsi2sd xmm1, r10              # frac numerator
+    cvtsi2sd xmm2, r11              # frac divisor
+    divsd   xmm1, xmm2              # frac value
+    addsd   xmm0, xmm1              # total
+    test    r8d, r8d
+    jz      .bstn_ret
+    # Negate: xmm0 = 0 - xmm0
+    xorpd   xmm1, xmm1
+    subsd   xmm1, xmm0
+    movsd   xmm0, xmm1
+    jmp     .bstn_ret
+.bstn_build:
+    cvtsi2sd xmm0, r9
+    test    r8d, r8d
+    jz      .bstn_ret
+    xorpd   xmm1, xmm1
+    subsd   xmm1, xmm0
+    movsd   xmm0, xmm1
+.bstn_ret:
+    sub     r14, 16
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+.bstn_zero:
+    sub     r14, 16
+    xorpd   xmm0, xmm0
+    movsd   [r14], xmm0
+    mov     qword ptr [r14+8], F64_MARKER
+    DISPATCH
+
+# __str_join(array, separator) → string
+# Join array of strings with separator between each
+.builtin_str_join:
+    mov     r8, [r14]                # sep ptr
+    mov     r9, [r14+8]             # sep len
+    mov     rax, [r14+16]            # array ptr
+    add     r14, 32                  # pop 2 args
+    # Follow array forwarding pointers
+.bsj_fwd:
+    cmp     qword ptr [rax], -2
+    jne     .bsj_nofwd
+    mov     rax, [rax + 8]
+    jmp     .bsj_fwd
+.bsj_nofwd:
+    mov     rcx, [rax+8]            # array count
+    test    rcx, rcx
+    jz      .bsj_empty
+    push    rbx
+    push    rbp
+    push    r12
+    push    r13
+    mov     rbx, rax                # array base
+    mov     rbp, rcx                # array count
+    mov     r12, r8                 # sep ptr
+    mov     r13, r9                 # sep len
+    # Destination = r15 (Zone C bump)
+    mov     rdi, r15                # result start
+    xor     ecx, ecx                # element index
+.bsj_loop:
+    cmp     rcx, rbp
+    jge     .bsj_done
+    # Get element: array[i] = [ptr:8][len:8] at offset 16 + i*16
+    mov     rax, rcx
+    shl     rax, 4                  # rax = i * 16
+    add     rax, 16                 # skip header
+    mov     rsi, [rbx + rax]        # element ptr
+    mov     rdx, [rbx + rax + 8]    # element len (or marker if not string)
+    # Skip non-string entries (f64 or nested array)
+    cmp     rdx, -1                 # F64_MARKER
+    je      .bsj_skip
+    cmp     rdx, -3                 # ARRAY_MARKER
+    je      .bsj_skip
+    # Skip if len <= 0
+    test    rdx, rdx
+    jle     .bsj_skip
+    # Add separator before element (except first)
+    test    ecx, ecx
+    jz      .bsj_copy_elem
+    # Copy separator
+    push    rcx
+    push    rsi
+    push    rdx
+    xor     eax, eax
+.bsj_copy_sep:
+    cmp     rax, r13
+    jge     .bsj_sep_done
+    movzx   edx, word ptr [r12 + rax*2]
+    mov     word ptr [r15], dx
+    add     r15, 2
+    inc     rax
+    jmp     .bsj_copy_sep
+.bsj_sep_done:
+    pop     rdx
+    pop     rsi
+    pop     rcx
+.bsj_copy_elem:
+    # Copy element string
+    push    rcx
+    xor     eax, eax
+.bsj_copy_ch:
+    cmp     rax, rdx
+    jge     .bsj_elem_done
+    movzx   r10d, word ptr [rsi + rax*2]
+    mov     word ptr [r15], r10w
+    add     r15, 2
+    inc     rax
+    jmp     .bsj_copy_ch
+.bsj_elem_done:
+    pop     rcx
+.bsj_skip:
+    inc     rcx
+    jmp     .bsj_loop
+.bsj_done:
+    # Result: ptr=rdi (saved start), len=(r15-rdi)/2
+    mov     rax, r15
+    sub     rax, rdi
+    shr     rax, 1                  # byte count → mol count
+    pop     r13
+    pop     r12
+    pop     rbp
+    pop     rbx
+    sub     r14, 16
+    mov     [r14], rdi
+    mov     [r14+8], rax
+    DISPATCH
+.bsj_empty:
+    sub     r14, 16
+    xor     eax, eax
+    mov     [r14], rax
+    mov     [r14+8], rax
+    DISPATCH
+
+# __str_replace(text, old, new) → string with all occurrences replaced
+.builtin_str_replace:
+    mov     r8, [r14]                # new ptr
+    mov     r9, [r14+8]              # new len
+    mov     r10, [r14+16]            # old ptr
+    mov     r11, [r14+24]            # old len
+    mov     rsi, [r14+32]            # text ptr
+    mov     rdx, [r14+40]            # text len
+    add     r14, 48                  # pop 3 args
+    test    r11, r11
+    jz      .bsr_copy_all            # empty old → just copy text
+    push    rbx
+    push    rbp
+    push    r12
+    push    r13
+    push    r14                      # save stack ptr
+    mov     rbx, rsi                 # text ptr
+    mov     rbp, rdx                 # text len
+    mov     r12, r10                 # old ptr
+    mov     r13, r11                 # old len
+    # Result built on r15
+    mov     rdi, r15                 # result start
+    xor     ecx, ecx                 # scan position
+.bsr_scan:
+    cmp     rcx, rbp
+    jge     .bsr_finish
+    # Check if old matches at position ecx
+    lea     rax, [rcx + r13]
+    cmp     rax, rbp
+    jg      .bsr_copy_rest           # not enough chars left
+    # Compare old at position
+    xor     edx, edx
+.bsr_cmp:
+    cmp     rdx, r13
+    jge     .bsr_matched
+    lea     rax, [rcx + rdx]
+    movzx   eax, word ptr [rbx + rax*2]
+    movzx   r14d, word ptr [r12 + rdx*2]
+    cmp     eax, r14d
+    jne     .bsr_no_match
+    inc     rdx
+    jmp     .bsr_cmp
+.bsr_matched:
+    # Copy replacement (new) to output
+    xor     eax, eax
+.bsr_copy_new:
+    cmp     rax, r9
+    jge     .bsr_new_done
+    movzx   edx, word ptr [r8 + rax*2]
+    mov     word ptr [r15], dx
+    add     r15, 2
+    inc     rax
+    jmp     .bsr_copy_new
+.bsr_new_done:
+    add     rcx, r13                 # skip past old in text
+    jmp     .bsr_scan
+.bsr_no_match:
+    # Copy current char to output
+    movzx   eax, word ptr [rbx + rcx*2]
+    mov     word ptr [r15], ax
+    add     r15, 2
+    inc     rcx
+    jmp     .bsr_scan
+.bsr_copy_rest:
+    # Copy remaining chars
+    cmp     rcx, rbp
+    jge     .bsr_finish
+    movzx   eax, word ptr [rbx + rcx*2]
+    mov     word ptr [r15], ax
+    add     r15, 2
+    inc     rcx
+    jmp     .bsr_copy_rest
+.bsr_finish:
+    mov     rax, r15
+    sub     rax, rdi
+    shr     rax, 1                   # byte count → mol count
+    pop     r14
+    pop     r13
+    pop     r12
+    pop     rbp
+    pop     rbx
+    sub     r14, 16
+    mov     [r14], rdi
+    mov     [r14+8], rax
+    DISPATCH
+.bsr_copy_all:
+    # Empty old: just return copy of text
+    mov     rdi, r15
+    xor     ecx, ecx
+.bsr_copy_all_loop:
+    cmp     rcx, rdx
+    jge     .bsr_copy_all_done
+    movzx   eax, word ptr [rsi + rcx*2]
+    mov     word ptr [r15], ax
+    add     r15, 2
+    inc     rcx
+    jmp     .bsr_copy_all_loop
+.bsr_copy_all_done:
+    sub     r14, 16
+    mov     [r14], rdi
+    mov     [r14+8], rdx
+    DISPATCH
+
+# ═══════════════════════════════════════════════════════════════════════════
 # CONSTANT STRINGS
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -6590,6 +8117,7 @@ str_type_string:   .word 's','t','r','i','n','g'
 str_type_array:    .word 'a','r','r','a','y'
 str_type_function: .word 'f','u','n','c','t','i','o','n'
 str_type_molecule: .word 'm','o','l','e','c','u','l','e'
+str_type_dict:     .word 'd','i','c','t'
 
 # ═══════════════════════════════════════════════════════════════════════════
 # BSS — Zero-initialized data
@@ -6682,6 +8210,13 @@ homeo_mode:     .space 1            # 0=ACTING, 1=LEARNING
 repl_heap_checkpoint: .space 8
 _call_save_hash: .space 8
 _call_save_argc: .space 8
+_call_save_name_ptr: .space 8
+_call_save_name_len: .space 8
+
+# Shadow call stack for error traces (64 entries × 24 bytes = 1536 bytes)
+.align 8
+call_stack_depth: .space 8
+call_stack:       .space 1536   # [(name_ptr:8, name_len:8, call_pc:8) × 64]
 _push_old_arr: .space 8
 try_depth:      .space 8
 

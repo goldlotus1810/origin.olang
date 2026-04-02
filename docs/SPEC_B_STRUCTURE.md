@@ -1,5 +1,6 @@
 # SPEC B — Cấu Trúc Dữ Liệu: Chain + KnowTree + Silk + QR
 
+> **Updated SS23 (2026-04-02)** — Added §B2.1 Persistence Model (→BP13), §B3.1 Reward-Modulated Fire (→BP16), §B4.1 QR reward note. Research: docs/research/04_overcome_nox_limitations.md.
 > **Tài liệu kỹ thuật chi tiết cho Phần B của HomeOS Unified Spec.**
 > **Prerequisite:** Đọc SPEC_A_FOUNDATION.md trước.
 > **Tác giả:** Lupin (thiết kế) + Nox (tổng hợp + verify)
@@ -175,6 +176,28 @@ L2+:
   16 GB disk: ~40,000 cuốn sách = thư viện nhỏ
 ```
 
+### B2.1 KnowTree Persistence [NEW SS23]
+
+```
+KnowTree hiện tại: chỉ tồn tại trong heap. Restart = mất hết.
+BP13 (Persistence) giải quyết bằng 3 layers:
+
+Layer 1: mmap binary format (NKB — Nox Knowledge Binary)
+  Header: [magic:4][version:2][node_count:4][edge_count:4][...]
+  Index:  [mol_hash:4][data_offset:4][data_len:4] = 12 bytes/node
+  Data:   [chain_len:2][chain_data:N][metadata:M]
+  Access: mmap + binary search on mol_hash. O(log n).
+  100K nodes = 1.2MB index. Data demand-paged from disk.
+
+Layer 2: LRU cache (2048 slots × 64 bytes = 128KB in heap)
+  Hit → return from cache. Miss → load from mmap'd NKB.
+
+Layer 3: Dream consolidation writes promoted QR to persistent NKB.
+
+→ See spec/SPEC_BP13_PERSISTENCE.md for full details.
+→ KnowTree structure (B2) unchanged. Only storage backend changes.
+```
+
 ---
 
 ## B3. Silk — 9,200 Loại Kết Nối
@@ -314,6 +337,31 @@ Structural Silk = thứ tự trong chain/array = 0 bytes.
 Hebbian Silk = learned per dimension = có weight.
 ```
 
+### B3.1 Reward-Modulated Hebbian Fire [NEW SS23]
+
+```
+Current (pure Hebbian):
+  Δw = emotion_factor × (1 − w) × 0.1
+  Fire together → wire together. No success/failure signal.
+
+Extended (BP16 Feedback):
+  Δw = emotion_factor × (1 − w) × 0.1 × reward_factor
+  reward_factor = calibrated_reward / 500
+    > 1 → stronger fire (good outcome)
+    < 1 → weaker fire (bad outcome)
+    = 1 → neutral (pure Hebbian — default until feedback exists)
+
+Edge format extended:
+  Old: [from_hash:4][to_hash:4][weight:2] = 10 bytes
+  New: [from_hash:4][to_hash:4][weight:2][fire_count:2][reward_sum:2][reward_count:2] = 16 bytes
+
+NO CONFLICT with current fire rule:
+  reward_factor defaults to 1.0 (no feedback yet) → degenerates to pure Hebbian.
+  BP16 EXTENDS, does not replace. Silk fire rule (φ⁻³) unchanged.
+
+→ See spec/SPEC_BP16_FEEDBACK.md for UCB1 selection and reward signals.
+```
+
 ---
 
 ## B4. QR — Append-Only Proven Knowledge
@@ -355,6 +403,21 @@ Mature     → đủ evidence, sẵn sàng QR (weight ≥ φ⁻¹ + fire ≥ Fib
 Formula → Evaluating: khi fire_count > 0
 Evaluating → Mature: khi weight ≥ 0.854 AND fire ≥ Fibonacci threshold
 Mature → Mature: irreversible (không quay lại)
+```
+
+### B4.1 QR Promotion and Reward [NEW SS23]
+
+```
+QR promotion criteria UNCHANGED:
+  weight ≥ 0.854 AND fire ≥ Fib[depth]
+
+Reward (BP16) affects promotion INDIRECTLY:
+  Good feedback → higher reward_factor → stronger silk fire → higher weight → faster promotion
+  Bad feedback → lower reward_factor → weaker fire → slower/no promotion
+
+NO direct reward criterion needed for QR.
+Reward flows through silk weight → promotion happens naturally.
+This is biologically correct: LTP doesn't check "was I right?" — it checks "was I reinforced?"
 ```
 
 ### Supersede (không xóa, chỉ thay thế)

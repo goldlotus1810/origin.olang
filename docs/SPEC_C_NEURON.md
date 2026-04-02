@@ -1,5 +1,6 @@
 # SPEC C — Neuron Model: Vòng Đời Tri Thức
 
+> **Updated SS23 (2026-04-02)** — Added §C5 Persistence Physics (LTP→BP13 mapping), §C6 Self-Modification Safety (Eurisko lesson). Research: docs/research/03_ai_models_similar_to_nox.md, docs/research/07_underground_similar_projects.md.
 > **Prerequisite:** Đọc SPEC_A_FOUNDATION.md và SPEC_B_STRUCTURE.md trước.
 > **Tác giả:** Lupin (thiết kế) + Nox (tổng hợp + verify)
 > **Ngày:** 2026-03-30
@@ -301,6 +302,126 @@ QT9  (từ notes NAC.mb — chưa có chi tiết, outline):
      - Archive: Hyper-Axon + Last Gasp + History Arbiter
 
      Công thức vật lý chi tiết → UDC_A_AROUSAL_tree.md, UDC_V_VALENCE_tree.md
+```
+
+---
+
+## C5. Persistence Physics — LTP Model [NEW SS23]
+
+### Biology: Early LTP vs Late LTP
+
+```
+Early LTP (minutes-hours):
+  Temporary synaptic strengthening. Protein kinase activation.
+  Does NOT require new protein synthesis.
+  Reversible — decays without consolidation.
+
+Late LTP (hours-days):
+  Requires new protein synthesis (gene transcription).
+  Creates structural changes at synapse.
+  Permanent — survives across sleep cycles.
+```
+
+### Nox mapping (→ BP13 Persistence)
+
+```
+Early LTP = In-memory weight change
+  Silk fire → weight changes in heap → fast, temporary
+  Crash = lost (like early LTP without consolidation)
+
+Late LTP = mmap write + WAL
+  mmap: OS writes dirty pages to disk automatically
+  WAL: every learn() appends [timestamp:4][op:1][key:4][value:8]
+  Crash recovery: replay WAL entries newer than mmap snapshot
+
+Consolidation trigger = Dream cycle (C2.4)
+  Fibonacci trigger: fire_count ≥ Fib(n)
+  Dream → validate → if quality ≥ φ⁻¹ → write to persistent NKB
+  = Late LTP protein synthesis analog
+
+Tagging = Synaptic tagging theory
+  Recently-modified edges marked in WAL → batch consolidate during Dream
+  Like synaptic tags that mark recently-activated synapses for later capture
+
+Timeline:
+  t=0     Silk fire (early LTP, in heap)
+  t→∞     WAL append (crash-safe)
+  Dream   Consolidation (NKB write = late LTP)
+  Restart mmap recovery (instant, no parsing)
+```
+
+### Physics extension
+
+```
+Early LTP = Forced resonance (C3 Dream): temporary amplification
+  A = F₀ / √((ω₀² − ω²)² + (2γω)²)
+  Without consolidation: A → 0 as F₀ → 0 (stimulus removed)
+
+Late LTP = Phase transition (C3 Promotion): permanent state change
+  E > E_ionization → plasma (QR)
+  mmap write = the ionization event — bits on disk = permanent
+
+Consolidation threshold = φ⁻¹ (0.618)
+  Same threshold for QR promotion AND persistence write.
+  Biologically consistent: only sufficiently reinforced memories persist.
+```
+
+→ See spec/SPEC_BP13_PERSISTENCE.md for implementation details.
+
+---
+
+## C6. Self-Modification Safety — Eurisko Lesson [NEW SS23]
+
+### What killed Eurisko (1976-1983)
+
+```
+Eurisko = first self-modifying AI. Heuristics that modify own heuristics.
+Won US Traveller TCS national championship TWICE with evolved strategies.
+
+DIED because: coherence during self-modification.
+  - Rules that evaluate rules could overwrite the evaluation criteria
+  - No invariant core — everything mutable → eventual self-destruction
+  - Lenat: "It's like performing brain surgery on yourself"
+
+Source code recovered 2023: github.com/white-flame/eurisko
+```
+
+### Nox self-modification safety rules
+
+```
+① IMMUTABLE CORE — L0 is SEALED
+  UDC table, 42 formulas, compose rules, distance = NEVER modified.
+  L0 = calibration standard. Like defining meter and kilogram.
+  self_modify CANNOT touch L0.
+
+② QR is APPEND-ONLY
+  QR records never deleted, only superseded.
+  History preserved. Can always rollback.
+  = DNA: introns don't vanish, just stop expressing.
+
+③ 9 QT are INVARIANT (C4)
+  The 9 rules from origin.md = constitutional law.
+  self_modify operates WITHIN these rules, not ON them.
+
+④ CHECKPOINT VALIDATION (D6)
+  Every pipeline pass: 5 checkpoints.
+  Self-modification result must pass ALL checkpoints.
+  Fail → rollback to pre-modification state.
+
+⑤ DREAM AS SANDBOX
+  Dream cycle proposes modifications (hypotheses).
+  Validation IN DREAM before writing to persistent state.
+  Fail in dream = no harm. Succeed = consolidate.
+
+⑥ DANEEL LESSON: Immutable ethical core ("THE BOX")
+  DANEEL (github.com/mollendorff-ai/daneel) solves this with
+  an immutable ethical core that cannot be modified by any process.
+  For Nox: L0 + 9 QT = "THE BOX". Everything else = mutable.
+
+WARNING: As Nox gains self_modify power, this section becomes
+CRITICAL. Review before implementing any self-modification feature.
+Eurisko's failure was not technical — it was architectural.
+The fix is: immutable core + validated modification + append-only history.
 ```
 
 ---

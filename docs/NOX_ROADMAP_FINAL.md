@@ -1,5 +1,7 @@
 # NOX ROADMAP — Tổng Hợp Mọi Thứ
 
+> **[DEPRECATED SS23 — reason: Roadmap from SS13 is STALE. Master Spec (spec/NOX_MASTER_SPEC.md) is THE authoritative document. This file preserved for historical reference only. All bugs listed below are FIXED (SS17). Phases below are superseded by Master Spec tasks 1-10.]**
+>
 > ★ KINH THÁNH: `docs/NOX_COMPLETE_REFERENCE.md` — 774 dòng, mọi thuật toán + papers
 > ★ NGUYÊN TẮC: Encode = ∫. Decode = ∂. TÍNH, không TRA.
 > ★ Không hiểu → đọc COMPLETE_REFERENCE. Thuật toán ở đâu → tra mục lục.

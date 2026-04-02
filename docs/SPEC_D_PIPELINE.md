@@ -1,5 +1,6 @@
-# SPEC D — Processing Pipeline: 14 Cơ Chế + 5 Checkpoints
+# SPEC D — Processing Pipeline: 15 Cơ Chế + 6 Checkpoints
 
+> **Updated SS23 (2026-04-02)** — Added Mechanism 15 (Reward/Feedback→BP16), CP6 (Post-Response Reward), §D2.1 Instinct Competition Model, §D3.1 Immune Selection vs GWT comparison, §D7.1 Reward-aware tone. 14→15 mechanisms, 5→6 checkpoints. Research: docs/research/03_ai_models_similar_to_nox.md (ACT-R, NARS), docs/research/07_underground_similar_projects.md (DANEEL GWT).
 > **Prerequisite:** Đọc SPEC_A, SPEC_B, SPEC_C trước.
 > **D không phải phần mới — D là cách SẮP XẾP A+B+C thành pipeline.**
 > **Tác giả:** Lupin (thiết kế) + Nox (tổng hợp + verify)
@@ -124,9 +125,44 @@ Capture holistic TRƯỚC → giữ bản chất. Decompose SAU → chi tiết.
    Cao → học tốt | Thấp → cần học thêm
 ```
 
+### D2.1 Instinct Selection Model [NEW SS23]
+
+```
+Current: 7 instincts run SEQUENTIALLY. Honesty first.
+
+ACT-R comparison:
+  ACT-R productions COMPETE — highest utility wins.
+  utility += alpha × (Reward - utility)  [exponential moving average]
+  
+For Nox — HYBRID approach:
+  ① Honesty ALWAYS runs first (safety gate — non-negotiable)
+  ② SecurityGate ALWAYS runs first (parallel with Honesty)
+  ③ Remaining 5 instincts (Contradiction, Causality, Abstraction,
+     Analogy, Curiosity, Reflection) → COMPETE:
+     
+     instinct_score(i) = relevance(i, input_mol) × silk_evidence(i)
+     winner = argmax(instinct_score)
+     
+     relevance = how much this instinct's dimension matches input:
+       Contradiction: high when V distance between STM items > 0.8
+       Causality:     high when temporal ordering + R strong
+       Abstraction:   high when cluster variance > 0.5
+       Analogy:       high when partial match found (2-3 dims close, 1-2 far)
+       Curiosity:     high when novelty > 0.5
+       Reflection:    periodic (every N interactions)
+     
+  ④ Winner gets execution. Others dormant.
+     Future: top-2 could run (like DANEEL competing thought streams).
+
+WHY Honesty stays first:
+  Eurisko lesson: if evaluation criteria compete, they can overwrite each other.
+  Honesty = "do I know enough?" Must run before any reasoning instinct.
+  = immune checkpoint before cell division. Skip = cancer.
+```
+
 ---
 
-## D3. 14 DNA Mechanisms — Pipeline
+## D3. 15 DNA Mechanisms — Pipeline
 
 ```
 Input (text / audio / image / sensor)
@@ -150,9 +186,14 @@ Input (text / audio / image / sensor)
   ──── CHECKPOINT 5: RESPONSE ────
   ↓
 Output (text + tone)
+  ↓
+  ↓ ⑮ Reward Update (Feedback)           → track used path, await feedback
+  ──── CHECKPOINT 6: FEEDBACK ──── [NEW SS23]
+  ↓
+Loop back → next input (with feedback applied)
 ```
 
-### Map vào A+B+C:
+### Map vào A+B+C+BP:
 
 ```
 ⑨ SecurityGate    = check prohibited space (V: U₀>>E)         [C3]
@@ -161,12 +202,45 @@ Output (text + tone)
 ⑬ Search          = KnowTree walk + Silk type follow           [B2+B3]
 ⑫ Homeostasis     = Free Energy F(t)                           [D4]
 ⑤ Compose          = union/amplify/max/dominant                [A4]
-⑧ Instincts       = 7 formulas trên 5D                        [D2]
+⑧ Instincts       = 7 formulas trên 5D (competitive: D2.1)    [D2]
 ⑪ Immune Selection = 3 branches, pick lowest entropy           [D5]
 ⑭ DNA Repair       = self-correct, bounded 3 iterations        [D5]
 ⑥ Hebbian          = Silk co-activate per dimension            [C3]
 ⑦ Dream            = cross-group resonance → hypothesis → validate [C4]
 ② Decode ∂          = lookup chain → KnowTree → content        [A5]
+⑮ Reward Update    = feedback → silk weight adjustment          [BP16] [NEW SS23]
+```
+
+### ⑮ Mechanism 15: Reward Update [NEW SS23]
+
+```
+AFTER output, BEFORE next input:
+
+① Store used path:
+   response_path = list of silk edges used during Search→Decode
+   Store in STM with response_mol and timestamp
+
+② Detect feedback (next interaction):
+   Explicit: user says "yes"/"no"/"correct"/"wrong" → reward 1000/0
+   Implicit:
+     Follow-up question referencing answer → reward 800 (accepted)
+     Same question repeated → reward 100 (failed)
+     Topic change → reward 500 (neutral)
+     Session length > 10 → +50 bonus all recent edges
+     Session length < 3 → -50 penalty all recent edges
+
+③ Update silk weights:
+   For each edge in response_path:
+     ACT-R utility: w += alpha × (reward - w) / 1000  (alpha=100)
+     UCB1 tracking: edge.reward_count++, edge.reward_sum += reward
+     WAL: persist_wal_append(REWARD, edge.hash, reward)
+
+④ Calibration:
+   Track per-confidence-bucket: total predictions vs correct
+   After enough data: calibrated_confidence replaces raw confidence
+   When Nox says "80% sure" → actually right ~80%
+
+→ See spec/SPEC_BP16_FEEDBACK.md for full UCB1 math and reward signals.
 ```
 
 ---
@@ -208,6 +282,34 @@ infer(N=3) → 3 candidate responses
   Best = argmin(H)
 ```
 
+### D5.1 Immune Selection vs Global Workspace Theory [NEW SS23]
+
+```
+Current Nox: 3 branches → pick lowest entropy (Shannon H).
+  = "most confident answer wins"
+
+DANEEL (Mollendorff):
+  Global Workspace Theory (Baars, 1988):
+  - Multiple "thought streams" run in parallel (unconscious)
+  - Most relevant stream gets "broadcast" to global workspace (conscious)
+  - Other streams contribute but don't dominate
+  
+  DANEEL: competing streams → winner broadcast → global workspace
+
+Comparison:
+  Nox "3 branches"   ≈  DANEEL "competing thought streams"
+  Nox "lowest H"     ≈  DANEEL "most relevant broadcast"
+  Nox lacks          :  loser streams still contributing (partial voting)
+  
+Future evolution (NOT now):
+  Instead of argmin(H), weighted voting:
+    final_response = Σ (1/H_i) × response_i / Σ (1/H_i)
+    = low-entropy branches contribute more, but ALL contribute
+    = closer to GWT's "broadcast with background processing"
+  
+Current approach is CORRECT and simpler. GWT = future refinement.
+```
+
 ### DNA Repair (bounded self-correction)
 
 ```
@@ -239,6 +341,8 @@ CP2 ENCODE:   |entities| ≥ 1, chain_hash ≠ 0, compose consistency ≥ 0.75
 CP3 INFER:    ≥1 branch valid ≥ 0.75, H(best) < 2.32, quality rollback OK
 CP4 PROMOTE:  weight ≥ φ⁻¹, fire ≥ Fib(n), eval_dims ≥ 3, H < 1.0
 CP5 RESPONSE: SecurityGate.check(response) = Safe, tone OK, confidence ≥ 0.40
+CP6 FEEDBACK: [NEW SS23] reward signal received OR timeout (5 interactions).
+    Store response_path. Track reward. Update silk. Calibrate.
 ```
 
 ---
@@ -265,6 +369,24 @@ TONE SELECTION — từ ĐẠO HÀM, không từ V hiện tại:
   otherwise                → Engaged     (bình thường)
 
 GIỚI HẠN: ΔV_max = 0.40/step (không nhảy đột ngột)
+```
+
+### D7.1 Reward-Aware Tone [NEW SS23]
+
+```
+ConversationCurve currently uses V(t), V'(t), V''(t) only.
+With BP16 feedback, tone selection gains a reward signal:
+
+Extended f(x):
+  f(x) = 0.5 × f_conv(t) + 0.3 × f_dn(nodes) + 0.2 × f_reward(recent)
+
+  f_reward(recent) = avg_reward(last_5_interactions) / 1000
+    High reward (>0.7) → shift toward Confident/Reinforcing
+    Low reward (<0.3)  → shift toward Cautious/Gentle
+    Neutral            → no change (0.5 × 0 = 0 effect)
+
+NO CHANGE to existing formula — f_reward is ADDITIVE term.
+When no feedback exists, f_reward = 0.5 (neutral) → degenerates to current behavior.
 ```
 
 ---

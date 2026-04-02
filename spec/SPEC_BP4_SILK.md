@@ -1,5 +1,6 @@
 # SPEC Part 4: Silk — Learned + Implicit Connections
 
+> **Updated SS23 (2026-04-02)** — Added §Reward-Modulated Fire (→BP16), edge format extension note, decay comparison (power-law vs ACT-R). No conflict with existing rules.
 > Author: Nox SS15
 > Date: 2026-04-01
 > Status: NOT YET ACHIEVED
@@ -227,6 +228,62 @@ Phase 5: Pruning (all 5 dims dead check) — ~10 LOC
 ```
 
 ~75 LOC total. No storage format change. No VM changes.
+
+## Reward-Modulated Hebbian Fire [NEW SS23]
+
+BP16 (Feedback) extends silk fire with reward signal:
+
+```
+Current (pure Hebbian):
+  Δw = covariance × emotion_factor
+  Fire together → wire together. No outcome signal.
+
+Extended (with BP16):
+  Δw = covariance × emotion_factor × reward_factor
+  reward_factor = calibrated_reward / 500
+    > 1 → stronger fire (good outcome confirmed)
+    < 1 → weaker fire (bad outcome confirmed)
+    = 1 → neutral (no feedback yet = pure Hebbian)
+
+NO CONFLICT: reward_factor defaults to 1.0 → degenerates to current behavior.
+BP16 EXTENDS, does not replace existing covariance/STDP/BCM rules.
+
+Edge format extension (BP16):
+  Current: [target, w_S, w_R, w_V, w_A, w_T] = 6 values
+  Extended: + [fire_count:2][reward_sum:2][reward_count:2] = +6 bytes
+  → Enables UCB1 selection (BP16) when multiple paths exist.
+  → fire_count already planned in VM spec (18-byte edge).
+  → reward_sum/count fit in remaining bytes.
+
+UCB1 path selection (when multiple silk paths available):
+  ucb1 = (reward_sum / reward_count) + sqrt(2 × ln(total) / reward_count)
+  → Unvisited paths explored first (reward_count=0 → infinite UCB)
+  → Well-performing paths exploited more
+  → Exploration decreases logarithmically
+
+→ See spec/SPEC_BP16_FEEDBACK.md for full details.
+→ See SPEC_B_STRUCTURE.md §B3.1 for theory-level description.
+```
+
+### Decay Model Comparison [NEW SS23]
+
+```
+System      | Decay model         | Nox
+ACT-R       | Power-law: t^(-d)   | Adaptive: β₀ × fire^(-0.35) per dream
+NARS        | Budget-based decay  | φ⁻¹ per 24h (exponential)
+Biology     | Ebbinghaus curve    | Approximated by adaptive β
+
+Current Nox: ×0.9 per dream cycle ≈ φ⁻¹ per 24h (correct)
+Research improvement: adaptive β (already in this spec, "Adaptive Decay" section)
+ACT-R power-law: more accurate for long-term memory
+Nox adaptive β: approximates power-law behavior (frequently-used edges decay slower)
+
+CONCLUSION: Current approach is correct. Adaptive β improves it further.
+No need to switch to pure power-law — adaptive β gives similar behavior
+and is simpler to compute in integer math.
+```
+
+---
 
 ## References
 

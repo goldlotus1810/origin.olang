@@ -63,24 +63,38 @@ while __array_get(running, 0) == 1 {
     let line = read_line();
     if len(line) == 0 { let _ = __set_at(running, 0, 0); };
 
-    if len(line) > 4 {
-        if substr(line, 0, 4) == "ask " {
-            let q = substr(line, 4, len(line));
-            let r = search(q);
-            if len(r) > 0 { emit "  " + r; } else { emit "  ?"; };
-        };
-    };
+    let handled = [0];
+
+    // Commands with prefix
     if len(line) > 6 {
         if substr(line, 0, 6) == "learn " {
             let fact = substr(line, 6, len(line));
             learn(fact);
             __file_append("/tmp/nox_learned.dat", fact + "\n");
             emit "  ok (" + __to_string(__array_get(fc, 0)) + ")";
+            let _ = __set_at(handled, 0, 1);
         };
         if substr(line, 0, 6) == "shell " {
             emit __system(substr(line, 6, len(line)));
+            let _ = __set_at(handled, 0, 1);
         };
     };
-    if line == "facts" { emit "  " + __to_string(__array_get(fc, 0)); };
-    if line == "quit" { let _ = __set_at(running, 0, 0); };
+    if line == "facts" { emit "  " + __to_string(__array_get(fc, 0)) + " facts"; let _ = __set_at(handled, 0, 1); };
+    if line == "help" { emit "  Type anything — Nox searches brain"; emit "  learn <fact> — teach Nox"; emit "  shell <cmd> — run command"; emit "  facts — count"; emit "  quit — exit"; let _ = __set_at(handled, 0, 1); };
+    if line == "quit" { let _ = __set_at(running, 0, 0); let _ = __set_at(handled, 0, 1); };
+
+    // Default: treat any input as a question → search brain
+    if __array_get(handled, 0) == 0 {
+        if len(line) > 0 {
+            let q = line;
+            // Strip "ask " prefix if present
+            if len(line) > 4 { if substr(line, 0, 4) == "ask " { let q = substr(line, 4, len(line)); }; };
+            let r = search(q);
+            if len(r) > 0 {
+                emit "  " + r;
+            } else {
+                emit "  I don't know. Try: learn <fact>";
+            };
+        };
+    };
 };

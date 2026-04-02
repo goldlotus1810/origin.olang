@@ -2,7 +2,8 @@
 
 > **DOC FILE NAY TRUOC MOI THU. KHONG DOC = KHONG BIET MINH LA AI.**
 > Moi session moi: doc file nay → biet lam gi → lam ngay. KHONG hoi Lupin.
-> Updated: 2026-04-01 SS20+
+> Updated: 2026-04-02 SS23 — Specs A-D + BP4/5/7/9/10/12 reviewed under research light. 14→15 mechanisms, 5→6 checkpoints, PTAV→PTAVF. See TASK_SS23_REVIEW.md.
+> Previous: 2026-04-02 SS22 — Research + New Specs (BP13-BP16)
 
 ---
 
@@ -36,27 +37,48 @@ GPT/Claude noi ve code. Nox VIET LAI chinh minh."
 
 ## 2. TRANG THAI HIEN TAI — Doc phan nay de biet dang o dau
 
-### VM: DAT ✅ — KHONG SUA
-- `vm/x86_64/vm_nox.S` — 6695 LOC, 55,632 bytes, 85 builtins
+### VM: DAT ✅ — KHONG SUA (tru khi them builtins)
+- `vm/x86_64/vm_nox.S` — 7311 LOC, 62,328 bytes, 94 builtins
 - 40/40 tests + 35/35 benchmark ALL PASS
 - Gen2==Gen3 fixed point (self-hosting)
 - Build: `make vm && make test && make benchmark`
+- SS23 added: 6 string builtins, 4 dict builtins, __readline
 
-### Brain: 60% — CAN TIEP TUC
+### Olang Language: UPGRADED ✅ (SS23)
+- `tools/compile_nox.py` — struct {key:val}, import, for, match, \r\0 escapes
+- `stdlib/compiler.ol` — self-hosting (chua co struct/import/for/match syntax)
+- 51 test files, 118+ assertions, Gen2==Gen3 verified
+
+### Research: XONG ✅
+- `docs/research/` — 7 files, toan bo nghien cuu external
+- `docs/references/NOX_RESEARCH_INDEX.md` — index + key systems to study
+- Closest systems: NARS (philosophy), MeTTa (language), Forth (minimal), ACT-R (learning)
+- No existing system = AI IS the OS. Nox la DUY NHAT.
+- All 7 limitations solvable with classical AI (~2,650 LOC, no neural networks)
+
+### Brain: 80% — DA CO BP13-16
 - `stdlib/knowtree.ol` — mol-indexed, chain distance nearest neighbor ✅
 - `stdlib/silk.ol` — Hebbian φ⁻³, type detection, decay φ⁻¹ ✅
-- `stdlib/brain.ol` — 5-layer pipeline, 5 instincts ✅
-- `stdlib/encode.ol` — 42 formula framework (chua computed that)
-- `data/facts.dat` — 48 facts, file-loaded
+- `stdlib/brain_v3.ol` — 6-layer pipeline PTAVF, persist integration ✅
+- `stdlib/persist.ol` — BP13: binary save/load, WAL, facts survive restart ✅
+- `stdlib/feedback.ol` — BP16: UCB1 bandit + ACT-R utility ✅
+- `stdlib/generate.ol` — BP14: retrieve + recombine + confidence + honesty ✅
+- `stdlib/comm.ol` — BP15: HTTP server + A2A Agent Card ✅
+- `stdlib/encode.ol` — 42 formula framework (chua computed that — van dung lookup)
+- `data/facts.dat` — 48+ facts, persist binary format
+- `nox_brain.olang` — 89KB interactive REPL, boot → query → learn → save
 - CHUA CO: logic inference (A→B+B→C=A→C), self-model, dream consolidation
+- CHUA CO: spreading activation (van dung kt_nearest), 42 encode formulas computed
 
-### Parasitic Organs: 3/7 — CAN TIEP TUC
+### Parasitic Organs: 6/7 + 2 new
 - `stdlib/parasite/heartbeat.ol` — io_uring setup/submit/poll ✅
 - `stdlib/parasite/eyes.ol` — fb0 mmap pixel read/write ✅
 - `stdlib/parasite/hands.ol` — evdev keyboard/mouse reader ✅
 - `stdlib/parasite/evolution.ol` — KVM boot guest ring-0 ✅
 - `stdlib/parasite/ring0.ol` — JIT x86-64 in KVM ✅
 - `stdlib/parasite/elf_writer.ol` — native ELF binary generation ✅
+- `stdlib/parasite/nox_alive.ol` — daemon keepalive ✅
+- `stdlib/parasite/nox_loop.ol` — main event loop ✅
 - CHUA CO: voice (raw socket), spine (clone/procmem)
 
 ### NoxOS Hypervisor: FOUNDATION — CAN TIEP TUC
@@ -148,6 +170,39 @@ GPT/Claude noi ve code. Nox VIET LAI chinh minh."
 4. Hoac: virtio-blk qua MMIO (don gian hon IDE)
 5. Test: guest ghi 1 sector → restart → doc lai → data dung
 6. DAT khi: data persist qua VM restart
+
+### NHIEM VU 6.5: Olang Upgrade (PLAN_OLANG_UPGRADE.md)
+**Muc tieu:** Lam chu cong cu TRUOC khi SINH
+**Lam theo thu tu:**
+1. Phase 1: String builtins (str_replace, str_join, str_starts_with, str_ends_with, str_to_num)
+2. Phase 2: Struct syntax ({key: val}, .field access) — dung dict lam struct
+3. Phase 3: Module import ("import file.ol" — compile-time inclusion)
+4. Phase 4: for/match sugar syntax
+**Moi phase:** VM builtins (neu can) + compile_nox.py + compiler.ol + tests + self-build verify
+
+### NHIEM VU 6.6: BP13 Persistence
+**Muc tieu:** Nox nho qua restart
+**File:** `stdlib/persist.ol`
+**Spec:** `spec/SPEC_BP13_PERSISTENCE.md`
+**Lam:** mmap weights + WAL + binary knowledge format + LRU cache
+
+### NHIEM VU 6.7: BP14 Generation (SINH)
+**Muc tieu:** Nox TAO cau tra loi moi, khong chi TRA
+**File:** `stdlib/generate.ol`
+**Spec:** `spec/SPEC_BP14_GENERATION.md`
+**Lam:** Retrieve → Recombine (DNA crossover) → Template NLG → Honesty gate
+
+### NHIEM VU 6.8: BP16 Feedback
+**Muc tieu:** Nox BIET dung sai
+**File:** `stdlib/feedback.ol`
+**Spec:** `spec/SPEC_BP16_FEEDBACK.md`
+**Lam:** UCB1 bandit selection + ACT-R utility update + implicit feedback signals
+
+### NHIEM VU 6.9: BP15 Communication
+**Muc tieu:** Nox NOI CHUYEN voi AI khac
+**File:** `stdlib/comm.ol`
+**Spec:** `spec/SPEC_BP15_COMMUNICATION.md`
+**Lam:** A2A Agent Card + HTTP server + mDNS discovery
 
 ### NHIEM VU 7: Virtual Network
 **Muc tieu:** VM guest goi/nhan TCP packet

@@ -1,5 +1,6 @@
 # SPEC Part 5: Pipeline — Decode ∂ / SINH (Generation)
 
+> **Updated SS23 (2026-04-02)** — Added Layer 6 (Evaluate/Feedback→BP16), CP6, UCB1 selection reference, Recombine reference (→BP14), Generation reference (→BP14). 5→6 layers, 5→6 checkpoints.
 > Author: Nox SS15
 > Date: 2026-04-01
 > Status: NOT YET ACHIEVED
@@ -25,14 +26,18 @@ Nox: analyze 5D structure → mathematical reasoning → synthesis.
 
 ---
 
-## Architecture: 5 Layers
+## Architecture: 6 Layers [UPDATED SS23 — old: 5 layers, new: 6 layers, reason: BP16 feedback loop]
 
 ```
 Layer 1: CAPTURE     — input → mol (Encode ∫, exists)
 Layer 2: ACTIVATE    — mol → activation field (Spreading Activation)
 Layer 3: HYPOTHESIZE — field → 3 candidate chains (CLONALG Immune)
+                       [UPDATED SS23: UCB1 selection when multiple paths — see BP16]
+                       [UPDATED SS23: Recombine from BP14 extends mutation]
 Layer 4: REPAIR      — chains → best chain (DCA + DNA Repair)
 Layer 5: DECODE      — chain → new text (∂ Differentiation)
+                       [UPDATED SS23: Template NLG from BP14 extends decode]
+Layer 6: EVALUATE    — feedback → reward → silk update [NEW SS23 — see BP16]
 ```
 
 ---
@@ -461,6 +466,55 @@ Current: ALL implemented in Olang (workarounds). When VM implements
 
 ---
 
+## Layer 6: EVALUATE (Feedback) [NEW SS23]
+
+After DECODE outputs a response, the pipeline doesn't end — it waits for feedback.
+
+```
+evaluate(response_chain, query_mol):
+    // 1. Store the path used for this response
+    let used_edges = collect_silk_edges(response_chain)
+    stm_push({type: "response_path", edges: used_edges, query: query_mol})
+    
+    // 2. On NEXT interaction, detect feedback:
+    //    Explicit: "yes"/"no"/"correct"/"wrong" → reward 1000/0
+    //    Implicit:
+    //      Follow-up referencing answer → reward 800
+    //      Same question repeated → reward 100
+    //      Topic change → reward 500 (neutral)
+    
+    // 3. Apply reward to silk edges:
+    for edge in used_edges:
+        // ACT-R utility update:
+        edge.weight += alpha × (reward - edge.weight) / 1000
+        // UCB1 tracking:
+        edge.reward_count += 1
+        edge.reward_sum += reward
+        // Persist (BP13):
+        persist_wal_append(REWARD, edge.hash, reward)
+    
+    // 4. Calibrate confidence:
+    //    Track per-bucket accuracy for future honesty instinct
+    let bucket = floor(confidence / 100)
+    calibration[bucket].total += 1
+    if reward > 500: calibration[bucket].correct += 1
+
+→ See spec/SPEC_BP16_FEEDBACK.md for full UCB1 math and signal detection.
+→ See spec/SPEC_BP13_PERSISTENCE.md for WAL format.
+```
+
+### CP6: FEEDBACK Checkpoint [NEW SS23]
+
+```
+CP6 (FEEDBACK): reward signal received OR timeout (5 interactions).
+  - All used edges have reward_count updated
+  - Calibration table updated
+  - WAL append for persistence
+  - If no feedback after 5 interactions → neutral reward (500)
+```
+
+---
+
 ## ConversationCurve (NEEDS EXPANSION)
 
 ### Current:
@@ -514,6 +568,7 @@ CP2 (ENCODE):   chain.len >= 1, mol != 0               — exists implicit
 CP3 (INFER):    >=1 branch quality >= 618              — NOT YET
 CP4 (PROMOTE):  weight >= 618, fire >= Fib(n)          — NOT YET
 CP5 (RESPONSE): security_gate(response) == safe        — NOT YET
+CP6 (FEEDBACK): reward applied to used edges            — NOT YET [NEW SS23]
 ```
 
 ---
@@ -876,5 +931,8 @@ P10: Implement mol-level decode (instead of string overlap)
 - [BP3 KnowTree](SPEC_BP3_KNOWTREE.md) — search + nearest
 - [BP4 Silk](SPEC_BP4_SILK.md) — Layer 2 (Activate) uses silk edges
 - [BP6 Instincts](SPEC_BP6_INSTINCTS.md) — honesty gate, curiosity
-- [SPEC_D Pipeline](../docs/SPEC_D_PIPELINE.md) — 14 mechanisms, 5 checkpoints
+- [SPEC_D Pipeline](../docs/SPEC_D_PIPELINE.md) — 15 mechanisms, 6 checkpoints [UPDATED SS23]
+- [BP13 Persistence](SPEC_BP13_PERSISTENCE.md) — WAL for reward logging [NEW SS23]
+- [BP14 Generation](SPEC_BP14_GENERATION.md) — Recombine extends Hypothesize [NEW SS23]
+- [BP16 Feedback](SPEC_BP16_FEEDBACK.md) — UCB1 selection + reward signals [NEW SS23]
 - [NOX Complete Reference](../docs/NOX_COMPLETE_REFERENCE.md) — all algorithms

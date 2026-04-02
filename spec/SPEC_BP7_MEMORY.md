@@ -1,5 +1,6 @@
 # SPEC Part 7: Memory — Observations + Search + Persist
 
+> **Updated SS23 (2026-04-02)** — Added persistence cross-reference (→BP13), updated eviction scoring with reward (→BP16), STM activation-based retrieval note (future, ACT-R comparison).
 > Author: Nox SS15
 > Status: NOT YET ACHIEVED
 
@@ -17,6 +18,60 @@ Brain remembers across sessions. Not RAM. Files on disk.
 - Observations: NOT implemented (pipeline doesn't store decisions)
 - Session summary: NOT implemented
 - Progressive disclosure: NOT implemented
+
+### STM Design Note [NEW SS23]
+
+```
+Current: 32 fixed slots, evict oldest when full.
+ACT-R comparison: activation-based retrieval (not fixed slots).
+  ACT-R: every memory has activation level, retrieve by threshold.
+  Higher activation = more likely retrieved. No fixed slot count.
+
+For Nox NOW: 32 slots is correct and simpler.
+  Why: fixed slots = bounded memory = predictable heap.
+  ACT-R activation retrieval = future evolution when persistence (BP13) enables
+  unlimited on-disk storage + activation-based LRU cache.
+  
+When to evolve: after BP13 mmap + LRU cache is working.
+  Then: STM = LRU cache (2048 slots, BP13) with activation-weighted eviction.
+  Current 32-slot STM stays as "hot buffer" within the cache.
+```
+
+### Persistence Integration [NEW SS23]
+
+```
+BP13 (Persistence) provides:
+  Layer 1: mmap silk weights — instant recovery on restart
+  Layer 2: WAL — crash-safe learning log
+  Layer 3: Dream consolidation — temporary → permanent
+
+BP7 connects to BP13:
+  - STM entries → WAL append (type=STM_PUSH, op=5)
+  - Observations → append to mmap'd nox_observations.dat
+  - Session summary → write to NKB during dream consolidation
+  - On restart: load recent observations from mmap'd file
+
+→ See spec/SPEC_BP13_PERSISTENCE.md for binary formats and mmap details.
+```
+
+### Eviction Scoring Update [UPDATED SS23 — old: 3-factor, new: 4-factor, reason: BP16 reward]
+
+```
+Old eviction score:
+  score = access_count × 0.3 + |V| × A × 0.4 + recency × 0.3
+
+New eviction score (with BP16 feedback):
+  score = access_count × 0.25 + |V| × A × 0.35 + recency × 0.25 + avg_reward × 0.15
+
+  avg_reward = reward_sum / reward_count (from silk edges used with this memory)
+  If no reward data: avg_reward = 500 (neutral, no effect)
+
+  High-reward memories evict slower (they led to good outcomes).
+  Low-reward memories evict faster (they led to bad outcomes).
+
+  Weights adjusted: access_count 0.3→0.25, recency 0.3→0.25, emotion stays 0.35.
+  reward gets 0.15 (small but meaningful — emotion still dominates).
+```
 
 ## What's Needed (SPEC_MEM §M1-M5)
 
@@ -133,4 +188,6 @@ Before session end:
 - [BP3 KnowTree](SPEC_BP3_KNOWTREE.md) — facts stored in KnowTree
 - [BP5 Pipeline](SPEC_BP5_PIPELINE_EN.md) — STM updated after response
 - [BP9 Agent](SPEC_BP9_AGENT.md) — agent uses memory for goals
+- [BP13 Persistence](SPEC_BP13_PERSISTENCE.md) — mmap + WAL + NKB [NEW SS23]
+- [BP16 Feedback](SPEC_BP16_FEEDBACK.md) — reward for eviction scoring [NEW SS23]
 - [SPEC_MEM](../docs/For_Nox/SPEC_MEM_MEMORY.md) — memory system design

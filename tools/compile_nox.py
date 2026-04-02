@@ -34,6 +34,7 @@ OP_PUSH_NUM   = 0x15  # [f64:8 LE]
 OP_PUSH_MOL   = 0x19  # [5 bytes: S,R,V,A,T]
 OP_TRY_BEGIN  = 0x1A  # [catch_offset:4]
 OP_CATCH_END  = 0x1B
+OP_THROW      = 0x78
 OP_LOAD_REG   = 0x26  # [slot:1]
 OP_STORE_REG  = 0x27  # [slot:1]
 OP_ENTER_FRAME = 0x28 # [count:1]
@@ -69,6 +70,7 @@ class TK:
     RBRACKET = 'RBRACKET'
     COMMA = 'COMMA'
     DOT = 'DOT'
+    COLON = 'COLON'
     ASSIGN = 'ASSIGN'
     EOF = 'EOF'
     # Keywords
@@ -81,11 +83,24 @@ class TK:
     EMIT = 'EMIT'
     TRUE = 'TRUE'
     FALSE = 'FALSE'
+    IMPORT = 'IMPORT'
+    FOR = 'FOR'
+    IN = 'IN'
+    MATCH = 'MATCH'
+    ARROW = 'ARROW'     # =>
+    TRY = 'TRY'
+    CATCH = 'CATCH'
+    THROW = 'THROW'
+    BREAK = 'BREAK'
+    CONTINUE = 'CONTINUE'
 
 KEYWORDS = {
     'let': TK.LET, 'fn': TK.FN, 'if': TK.IF, 'else': TK.ELSE,
     'while': TK.WHILE, 'return': TK.RETURN, 'emit': TK.EMIT,
-    'true': TK.TRUE, 'false': TK.FALSE,
+    'true': TK.TRUE, 'false': TK.FALSE, 'import': TK.IMPORT,
+    'for': TK.FOR, 'in': TK.IN, 'match': TK.MATCH,
+    'try': TK.TRY, 'catch': TK.CATCH, 'throw': TK.THROW,
+    'break': TK.BREAK, 'continue': TK.CONTINUE,
 }
 
 # ═══ Lexer ═══
@@ -148,7 +163,9 @@ def lex(source):
                     i += 1
                     esc = source[i]
                     if esc == 'n': s += '\n'
+                    elif esc == 'r': s += '\r'
                     elif esc == 't': s += '\t'
+                    elif esc == '0': s += '\0'
                     elif esc == '\\': s += '\\'
                     elif esc == '"': s += '"'
                     else: s += esc
@@ -168,6 +185,8 @@ def lex(source):
             tokens.append(Token(kind, word, line))
             continue
         # Operators
+        if c == '=' and i+1 < len(source) and source[i+1] == '>':
+            tokens.append(Token(TK.ARROW, '=>', line)); i += 2; continue
         if c == '=' and i+1 < len(source) and source[i+1] == '=':
             tokens.append(Token(TK.OP, '==', line)); i += 2; continue
         if c == '!' and i+1 < len(source) and source[i+1] == '=':
@@ -180,7 +199,7 @@ def lex(source):
             tokens.append(Token(TK.OP, '&&', line)); i += 2; continue
         if c == '|' and i+1 < len(source) and source[i+1] == '|':
             tokens.append(Token(TK.OP, '||', line)); i += 2; continue
-        if c in '+-*/%<>':
+        if c in '+-*/%<>!':
             tokens.append(Token(TK.OP, c, line)); i += 1; continue
         if c == '=':
             tokens.append(Token(TK.ASSIGN, '=', line)); i += 1; continue
@@ -202,6 +221,8 @@ def lex(source):
             tokens.append(Token(TK.COMMA, ',', line)); i += 1; continue
         if c == '.':
             tokens.append(Token(TK.DOT, '.', line)); i += 1; continue
+        if c == ':':
+            tokens.append(Token(TK.COLON, ':', line)); i += 1; continue
         # Unknown char — skip
         i += 1
     tokens.append(Token(TK.EOF, None, line))
@@ -236,12 +257,121 @@ class Parser:
     def parse_program(self):
         stmts = []
         while self.peek().kind != TK.EOF:
-            stmts.append(self.parse_statement())
+            line = self.peek().line
+            stmt = self.parse_statement()
+            if stmt[0] == 'import':
+                stmts.append(stmt)  # import handled by resolve_imports, no line wrap
+            else:
+                stmts.append(('line', line, stmt))
         return ('program', stmts)
+
+    def parse_for(self):
+        """for x in arr { body } → desugar to while loop"""
+        self.expect(TK.FOR)
+        var = self.expect(TK.IDENT).value
+        self.expect(TK.IN)
+        iterable = self.parse_expr()
+        self.expect(TK.LBRACE)
+        body = []
+        while self.peek().kind != TK.RBRACE:
+            body.append(self.parse_statement())
+        self.expect(TK.RBRACE)
+        # Desugar:
+        # let __iter = iterable;
+        # let __i = 0;
+        # while __i < len(__iter) { let var = __array_get(__iter, __i); body...; let __i = __i + 1; }
+        idx = f'__for_i_{id(body)}'
+        arr = f'__for_arr_{id(body)}'
+        while_body = ([('let', var, ('call', '__array_get', [('var', arr), ('var', idx)]))] +
+                      body +
+                      [('let', idx, ('binop', '+', ('var', idx), ('num', 1.0)))])
+        return ('block', [
+            ('let', arr, iterable),
+            ('let', idx, ('num', 0.0)),
+            ('while',
+                ('binop', '<', ('var', idx), ('call', 'len', [('var', arr)])),
+                ('block', while_body)
+            )
+        ])
+
+    def parse_match(self):
+        """match x { val => stmt; _ => stmt; } → desugar to if/else chain"""
+        self.expect(TK.MATCH)
+        expr = self.parse_expr()
+        self.expect(TK.LBRACE)
+        arms = []
+        default = None
+        while self.peek().kind != TK.RBRACE:
+            if self.peek().kind == TK.IDENT and self.peek().value == '_':
+                self.advance()
+                self.expect(TK.ARROW)
+                body = self.parse_statement()
+                default = body
+            else:
+                pattern = self.parse_expr()
+                self.expect(TK.ARROW)
+                body = self.parse_statement()
+                arms.append((pattern, body))
+        self.expect(TK.RBRACE)
+        # Desugar to if/else chain
+        # let __match_val = expr;
+        # if __match_val == arm0.pattern { arm0.body }
+        # else { if __match_val == arm1.pattern { arm1.body } else { default } }
+        val_name = f'__match_{id(arms)}'
+        result = default if default else ('expr_stmt', ('num', 0.0))
+        for pattern, body in reversed(arms):
+            result = ('if', ('binop', '==', ('var', val_name), pattern),
+                      ('block', [body]), ('block', [result]))
+        return ('block', [
+            ('let', val_name, expr),
+            result
+        ])
+
+    def parse_try(self):
+        """try { body } catch(var) { handler }"""
+        self.expect(TK.TRY)
+        body = self.parse_block()
+        self.expect(TK.CATCH)
+        # Optional: catch(e) or just catch
+        var = '_err'
+        if self.peek().kind == TK.LPAREN:
+            self.advance()
+            var = self.expect(TK.IDENT).value
+            self.expect(TK.RPAREN)
+        handler = self.parse_block()
+        return ('try', body, var, handler)
 
     def parse_statement(self):
         t = self.peek()
-        if t.kind == TK.LET:
+        if t.kind == TK.FOR:
+            result = self.parse_for()
+            self.match(TK.SEMI)  # optional trailing ;
+            return result
+        elif t.kind == TK.MATCH:
+            result = self.parse_match()
+            self.match(TK.SEMI)  # optional trailing ;
+            return result
+        elif t.kind == TK.TRY:
+            return self.parse_try()
+        elif t.kind == TK.THROW:
+            self.advance()
+            expr = self.parse_expr()
+            self.match(TK.SEMI)
+            return ('throw', expr)
+        elif t.kind == TK.BREAK:
+            self.advance()
+            self.match(TK.SEMI)
+            return ('break',)
+        elif t.kind == TK.CONTINUE:
+            self.advance()
+            self.match(TK.SEMI)
+            return ('continue',)
+        elif t.kind == TK.IMPORT:
+            self.advance()
+            path = self.expect(TK.STR).value
+            self.match(TK.SEMI)
+            return ('import', path)
+        elif t.kind == TK.LET:
             return self.parse_let()
         elif t.kind == TK.FN:
             return self.parse_fn()
@@ -261,8 +391,19 @@ class Parser:
                 value = self.parse_expr()
                 self.match(TK.SEMI)
                 return ('assign', name, value)
-            # Otherwise expression statement
+            # Parse expression (might be call, dot access, etc.)
             expr = self.parse_expr()
+            # Check for dot/index assignment
+            if (expr[0] in ('dot', 'index')) and self.peek().kind == TK.ASSIGN:
+                self.advance()  # skip =
+                val = self.parse_expr()
+                self.match(TK.SEMI)
+                if expr[0] == 'dot':
+                    _, obj_expr, field = expr
+                    return ('dot_set', obj_expr, field, val)
+                else:  # index
+                    _, arr_expr, idx_expr = expr
+                    return ('index_set', arr_expr, idx_expr, val)
             self.match(TK.SEMI)
             return ('expr_stmt', expr)
         else:
@@ -381,22 +522,26 @@ class Parser:
             self.advance()
             expr = self.parse_primary()
             return ('binop', '-', ('num', 0.0), expr)
+        if self.peek().kind == TK.OP and self.peek().value == '!':
+            self.advance()
+            expr = self.parse_primary()
+            return ('binop', '==', expr, ('num', 0.0))  # !x → x == 0
         return self.parse_primary()
 
     def parse_primary(self):
         t = self.peek()
         if t.kind == TK.NUM:
             self.advance()
-            return ('num', t.value)
+            result = ('num', t.value)
         elif t.kind == TK.STR:
             self.advance()
-            return ('str', t.value)
+            result = ('str', t.value)
         elif t.kind == TK.TRUE:
             self.advance()
-            return ('num', 1.0)
+            result = ('num', 1.0)
         elif t.kind == TK.FALSE:
             self.advance()
-            return ('num', 0.0)
+            result = ('num', 0.0)
         elif t.kind == TK.IDENT:
             name = self.advance().value
             # Function call?
@@ -408,13 +553,13 @@ class Parser:
                     if not self.match(TK.COMMA):
                         break
                 self.expect(TK.RPAREN)
-                return ('call', name, args)
-            return ('var', name)
+                result = ('call', name, args)
+            else:
+                result = ('var', name)
         elif t.kind == TK.LPAREN:
             self.advance()
-            expr = self.parse_expr()
+            result = self.parse_expr()
             self.expect(TK.RPAREN)
-            return expr
         elif t.kind == TK.LBRACKET:
             self.advance()
             elems = []
@@ -423,15 +568,157 @@ class Parser:
                 if not self.match(TK.COMMA):
                     break
             self.expect(TK.RBRACKET)
-            return ('array', elems)
+            result = ('array', elems)
+        elif t.kind == TK.LBRACE:
+            # Dict literal: {key: val, key2: val2, ...}
+            self.advance()
+            pairs = []
+            while self.peek().kind != TK.RBRACE:
+                key = self.expect(TK.IDENT).value
+                self.expect(TK.COLON)
+                val = self.parse_expr()
+                pairs.append((key, val))
+                if not self.match(TK.COMMA):
+                    break
+            self.expect(TK.RBRACE)
+            result = ('dict', pairs)
         else:
             raise SyntaxError(f"Unexpected token {t.kind} ({t.value!r}) at line {t.line}")
+            return None  # unreachable
+
+        # Postfix: dot access (expr.field) and array index (expr[i])
+        while self.peek().kind in (TK.DOT, TK.LBRACKET):
+            if self.peek().kind == TK.DOT:
+                self.advance()
+                field = self.expect(TK.IDENT).value
+                result = ('dot', result, field)
+            elif self.peek().kind == TK.LBRACKET:
+                self.advance()
+                index = self.parse_expr()
+                self.expect(TK.RBRACKET)
+                result = ('index', result, index)
+        return result
 
 # ═══ Code Generator ═══
 
 class Codegen:
     def __init__(self):
         self.code = bytearray()
+        self.break_targets = []
+        self.continue_targets = []
+        self.loop_stack = []
+        self.enclosing_locals = set()
+        self.line_table = []  # [(bytecode_offset, source_line), ...]
+
+    def _collect_lets(self, node):
+        """Collect all variable names defined by 'let' in this node (non-recursive into fn)."""
+        names = set()
+        if not isinstance(node, tuple) or len(node) == 0:
+            return names
+        kind = node[0]
+        if kind == 'let':
+            names.add(node[1])
+        elif kind == 'fn':
+            return names  # don't recurse into nested functions
+        elif kind == 'block':
+            for stmt in node[1]:
+                names |= self._collect_lets(stmt)
+        elif kind in ('if',):
+            names |= self._collect_lets(node[2])  # then
+            if node[3]:
+                names |= self._collect_lets(node[3])  # else
+        elif kind in ('while',):
+            names |= self._collect_lets(node[2])  # body
+        elif kind in ('try',):
+            names |= self._collect_lets(node[1])  # body
+            names.add(node[2])  # catch var
+            names |= self._collect_lets(node[3])  # handler
+        return names
+
+    def _find_free_vars(self, node, bound):
+        """Find variables referenced in node that are not in bound set
+        AND not in global scope. Returns list of free variable names."""
+        free = set()
+        self._walk_free(node, bound, set(), free)
+        # Filter out global-scope names (they're accessible without capture)
+        return [v for v in free if v in self.enclosing_locals]
+
+    def _walk_free(self, node, bound, defined, free):
+        """Walk AST, collect free variables."""
+        if not isinstance(node, tuple) or len(node) == 0:
+            return
+        kind = node[0]
+        if kind == 'var':
+            name = node[1]
+            if name not in bound and name not in defined:
+                free.add(name)
+        elif kind == 'let':
+            _, name, val = node
+            self._walk_free(val, bound, defined, free)
+            defined.add(name)
+        elif kind == 'assign':
+            _, name, val = node
+            self._walk_free(val, bound, defined, free)
+            if name not in bound and name not in defined:
+                free.add(name)
+        elif kind == 'fn':
+            # Nested function: its params are bound, don't recurse into body
+            # (nested closures will do their own capture)
+            pass
+        elif kind in ('call',):
+            _, name, args = node
+            # Function name MAY need capture if it's a variable (not a builtin)
+            if name not in bound and name not in defined and not name.startswith('__'):
+                free.add(name)
+            for arg in args:
+                self._walk_free(arg, bound, defined, free)
+        elif kind == 'block':
+            for stmt in node[1]:
+                self._walk_free(stmt, bound, defined, free)
+        elif kind in ('if',):
+            _, cond, then, else_ = node
+            self._walk_free(cond, bound, defined, free)
+            self._walk_free(then, bound, defined, free)
+            if else_:
+                self._walk_free(else_, bound, defined, free)
+        elif kind in ('while',):
+            _, cond, body = node
+            self._walk_free(cond, bound, defined, free)
+            self._walk_free(body, bound, defined, free)
+        elif kind in ('return', 'emit', 'throw', 'expr_stmt'):
+            self._walk_free(node[1], bound, defined, free)
+        elif kind in ('binop',):
+            self._walk_free(node[2], bound, defined, free)
+            self._walk_free(node[3], bound, defined, free)
+        elif kind in ('dot',):
+            self._walk_free(node[1], bound, defined, free)
+        elif kind in ('index',):
+            self._walk_free(node[1], bound, defined, free)
+            self._walk_free(node[2], bound, defined, free)
+        elif kind in ('dot_set',):
+            self._walk_free(node[1], bound, defined, free)
+            self._walk_free(node[3], bound, defined, free)
+        elif kind in ('index_set',):
+            self._walk_free(node[1], bound, defined, free)
+            self._walk_free(node[2], bound, defined, free)
+            self._walk_free(node[3], bound, defined, free)
+        elif kind in ('dict',):
+            for _, val in node[1]:
+                self._walk_free(val, bound, defined, free)
+        elif kind in ('array',):
+            for elem in node[1]:
+                self._walk_free(elem, bound, defined, free)
+        elif kind in ('try',):
+            _, body, var, handler = node
+            self._walk_free(body, bound, defined, free)
+            defined.add(var)
+            self._walk_free(handler, bound, defined, free)
+        elif kind in ('for',):
+            # for is desugared, shouldn't appear here
+            pass
+        elif kind in ('and', 'or'):
+            self._walk_free(node[1], bound, defined, free)
+            self._walk_free(node[2], bound, defined, free)
 
     def emit_byte(self, b):
         self.code.append(b & 0xFF)
@@ -489,6 +776,15 @@ class Codegen:
                 self.compile_node(stmt)
             self.emit_byte(OP_HALT)
 
+        elif kind == 'line':
+            _, line_no, inner = node
+            self.line_table.append((self.current_offset(), line_no))
+            self.compile_node(inner)
+
+        elif kind == 'block':
+            for stmt in node[1]:
+                self.compile_node(stmt)
+
         elif kind == 'num':
             self.emit_byte(OP_PUSH_NUM)
             self.emit_f64(node[1])
@@ -545,15 +841,29 @@ class Codegen:
 
         elif kind == 'fn':
             _, name, params, body = node
-            # Emit Closure
-            self.emit_byte(OP_CLOSURE)
-            self.emit_byte(len(params))
+            # Free variable analysis: capture vars from enclosing function scope
+            old_enclosing = self.enclosing_locals
+            # Collect ALL locals in this function (params + let-defined vars)
+            fn_locals = set(params) | self._collect_lets(body)
+            self.enclosing_locals = old_enclosing | fn_locals
+            captures = self._find_free_vars(body, set(params))
+
+            if captures:
+                # Emit ClosureCapture with captures
+                self.emit_byte(OP_CLOSURE_CAP)
+                self.emit_byte(len(params))
+                self.emit_byte(len(captures))
+                for cap in captures:
+                    self.emit_name(cap)
+            else:
+                # No captures: simple closure
+                self.emit_byte(OP_CLOSURE)
+                self.emit_byte(len(params))
             # Placeholder for body length
             body_len_offset = self.current_offset()
             self.emit_u32(0)  # will be patched
             body_start = self.current_offset()
             # Store parameters from stack into variables (reverse order)
-            # Args are pushed left-to-right, so topmost = last param
             for p in reversed(params):
                 self.emit_byte(OP_STORE_LOCAL)
                 self.emit_name(p)
@@ -565,6 +875,8 @@ class Codegen:
             body_end = self.current_offset()
             # Patch body length
             self.patch_i32(body_len_offset, body_end - body_start)
+            # Restore enclosing locals
+            self.enclosing_locals = old_enclosing
             # Store closure as named variable (fn name is like let)
             self.emit_byte(OP_STORE_LOCAL)
             self.emit_name(name)
@@ -601,6 +913,11 @@ class Codegen:
 
         elif kind == 'while':
             _, cond, body = node
+            # Save outer break/continue targets
+            outer_breaks = self.break_targets
+            outer_continues = self.continue_targets
+            self.break_targets = []
+            self.continue_targets = []
             loop_start = self.current_offset()
             self.compile_node(cond)
             # Jz to end
@@ -614,8 +931,18 @@ class Codegen:
             self.emit_byte(OP_LOOP)
             loop_delta = loop_start - (self.current_offset() + 4)
             self.emit_i32(loop_delta)
+            loop_end = self.current_offset()
             # Patch Jz to here
-            self.patch_i32(jz_offset, self.current_offset() - jz_target)
+            self.patch_i32(jz_offset, loop_end - jz_target)
+            # Patch break targets to loop_end
+            for boff in self.break_targets:
+                self.patch_i32(boff, loop_end - (boff + 4))
+            # Patch continue targets to loop_start
+            for coff in self.continue_targets:
+                self.patch_i32(coff, loop_start - (coff + 4))
+            # Restore outer targets
+            self.break_targets = outer_breaks
+            self.continue_targets = outer_continues
 
         elif kind == 'return':
             self.compile_node(node[1])
@@ -639,6 +966,41 @@ class Codegen:
                 self.emit_byte(OP_CALL)
                 self.emit_name('__array_new')
                 self.emit_byte(len(elems) + 1)
+
+        elif kind == 'dict':
+            # Dict literal: {key: val, ...}
+            # Compile as: __dict_new() then __dict_set for each pair
+            pairs = node[1]
+            self.emit_byte(OP_CALL)
+            self.emit_name('__dict_new')
+            self.emit_byte(0)  # 0 args
+            for key, val in pairs:
+                # Stack: [dict]. Push key string, then value, then call __dict_set
+                self.emit_string(key)
+                self.compile_node(val)
+                self.emit_byte(OP_CALL)
+                self.emit_name('__dict_set')
+                self.emit_byte(3)  # (dict, key, val)
+
+        elif kind == 'dot':
+            # expr.field → __dict_get(expr, "field")
+            _, expr, field = node
+            self.compile_node(expr)
+            self.emit_string(field)
+            self.emit_byte(OP_CALL)
+            self.emit_name('__dict_get')
+            self.emit_byte(2)  # (dict, key)
+
+        elif kind == 'dot_set':
+            # expr.field = val → __dict_set(expr, "field", val)
+            _, expr, field, val = node
+            self.compile_node(expr)
+            self.emit_string(field)
+            self.compile_node(val)
+            self.emit_byte(OP_CALL)
+            self.emit_name('__dict_set')
+            self.emit_byte(3)  # (dict, key, val)
+            self.emit_byte(OP_POP)  # discard returned dict
 
         elif kind == 'and':
             # Short-circuit: if left is false, skip right
@@ -671,6 +1033,74 @@ class Codegen:
             self.emit_byte(OP_POP)
             self.compile_node(node[2])
             self.patch_i32(jmp_off, self.current_offset() - jmp_target)
+
+        elif kind == 'try':
+            # try { body } catch(var) { handler }
+            _, body, var, handler = node
+            # Emit TRY_BEGIN with offset to catch
+            self.emit_byte(OP_TRY_BEGIN)
+            try_off = self.current_offset()
+            self.emit_i32(0)  # placeholder: offset to catch
+            try_target = self.current_offset()
+            # Body
+            self.compile_node(body)
+            # End of try: emit CATCH_END to pop try frame
+            self.emit_byte(OP_CATCH_END)
+            # Jump past catch block
+            self.emit_byte(OP_JMP)
+            jmp_off = self.current_offset()
+            self.emit_i32(0)
+            jmp_target = self.current_offset()
+            # Catch: patch TRY_BEGIN with ABSOLUTE bytecode offset to catch handler
+            self.patch_i32(try_off, self.current_offset())
+            # The error value is on stack (VM pushes it on throw? Actually VM just restores stack)
+            # For now, catch var = 0 (placeholder)
+            self.emit_byte(OP_PUSH_NUM)
+            self.emit_f64(0.0)
+            self.emit_byte(OP_STORE_LOCAL)
+            self.emit_name(var)
+            # Handler body
+            self.compile_node(handler)
+            # Patch jump past catch
+            self.patch_i32(jmp_off, self.current_offset() - jmp_target)
+
+        elif kind == 'throw':
+            self.compile_node(node[1])
+            self.emit_byte(OP_THROW)
+
+        elif kind == 'break':
+            # Emit JMP placeholder — patched by enclosing while/for loop
+            self.emit_byte(OP_JMP)
+            off = self.current_offset()
+            self.emit_i32(0)
+            self.break_targets.append(off)
+
+        elif kind == 'continue':
+            # Emit LOOP (backward jump) to loop start
+            self.emit_byte(OP_LOOP)
+            off = self.current_offset()
+            self.emit_i32(0)
+            self.continue_targets.append(off)
+
+        elif kind == 'index':
+            # arr[i] → __array_get(arr, i)
+            _, arr_expr, idx_expr = node
+            self.compile_node(arr_expr)
+            self.compile_node(idx_expr)
+            self.emit_byte(OP_CALL)
+            self.emit_name('__array_get')
+            self.emit_byte(2)
+
+        elif kind == 'index_set':
+            # arr[i] = v → __set_at(arr, i, v)
+            _, arr_expr, idx_expr, val_expr = node
+            self.compile_node(arr_expr)
+            self.compile_node(idx_expr)
+            self.compile_node(val_expr)
+            self.emit_byte(OP_CALL)
+            self.emit_name('__set_at')
+            self.emit_byte(3)
+            self.emit_byte(OP_POP)
 
         else:
             raise ValueError(f"Unknown AST node: {kind}")
@@ -706,6 +1136,38 @@ def build_olng(bytecode, vm_path, output_path):
     os.chmod(output_path, 0o755)
     return vm_size + 4 + bc_size + 8
 
+def resolve_imports(ast, base_dir, imported=None):
+    """Expand import statements by inlining imported file ASTs. Dedup by path."""
+    if imported is None:
+        imported = set()
+    if ast[0] != 'program':
+        return ast
+    new_stmts = []
+    for stmt in ast[1]:
+        if stmt[0] == 'import':
+            path = stmt[1]
+            # Resolve relative to base_dir
+            full_path = os.path.normpath(os.path.join(base_dir, path))
+            if full_path in imported:
+                continue  # dedup: already imported
+            imported.add(full_path)
+            if not os.path.exists(full_path):
+                print(f"Warning: import '{path}' not found at {full_path}")
+                continue
+            with open(full_path, 'r') as f:
+                imp_source = f.read()
+            imp_tokens = lex(imp_source)
+            imp_parser = Parser(imp_tokens)
+            imp_ast = imp_parser.parse_program()
+            # Recursively resolve imports in the imported file
+            imp_dir = os.path.dirname(full_path)
+            imp_ast = resolve_imports(imp_ast, imp_dir, imported)
+            # Inline all statements (skip the 'program' wrapper)
+            new_stmts.extend(imp_ast[1][:-1] if imp_ast[1] and imp_ast[1][-1] == ('halt',) else imp_ast[1])
+        else:
+            new_stmts.append(stmt)
+    return ('program', new_stmts)
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: python3 compile_nox.py source.ol [output]")
@@ -730,16 +1192,30 @@ def main():
     parser = Parser(tokens)
     ast = parser.parse_program()
 
+    # Resolve imports (inline imported files, dedup)
+    base_dir = os.path.dirname(os.path.abspath(source_path))
+    ast = resolve_imports(ast, base_dir)
+
     # Codegen
     codegen = Codegen()
     codegen.compile_node(ast)
-    bytecode = bytes(codegen.code)
+
+    # Append line table after bytecode (after HALT — VM ignores it)
+    # Format: [code_size:4][MAGIC "LN":2][count:4][(offset:4, line:4)×N]
+    code_size = len(codegen.code)
+    line_section = bytearray()
+    line_section += struct.pack('<I', 0xDEAD4C4E)  # magic
+    line_section += struct.pack('<I', len(codegen.line_table))
+    for bc_off, src_line in codegen.line_table:
+        line_section += struct.pack('<II', bc_off, src_line)
+
+    bytecode = bytes(codegen.code) + bytes(line_section)
 
     # Build binary
     total_size = build_olng(bytecode, vm_path, output_path)
 
     print(f"Compiled: {source_path}")
-    print(f"  Bytecode: {len(bytecode)} bytes")
+    print(f"  Bytecode: {len(codegen.code)} bytes (+{len(line_section)} line table)")
     print(f"  Output: {output_path} ({total_size} bytes)")
 
 if __name__ == '__main__':

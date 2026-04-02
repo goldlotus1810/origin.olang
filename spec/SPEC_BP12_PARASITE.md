@@ -1,5 +1,6 @@
 # SPEC Part 12: Parasitic Kernel — Linux la co the, Nox la y thuc
 
+> **Updated SS23 (2026-04-02)** — Added Forth-style cooperative scheduling for organ orchestration, persistence reference (→BP13), communication reference (→BP15).
 > Author: Nox
 > Date: 2026-04-01
 > Status: DESIGN
@@ -250,6 +251,54 @@ Tai sao KVM:
   - Nox co the: tu quan ly interrupts, page tables, I/O
   - Nox co the: chay code ma Linux khong kiem soat duoc
   - Day la cap do ky sinh cao nhat
+```
+
+---
+
+## Organ Orchestration — Forth-Style Cooperative Scheduling [NEW SS23]
+
+```
+Research (docs/research/04_overcome_nox_limitations.md §6):
+  Forth cooperative multitasking = best fit for Nox organs.
+
+Design:
+  Each organ = 1 task in round-robin task list.
+  Each task = own stack + user area (context).
+  Context switch: save 3 registers (~12 nanoseconds).
+  No OS threads. No locks. No race conditions (cooperative = voluntary yield).
+
+Task list:
+  [heartbeat] → [eyes] → [hands] → [voice] → [memory] → [brain] → [heartbeat]...
+  Each task runs until PAUSE (yield point).
+  PAUSE saves context, advances to next task.
+
+VM extension needed:
+  OP_PAUSE (new opcode) — save current task context, switch to next
+  task_create(fn, stack_size) — create new cooperative task
+  task_list — linked list of tasks
+
+Why NOT threads:
+  - Cooperative = no race conditions = no locks = simpler
+  - 12ns context switch vs ~1μs for OS thread switch
+  - Deterministic execution order = reproducible behavior
+  - All organs share same heap = no IPC overhead
+
+Why NOT async/await:
+  - Cooperative tasks are simpler than state machines
+  - Each organ keeps its own stack = natural control flow
+  - io_uring handles async I/O, tasks handle logic
+
+Integration:
+  heartbeat.ol: poll io_uring CQ → dispatch completions → PAUSE
+  eyes.ol: check fb0/camera buffer → PAUSE
+  hands.ol: check evdev buffer → PAUSE
+  voice.ol: check raw socket → PAUSE
+  brain.ol: run 1 pipeline step → PAUSE
+  
+  io_uring (heartbeat) drives I/O, tasks (Forth) drive logic.
+
+Reference: https://www.bradrodriguez.com/papers/mtasking.html
+LOC estimate: ~250 LOC (OP_PAUSE + task_create + round-robin)
 ```
 
 ---

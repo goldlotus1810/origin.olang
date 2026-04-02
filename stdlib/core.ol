@@ -1,9 +1,7 @@
 // core.ol — Standard library for VM v2
 // Every function here compiles and runs on vm_nox
 
-// Array operations
-fn len(arr) { return __builtin_len(arr); };
-fn push(arr, val) { return __builtin_push(arr, val); };
+// Array operations — push and len are VM builtins, no wrapper needed
 
 // String operations
 fn str(x) { return __to_string(x); };

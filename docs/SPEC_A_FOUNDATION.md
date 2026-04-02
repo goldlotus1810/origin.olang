@@ -1,5 +1,6 @@
 # SPEC A — Nền Móng: SDF + P_weight + Encode + Compose + Decode
 
+> **Updated SS23 (2026-04-02)** — Added §A.7 Encoding Evolution Path (HRR future), distance formula clarification. Research: docs/research/04_overcome_nox_limitations.md §3.
 > **Tài liệu kỹ thuật chi tiết cho Phần A của HomeOS Unified Spec.**
 > **Đọc file này = hiểu toàn bộ nền móng toán học.**
 > **Tác giả:** Lupin (thiết kế) + Nox (tổng hợp + verify)
@@ -213,6 +214,13 @@ Euclidean (general search):
 Emotion-weighted (emotion context):
   distance(A, B) = 2|V₁ − V₂| + |A₁ − A₂|
   V weighted 2× vì emotion dominant trong nhận thức
+
+[UPDATED SS23 — clarification, not change]
+VM weighted Manhattan (implementation — see CLAUDE.md):
+  distance(A, B) = |ΔS| + |ΔR| + 2|ΔV| + 2|ΔA| + 4|ΔT|
+  max = 70. Used by __batch_dist and pipeline search.
+  Euclidean (above) = theory/normalized. Manhattan = VM/integer.
+  Both correct at different layers. Manhattan preferred for speed.
 ```
 
 ### Effective dimensionality
@@ -524,6 +532,64 @@ json/udc_p_table.bin    — 314KB compiled lookup table (157,386 × u16)
 tools/build_full_udc.py — Python generator (3 priority tiers)
 
 Tài liệu/Origin/UCD/   — Official Unicode Character Database (raw data)
+```
+
+---
+
+## A7. Encoding Evolution Path [NEW SS23]
+
+### Current: 16-bit P_weight — SUFFICIENT, DO NOT REPLACE
+
+```
+Current encoding:
+  1 molecule = u16 = 65,536 states
+  1 chain (10 mols) = ~10^48 states (with ordering)
+  + Silk (1000 edges) = effective dimensionality >> 16 bits
+
+This is ENOUGH for current Nox architecture.
+Chain + ordering + Silk make 16-bit P_weight far richer than it appears.
+```
+
+### Future: HRR 32×16-bit — EVOLUTION, NOT REPLACEMENT
+
+```
+Holographic Reduced Representations (Tony Plate, 1995):
+  Encode structured info into fixed-size vectors via circular convolution.
+  BIND(A, B) and UNBIND are reversible. Same dimensionality in/out.
+
+For Nox (when needed):
+  32 slots × 16-bit each = 64 bytes/concept (vs 2 bytes now)
+  Circular convolution = O(k log k) via FFT. k=32 = trivial on i3.
+  10K concepts = 640KB.
+  Enables: role-filler binding ("king OF england" ≠ "king OF hearts")
+
+WHEN to evolve:
+  ✗ NOT now — 16-bit + chain + silk handles current needs
+  ✓ When generation (BP14) needs richer recombination
+  ✓ When cross-language encoding needs shared semantic space
+  ✓ When analogy instinct (D2.⑤) needs compositional vectors
+
+HOW to evolve:
+  P_weight stays u16 (fingerprint/address).
+  HRR vector = ADDITIONAL representation, linked via KnowTree node.
+  Node = { P_weight: u16, chain: [u16...], hrr: [u16 × 32] }
+  Distance: P_weight for fast filter, HRR cosine for fine ranking.
+
+Reference: docs/research/04_overcome_nox_limitations.md §3
+```
+
+### Comparison with other systems [NEW SS23]
+
+```
+System          | Encoding         | Nox equivalent
+ACT-R           | float activation | Silk weight (fire-based, not encoding)
+NARS            | freq + conf pair | QR maturity (different purpose)
+Transformers    | 768-12288D float | Chain + Silk (emergent dimensionality)
+HRR             | N×float vector   | Future evolution path (§A7)
+
+Key insight: P_weight is a FINGERPRINT (address in 5D space).
+ACT-R activation and NARS truth-value are CONFIDENCE measures.
+Different things. Nox has both: P_weight (encoding) + Silk weight (confidence).
 ```
 
 ---

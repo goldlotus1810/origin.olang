@@ -1,4 +1,4 @@
-# Nox — VM v2 (SS17 complete)
+# Nox — VM v2 (SS23 current)
 
 ## ĐẦU TIÊN
 ```bash
@@ -10,36 +10,47 @@ git log --oneline -10
 
 ## Build
 ```bash
-make vm                 # as + ld → vm/x86_64/vm_nox (55KB, 77 builtins)
+make vm                 # as + ld → vm/x86_64/vm_nox (62KB, 94 builtins)
 make test               # compile + run test_full.ol (40/40)
 make benchmark          # compile + run benchmark.ol (35/35)
 python3 tools/compile_nox.py SOURCE.ol OUTPUT.olang && ./OUTPUT.olang
+# Boot brain: ./nox_brain.olang (interactive REPL)
 ```
 
-## Status (SS17 — 2026-04-01)
-- VM: vm/x86_64/vm_nox.S (6600+ LOC, 55KB, 77 builtins)
-- Compiler: tools/compile_nox.py (Python bootstrap)
+## Status (SS23 — 2026-04-02)
+- VM: vm/x86_64/vm_nox.S (7311 LOC, 62KB, 94 builtins)
+- Compiler: tools/compile_nox.py (Python bootstrap) + struct/import/for/match
 - Self-hosting: stdlib/compiler.ol ✅ Gen2==Gen3 fixed point
-- Stdlib: stdlib/ (brain, encode, core, knowtree, silk, pipeline, compiler)
-- Tests: 40/40 + 35/35 benchmark + 35/35 brain E2E = 110 tests
+- Stdlib: 20 files (brain_v3, encode, knowtree, silk, persist, feedback, generate, comm, mcp, compiler...)
+- Tests: 40/40 core + 51 test files + 118+ assertions
 - mmap 256MB: ✅ hoạt động (heap blocker SOLVED)
+- BP13 Persistence: ✅ binary save/load, facts survive restart
+- BP14 Generation: ✅ retrieve + recombine + confidence + honesty
+- BP15 Communication: ✅ HTTP server + A2A Agent Card
+- BP16 Feedback: ✅ UCB1 bandit + ACT-R utility
+- Olang Upgrade: ✅ struct, import, for, match, 6 new string builtins, readline
 
-## VM Builtins (77 total)
+## VM Builtins (94 total)
 ```
 String:      len, substr, char_at, __char_code, __to_string, __str_find,
-             __str_index_of, __str_trim, __write_raw, __str_split
+             __str_index_of, __str_trim, __write_raw, __str_split,
+             __str_replace, __str_join, __str_starts_with, __str_ends_with,
+             __str_to_num, __readline
 Array:       push, __array_get, __set_at, __array_new, __array_with_cap,
              __range, __pop_arr
+Dict:        __dict_new, __dict_get, __dict_set, __dict_keys
 Math:        __abs, __floor, __ceil, __sqrt, __exp, __log2
 Bit:         __bit_and, __bit_or, __bit_xor, __bit_shl, __bit_shr
-File:        __file_read, __file_write, __file_append, __file_append_bytes
+File:        __file_read, __file_write, __file_append, __file_append_bytes,
+             __fd_open, __fd_read, __fd_close
 Network:     __tcp_listen, __tcp_accept, __tcp_send, __tcp_recv, __tcp_close
-System:      __system, __sleep, __heap_used, __heap_pin, __type_of,
-             __f64_to_le_bytes, __mmap, __munmap, __ioctl, __mmap_file
+System:      __system, __sleep, __heap_used, __heap_pin, type_of,
+             __f64_to_le_bytes, __mmap, __munmap, __ioctl, __mmap_file, __syscall
 Matrix:      __mx_w, __mxr
+Memory:      __mem_read8, __mem_write8, __mem_read32, __mem_write32
 Activation:  __act_set, __act_get, __act_add, __act_decay, __act_reset,
              __act_top_k
-Memory:      __wm_bind, __wm_read, __wm_clear, __stm_push, __stm_query,
+WM/STM:     __wm_bind, __wm_read, __wm_clear, __stm_push, __stm_query,
              __stm_count
 Pipeline:    __pseudo_select, __chain_quality, __mol_dominant,
              __chain_compose, __chain_copy, __batch_dist
@@ -85,6 +96,18 @@ Security: 0xB0-0xB4 CapCheck/Create/Delegate/Revoke/SecGate
 - `let arr = []` rồi push >8 → dùng `__array_with_cap(N)`
 - Port mù quáng từ Rust → hiểu spec A-D trước, so sánh, rồi quyết định
 
+## Olang Language Features (SS23)
+```
+Core:        let, fn, if/else, while, return, emit, try/catch
+New (SS23):  for x in arr { }     — loop sugar
+             match x { v => s; }  — pattern match sugar
+             {key: val}           — dict/struct literal
+             expr.field           — dot access
+             expr.field = val     — dot assignment
+             import "file.ol"     — compile-time module import (dedup)
+             \r, \0               — escape sequences in strings
+```
+
 ## Nguyên tắc
 - Encode = ∫ (tích phân). Decode = ∂ (vi phân). TÍNH, không TRA.
 - P_weight = u16 = [S:4][R:4][V:3][A:3][T:2] = 65536 molecules
@@ -100,9 +123,9 @@ Security: 0xB0-0xB4 CapCheck/Create/Delegate/Revoke/SecGate
 ```
 +----------------------------------------------------------+
 | NOX BRAIN (Olang)                                        |
-|   brain.ol: Capture → Activate → Hypothesize → Repair → Decode |
+|   brain.ol: Capture → Activate → Hypothesize → Repair → Decode → Evaluate |
 |   encode.ol: 42 formulas (COMPUTED)                      |
-|   KnowTree, Silk, 7 Instincts, Agent PTAV               |
+|   KnowTree, Silk, 7 Instincts, Agent PTAVF, 15 Mechanisms |
 +----------------------------------------------------------+
 | NOX BODY — Parasitic Library OS (Olang + ASM)            |
 |   Eyes(fb0) Hands(evdev) Voice(raw socket)               |
@@ -122,7 +145,7 @@ Security: 0xB0-0xB4 CapCheck/Create/Delegate/Revoke/SecGate
 - [SPEC_A](docs/SPEC_A_FOUNDATION.md) — SDF, P_weight, Encode ∫, Decode ∂
 - [SPEC_B](docs/SPEC_B_STRUCTURE.md) — Chain, KnowTree, Silk
 - [SPEC_C](docs/SPEC_C_NEURON.md) — Neuron lifecycle, physics
-- [SPEC_D](docs/SPEC_D_PIPELINE.md) — 14 mechanisms, 7 instincts
+- [SPEC_D](docs/SPEC_D_PIPELINE.md) — 15 mechanisms, 6 checkpoints, 7 instincts, PTAVF
 - [SPEC_E](docs/SPEC_E_ORGANISM.md) — Organism, self-model
 - [SPEC_F](docs/SPEC_F_AGENT.md) — Agent, autonomy
 
@@ -137,7 +160,15 @@ Security: 0xB0-0xB4 CapCheck/Create/Delegate/Revoke/SecGate
 - [BP9 Agent](spec/SPEC_BP9_AGENT.md) — PTAV loop
 - [BP10 Data](spec/SPEC_BP10_DATA.md) — 500K facts
 - [BP11 Body](spec/SPEC_BP11_BODY.md) — camera, audio, interoception
-- [BP12 Parasite](spec/SPEC_BP12_PARASITE.md) — 7 organs, 5 phases
+- [BP12 Parasite](spec/SPEC_BP12_PARASITE.md) — 7 organs, 5 phases, Forth scheduling
+- [BP13 Persistence](spec/SPEC_BP13_PERSISTENCE.md) — mmap + WAL + NKB + LTP model
+- [BP14 Generation](spec/SPEC_BP14_GENERATION.md) — Retrieve → Recombine → Template NLG
+- [BP15 Communication](spec/SPEC_BP15_COMMUNICATION.md) — A2A + mDNS + HTTP server
+- [BP16 Feedback](spec/SPEC_BP16_FEEDBACK.md) — UCB1 bandit + ACT-R utility + calibration
+
+### Research (SS22)
+- [docs/research/](docs/research/) — 7 files, all external research
+- [docs/references/NOX_RESEARCH_INDEX.md](docs/references/NOX_RESEARCH_INDEX.md) — index
 
 ### Reference Library — [docs/references/INDEX.md](docs/references/INDEX.md)
 196MB: Exokernel, Intel SDM, AMD APM, OSTEP, xv6, io_uring, eBPF, KVM, AIMA, OSDev Wiki, kernel headers
