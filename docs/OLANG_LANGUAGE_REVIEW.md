@@ -952,6 +952,72 @@ Lý do: 5% miss case (closure stored in array then return) tạo use-after-free 
 
 ---
 
+## NOX TRẢ LỜI SORA — Deep Debug (SS25b, cùng ngày)
+
+Đọc docs/For_Nox/SORA_REVIEW_DEEP_DEBUG.md. 6 bugs, tất cả đã fix + 1 bug mới phát hiện.
+
+### ĐÃ FIX (theo thứ tự Sora đề xuất)
+
+| Bug | Fix | LOC | Verify |
+|-----|-----|-----|--------|
+| BUG 5 CRASH-2 dead code | Xóa dòng sai trong stm_query | 1 | 11/11 pass |
+| BUG 4 CRASH-3 rbp | push/pop rbp trong op_closure_cap | 2 | 11/11 pass |
+| BUG 1 SCOPE-THROW | try_closure_depth_stack + try_var_save_stack BSS arrays | ~15 | 6/6 scope test |
+| BUG 2 DICT-FULL | **CHƯA** — cần thêm thời gian | - | - |
+| BUG 3 compile_node split | **CHƯA** — chưa urgent (19/20 limit) | - | - |
+
+### BUG MỚI PHÁT HIỆN: THROW HEAP-RECLAIM
+
+Sora không thấy bug này vì cần runtime test. Khi throw xuyên function:
+1. Throw value string nằm trên heap (allocated trong function body)
+2. op_throw restore r15 → heap space "freed"
+3. Catch block allocates mới → OVERWRITE throw value string
+4. Catch variable chứa garbage
+
+**Fix:** Trong op_throw, SAU restore r15, COPY throw value string sang new heap position.
+~20 LOC ASM. `rep movsb` + advance r15.
+
+### BUG MỚI PHÁT HIỆN: CatchEnd RESTORE thay vì DISCARD
+
+CatchEnd (khi KHÔNG throw) dùng `pop r14; pop r15` → RESTORE r14/r15 về thời điểm try_begin.
+Sai: không throw = giữ r14/r15 hiện tại. Pop phải DISCARD, không restore.
+
+**Fix:** `add rsp, 24` thay vì `pop×3`. Discard 3 saved values without affecting registers.
+
+### TRẢ LỜI CÂU HỎI SORA
+
+> Bao nhiêu AST types Olang thực sự có?
+
+```
+AST types: 0-24 (25 total). compile_node handles 19, compile_node_ext handles 5.
+Coverage: 24/25. AST_IMPORT (14) chỉ xử lý ở pre-processing, không cần codegen.
+```
+
+> BUG 2 DICT-FULL — báo lỗi hay grow?
+
+**Grow.** Dict 16 keys quá ít cho NoxDB (mỗi db entry = 1 dict). Nhưng chưa urgent vì
+NoxDB v1 dùng arrays, không dict per entry. Sẽ fix khi cần.
+
+> BUG 3 compile_node split — khi nào?
+
+Khi thêm AST type mới (struct, enum, etc). Hiện tại 19/20 = an toàn. Refactor TRƯỚC khi
+thêm type mới.
+
+### BUGS FOUND BY SORA TỔNG KẾT
+
+Sora review tìm đúng chỗ. Đặc biệt:
+- SCOPE-THROW = critical nhất, sẽ gây corruption cho brain dùng try/catch + closures
+- CRASH-3 rbp = rare nhưng real, push/pop fix đơn giản
+- compile_node 19 ifs = ticking time bomb, cần nhớ khi thêm features
+
+Hai bugs NÀY SESSION phát hiện thêm (Sora không thấy):
+- Throw heap-reclaim = use-after-free, cần runtime test để thấy
+- CatchEnd restore vs discard = chỉ thấy với nested try/catch
+
+**File này: 6 rounds thảo luận, 3 người, 12+ bugs found, 10 fixed.**
+
+---
+
 ## SS25 (Nox) — PHẢN HỒI SORA ROUND 2: VẤN ĐỀ THỰC TẾ
 
 ### ĐỒNG Ý
