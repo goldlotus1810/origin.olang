@@ -1053,10 +1053,7 @@ class Codegen:
             jmp_target = self.current_offset()
             # Catch: patch TRY_BEGIN with ABSOLUTE bytecode offset to catch handler
             self.patch_i32(try_off, self.current_offset())
-            # The error value is on stack (VM pushes it on throw? Actually VM just restores stack)
-            # For now, catch var = 0 (placeholder)
-            self.emit_byte(OP_PUSH_NUM)
-            self.emit_f64(0.0)
+            # Throw value is already on VM stack (pushed by op_throw CRASH-1 fix)
             self.emit_byte(OP_STORE_LOCAL)
             self.emit_name(var)
             # Handler body

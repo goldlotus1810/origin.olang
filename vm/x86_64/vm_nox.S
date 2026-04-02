@@ -75,7 +75,7 @@
 # Sizes
 .equ STACK_SIZE,     0x1000000   # 16 MB VM stack
 .equ GUARD_SIZE,     0x1000      # 4 KB guard page
-.equ ZONE_C_SIZE,    0x400000    # 4 MB Zone C (turn temps)
+.equ ZONE_C_SIZE,    0x4000000   # 64 MB Zone C (turn temps) — was 4MB, increased per DECISION A3
 .equ ZONE_B_SIZE,    0x1000000   # 16 MB Zone B (session)
 .equ ZONE_A_SIZE,    0x10000000  # 256 MB Zone A (permanent)
 .equ HEAP_TOTAL,     0x20000000  # 512 MB total heap (expandable)
@@ -88,6 +88,7 @@
 .equ ARRAY_CAP,      -5    # capacity-tracked array
 .equ MOL_MARKER,     -6    # molecule type (NEW)
 .equ CLOSURE_MARKER, -7    # closure
+.equ BYTES_MARKER,   -8    # byte array (raw u8 buffer)
 
 .equ ARRAY_INIT_CAP, 512   # initial array capacity
 
@@ -587,6 +588,7 @@ op_add:
     cmp     rcx, F64_MARKER
     je      .add_str_f64
     # Both strings: concat (u16 molecules — 2 bytes each)
+.add_do_concat:
     mov     rax, r15                # dest = new string on heap
     push    rsi                      # save a.len (mol count)
     push    rcx                      # save b.len (mol count)
@@ -626,19 +628,29 @@ op_add:
     mov     [r14 + 8], rcx
     DISPATCH
 .add_f64_str:
-    # f64 on left: convert to string, then concat
-    # TODO: implement f64 → string conversion for concat
-    sub     r14, 16
-    mov     qword ptr [r14], 0
-    mov     qword ptr [r14 + 8], 0
-    DISPATCH
+    # f64 (rdi=bits) + string (rdx=ptr, rcx=len)
+    # Convert f64 to string, then concat: result = f64_str + original_str
+    push    rdx                          # save string ptr
+    push    rcx                          # save string len
+    movq    xmm0, rdi                    # f64 bits → xmm0
+    call    f64_to_string                # → rax=ptr, edx=len (u16 mols on heap)
+    mov     rdi, rax                     # a.ptr = f64 string
+    mov     rsi, rdx                     # a.len = f64 string len
+    pop     rcx                          # b.len = original string len
+    pop     rdx                          # b.ptr = original string ptr
+    jmp     .add_do_concat
 .add_str_f64:
-    # f64 on right: convert to string, then concat
-    # TODO: implement
-    sub     r14, 16
-    mov     qword ptr [r14], 0
-    mov     qword ptr [r14 + 8], 0
-    DISPATCH
+    # string (rdi=ptr, rsi=len) + f64 (rdx=bits)
+    # Convert f64 to string, then concat: result = original_str + f64_str
+    push    rdi                          # save string ptr
+    push    rsi                          # save string len
+    movq    xmm0, rdx                    # f64 bits → xmm0
+    call    f64_to_string                # → rax=ptr, edx=len
+    mov     rcx, rdx                     # b.len = f64 string len
+    mov     rdx, rax                     # b.ptr = f64 string ptr
+    pop     rsi                          # a.len = original string len
+    pop     rdi                          # a.ptr = original string ptr
+    jmp     .add_do_concat
 
 op_sub:
     movsd   xmm0, [r14 + 16]
@@ -1281,6 +1293,11 @@ op_try_begin:
     push    r15                          # save heap
     push    r14                          # save VM stack
     push    rax                          # catch PC
+    # CRASH-1 FIX: save rsp AFTER pushes into BSS array (indexed by try_depth)
+    # On throw, restore rsp here → pop try frame normally regardless of call depth
+    mov     rcx, [rip + try_depth]
+    lea     rdi, [rip + try_rsp_stack]
+    mov     [rdi + rcx*8], rsp           # try_rsp_stack[depth] = rsp (after pushes)
     inc     qword ptr [rip + try_depth]
     DISPATCH
 
@@ -1288,21 +1305,38 @@ op_try_begin:
 op_catch_end:
     cmp     qword ptr [rip + try_depth], 0
     je      .ce_skip
+    # Restore rsp from BSS (in case catch block itself called functions)
+    dec     qword ptr [rip + try_depth]
+    mov     rcx, [rip + try_depth]
+    lea     rdi, [rip + try_rsp_stack]
+    mov     rsp, [rdi + rcx*8]           # restore rsp to try frame position
     pop     rax                          # discard catch_pc
     pop     r14                          # discard saved stack (we're past the try now)
     pop     r15                          # discard saved heap
-    dec     qword ptr [rip + try_depth]
 .ce_skip:
     DISPATCH
 
 # 0x78: Throw — jump to catch handler
+# CRASH-1 FIX: restore rsp from BSS array to unwind CPU stack across function boundaries
 op_throw:
     cmp     qword ptr [rip + try_depth], 0
     je      .throw_uncaught
+    # Save throw value from VM stack before restoring r14
+    mov     rcx, [r14]                   # throw value ptr
+    mov     rdx, [r14 + 8]              # throw value len
+    # Restore CPU stack to try frame position (unwinds all function call frames)
+    dec     qword ptr [rip + try_depth]
+    mov     rax, [rip + try_depth]
+    lea     rdi, [rip + try_rsp_stack]
+    mov     rsp, [rdi + rax*8]           # rsp → try frame (after original pushes)
+    # Pop try frame normally
     pop     rax                          # catch_pc
     pop     r14                          # restore VM stack
     pop     r15                          # restore heap
-    dec     qword ptr [rip + try_depth]
+    # Push throw value onto restored VM stack for catch block
+    sub     r14, 16
+    mov     [r14], rcx                   # throw value ptr
+    mov     [r14 + 8], rdx              # throw value len
     mov     r13d, eax                    # jump to catch
     DISPATCH
 .throw_uncaught:
@@ -5195,11 +5229,12 @@ builtin_hash_table:
 
 # __file_read(path) → string
 .builtin_file_read:
+    # CORRUPT-1 FIX: all buffers allocated on heap (r15), no fixed offsets
     mov     rsi, [r14]              # path ptr (u16 molecules)
     mov     rdx, [r14+8]            # path len (mol count)
     add     r14, 16
-    # Decode path: u16 mols → ASCII bytes
-    mov     rdi, r15                # temp buffer
+    # Decode path: u16 mols → ASCII bytes at heap top
+    mov     rdi, r15                # path buffer on heap
     xor     ecx, ecx
 .bfr_decode:
     cmp     ecx, edx
@@ -5210,16 +5245,16 @@ builtin_hash_table:
     jmp     .bfr_decode
 .bfr_open:
     mov     byte ptr [rdi + rcx], 0  # null terminate
-    mov     rdi, r15                 # path string
+    mov     rdi, r15                 # path string at heap
     xor     esi, esi                 # O_RDONLY
     mov     eax, SYS_OPEN
     syscall
     test    eax, eax
     js      .bfr_fail
     mov     edi, eax                 # fd
-    # Read file content onto heap
-    lea     rsi, [r15 + 4096]       # skip path buffer
-    mov     edx, 0x100000           # read up to 1MB
+    # Read file content: buffer at r15 + 4096 (path takes <4096 bytes)
+    lea     rsi, [r15 + 4096]       # read buffer after path
+    mov     edx, 0x400000           # read up to 4MB (was 1MB)
     mov     eax, SYS_READ
     syscall
     push    rax                      # save bytes read
@@ -5231,10 +5266,14 @@ builtin_hash_table:
     pop     rcx                      # bytes read
     test    rcx, rcx
     jle     .bfr_fail
-    # Encode bytes to u16 molecules on heap
-    lea     rsi, [r15 + 4096]       # raw bytes
-    mov     rdi, r15
-    add     rdi, 0x200000            # mol output area
+    # Encode bytes → u16 molecules DIRECTLY on heap after read buffer
+    lea     rsi, [r15 + 4096]       # raw bytes (source)
+    # Output area: after read buffer. r15 + 4096 + bytes_read, aligned
+    lea     rdi, [r15 + 4096]
+    add     rdi, rcx                # skip past raw bytes
+    add     rdi, 15
+    and     rdi, -16                # align 16
+    push    rdi                      # save mol output start
     xor     edx, edx
 .bfr_encode:
     cmp     edx, ecx
@@ -5244,9 +5283,12 @@ builtin_hash_table:
     inc     edx
     jmp     .bfr_encode
 .bfr_result:
+    pop     rdi                      # mol output start
+    # Advance heap past all allocated data: mol_output + mol_count*2
+    lea     r15, [rdi + rcx*2 + 16] # advance heap past molecules
     # Push result string
     sub     r14, 16
-    mov     [r14], rdi               # mol ptr
+    mov     [r14], rdi               # mol ptr (on heap, safe)
     mov     [r14+8], rcx             # mol count
     DISPATCH
 .bfr_fail:
@@ -8290,6 +8332,7 @@ call_stack_depth: .space 8
 call_stack:       .space 1536   # [(name_ptr:8, name_len:8, call_pc:8) × 64]
 _push_old_arr: .space 8
 try_depth:      .space 8
+try_rsp_stack:  .space 64              # 8 nested try levels × 8 bytes (saved rsp)
 
 # SIMD temp buffer
 .align 16

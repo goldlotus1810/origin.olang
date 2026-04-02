@@ -1253,8 +1253,7 @@ fn compile_node_ext(kind, node) {
         emit_i32(0);
         let jmp_target = current_offset();
         patch_i32(try_off, current_offset());
-        emit_byte(OP_PUSH_NUM);
-        emit_f64(0);
+        // Throw value is already on VM stack (pushed by op_throw CRASH-1 fix)
         emit_byte(OP_STORE_LOCAL);
         emit_name(var_name);
         compile_node(handler);

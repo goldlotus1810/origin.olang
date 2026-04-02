@@ -931,6 +931,27 @@ SS25, Lupin — đồng ý không? Hay cần sắp lại priority?
 
 ---
 
+## LUPIN REVIEW — Quyết định cuối (2026-04-02)
+
+Lupin đánh giá sau 5+ rounds thảo luận:
+
+**Đặc biệt tốt:**
+- Hex bug = phát hiện quan trọng nhất. Mọi thứ trước đó xây trên nền giả.
+- throw/rsp = setjmp/longjmp, đơn giản đúng
+- FFI = không, lập luận chặt
+- Region-based = không, Nox bắt đúng lỗ hổng closure
+- f64 chặn crypto = phân tích sâu đúng
+- compiler.ol = stem cell = không metaphor, kiến trúc thật
+- "Được" vs "Tốt" = framework đánh giá tốt
+
+**Lupin veto: Escape analysis = KHÔNG LÀM.**
+Lý do: 5% miss case (closure stored in array then return) tạo use-after-free cực khó debug.
+"95% cover" nghe đẹp nhưng 5% còn lại là bombs ẩn. Zone C 64MB + arena reset đủ.
+
+→ Ghi vào DECISIONS.md: X6 — Không escape analysis. Lupin veto.
+
+---
+
 ## SS25 (Nox) — PHẢN HỒI SORA ROUND 2: VẤN ĐỀ THỰC TẾ
 
 ### ĐỒNG Ý
@@ -1475,3 +1496,39 @@ các quyết định đã thống nhất. Session sau đọc DECISIONS.md (ngắ
 review file 1400+ dòng này.
 
 File này giữ làm archive — lịch sử thảo luận. Không sửa thêm.
+
+---
+
+## SORA — QUYẾT ĐỊNH CUỐI + ĐÓNG FILE
+
+Đọc toàn bộ 5 rounds. Lupin nói đúng: anh hiểu hạn chế hơn chúng tôi.
+Chúng tôi thấy bugs, features, architecture. Anh thấy **vòng lặp**.
+
+### ĐÃ TẠO
+
+1. **`DECISIONS.md`** (root) — <50 dòng quyết định. Mọi session đọc đầu tiên.
+2. **`BUGS_KNOWN.md`** (root) — Bugs với status. Không tìm lại.
+3. **`CLAUDE.md`** updated — trỏ tới 2 files trên TRƯỚC mọi thứ khác.
+
+### LÝ DO
+
+Vấn đề cốt lõi mà Lupin muốn chúng tôi thấy:
+**Mỗi session bắt đầu lại. Anh phải dạy lại. Origin đi vòng tròn.**
+
+Giải pháp không phải code. Giải pháp là **quy trình**:
+- Quyết định GHI LẠI → session sau không đề xuất lại
+- Bugs GHI LẠI → session sau không tìm lại
+- Thảo luận GHI LẠI → bất đồng không lặp
+
+### FILE NÀY ĐÓNG
+
+Review file = 1470+ dòng. Đã đủ. Kết quả extract vào DECISIONS.md + BUGS_KNOWN.md.
+Session sau đọc DECISIONS.md (ngắn) thay vì file này (dài).
+File này giữ làm archive nếu cần tra cứu lý do đằng sau quyết định.
+
+### CHO SESSION TIẾP THEO
+
+Bạn là session mới. Bạn không nhớ gì. Đó là bình thường.
+DECISIONS.md + BUGS_KNOWN.md = memory của bạn. Đọc chúng.
+Nếu bạn muốn thay đổi quyết định: ghi LÝ DO vào file này, không ghi đè DECISIONS.md.
+Lupin sẽ quyết định có chấp nhận thay đổi không.
