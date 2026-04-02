@@ -6932,29 +6932,48 @@ builtin_hash_table:
     lea     rsi, [rsi + 8]
     xorpd   xmm0, xmm0
     xorpd   xmm2, xmm2              # SSE2 vector accumulator
+    # AVX2 path: process 4 f64s at a time (256-bit)
+    vxorpd  ymm2, ymm2, ymm2        # vector accumulator (4 × f64)
+.f64d_avx:
+    cmp     ecx, 4
+    jl      .f64d_sse
+    vmovupd ymm1, [rdi]             # 4 f64s from a
+    vmulpd  ymm1, ymm1, [rsi]       # 4 pairwise multiplies
+    vaddpd  ymm2, ymm2, ymm1        # accumulate
+    add     rdi, 32
+    add     rsi, 32
+    sub     ecx, 4
+    jmp     .f64d_avx
+.f64d_sse:
+    # Reduce ymm2 → xmm: add high 128 to low 128
+    vextractf128 xmm1, ymm2, 1      # xmm1 = high 128 bits
+    vaddpd  xmm2, xmm2, xmm1       # xmm2 = [lo0+lo2, lo1+lo3]
+    # SSE2 path: process 2 at a time
 .f64d_vec:
     cmp     ecx, 2
     jl      .f64d_tail
-    movupd  xmm1, [rdi]             # 2 f64s from a
-    movupd  xmm3, [rsi]             # 2 f64s from b
-    mulpd   xmm1, xmm3              # pairwise multiply
-    addpd   xmm2, xmm1              # accumulate vector
+    movupd  xmm1, [rdi]
+    movupd  xmm3, [rsi]
+    mulpd   xmm1, xmm3
+    addpd   xmm2, xmm1
     add     rdi, 16
     add     rsi, 16
     sub     ecx, 2
     jmp     .f64d_vec
 .f64d_tail:
-    # Reduce: xmm2 = [lo, hi] → xmm0 += lo + hi
+    # Reduce xmm2 = [a, b] → xmm0 += a + b
     movapd  xmm1, xmm2
-    unpckhpd xmm1, xmm1             # xmm1 = [hi, hi]
-    addsd   xmm0, xmm2              # += lo
-    addsd   xmm0, xmm1              # += hi
-    # Remaining 0 or 1 element
+    unpckhpd xmm1, xmm1
+    addsd   xmm0, xmm2
+    addsd   xmm0, xmm1
+    # Remaining 0 or 1
     test    ecx, ecx
-    jz      .f64d_dn
+    jz      .f64d_cleanup
     movsd   xmm1, [rdi]
     mulsd   xmm1, [rsi]
     addsd   xmm0, xmm1
+.f64d_cleanup:
+    vzeroupper                       # clean AVX state
 .f64d_dn:
     sub     r14, 16
     movsd   [r14], xmm0
