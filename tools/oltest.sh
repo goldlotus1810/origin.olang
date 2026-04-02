@@ -30,6 +30,14 @@ run_test() {
         return 1
     fi
 
+    # Check bytecode is non-empty (AST_DICT bug: 0 bytes = silent empty)
+    local fsize=$(wc -c < "$out" 2>/dev/null || echo 0)
+    local vmsize=$(wc -c < "$VM" 2>/dev/null || echo 0)
+    if [ "$fsize" -le "$vmsize" ]; then
+        echo "EMPTY: $src (0 bytes bytecode — compiler bug?)"
+        return 1
+    fi
+
     # Run
     local result
     if result=$("$out" 2>&1); then
